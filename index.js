@@ -2247,7 +2247,55 @@ Ada yang deposit nih kak, coba dicek saldonya`
    _• *Saldo:* Rp${toRupiah(db.data.users[sender].saldo)}_
   
 *Note:*
-_Saldo hanya bisa untuk topup_`)
+_Saldo bisa digunakan untuk membeli produk di bot ini_`)
+      }
+        break
+
+      case 'isiulang': {
+        ronzz.sendMessage(from, {
+          footer: `${botName} © ${ownerName}`,
+          buttons: [
+            {
+              buttonId: 'saldo', buttonText: { displayText: 'Cek Saldo' }, type: 1,
+            }
+          ],
+          headerType: 1,
+          viewOnce: true,
+          image: fs.readFileSync('option/image/payment.jpg'),
+          caption: `*DEPOSIT / ISI SALDO DI BOT ORDER MINIMAL 5.000*
+
+*BONUS SALDO 7% - 10% UNTUK DEPOSIT DENGAN NOMINAL 25.000 KE ATAS*
+
+*BUKTI PAYMENT SENT NICOLA/GIGI*
+
+*contoh depo :*
+50.000 + 7% = 53.500
+100.000 + 7% = 107.000
+
+150.000 + 8% = 162.000
+200.000 + 9% = 218.000
+300.000 + 10% = 330.000
+Dst
+
+*ALL PAYMENT LANGSUNG TF KE QRIS YA❣️*
+*QRIS NO FEE*
+
+*PAYMENT KE QRIS ATAU DATA DIBAWAH*
+BCA XX
+OVO, nanti saya add lagi.`,
+          contextInfo: {
+            forwardingScore: 999,
+            isForwarded: true,
+            externalAdReply: {
+              title: botName,
+              body: `By ${ownerName}`,
+              thumbnailUrl: ppuser,
+              sourceUrl: '',
+              mediaType: 1,
+              renderLargerThumbnail: false
+            }
+          }
+        }, { quoted: m });
       }
         break
 
