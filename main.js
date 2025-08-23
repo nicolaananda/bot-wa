@@ -31,10 +31,19 @@ const question = (text) => {
 global.opts = new Object(yargs(process.argv.slice(2)).exitProcess(false).parse())
 global.db = new (require('./function/database'))(`${opts._[0] ? opts._[0] + '_' : ''}options/database.json`, null, 2)
 
+// Load backup system
+require('./options/backup')
+
+// Load graceful shutdown handler
+require('./options/graceful-shutdown')
+
+// Load database helper
+global.dbHelper = require('./options/db-helper')
+
 if (!db.data.list) db.data.list = []
 if (!db.data.testi) db.data.testi = []
 if (!db.data.chat) db.data.chat = {}
-if (!db.data.user) db.data.users = {}
+if (!db.data.users) db.data.users = {}
 if (!db.data.sewa) db.data.sewa = {}
 if (!db.data.profit) db.data.profit = {}
 if (!db.data.topup) db.data.topup = {}
@@ -52,7 +61,7 @@ if (!opts['test']) setInterval(async () => {
   if (JSON.stringify(db.data) == lastJSON) return
   await db.save()
   lastJSON = JSON.stringify(db.data)
-}, 10 * 1000)
+}, 5 * 1000) // Ubah dari 10 detik ke 5 detik
 
 async function startronzz() {
 

@@ -699,6 +699,7 @@ module.exports = async (ronzz, m, mek) => {
                         fs.unlinkSync(invoice)
                       }
                       db.data.users[sender].saldo -= db.data.topup[sender].data.price
+                      await db.save() // Force save database
                       delete db.data.topup[sender]
                       break
                     }
@@ -864,6 +865,7 @@ Total Bayar: Rp${toRupiah(db.data.deposit[sender].data.total_deposit)}`
                     await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: text_sukses, mentions: [sender] })
 
                     db.data.users[sender].saldo += Number(db.data.deposit[sender].data.amount_deposit)
+                    await db.save() // Force save database
                     delete db.data.deposit[sender]
                   }
                 } catch (error) {
@@ -1898,6 +1900,9 @@ Ada transaksi yang telah dibayar!
 
         // Kurangi saldo user
         db.data.users[sender].saldo -= totalHarga
+        
+        // Force save database setelah perubahan saldo
+        await db.save()
 
         await sleep(1000)
         
@@ -1925,23 +1930,11 @@ Ada transaksi yang telah dibayar!
         // Kirim detail akun ke chat pribadi user
         await ronzz.sendMessage(sender, { text: detailAkun }, { quoted: m })
         
-        // Kirim detail transaksi dan SNK ke group chat
-        let transaksiDetail = `*───「 TRANSAKSI DETAIL 」───*\n\n`
-        transaksiDetail += `*╭────「 TRANSAKSI DETAIL 」───*\n`
-        transaksiDetail += `*┊・ 🧾| Reff Id:* ${reffId}\n`
-        transaksiDetail += `*┊・ 📦| Nama Barang:* ${db.data.produk[data[0]].name}\n`
-        transaksiDetail += `*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}\n`
-        transaksiDetail += `*┊・ 🛍️| Jumlah Order:* ${data[1]}\n`
-        transaksiDetail += `*┊・ 💰| Total Bayar:* Rp${toRupiah(totalHarga)}\n`
-        transaksiDetail += `*┊・ 💳| Metode Bayar:* Saldo\n`
-        transaksiDetail += `*┊・ 📅| Tanggal:* ${tanggal}\n`
-        transaksiDetail += `*┊・ ⏰| Jam:* ${jamwib} WIB\n`
-        transaksiDetail += `*┊・ 💰| Saldo Sisa:* Rp${toRupiah(db.data.users[sender].saldo)}\n`
-        transaksiDetail += `*╰┈┈┈┈┈┈┈┈*\n\n`
-        transaksiDetail += `*───「 SNK PRODUK 」───*\n\n`
-        transaksiDetail += `${db.data.produk[data[0]].snk}`
+        // Kirim SNK produk ke chat pribadi user
+        let snkProduk = `*───「 SNK PRODUK 」───*\n\n`
+        snkProduk += `${db.data.produk[data[0]].snk}`
         
-        await ronzz.sendMessage(from, { text: transaksiDetail }, { quoted: m })
+        await ronzz.sendMessage(sender, { text: snkProduk }, { quoted: m })
         
         // Kirim notifikasi ke owner
         await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
@@ -2203,6 +2196,7 @@ Ada yang deposit nih kak, coba dicek saldonya`
         let orang = q.split(",")[0].replace(/[^0-9]/g, '')
         let pajakny = (Number(db.data.persentase["feeDepo"] / 100)) * Number(db.data.deposit[orang + "@s.whatsapp.net"].data.amount_deposit)
         db.data.users[orang + "@s.whatsapp.net"].saldo += Number(db.data.deposit[orang + "@s.whatsapp.net"].data.amount_deposit)
+        await db.save() // Force save database
         var text_sukses = `*✅「 DEPOSIT SUKSES 」✅*
 
 *ID:* ${db.data.deposit[orang + "@s.whatsapp.net"].ID}
@@ -2264,6 +2258,7 @@ _Saldo hanya bisa untuk topup_`)
         if (!q.split(",")[1]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
         let nomorNya = q.split(",")[0].replace(/[^0-9]/g, '') + "@s.whatsapp.net"
         db.data.users[nomorNya].saldo += Number(q.split(",")[1])
+        await db.save() // Force save database
         await sleep(50)
         ronzz.sendMessage(from, { text: `*SALDO USER*\nID: ${nomorNya.split('@')[0]}\nNomer: @${nomorNya.split('@')[0]}\nSaldo: Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
       }
@@ -2278,6 +2273,7 @@ _Saldo hanya bisa untuk topup_`)
         if (db.data.users[nomorNya].saldo <= 0) return reply("Dia belum terdaftar di database saldo.")
         if (db.data.users[nomorNya].saldo < q.split(",")[1] && db.data.saldo[nomorNya] !== 0) return reply(`Dia saldonya ${db.data.users[nomorNya].saldo}, jadi jangan melebihi ${db.data.users[nomorNya].saldo} yah kak??`)
         db.data.users[nomorNya].saldo -= Number(q.split(",")[1])
+        await db.save() // Force save database
         await sleep(50)
         ronzz.sendMessage(from, { text: `*SALDO USER*\nID: ${nomorNya.split('@')[0]}\nNomer: @${nomorNya.split('@')[0]}\nSaldo: Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
       }
