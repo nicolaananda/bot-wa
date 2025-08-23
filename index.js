@@ -2251,7 +2251,7 @@ _Saldo bisa digunakan untuk membeli produk di bot ini_`)
       }
         break
 
-      case 'isiulang': {
+      case 'payment': {
         ronzz.sendMessage(from, {
           footer: `${botName} © ${ownerName}`,
           buttons: [
