@@ -2262,27 +2262,22 @@ _Saldo bisa digunakan untuk membeli produk di bot ini_`)
           headerType: 1,
           viewOnce: true,
           image: fs.readFileSync('./options/image/payment.jpg'),
-          caption: `*DEPOSIT / ISI SALDO DI BOT ORDER MINIMAL 5.000*
+          caption: `*DEPOSIT / ISI SALDO DI BOT TANPA MINIMAL ORDER*
 
-*BONUS SALDO 7% - 10% UNTUK DEPOSIT DENGAN NOMINAL 25.000 KE ATAS*
+*BONUS SALDO 2k DEPOSIT DENGAN NOMINAL 50.000 KE ATAS*
 
 *BUKTI PAYMENT SENT NICOLA/GIGI*
-
 *contoh depo :*
-50.000 + 7% = 53.500
-100.000 + 7% = 107.000
-
-150.000 + 8% = 162.000
-200.000 + 9% = 218.000
-300.000 + 10% = 330.000
+50.000 + (Bonus 2.000) = 52.000
+100.000 + (Bonus 4.000) = 104.000
 Dst
 
-*ALL PAYMENT LANGSUNG TF KE QRIS YA❣️*
-*QRIS NO FEE*
+ALL PAYMENT LANGSUNG TF KE QRIS YA❣️NO FEE
 
 *PAYMENT KE QRIS ATAU DATA DIBAWAH*
-BCA XX
-OVO, nanti saya add lagi.`,
+BCA 1400804423 an B N
+OVO | GOPAY | SHOPEEPAY | DANA
+085235540944 an B N`,
           contextInfo: {
             forwardingScore: 999,
             isForwarded: true,
