@@ -117,39 +117,30 @@ async function startronzz() {
 
   store.bind(ronzz.ev)
 
-  // Flag to prevent duplicate event handler registration
-  let messageHandlerRegistered = false;
-  
-  // Check if event handler is already registered
-  if (!ronzz.ev.listenerCount('messages.upsert')) {
-    ronzz.ev.on('messages.upsert', async chatUpdate => {
-      // Prevent duplicate processing
-      if (messageHandlerRegistered) return;
-      messageHandlerRegistered = true;
-      
-      try {
-        for (let mek of chatUpdate.messages) {
-          if (!mek.message) continue
-          mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
-          const m = smsg(ronzz, mek, store)
-          if (mek.key && mek.key.remoteJid === 'status@broadcast') continue
-          if (mek.key.id.startsWith('BAE5') && mek.key.id.length === 16) continue
-          
-          // Process message only once
-          require('./index')(ronzz, m, mek)
-        }
-      } catch (err) {
-        console.log(err)
-      } finally {
-        // Reset flag after processing
-        messageHandlerRegistered = false;
+  ronzz.ev.on('messages.upsert', async chatUpdate => {
+    try {
+      for (let mek of chatUpdate.messages) {
+        if (!mek.message) return
+        mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
+        const m = smsg(ronzz, mek, store)
+        if (mek.key && mek.key.remoteJid === 'status@broadcast') return
+        if (mek.key.id.startsWith('BAE5') && mek.key.id.length === 16) return
+        require('./index')(ronzz, m, mek)
       }
-    })
-  }
+    } catch (err) {
+      console.log(err)
+    }
+  })
 
   ronzz.ev.process(async (events) => {
     if (events['presence.update']) {
       await ronzz.sendPresenceUpdate('available')
+    }
+    if (events['messages.upsert']) {
+      const upsert = events['messages.upsert']
+      for (let msg of upsert.messages) {
+        if (msg.key.remoteJid === 'status@broadcast') return
+      }
     }
     if (events['creds.update']) {
       await saveCreds()
