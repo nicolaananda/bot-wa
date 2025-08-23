@@ -2327,6 +2327,30 @@ OVO, nanti saya add lagi.`,
       }
         break
 
+      case 'isi': {
+        if (!isOwner) return reply(mess.owner)
+        if (!isQuotedMsg) return reply(`Reply pesan orang yang ingin diisi saldonya dengan caption *${prefix + command} nominal*\n\nContoh: ${prefix + command} 100000`)
+        if (!q) return reply(`Masukkan nominal saldo yang ingin diisi!\n\nContoh: ${prefix + command} 100000`)
+        
+        let nominal = parseInt(q.replace(/[^0-9]/g, ''))
+        if (isNaN(nominal) || nominal <= 0) return reply(`Nominal tidak valid! Masukkan angka yang benar.\n\nContoh: ${prefix + command} 100000`)
+        
+        let targetUser = m.quoted.sender
+        if (!db.data.users[targetUser]) {
+          db.data.users[targetUser] = {
+            saldo: 0,
+            role: 'bronze'
+          }
+        }
+        
+        db.data.users[targetUser].saldo += nominal
+        await db.save() // Force save database
+        await sleep(50)
+        
+        reply(`✅ *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${targetUser.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[targetUser].saldo)}\n\n*By:* @${sender.split('@')[0]}`, { mentions: [targetUser, sender] })
+      }
+        break
+
       case 'tp': {
         if (!q) return
         if (!db.data.topup[sender]) {
