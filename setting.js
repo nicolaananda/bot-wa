@@ -32,7 +32,7 @@ global.uGold = 200000
 
 //Other
 global.botName = "GiHa Smart Bot" //Nama bot
-global.owner = ["6287777657944", "6281389592985"] //Ganti agar fitur owner bisa digunakan
+global.owner = ["6287777657944", "6281389592985","6287887842985"] //Ganti agar fitur owner bisa digunakan
 global.ownerNomer = "6287887842985" //Nomor lu
 global.ownerName = "Owner" //Nama lu
 global.packname = "" //Seterah
