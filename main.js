@@ -148,6 +148,12 @@ async function startronzz() {
   })
   
   async function autoBackup() {
+    // Create backup directory if it doesn't exist
+    const backupDir = './backup';
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+    
     let ls = (await execSync("ls")).toString().split("\n").filter((pe) =>
       pe != "node_modules" &&
       pe != "session" &&
@@ -155,21 +161,38 @@ async function startronzz() {
       pe != "yarn.lock" &&
       pe != ".npm" &&
       pe != ".cache" &&
+      pe != "backup" &&
       pe != ""
     )
-    await execSync(`zip -r backup.zip ${ls.join(" ")}`)
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupFileName = `SC-TOPUP-ORKUT-BUTTON-${timestamp}.zip`;
+    const backupPath = `${backupDir}/${backupFileName}`;
+    
+    await execSync(`zip -r ${backupPath} ${ls.join(" ")}`)
     await delay(500)
+    
     try {
-      await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", {
-        "document": fs.readFileSync('./backup.zip'),
-        "fileName": "SC-TOPUP-ORKUT-BUTTON.zip",
-        "mimetype": "application/zip",
-        "caption": "Sukses backup script"
-      }).catch(err => console.log("Failed send backup to Whatsapp"))
-      await delay(500)
-      await execSync('rm backup.zip')
+      console.log(`✅ Backup berhasil dibuat: ${backupPath}`);
+      
+      // Hapus backup lama (lebih dari 7 hari)
+      const files = fs.readdirSync(backupDir);
+      const now = Date.now();
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      
+      files.forEach(file => {
+        if (file.startsWith('SC-TOPUP-ORKUT-BUTTON-') && file.endsWith('.zip')) {
+          const filePath = `${backupDir}/${file}`;
+          const stats = fs.statSync(filePath);
+          if (now - stats.mtime.getTime() > sevenDays) {
+            fs.unlinkSync(filePath);
+            console.log(`🗑️ Backup lama dihapus: ${file}`);
+          }
+        }
+      });
+      
     } catch (err) {
-      console.log(err);
+      console.log("❌ Error saat membuat backup:", err);
     }
   }
   autoBackup();
