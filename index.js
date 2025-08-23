@@ -1922,10 +1922,10 @@ Ada transaksi yang telah dibayar!
           detailAkun += `• 2FA: ${dataAkun[4] ? dataAkun[4] : "-"}\n\n`
         })
         
-        // Kirim detail akun langsung ke chat
-        await ronzz.sendMessage(from, { text: detailAkun }, { quoted: m })
+        // Kirim detail akun ke chat pribadi user
+        await ronzz.sendMessage(sender, { text: detailAkun }, { quoted: m })
         
-        // Kirim detail transaksi dan SNK
+        // Kirim detail transaksi dan SNK ke group chat
         let transaksiDetail = `*───「 TRANSAKSI DETAIL 」───*\n\n`
         transaksiDetail += `*╭────「 TRANSAKSI DETAIL 」───*\n`
         transaksiDetail += `*┊・ 🧾| Reff Id:* ${reffId}\n`
