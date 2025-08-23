@@ -2261,7 +2261,7 @@ _Saldo bisa digunakan untuk membeli produk di bot ini_`)
           ],
           headerType: 1,
           viewOnce: true,
-          image: fs.readFileSync('option/image/payment.jpg'),
+          image: fs.readFileSync('./options/image/payment.jpeg'),
           caption: `*DEPOSIT / ISI SALDO DI BOT ORDER MINIMAL 5.000*
 
 *BONUS SALDO 7% - 10% UNTUK DEPOSIT DENGAN NOMINAL 25.000 KE ATAS*
