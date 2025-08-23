@@ -5,21 +5,28 @@ const path = require('path');
 function backupDatabase() {
   try {
     const dbPath = path.join(__dirname, 'database.json');
-    const backupPath = path.join(__dirname, `database_backup_${Date.now()}.json`);
+    const dbTrashPath = path.join(__dirname, 'db_trash');
+    
+    // Buat folder db_trash jika belum ada
+    if (!fs.existsSync(dbTrashPath)) {
+      fs.mkdirSync(dbTrashPath, { recursive: true });
+    }
+    
+    const backupPath = path.join(dbTrashPath, `database_backup_${Date.now()}.json`);
     
     if (fs.existsSync(dbPath)) {
       const dbContent = fs.readFileSync(dbPath, 'utf8');
       fs.writeFileSync(backupPath, dbContent, 'utf8');
       console.log(`Database backup created: ${backupPath}`);
       
-      // Hapus backup lama (lebih dari 7 hari)
-      const files = fs.readdirSync(__dirname);
+      // Hapus backup lama (lebih dari 7 hari) dari folder db_trash
+      const files = fs.readdirSync(dbTrashPath);
       const now = Date.now();
       const sevenDays = 7 * 24 * 60 * 60 * 1000;
       
       files.forEach(file => {
         if (file.startsWith('database_backup_') && file.endsWith('.json')) {
-          const filePath = path.join(__dirname, file);
+          const filePath = path.join(dbTrashPath, file);
           const stats = fs.statSync(filePath);
           if (now - stats.mtime.getTime() > sevenDays) {
             fs.unlinkSync(filePath);

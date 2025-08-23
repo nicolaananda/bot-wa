@@ -1865,7 +1865,12 @@ Ada transaksi yang telah dibayar!
                 price: hargaProduk(data[0], db.data.users[sender].role),
                 date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
                 profit: db.data.produk[data[0]].profit,
-                jumlah: Number(data[1])
+                jumlah: Number(data[1]),
+                user: sender.split("@")[0],
+                userRole: db.data.users[sender].role,
+                reffId: reffId,
+                metodeBayar: "QRIS",
+                totalBayar: totalAmount
               })
 
               fs.unlinkSync(`./options/TRX-${reffId}.txt`)
@@ -1959,7 +1964,12 @@ Ada transaksi dengan saldo yang telah selesai!
           price: hargaProduk(data[0], db.data.users[sender].role),
           date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
           profit: db.data.produk[data[0]].profit,
-          jumlah: Number(data[1])
+          jumlah: Number(data[1]),
+          user: sender.split("@")[0],
+          userRole: db.data.users[sender].role,
+          reffId: reffId,
+          metodeBayar: "Saldo",
+          totalBayar: totalHarga
         })
         
         reply("Pembelian berhasil! Detail akun telah dikirim ke chat.")
@@ -1972,6 +1982,212 @@ Ada transaksi dengan saldo yang telah selesai!
         await ronzz.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
         reply("Berhasil membatalkan pembayaran")
         delete db.data.order[sender]
+      }
+        break
+        
+      case 'riwayat': {
+        if (!q) return reply(`Contoh: ${prefix + command} <nomor>\n\nContoh: ${prefix + command} 6281234567890`)
+        
+        let targetUser = q.replace(/[^0-9]/g, '') + "@s.whatsapp.net"
+        let userTransaksi = db.data.transaksi.filter(t => t.user === q.replace(/[^0-9]/g, ''))
+        
+        if (userTransaksi.length === 0) {
+          return reply(`Tidak ada riwayat transaksi untuk nomor *${q}*`)
+        }
+        
+        let teks = `*📊 RIWAYAT TRANSAKSI USER*\n\n`
+        teks += `*📱 Nomor:* ${q}\n`
+        teks += `*📅 Total Transaksi:* ${userTransaksi.length}\n\n`
+        
+        userTransaksi.forEach((t, i) => {
+          teks += `*${i + 1}. ${t.name}*\n`
+          teks += `• ID: ${t.id}\n`
+          teks += `• Harga: Rp${toRupiah(t.price)}\n`
+          teks += `• Jumlah: ${t.jumlah}\n`
+          teks += `• Total: Rp${toRupiah(t.totalBayar || (t.price * t.jumlah))}\n`
+          teks += `• Metode: ${t.metodeBayar || 'Tidak diketahui'}\n`
+          teks += `• Tanggal: ${t.date}\n`
+          teks += `• Reff ID: ${t.reffId || 'Tidak ada'}\n\n`
+        })
+        
+        reply(teks)
+      }
+        break
+        
+      case 'statistik': {
+        if (!isOwner) return reply(mess.owner)
+        
+        let totalTransaksi = db.data.transaksi.length
+        let transaksiSaldo = db.data.transaksi.filter(t => t.metodeBayar === "Saldo").length
+        let transaksiQris = db.data.transaksi.filter(t => t.metodeBayar === "QRIS").length
+        let totalPendapatan = db.data.transaksi.reduce((sum, t) => sum + (t.totalBayar || (t.price * t.jumlah)), 0)
+        
+        // Hitung user unik yang melakukan transaksi
+        let uniqueUsers = [...new Set(db.data.transaksi.map(t => t.user).filter(u => u))]
+        let totalUsers = uniqueUsers.length
+        
+        let teks = `*📊 STATISTIK TRANSAKSI*\n\n`
+        teks += `*📈 Total Transaksi:* ${totalTransaksi}\n`
+        teks += `*👥 Total User Unik:* ${totalUsers}\n`
+        teks += `*💳 Transaksi Saldo:* ${transaksiSaldo}\n`
+        teks += `*📱 Transaksi QRIS:* ${transaksiQris}\n`
+        teks += `*💰 Total Pendapatan:* Rp${toRupiah(totalPendapatan)}\n\n`
+        
+        if (uniqueUsers.length > 0) {
+          teks += `*🏆 TOP 5 USER AKTIF:*\n`
+          let userStats = {}
+          db.data.transaksi.forEach(t => {
+            if (t.user) {
+              userStats[t.user] = (userStats[t.user] || 0) + 1
+            }
+          })
+          
+          let sortedUsers = Object.entries(userStats)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 5)
+          
+          sortedUsers.forEach(([user, count], i) => {
+            teks += `${i + 1}. ${user}: ${count} transaksi\n`
+          })
+        }
+        
+        reply(teks)
+      }
+        break
+        
+      case 'cari': {
+        if (!q) return reply(`Contoh: ${prefix + command} <reff_id>\n\nContoh: ${prefix + command} ABC123`)
+        
+        let reffId = q.toUpperCase()
+        let transaksi = db.data.transaksi.find(t => t.reffId === reffId)
+        
+        if (!transaksi) {
+          return reply(`Tidak ada transaksi dengan Reff ID *${reffId}*`)
+        }
+        
+        let teks = `*🔍 DETAIL TRANSAKSI*\n\n`
+        teks += `*🧾 Reff ID:* ${transaksi.reffId}\n`
+        teks += `*📱 User:* ${transaksi.user || 'Tidak diketahui'}\n`
+        teks += `*👑 Role:* ${transaksi.userRole || 'Tidak diketahui'}\n`
+        teks += `*📦 Produk:* ${transaksi.name}\n`
+        teks += `*🏷️ ID Produk:* ${transaksi.id}\n`
+        teks += `*💰 Harga Satuan:* Rp${toRupiah(transaksi.price)}\n`
+        teks += `*🛍️ Jumlah:* ${transaksi.jumlah}\n`
+        teks += `*💵 Total Bayar:* Rp${toRupiah(transaksi.totalBayar || (transaksi.price * transaksi.jumlah))}\n`
+        teks += `*💳 Metode Bayar:* ${transaksi.metodeBayar || 'Tidak diketahui'}\n`
+        teks += `*📅 Tanggal:* ${transaksi.date}\n`
+        teks += `*💸 Profit:* ${transaksi.profit || 'Tidak diketahui'}`
+        
+        reply(teks)
+      }
+        break
+        
+      case 'export': {
+        if (!isOwner) return reply(mess.owner)
+        if (!q) return reply(`Contoh: ${prefix + command} <format>\n\nFormat: json, csv, txt`)
+        
+        let format = q.toLowerCase()
+        let filename = `transaksi_${moment.tz("Asia/Jakarta").format("YYYY-MM-DD_HH-mm-ss")}`
+        
+        if (format === 'json') {
+          let jsonData = JSON.stringify(db.data.transaksi, null, 2)
+          fs.writeFileSync(`./options/${filename}.json`, jsonData, 'utf8')
+          reply(`Data transaksi berhasil diexport ke file *${filename}.json*`)
+        } else if (format === 'csv') {
+          let csvData = 'User,Role,Produk,ID Produk,Harga,Jumlah,Total,Metode,Tanggal,Reff ID,Profit\n'
+          db.data.transaksi.forEach(t => {
+            csvData += `${t.user || 'N/A'},${t.userRole || 'N/A'},${t.name},${t.id},${t.price},${t.jumlah},${t.totalBayar || (t.price * t.jumlah)},${t.metodeBayar || 'N/A'},${t.date},${t.reffId || 'N/A'},${t.profit || 'N/A'}\n`
+          })
+          fs.writeFileSync(`./options/${filename}.csv`, csvData, 'utf8')
+          reply(`Data transaksi berhasil diexport ke file *${filename}.csv*`)
+        } else if (format === 'txt') {
+          let txtData = 'DATA TRANSAKSI\n\n'
+          db.data.transaksi.forEach((t, i) => {
+            txtData += `${i + 1}. ${t.name}\n`
+            txtData += `   User: ${t.user || 'N/A'}\n`
+            txtData += `   Role: ${t.userRole || 'N/A'}\n`
+            txtData += `   ID: ${t.id}\n`
+            txtData += `   Harga: Rp${t.price}\n`
+            txtData += `   Jumlah: ${t.jumlah}\n`
+            txtData += `   Total: Rp${t.totalBayar || (t.price * t.jumlah)}\n`
+            txtData += `   Metode: ${t.metodeBayar || 'N/A'}\n`
+            txtData += `   Tanggal: ${t.date}\n`
+            txtData += `   Reff ID: ${t.reffId || 'N/A'}\n`
+            txtData += `   Profit: ${t.profit || 'N/A'}\n\n`
+          })
+          fs.writeFileSync(`./options/${filename}.txt`, txtData, 'utf8')
+          reply(`Data transaksi berhasil diexport ke file *${filename}.txt*`)
+        } else {
+          reply(`Format tidak valid! Gunakan: json, csv, atau txt`)
+        }
+      }
+        break
+        
+      case 'dashboard': {
+        if (!isOwner) return reply(mess.owner)
+        
+        // Data untuk dashboard
+        let dashboardData = {
+          totalTransaksi: db.data.transaksi.length,
+          totalPendapatan: db.data.transaksi.reduce((sum, t) => sum + (t.totalBayar || (t.price * t.jumlah)), 0),
+          transaksiHariIni: db.data.transaksi.filter(t => {
+            let today = moment.tz("Asia/Jakarta").format("YYYY-MM-DD")
+            return t.date.startsWith(today)
+          }).length,
+          pendapatanHariIni: db.data.transaksi.filter(t => {
+            let today = moment.tz("Asia/Jakarta").format("YYYY-MM-DD")
+            return t.date.startsWith(today)
+          }).reduce((sum, t) => sum + (t.totalBayar || (t.price * t.jumlah)), 0),
+          metodeBayar: {
+            saldo: db.data.transaksi.filter(t => t.metodeBayar === "Saldo").length,
+            qris: db.data.transaksi.filter(t => t.metodeBayar === "QRIS").length
+          },
+          topUsers: []
+        }
+        
+        // Hitung top users
+        let userStats = {}
+        db.data.transaksi.forEach(t => {
+          if (t.user) {
+            userStats[t.user] = (userStats[t.user] || 0) + 1
+          }
+        })
+        
+        let sortedUsers = Object.entries(userStats)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 10)
+        
+        dashboardData.topUsers = sortedUsers.map(([user, count]) => ({
+          user: user,
+          transaksi: count,
+          totalSpent: db.data.transaksi.filter(t => t.user === user)
+            .reduce((sum, t) => sum + (t.totalBayar || (t.price * t.jumlah)), 0)
+        }))
+        
+        // Export data dashboard ke JSON
+        let filename = `dashboard_${moment.tz("Asia/Jakarta").format("YYYY-MM-DD_HH-mm-ss")}.json`
+        fs.writeFileSync(`./options/${filename}`, JSON.stringify(dashboardData, null, 2), 'utf8')
+        
+        let teks = `*📊 DASHBOARD DATA EXPORTED*\n\n`
+        teks += `*📈 Total Transaksi:* ${dashboardData.totalTransaksi}\n`
+        teks += `*💰 Total Pendapatan:* Rp${toRupiah(dashboardData.totalPendapatan)}\n`
+        teks += `*📅 Transaksi Hari Ini:* ${dashboardData.transaksiHariIni}\n`
+        teks += `*💵 Pendapatan Hari Ini:* Rp${toRupiah(dashboardData.pendapatanHariIni)}\n`
+        teks += `*💳 Metode Bayar:*\n`
+        teks += `  • Saldo: ${dashboardData.metodeBayar.saldo}\n`
+        teks += `  • QRIS: ${dashboardData.metodeBayar.qris}\n\n`
+        teks += `*🏆 TOP 10 USERS:*\n`
+        
+        dashboardData.topUsers.forEach((user, i) => {
+          teks += `${i + 1}. ${user.user}\n`
+          teks += `   • Transaksi: ${user.transaksi}\n`
+          teks += `   • Total Spent: Rp${toRupiah(user.totalSpent)}\n\n`
+        })
+        
+        teks += `*📁 File:* ${filename}\n`
+        teks += `*💡 Gunakan file JSON ini untuk dashboard web*`
+        
+        reply(teks)
       }
         break
         
