@@ -955,7 +955,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           footer: `${botName} © ${ownerName}`,
           buttons: [
             {
-              buttonId: '.sc', buttonText: { displayText: 'Script 📥' }, type: 1,
+              buttonId: '.saldo', buttonText: { displayText: 'Saldo 📥' }, type: 1,
             }, {
               buttonId: '.owner', buttonText: { displayText: 'Owner 👤' }, type: 1,
             },
@@ -1061,7 +1061,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           footer: `${botName} © ${ownerName}`,
           buttons: [
             {
-              buttonId: '.sc', buttonText: { displayText: 'Script 📥' }, type: 1,
+              buttonId: '.saldo', buttonText: { displayText: 'Saldo 📥' }, type: 1,
             }, {
               buttonId: '.owner', buttonText: { displayText: 'Owner 👤' }, type: 1,
             },
@@ -1121,7 +1121,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           footer: `${botName} © ${ownerName}`,
           buttons: [
             {
-              buttonId: '.sc', buttonText: { displayText: 'Script 📥' }, type: 1,
+              buttonId: '.saldo', buttonText: { displayText: 'Saldo 📥' }, type: 1,
             }, {
               buttonId: '.owner', buttonText: { displayText: 'Owner 👤' }, type: 1,
             },
@@ -1181,7 +1181,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           footer: `${botName} © ${ownerName}`,
           buttons: [
             {
-              buttonId: '.sc', buttonText: { displayText: 'Script 📥' }, type: 1,
+              buttonId: '.saldo', buttonText: { displayText: 'Saldo 📥' }, type: 1,
             }, {
               buttonId: '.owner', buttonText: { displayText: 'Owner 👤' }, type: 1,
             },
@@ -1241,7 +1241,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           footer: `${botName} © ${ownerName}`,
           buttons: [
             {
-              buttonId: '.sc', buttonText: { displayText: 'Script 📥' }, type: 1,
+              buttonId: '.saldo', buttonText: { displayText: 'Saldo 📥' }, type: 1,
             }, {
               buttonId: '.owner', buttonText: { displayText: 'Owner 👤' }, type: 1,
             },
@@ -1301,7 +1301,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           footer: `${botName} © ${ownerName}`,
           buttons: [
             {
-              buttonId: '.sc', buttonText: { displayText: 'Script 📥' }, type: 1,
+              buttonId: '.saldo', buttonText: { displayText: 'Saldo 📥' }, type: 1,
             }, {
               buttonId: '.owner', buttonText: { displayText: 'Owner 👤' }, type: 1,
             },
@@ -1361,7 +1361,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           footer: `${botName} © ${ownerName}`,
           buttons: [
             {
-              buttonId: '.sc', buttonText: { displayText: 'Script 📥' }, type: 1,
+              buttonId: '.saldo', buttonText: { displayText: 'Saldo 📥' }, type: 1,
             }, {
               buttonId: '.owner', buttonText: { displayText: 'Owner 👤' }, type: 1,
             },
@@ -1421,7 +1421,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           footer: `${botName} © ${ownerName}`,
           buttons: [
             {
-              buttonId: '.sc', buttonText: { displayText: 'Script 📥' }, type: 1,
+              buttonId: '.saldo', buttonText: { displayText: 'Saldo 📥' }, type: 1,
             }, {
               buttonId: '.owner', buttonText: { displayText: 'Owner 👤' }, type: 1,
             },
@@ -1481,7 +1481,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           footer: `${botName} © ${ownerName}`,
           buttons: [
             {
-              buttonId: '.sc', buttonText: { displayText: 'Script 📥' }, type: 1,
+              buttonId: '.saldo', buttonText: { displayText: 'Saldo 📥' }, type: 1,
             }, {
               buttonId: '.owner', buttonText: { displayText: 'Owner 👤' }, type: 1,
             },

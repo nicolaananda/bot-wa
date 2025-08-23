@@ -32,8 +32,8 @@ global.uGold = 200000
 
 //Other
 global.botName = "GiHa Smart Bot" //Nama bot
-global.owner = ["6285235540944", "6281389592985"] //Ganti agar fitur owner bisa digunakan
-global.ownerNomer = ["6285235540944", "6281389592985"] //Nomor lu
+global.owner = ["6285235540944", "6287887842985"] //Ganti agar fitur owner bisa digunakan
+global.ownerNomer = ["6287777657944", "6281389592985"] //Nomor lu
 global.ownerName = "Owner" //Nama lu
 global.packname = "" //Seterah
 global.author = "Owner" //Seterah
@@ -114,6 +114,7 @@ global.menu = (prefix, sender, pushname) => {
 • All pengguna bot`
 }
 
+// #ALL MENU
 global.allmenu = (prefix, sender, pushname) => {
   let more = String.fromCharCode(8206)
   let readmore = more.repeat(4001)
@@ -248,6 +249,7 @@ ${readmore}
 • All pengguna bot`
 }
 
+// GROUP MENU
 global.groupmenu = (prefix, sender, pushname) => {
   let more = String.fromCharCode(8206)
   let readmore = more.repeat(4001)
