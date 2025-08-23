@@ -5,7 +5,7 @@ global.pairingCode = true //true = gausah scan qr cukup 1 hp || false = harus sc
 global.jamBackup = 12 //Contoh: 12, berarti setiap 12 jam otomatis backup script
 
 //Setting order kuota
-global.memberId = "" //Untuk cara mendapatkannya cek di file panduan.txt
+global.memberId = "OK2596040" //Untuk cara mendapatkannya cek di file panduan.txt
 global.pin = "" //Pin order kuota
 global.pw = "" //Password order kuota
 global.codeqr = "" //Code QR lu
@@ -31,14 +31,14 @@ global.uSilver = 100000
 global.uGold = 200000
 
 //Other
-global.botName = "" //Nama bot
-global.owner = ["", ""] //Ganti agar fitur owner bisa digunakan
-global.ownerNomer = "" //Nomor lu
-global.ownerName = "" //Nama lu
+global.botName = "GiHa Smart Bot" //Nama bot
+global.owner = ["6285235540944", "6281389592985"] //Ganti agar fitur owner bisa digunakan
+global.ownerNomer = ["6285235540944", "6281389592985"] //Nomor lu
+global.ownerName = "Owner" //Nama lu
 global.packname = "" //Seterah
-global.author = "" //Seterah
+global.author = "Owner" //Seterah
 global.sessionName = "session" //Ngga usah di ganti
-global.linkGroup = "" //Link gc lu
+global.linkGroup = ["https://chat.whatsapp.com/L0LR1HBOFKJAiQv5Busd9t?mode=ems_copy_t","https://chat.whatsapp.com/KwBA0yxcwl0JGpL6uN7L9i?mode=ems_copy_t"] //Link gc lu
 
 //Image
 global.thumbnail = "./options/image/thumbnail.jpg"
@@ -62,19 +62,19 @@ global.mess = {
 //Payment
 global.payment = {
   qris: {
-    an: "RONZZ YT" //Atas nama qris
+    an: "GIGIHADIOD" //Atas nama qris
   },
   dana: {
-    nope: "08817839722",
-    an: "SUH****"
+    nope: "085235540944",
+    an: "BRI****"
   },
   gopay: {
-    nope: "-",
-    an: "-"
+    nope: "085235540944",
+    an: "BRI****"
   },
   ovo: {
-    nope: "-",
-    an: "-"
+    nope: "085235540944",
+    an: "BRI****"
   }
 }
 
@@ -110,8 +110,6 @@ global.menu = (prefix, sender, pushname) => {
 • WIT: ${moment.tz('Asia/Jayapura').format('HH:mm:ss')}
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
-• @Whiskeysockets (Baileys)
-• Ronzz YT (Creator)
 • ${ownerName} (Owner)
 • All pengguna bot`
 }
@@ -246,8 +244,6 @@ ${readmore}
 ╰─────╼
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
-• @Whiskeysockets (Baileys)
-• Ronzz YT (Creator)
 • ${ownerName} (Owner)
 • All pengguna bot`
 }
@@ -294,8 +290,7 @@ ${readmore}
 ╰─────╼
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
-• @Whiskeysockets (Baileys)
-• Ronzz YT (Creator)
+
 • ${ownerName} (Owner)
 • All pengguna bot`
 }
@@ -330,8 +325,7 @@ ${readmore}
 ╰─────╼
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
-• @Whiskeysockets (Baileys)
-• Ronzz YT (Creator)
+
 • ${ownerName} (Owner)
 • All pengguna bot`
 }
@@ -389,8 +383,7 @@ ${readmore}
 ╰─────╼
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
-• @Whiskeysockets (Baileys)
-• Ronzz YT (Creator)
+
 • ${ownerName} (Owner)
 • All pengguna bot`
 }
@@ -435,8 +428,7 @@ ${readmore}
 ╰─────╼
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
-• @Whiskeysockets (Baileys)
-• Ronzz YT (Creator)
+
 • ${ownerName} (Owner)
 • All pengguna bot`
 }
@@ -483,8 +475,7 @@ ${readmore}
 ╰─────╼
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
-• @Whiskeysockets (Baileys)
-• Ronzz YT (Creator)
+
 • ${ownerName} (Owner)
 • All pengguna bot`
 }
@@ -518,8 +509,6 @@ ${readmore}
 ╰─────╼
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
-• @Whiskeysockets (Baileys)
-• Ronzz YT (Creator)
 • ${ownerName} (Owner)
 • All pengguna bot`
 }
@@ -552,8 +541,6 @@ ${readmore}
 ╰─────╼
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
-• @Whiskeysockets (Baileys)
-• Ronzz YT (Creator)
 • ${ownerName} (Owner)
 • All pengguna bot`
 }

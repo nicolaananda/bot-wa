@@ -13,7 +13,7 @@ function uncache(module = '.') {
 }
 
 function nocache(module, cb = () => { }) {
-  console.log(chalk.greenBright(`Module ${module} di pantau oleh Ronzz YT`))
+  // console.log(chalk.greenBright(`Module ${module} di pantau oleh Ronzz YT`))
   fs.watchFile(require.resolve(module), async () => {
     await uncache(require.resolve(module))
     cb(module)
