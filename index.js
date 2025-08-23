@@ -1909,39 +1909,39 @@ Ada transaksi yang telah dibayar!
         }
 
         let reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
-        let teks = `Tanggal Transaksi: ${tanggal}\n\n----- ACCOUNT DETAIL -----\n`
-
-        dataStok.forEach(i => {
-          let dataAkun = i.split("|")
-          teks += `• Email: ${dataAkun[0]}\n• Password: ${dataAkun[1]}\n• Profil: ${dataAkun[2] ? dataAkun[2] : "-"}\n• Pin: ${dataAkun[3] ? dataAkun[3] : "-"}\n• 2FA: ${dataAkun[4] ? dataAkun[4] : "-"}\n\n`
-        })
-
-        fs.writeFileSync(`./options/TRX-${reffId}.txt`, teks, "utf8")
         
-        // Kirim detail akun ke user
-        await ronzz.sendMessage(sender, {
-          document: fs.readFileSync(`./options/TRX-${reffId}.txt`),
-          mimetype: "text/plain",
-          fileName: `TRX-${reffId}.txt`,
-          caption: `*───「 ACCOUNT DETAIL 」───*
-Silahkan buka file txt yang sudah diberikan
-
-*╭────「 TRANSAKSI DETAIL 」───*
-*┊・ 🧾| Reff Id:* ${reffId}
-*┊・ 📦| Nama Barang:* ${db.data.produk[data[0]].name}
-*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}
-*┊・ 🛍️| Jumlah Order:* ${data[1]}
-*┊・ 💰| Total Bayar:* Rp${toRupiah(totalHarga)}
-*┊・ 💳| Metode Bayar:* Saldo
-*┊・ 📅| Tanggal:* ${tanggal}
-*┊・ ⏰| Jam:* ${jamwib} WIB
-*┊・ 💰| Saldo Sisa:* Rp${toRupiah(db.data.users[sender].saldo)}
-*╰┈┈┈┈┈┈┈┈*
-
-*───「 SNK PRODUK 」───*
-
-${db.data.produk[data[0]].snk}`
-        }, { quoted: m })
+        // Buat teks detail akun
+        let detailAkun = `*───「 ACCOUNT DETAIL 」───*\n\n`
+        dataStok.forEach((i, index) => {
+          let dataAkun = i.split("|")
+          detailAkun += `*📱 Akun ${index + 1}*\n`
+          detailAkun += `• Email: ${dataAkun[0]}\n`
+          detailAkun += `• Password: ${dataAkun[1]}\n`
+          detailAkun += `• Profil: ${dataAkun[2] ? dataAkun[2] : "-"}\n`
+          detailAkun += `• Pin: ${dataAkun[3] ? dataAkun[3] : "-"}\n`
+          detailAkun += `• 2FA: ${dataAkun[4] ? dataAkun[4] : "-"}\n\n`
+        })
+        
+        // Kirim detail akun langsung ke chat
+        await ronzz.sendMessage(from, { text: detailAkun }, { quoted: m })
+        
+        // Kirim detail transaksi dan SNK
+        let transaksiDetail = `*───「 TRANSAKSI DETAIL 」───*\n\n`
+        transaksiDetail += `*╭────「 TRANSAKSI DETAIL 」───*\n`
+        transaksiDetail += `*┊・ 🧾| Reff Id:* ${reffId}\n`
+        transaksiDetail += `*┊・ 📦| Nama Barang:* ${db.data.produk[data[0]].name}\n`
+        transaksiDetail += `*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}\n`
+        transaksiDetail += `*┊・ 🛍️| Jumlah Order:* ${data[1]}\n`
+        transaksiDetail += `*┊・ 💰| Total Bayar:* Rp${toRupiah(totalHarga)}\n`
+        transaksiDetail += `*┊・ 💳| Metode Bayar:* Saldo\n`
+        transaksiDetail += `*┊・ 📅| Tanggal:* ${tanggal}\n`
+        transaksiDetail += `*┊・ ⏰| Jam:* ${jamwib} WIB\n`
+        transaksiDetail += `*┊・ 💰| Saldo Sisa:* Rp${toRupiah(db.data.users[sender].saldo)}\n`
+        transaksiDetail += `*╰┈┈┈┈┈┈┈┈*\n\n`
+        transaksiDetail += `*───「 SNK PRODUK 」───*\n\n`
+        transaksiDetail += `${db.data.produk[data[0]].snk}`
+        
+        await ronzz.sendMessage(from, { text: transaksiDetail }, { quoted: m })
         
         // Kirim notifikasi ke owner
         await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
@@ -1968,11 +1968,8 @@ Ada transaksi dengan saldo yang telah selesai!
           profit: db.data.produk[data[0]].profit,
           jumlah: Number(data[1])
         })
-
-        // Hapus file temporary
-        fs.unlinkSync(`./options/TRX-${reffId}.txt`)
         
-        reply("Pembelian berhasil! Detail akun telah dikirim ke chat pribadi kamu.")
+        reply("Pembelian berhasil! Detail akun telah dikirim ke chat.")
       }
         break
 
