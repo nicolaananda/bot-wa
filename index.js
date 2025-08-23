@@ -1878,6 +1878,104 @@ Ada transaksi yang telah dibayar!
       }
         break
 
+      case 'buynow': {
+        if (db.data.order[sender] !== undefined) return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
+        let data = q.split(" ")
+        if (!data[1]) return reply(`Contoh: ${prefix + command} idproduk jumlah`)
+        if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
+
+        let stok = db.data.produk[data[0]].stok
+        if (stok.length <= 0) return reply("Stok habis, silahkan hubungi Owner untuk restok")
+        if (stok.length < data[1]) return reply(`Stok tersedia ${stok.length}, jadi harap jumlah tidak melebihi stok`)
+
+        // Cek saldo user
+        let totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * Number(data[1])
+        if (db.data.users[sender].saldo < totalHarga) {
+          return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(db.data.users[sender].saldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}topup*`)
+        }
+
+        reply("Sedang memproses pembelian dengan saldo...")
+
+        // Kurangi saldo user
+        db.data.users[sender].saldo -= totalHarga
+
+        await sleep(1000)
+        
+        // Proses pembelian langsung
+        db.data.produk[data[0]].terjual += Number(data[1])
+        let dataStok = []
+        for (let i = 0; i < data[1]; i++) {
+          dataStok.push(db.data.produk[data[0]].stok.shift())
+        }
+
+        let reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
+        let teks = `Tanggal Transaksi: ${tanggal}\n\n----- ACCOUNT DETAIL -----\n`
+
+        dataStok.forEach(i => {
+          let dataAkun = i.split("|")
+          teks += `• Email: ${dataAkun[0]}\n• Password: ${dataAkun[1]}\n• Profil: ${dataAkun[2] ? dataAkun[2] : "-"}\n• Pin: ${dataAkun[3] ? dataAkun[3] : "-"}\n• 2FA: ${dataAkun[4] ? dataAkun[4] : "-"}\n\n`
+        })
+
+        fs.writeFileSync(`./options/TRX-${reffId}.txt`, teks, "utf8")
+        
+        // Kirim detail akun ke user
+        await ronzz.sendMessage(sender, {
+          document: fs.readFileSync(`./options/TRX-${reffId}.txt`),
+          mimetype: "text/plain",
+          fileName: `TRX-${reffId}.txt`,
+          caption: `*───「 ACCOUNT DETAIL 」───*
+Silahkan buka file txt yang sudah diberikan
+
+*╭────「 TRANSAKSI DETAIL 」───*
+*┊・ 🧾| Reff Id:* ${reffId}
+*┊・ 📦| Nama Barang:* ${db.data.produk[data[0]].name}
+*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}
+*┊・ 🛍️| Jumlah Order:* ${data[1]}
+*┊・ 💰| Total Bayar:* Rp${toRupiah(totalHarga)}
+*┊・ 💳| Metode Bayar:* Saldo
+*┊・ 📅| Tanggal:* ${tanggal}
+*┊・ ⏰| Jam:* ${jamwib} WIB
+*┊・ 💰| Saldo Sisa:* Rp${toRupiah(db.data.users[sender].saldo)}
+*╰┈┈┈┈┈┈┈┈*
+
+*───「 SNK PRODUK 」───*
+
+${db.data.produk[data[0]].snk}`
+        }, { quoted: m })
+        
+        // Kirim notifikasi ke owner
+        await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
+Ada transaksi dengan saldo yang telah selesai!
+
+*╭────「 TRANSAKSI DETAIL 」───*
+*┊・ 🧾| Reff Id:* ${reffId}
+*┊・ 📮| Nomor:* @${sender.split("@")[0]}
+*┊・ 📦| Nama Barang:* ${db.data.produk[data[0]].name}
+*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}
+*┊・ 🛍️| Jumlah Order:* ${data[1]}
+*┊・ 💰| Total Bayar:* Rp${toRupiah(totalHarga)}
+*┊・ 💳| Metode Bayar:* Saldo
+*┊・ 📅| Tanggal:* ${tanggal}
+*┊・ ⏰| Jam:* ${jamwib} WIB
+*╰┈┈┈┈┈┈┈┈*`, mentions: [sender] })
+
+        // Tambah ke database transaksi
+        db.data.transaksi.push({
+          id: data[0],
+          name: db.data.produk[data[0]].name,
+          price: hargaProduk(data[0], db.data.users[sender].role),
+          date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+          profit: db.data.produk[data[0]].profit,
+          jumlah: Number(data[1])
+        })
+
+        // Hapus file temporary
+        fs.unlinkSync(`./options/TRX-${reffId}.txt`)
+        
+        reply("Pembelian berhasil! Detail akun telah dikirim ke chat pribadi kamu.")
+      }
+        break
+
       case 'batal': {
         if (db.data.order[sender] == undefined) return
         
