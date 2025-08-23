@@ -1,0 +1,404 @@
+{
+  "list": [
+    {
+      "id": "120363419470324991@g.us",
+      "key": "mobil",
+      "response": "remot",
+      "isImage": false,
+      "image_url": "-"
+    }
+  ],
+  "testi": [
+    {
+      "key": "key",
+      "response": "response",
+      "isImage": true,
+      "image_url": "https://img1.pixhost.to/images/8161/633963817_1755928328059.jpg"
+    }
+  ],
+  "chat": {
+    "120363419470324991@g.us": {
+      "welcome": false,
+      "antilink": false,
+      "antilink2": false,
+      "sDone": "",
+      "sProses": ""
+    },
+    "120363420814356923@g.us": {
+      "welcome": false,
+      "antilink": false,
+      "antilink2": false,
+      "sDone": "",
+      "sProses": ""
+    },
+    "6281252377972-1635740222@g.us": {
+      "welcome": false,
+      "antilink": false,
+      "antilink2": false,
+      "sDone": "",
+      "sProses": ""
+    },
+    "6285235540944-1632562169@g.us": {
+      "welcome": false,
+      "antilink": false,
+      "antilink2": false,
+      "sDone": "",
+      "sProses": ""
+    },
+    "120363195304284179@g.us": {
+      "welcome": false,
+      "antilink": false,
+      "antilink2": false,
+      "sDone": "",
+      "sProses": ""
+    }
+  },
+  "users": {
+    "6287777657944@s.whatsapp.net": {
+      "saldo": 0,
+      "role": "bronze"
+    },
+    "6281389592985@s.whatsapp.net": {
+      "saldo": 72600,
+      "role": "bronze"
+    },
+    "6285235540944@s.whatsapp.net": {
+      "saldo": 82600,
+      "role": "bronze"
+    },
+    "6287883940775@s.whatsapp.net": {
+      "saldo": 0,
+      "role": "bronze"
+    },
+    "6281359417389@s.whatsapp.net": {
+      "saldo": 0,
+      "role": "bronze"
+    }
+  },
+  "sewa": {},
+  "profit": {
+    "bronze": 1000,
+    "silver": 500,
+    "gold": 200
+  },
+  "topup": {},
+  "type": "persen",
+  "setting": {
+    "6285777992985@s.whatsapp.net": {
+      "autoread": true,
+      "autoketik": false,
+      "anticall": true
+    },
+    "6281359417389@s.whatsapp.net": {
+      "autoread": true,
+      "autoketik": false,
+      "anticall": true
+    }
+  },
+  "deposit": {},
+  "produk": {
+    "net2u": {
+      "id": "net2u",
+      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
+      "desc": "FREE VIU 1 TAHUN/CANVA 1 BULAN CHAT ADMIN GIGI, Netflix sharing 1p2u durasi 1 bulan fullgar 28-30d",
+      "snk": "\n*SEBELUM KASIH KE CUST CEK GET CONTACT DULU, RAWAN DI CURI EMAIL! KENA CURI? DI DENDA!!!* \n\n•⁠ ⁠Denda berlaku jika akun kena curi/change email (ditanggung FH & reseller)\n*Wajib isi monitoring Netflix!*\n   — nomor telp CUST : \n — device :\n — lokasi : \n — durasi :\n — pembelian tanggal :\n — sharing : 1u/2u/semiprivate\n\n=POTONG=\nSEND KE ADMIN GIGI KARENA DIPANTAU, GAK SEND? NOGAR YEAH\n\nNETFLIX PREMIUM\n➖➖➖➖➖➖➖\n📩 S&K :\n⚠️ Jangan mengganti email, pass, atau mengotak atik akun terutama bill payment!\n⚠️ Dilarang Login 1 Profile lebih dari 1 device\n⚠️ Dilarang memakai VPN\n⚠️ Dilarang login logout terlalu sering (spam login logout)\n⚠️ Jika ada notifikasi perbaharui pembayaran? Abaikan atau klik NOT NOW/ TIDAK SEKARANG/ klik TANDA X / klik LAIN KALI\n⚠️ Jika email notfound/tidak ditemukan lansung LAPOR ADMIN dan jangan di otak atik! \n{1 bulan durasi 28-30 hari}\nFULGARANSI BAGI YG SEND BUKTI LOGIN + MERK DEVICE KE ADMIN DALAM WAKTU 1X24 JAM, GAK SEND? GARANSI HANGUS \n⚡️FULL GARANSI, namun segala kesalahan pengguna akan menghilangkan garansi tsb⚡️\n➖➖➖➖➖➖\n\nThanks for order and happy watching✨\n\n*(Send SS dan form diatas jgn lupa yaa)*",
+      "priceB": "13700",
+      "priceS": "13700",
+      "priceG": "13700",
+      "terjual": 157,
+      "stok": [
+        "raulbasulto.mx@anafa.top|anafa008|3|8888|-",
+        "raulbasulto.mx@anafa.top|anafa008|4|8888|-",
+        "raulbasulto.mx@anafa.top|anafa008|5|8888|-"
+      ]
+    },
+    "net1u": {
+      "id": "net1u",
+      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
+      "desc": "FREE VIU 1 TAHUN/CANVA 1 BULAN CHAT ADMIN GIGI, Netflix sharing 1p2u durasi 1 bulan fullgar 28-30d",
+      "snk": "snk",
+      "priceB": "25000",
+      "priceS": "25000",
+      "priceG": "25000",
+      "terjual": 0,
+      "stok": []
+    },
+    "net1m": {
+      "id": "net1m",
+      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
+      "desc": "Netflix Sharing 1 minggu 1p1u FULLGAR",
+      "snk": "snk",
+      "priceB": "8000",
+      "priceS": "8000",
+      "priceG": "8000",
+      "terjual": 0,
+      "stok": []
+    },
+    "capcutshr": {
+      "id": "capcutshr",
+      "name": "CAPCUT 1 BULAN SHARING 3U ",
+      "desc": "Capcut sharing full garansi 25-30d FULLGAR",
+      "snk": "\nSyarat & Ketentuan CapCut Sharing (3 User)\nBaca sampai habis ya, jangan asal beli nanti nyesel!\n🍉 Sharing 3 User\nCapCut nggak jelas limitnya berapa, jadi kalau kena limit = GABISA GANTI AKUN!\nSaran admin : mending beli versi 2 user / private biar aman tentram sejahtera.\n🗓️ 25–30 hari = 1 bulan\nBeli = Setuju SNK ini ya!\n⚠️ WAJIB PAKAI APLIKASI VERSI TERBARU!\nKalau belum update, uninstall lalu install ulang CapCut-nya ya!\n⸻\nGARANSI & KETENTUAN:\n\n҂ Bergaransi Backfree\n҂ Sharing? Kena Limit? = NO GARANSI!\n҂ Support Android / iOS / Windows\n\n🚫 TIDAK ADA GARANSI / REFUND jika CapCut update besar-besaran (massal)\nGaransi hanya berlaku kalau akun backfree & sesuai prosedur!\n⸻\nWAJIB DIBACA!!\n🍷 Login MAX 1 DEVICE!\n🍷 Kirim bukti login dalam 1x24 jam ke bot ini untuk dapat garansi.\nGAK KIRIM? YA NO GARANSI!\n🍷 Ketahuan login lebih dari 1 perangkat / dipinjemin orang lain =\nAkun DIAMBIL + DENDA Rp200.000!\n🍷 Login di laptop/PC hanya untuk user 2 slot!\nKalau beli sharing 3 user tapi ketahuan login di laptop = NO GARANSI!\n📍 Setelah login, DILARANG LOGOUT! Logout = Garansi HANGUS!\n📌 Login langsung di aplikasi CapCut via email, BUKAN Gmail/Google/FB/Tiktok!\n📌 Kapasitas hanya 100GB, setelah edit hapus file-nya kalau sudah nggak dipakai ya!\n📌 Risiko kehilangan ditanggung bersama ya guys~\n⸻\nMakasih udah beli, jangan bandel yaaa biar semua aman~",
+      "priceB": "5000",
+      "priceS": "5000",
+      "priceG": "5000",
+      "terjual": 0,
+      "stok": []
+    },
+    "capcut2u": {
+      "id": "capcut2u",
+      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
+      "desc": "Capcut sharing full garansi 25-30 FULLGAR, LIMIT?BISA GANTI AKUN",
+      "snk": "snk",
+      "priceB": "8000",
+      "priceS": "8000",
+      "priceG": "8000",
+      "terjual": 0,
+      "stok": []
+    },
+    "capcutpriv": {
+      "id": "capcutpriv",
+      "name": "CAPCUT 1 BULAN PRIVATE ",
+      "desc": "Capcut sharing full garansi 25-30 FULLGAR, LIMIT?BISA GANTI AKUN",
+      "snk": "snk",
+      "priceB": "14500",
+      "priceS": "14500",
+      "priceG": "14500",
+      "terjual": 0,
+      "stok": []
+    },
+    "canva1b": {
+      "id": "canva1b",
+      "name": "CANVA PRO SEBULAN ",
+      "desc": "Durasi Sebulan cust klik link yang tertera setelah payment",
+      "snk": "snk",
+      "priceB": "1900",
+      "priceS": "1900",
+      "priceG": "1900",
+      "terjual": 0,
+      "stok": []
+    },
+    "canva1m": {
+      "id": "canva1m",
+      "name": "CANVA PRO 1 MINGGU ",
+      "desc": "Durasi 1Minggu cust klik link yang tertera setelah payment",
+      "snk": "snk",
+      "priceB": "800",
+      "priceS": "800",
+      "priceG": "800",
+      "terjual": 0,
+      "stok": []
+    },
+    "gptshr": {
+      "id": "gptshr",
+      "name": " AI CHAT GPT+ SHARING FULLGAR",
+      "desc": "Durasi 1 bulan Bisa menggunakan hingga GPT 4.5\n",
+      "snk": "snk",
+      "priceB": "23000",
+      "priceS": "23000",
+      "priceG": "23000",
+      "terjual": 0,
+      "stok": []
+    },
+    "viu1b": {
+      "id": "viu1b",
+      "name": "VIU 1 BULAN ",
+      "desc": "VIU 1 BULAN PRIVATE ANLIM FULLGAR BF 30D",
+      "snk": "snk",
+      "priceB": "1000",
+      "priceS": "1000",
+      "priceG": "1000",
+      "terjual": 0,
+      "stok": []
+    },
+    "viu1t": {
+      "id": "viu1t",
+      "name": "VIU 1 TAHUN ",
+      "desc": "private anlim garansi 6 bulan",
+      "snk": "snk",
+      "priceB": "3500",
+      "priceS": "3500",
+      "priceG": "3500",
+      "terjual": 0,
+      "stok": []
+    },
+    "vid3u": {
+      "id": "vid3u",
+      "name": "VIDIO SHARING 3USER ",
+      "desc": "vidio platinum shar 3u HANYA BISA hp,tab, dan laptop, klo TV 5k priv dan 3k shar dibawah⬇️",
+      "snk": "snk",
+      "priceB": "8000",
+      "priceS": "8000",
+      "priceG": "8000",
+      "terjual": 0,
+      "stok": []
+    },
+    "vid2u": {
+      "id": "vid2u",
+      "name": "VIDIO SHARING 2 USER ",
+      "desc": "vidio platinum shar 2user HANYA BISA hp,tab, dan laptop, klo TV 5k priv dan 3k shar dibawah⬇️",
+      "snk": "snk",
+      "priceB": "11000",
+      "priceS": "11000",
+      "priceG": "11000",
+      "terjual": 0,
+      "stok": []
+    },
+    "vidpriv": {
+      "id": "vidpriv",
+      "name": "VIDIO PRIVATE ",
+      "desc": "platinum PRIVAT HANYA BISA hp,tab, dan laptop, klo TV 5k priv dan 3k shar dibawah⬇️",
+      "snk": "snk",
+      "priceB": "21000",
+      "priceS": "21000",
+      "priceG": "21000",
+      "terjual": 0,
+      "stok": []
+    },
+    "wetv": {
+      "id": "wetv",
+      "name": "WETV SHARING 1 BULAN",
+      "desc": "sharing fulgar",
+      "snk": "snk",
+      "priceB": "6000",
+      "priceS": "6000",
+      "priceG": "6000",
+      "terjual": 0,
+      "stok": []
+    },
+    "prime": {
+      "id": "prime",
+      "name": "PRIME SHARING 1 BULAN",
+      "desc": "sharing 1 bulan fulgar",
+      "snk": "snk",
+      "priceB": "3500",
+      "priceS": "3500",
+      "priceG": "3500",
+      "terjual": 0,
+      "stok": []
+    },
+    "capcut7d": {
+      "id": "capcut7d",
+      "name": "CAPCUT 1 MINGGU SHARING 3U ",
+      "desc": "sharing 7d",
+      "snk": "snk",
+      "priceB": "3000",
+      "priceS": "3000",
+      "priceG": "3000",
+      "terjual": 0,
+      "stok": []
+    },
+    "capcut3d": {
+      "id": "capcut3d",
+      "name": "CAPCUT 3-6 hari SHARING ",
+      "desc": "durasi random 3-6 hari",
+      "snk": "snk",
+      "priceB": "1500",
+      "priceS": "1500",
+      "priceG": "1500",
+      "terjual": 0,
+      "stok": []
+    },
+    "capcutpriv7d": {
+      "id": "capcutpriv7d",
+      "name": "CAPCUT 1 MINGGU PRIVATE ",
+      "desc": " private 7D FULLGAR",
+      "snk": "snk",
+      "priceB": "5000",
+      "priceS": "5000",
+      "priceG": "5000",
+      "terjual": 0,
+      "stok": []
+    },
+    "yt3b": {
+      "id": "yt3b",
+      "name": "YOUTUBE PREMIUM 3 BULAN ",
+      "desc": " mixplan 3 bulan akun seller",
+      "snk": "snk",
+      "priceB": "15000",
+      "priceS": "15000",
+      "priceG": "15000",
+      "terjual": 0,
+      "stok": []
+    }
+  },
+  "order": {},
+  "transaksi": [
+    {
+      "id": "net2u",
+      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
+      "price": "13700",
+      "date": "2025-08-23 22:57:46",
+      "jumlah": 1
+    },
+    {
+      "id": "net2u",
+      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
+      "price": "13700",
+      "date": "2025-08-23 23:03:45",
+      "jumlah": 1
+    },
+    {
+      "id": "net2u",
+      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
+      "price": "13700",
+      "date": "2025-08-23 23:05:37",
+      "jumlah": 1
+    },
+    {
+      "id": "net2u",
+      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
+      "price": "13700",
+      "date": "2025-08-23 23:10:05",
+      "jumlah": 1
+    },
+    {
+      "id": "net2u",
+      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
+      "price": "13700",
+      "date": "2025-08-23 23:11:44",
+      "jumlah": 1
+    },
+    {
+      "id": "net2u",
+      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
+      "price": "13700",
+      "date": "2025-08-23 23:18:05",
+      "jumlah": 1
+    },
+    {
+      "id": "net2u",
+      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
+      "price": "13700",
+      "date": "2025-08-23 23:18:57",
+      "jumlah": 1
+    }
+  ],
+  "persentase": {
+    "feeDepo": 2,
+    "bronze": 2,
+    "silver": 1,
+    "gold": 1
+  },
+  "customProfit": {},
+  "orkut": {
+    "username": "",
+    "authToken": ""
+  },
+  "unik": [
+    "0",
+    "128",
+    "9",
+    "169",
+    "111",
+    "178",
+    "112",
+    "51",
+    "191",
+    "170",
+    "90",
+    "186",
+    "17",
+    "88"
+  ]
+}

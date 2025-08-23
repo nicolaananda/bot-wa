@@ -10,7 +10,7 @@
   "author": "Ronzz YT",
   "license": "ISC",
   "dependencies": {
-    "@whiskeysockets/baileys": "github:RyuuXiaoo/ryuu-xiao-bail",
+    "@whiskeysockets/baileys": "github:JarotOffc/Oscar-bail",
     "awesome-phonenumber": "^2.69.0",
     "canvas": "^3.0.0",
     "chalk": "^4.1.2",
