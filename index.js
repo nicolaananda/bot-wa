@@ -51,14 +51,37 @@ module.exports = async (ronzz, m, mek) => {
     const q = args.join(" ");
     const command = chats.replace(prefix, '').trim().split(/ +/).shift().toLowerCase()
     const botNumber = ronzz.user.id.split(':')[0] + '@s.whatsapp.net'
-    const groupMetadata = isGroup ? await ronzz.groupMetadata(from) : ''
-    const groupName = isGroup ? groupMetadata.subject : ''
-    const groupId = isGroup ? groupMetadata.id : ''
-    const groupMembers = isGroup ? groupMetadata.participants : ''
-    const groupAdmins = isGroup ? getGroupAdmins(groupMembers) : ''
-    const isBotGroupAdmins = groupAdmins.includes(botNumber) || false
-    const isGroupAdmins = groupAdmins.includes(sender)
-    const participants = isGroup ? await groupMetadata.participants : ''
+    let groupMetadata = ''
+    let groupName = ''
+    let groupId = ''
+    let groupMembers = ''
+    let groupAdmins = []
+    let isBotGroupAdmins = false
+    let isGroupAdmins = false
+    let participants = ''
+    
+    if (isGroup) {
+      try {
+        groupMetadata = await ronzz.groupMetadata(from)
+        groupName = groupMetadata.subject || ''
+        groupId = groupMetadata.id || ''
+        groupMembers = groupMetadata.participants || []
+        groupAdmins = getGroupAdmins(groupMembers)
+        isBotGroupAdmins = groupAdmins.includes(botNumber) || false
+        isGroupAdmins = groupAdmins.includes(sender) || false
+        participants = groupMembers
+      } catch (error) {
+        console.log('Error getting group metadata:', error.message)
+        // Fallback values for group
+        groupName = 'Unknown Group'
+        groupId = from
+        groupMembers = []
+        groupAdmins = []
+        isBotGroupAdmins = false
+        isGroupAdmins = false
+        participants = []
+      }
+    }
     
     const isImage = (m.mtype == 'imageMessage')
     const isQuotedImage = isQuotedMsg ? content.includes('imageMessage') ? true : false : false

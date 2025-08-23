@@ -116,10 +116,16 @@ async function startronzz() {
         const m = smsg(ronzz, mek, store)
         if (mek.key && mek.key.remoteJid === 'status@broadcast') return
         if (mek.key.id.startsWith('BAE5') && mek.key.id.length === 16) return
-        require('./index')(ronzz, m, mek)
+        
+        try {
+          require('./index')(ronzz, m, mek)
+        } catch (cmdError) {
+          console.log('Command execution error:', cmdError.message)
+          // Don't crash the bot, just log the error
+        }
       }
     } catch (err) {
-      console.log(err)
+      console.log('Message processing error:', err.message)
     }
   })
 
