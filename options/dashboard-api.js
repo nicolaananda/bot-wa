@@ -6,6 +6,9 @@ const https = require('https');
 const http = require('http');
 const { getDashboardData, getDailyChartData, getMonthlyChartData, getUserActivityData } = require('./dashboard-helper');
 
+// Import stock helper functions
+const stockHelper = require('./stock-helper');
+
 // Contoh API endpoint untuk dashboard web
 // Pastikan install: npm install express cors
 
@@ -795,6 +798,637 @@ app.get('/api/dashboard/transactions/recent', (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
+      error: error.message
+    });
+  }
+});
+
+// Stock Management API Endpoints
+
+// Helper function to determine stock status
+function getStockStatus(stockCount) {
+  if (stockCount === 0) return 'out';
+  if (stockCount <= 3) return 'low';
+  if (stockCount <= 10) return 'medium';
+  return 'good';
+}
+
+// Helper function to determine product category
+function getProductCategory(productId, productName) {
+  const name = productName.toLowerCase();
+  if (name.includes('netflix') || name.includes('viu') || name.includes('vidio') || name.includes('youtube')) {
+    return 'Streaming';
+  } else if (name.includes('capcut') || name.includes('canva')) {
+    return 'Software';
+  } else if (name.includes('game') || name.includes('gaming')) {
+    return 'Gaming';
+  }
+  return 'Uncategorized';
+}
+
+// Helper function to parse stock item
+function parseStockItem(stockString) {
+  const parts = stockString.split('|');
+  if (parts.length >= 4) {
+    return {
+      email: parts[0] || '',
+      password: parts[1] || '',
+      profile: parts[2] || '',
+      pin: parts[3] || '',
+      notes: parts[4] || '-'
+    };
+  }
+  return {
+    email: stockString,
+    password: '',
+    profile: '',
+    pin: '',
+    notes: '-'
+  };
+}
+
+// 1. Get Product Stock Data
+app.get('/api/dashboard/products/stock', async (req, res) => {
+  try {
+    const db = loadDatabase();
+    if (!db || !db.produk) {
+      return res.status(404).json({
+        success: false,
+        message: 'Database or products not found'
+      });
+    }
+
+    const products = [];
+    let totalSold = 0;
+
+    for (const [productId, product] of Object.entries(db.produk)) {
+      const stockCount = product.stok ? product.stok.length : 0;
+      totalSold += product.terjual || 0;
+
+      const formattedProduct = {
+        id: product.id,
+        name: product.name,
+        desc: product.desc,
+        priceB: product.priceB,
+        priceS: product.priceS,
+        priceG: product.priceG,
+        terjual: product.terjual || 0,
+        stockCount: stockCount,
+        stok: product.stok || [],
+        stockStatus: getStockStatus(stockCount),
+        category: getProductCategory(productId, product.name),
+        lastRestock: product.lastRestock || null
+      };
+
+      products.push(formattedProduct);
+    }
+
+    // Sort products by stock count (ascending) to show low stock first
+    products.sort((a, b) => a.stockCount - b.stockCount);
+
+    // Get top products by sales
+    const topProducts = products
+      .filter(p => p.terjual > 0)
+      .sort((a, b) => b.terjual - a.terjual)
+      .slice(0, 5);
+
+    res.json({
+      success: true,
+      data: {
+        totalProducts: products.length,
+        totalSold: totalSold,
+        products: products,
+        topProducts: topProducts
+      }
+    });
+  } catch (error) {
+    console.error('Error getting product stock data:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 2. Get Stock Summary
+app.get('/api/dashboard/products/stock/summary', async (req, res) => {
+  try {
+    const db = loadDatabase();
+    if (!db || !db.produk) {
+      return res.status(404).json({
+        success: false,
+        message: 'Database or products not found'
+      });
+    }
+
+    let totalStockItems = 0;
+    let lowStockProducts = 0;
+    let outOfStockProducts = 0;
+    const categories = new Set();
+    const stockByCategory = {};
+
+    for (const [productId, product] of Object.entries(db.produk)) {
+      const stockCount = product.stok ? product.stok.length : 0;
+      const category = getProductCategory(productId, product.name);
+      
+      totalStockItems += stockCount;
+      categories.add(category);
+      
+      if (stockCount === 0) {
+        outOfStockProducts++;
+      } else if (stockCount <= 3) {
+        lowStockProducts++;
+      }
+
+      // Count stock by category
+      if (!stockByCategory[category]) {
+        stockByCategory[category] = 0;
+      }
+      stockByCategory[category] += stockCount;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        totalProducts: Object.keys(db.produk).length,
+        totalStockItems: totalStockItems,
+        lowStockProducts: lowStockProducts,
+        outOfStockProducts: outOfStockProducts,
+        categories: Array.from(categories),
+        stockByCategory: stockByCategory
+      }
+    });
+  } catch (error) {
+    console.error('Error getting stock summary:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 3. Update Product Stock
+app.put('/api/dashboard/products/:productId/stock', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { action, stockItems, notes } = req.body;
+
+    if (!action || !stockItems || !Array.isArray(stockItems)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request body. Required: action, stockItems array'
+      });
+    }
+
+    if (!['add', 'remove'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Action must be either "add" or "remove"'
+      });
+    }
+
+    const db = loadDatabase();
+    if (!db || !db.produk) {
+      return res.status(404).json({
+        success: false,
+        message: 'Database or products not found'
+      });
+    }
+
+    if (!db.produk[productId]) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    const product = db.produk[productId];
+    const previousStockCount = product.stok ? product.stok.length : 0;
+    let newStockCount = previousStockCount;
+
+    if (action === 'add') {
+      // Add new stock items
+      if (!product.stok) {
+        product.stok = [];
+      }
+      
+      // Validate stock items format
+      const validStockItems = stockItems.filter(item => {
+        if (typeof item === 'string') {
+          return item.includes('|') && item.split('|').length >= 4;
+        }
+        return false;
+      });
+
+      if (validStockItems.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid stock item format. Expected: "email|password|profile|pin|notes"'
+        });
+      }
+
+      product.stok.push(...validStockItems);
+      newStockCount = product.stok.length;
+      
+      // Update last restock timestamp
+      product.lastRestock = new Date().toISOString();
+
+    } else if (action === 'remove') {
+      // Remove stock items
+      if (!product.stok || product.stok.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No stock available to remove'
+        });
+      }
+
+      // Remove items from the beginning of the array (FIFO)
+      const itemsToRemove = Math.min(stockItems.length, product.stok.length);
+      product.stok.splice(0, itemsToRemove);
+      newStockCount = product.stok.length;
+    }
+
+    // Save updated database
+    if (saveDatabase(db)) {
+      res.json({
+        success: true,
+        data: {
+          productId: productId,
+          previousStockCount: previousStockCount,
+          newStockCount: newStockCount,
+          addedItems: action === 'add' ? stockItems.length : 0,
+          removedItems: action === 'remove' ? Math.min(stockItems.length, previousStockCount) : 0,
+          updatedAt: new Date().toISOString(),
+          notes: notes || null
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to save database'
+      });
+    }
+
+  } catch (error) {
+    console.error('Error updating product stock:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 4. Get Low Stock Alerts
+app.get('/api/dashboard/products/stock/alerts', async (req, res) => {
+  try {
+    const db = loadDatabase();
+    if (!db || !db.produk) {
+      return res.status(404).json({
+        success: false,
+        message: 'Database or products not found'
+      });
+    }
+
+    const alerts = [];
+    const threshold = 5; // Low stock threshold
+
+    for (const [productId, product] of Object.entries(db.produk)) {
+      const stockCount = product.stok ? product.stok.length : 0;
+      
+      if (stockCount <= threshold) {
+        alerts.push({
+          productId: product.id,
+          productName: product.name,
+          currentStock: stockCount,
+          threshold: threshold,
+          status: stockCount === 0 ? 'out' : 'low',
+          category: getProductCategory(productId, product.name),
+          lastRestock: product.lastRestock || null,
+          urgency: stockCount === 0 ? 'critical' : stockCount <= 2 ? 'high' : 'medium'
+        });
+      }
+    }
+
+    // Sort by urgency (critical first, then by stock count)
+    alerts.sort((a, b) => {
+      if (a.urgency === 'critical' && b.urgency !== 'critical') return -1;
+      if (b.urgency === 'critical' && a.urgency !== 'critical') return 1;
+      return a.currentStock - b.currentStock;
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalAlerts: alerts.length,
+        criticalAlerts: alerts.filter(a => a.urgency === 'critical').length,
+        highAlerts: alerts.filter(a => a.urgency === 'high').length,
+        mediumAlerts: alerts.filter(a => a.urgency === 'medium').length,
+        alerts: alerts
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting stock alerts:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 5. Get Product Stock History (Basic implementation)
+app.get('/api/dashboard/products/:productId/stock/history', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const db = loadDatabase();
+    
+    if (!db || !db.produk || !db.produk[productId]) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    const product = db.produk[productId];
+    
+    // Basic history - in a real implementation, you'd want to track this separately
+    const history = [];
+    
+    if (product.lastRestock) {
+      history.push({
+        type: 'restock',
+        timestamp: product.lastRestock,
+        description: 'Stock added to product',
+        quantity: product.stok ? product.stok.length : 0
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        productId: productId,
+        productName: product.name,
+        currentStock: product.stok ? product.stok.length : 0,
+        history: history,
+        message: 'Note: Detailed history tracking requires additional database fields'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting product stock history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 6. Get Advanced Stock Analytics
+app.get('/api/dashboard/products/stock/analytics', async (req, res) => {
+  try {
+    const analytics = stockHelper.getStockAnalytics();
+    
+    if (!analytics) {
+      return res.status(404).json({
+        success: false,
+        message: 'Failed to generate stock analytics'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: analytics
+    });
+  } catch (error) {
+    console.error('Error getting stock analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 7. Generate Stock Report
+app.get('/api/dashboard/products/stock/report', async (req, res) => {
+  try {
+    const report = stockHelper.generateStockReport();
+    
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: 'Failed to generate stock report'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: report
+    });
+  } catch (error) {
+    console.error('Error generating stock report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 8. Export Stock Data to CSV
+app.get('/api/dashboard/products/stock/export', async (req, res) => {
+  try {
+    const csv = stockHelper.exportStockToCSV();
+    
+    if (!csv) {
+      return res.status(404).json({
+        success: false,
+        message: 'Failed to export stock data'
+      });
+    }
+
+    // Set headers for CSV download
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="stock_report_${new Date().toISOString().split('T')[0]}.csv"`);
+    
+    res.send(csv);
+  } catch (error) {
+    console.error('Error exporting stock data:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 9. Bulk Stock Update
+app.post('/api/dashboard/products/stock/bulk-update', async (req, res) => {
+  try {
+    const { updates } = req.body;
+    
+    if (!updates || !Array.isArray(updates)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request body. Required: updates array'
+      });
+    }
+
+    const db = stockHelper.loadDatabase();
+    if (!db || !db.produk) {
+      return res.status(404).json({
+        success: false,
+        message: 'Database or products not found'
+      });
+    }
+
+    const results = [];
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const update of updates) {
+      const { productId, action, stockItems, notes } = update;
+      
+      try {
+        if (!db.produk[productId]) {
+          results.push({
+            productId,
+            success: false,
+            error: 'Product not found'
+          });
+          errorCount++;
+          continue;
+        }
+
+        const product = db.produk[productId];
+        const previousStockCount = product.stok ? product.stok.length : 0;
+        let newStockCount = previousStockCount;
+
+        if (action === 'add') {
+          if (!product.stok) product.stok = [];
+          
+          const validItems = stockItems.filter(item => stockHelper.validateStockItem(item));
+          product.stok.push(...validItems);
+          newStockCount = product.stok.length;
+          product.lastRestock = new Date().toISOString();
+          
+        } else if (action === 'remove') {
+          if (product.stok && product.stok.length > 0) {
+            const itemsToRemove = Math.min(stockItems.length, product.stok.length);
+            product.stok.splice(0, itemsToRemove);
+            newStockCount = product.stok.length;
+          }
+        }
+
+        results.push({
+          productId,
+          success: true,
+          previousStockCount,
+          newStockCount,
+          action,
+          itemsProcessed: stockItems.length
+        });
+        successCount++;
+
+      } catch (error) {
+        results.push({
+          productId,
+          success: false,
+          error: error.message
+        });
+        errorCount++;
+      }
+    }
+
+    // Save database if any updates were successful
+    if (successCount > 0) {
+      stockHelper.saveDatabase(db);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        totalUpdates: updates.length,
+        successfulUpdates: successCount,
+        failedUpdates: errorCount,
+        results: results
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in bulk stock update:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 10. Get Product Stock Details
+app.get('/api/dashboard/products/:productId/stock/details', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const db = stockHelper.loadDatabase();
+    
+    if (!db || !db.produk || !db.produk[productId]) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    const product = db.produk[productId];
+    const metrics = stockHelper.calculateStockMetrics(product);
+    
+    // Parse stock items for detailed view
+    const stockItems = (product.stok || []).map(item => {
+      const parsed = stockHelper.parseStockItem(item);
+      return {
+        raw: item,
+        parsed: parsed,
+        isValid: stockHelper.validateStockItem(item)
+      };
+    });
+
+    const response = {
+      productId: product.id,
+      productName: product.name,
+      description: product.desc,
+      prices: {
+        bronze: product.priceB,
+        silver: product.priceS,
+        gold: product.priceG
+      },
+      sales: {
+        total: product.terjual || 0
+      },
+      stock: {
+        count: metrics.stockCount,
+        status: metrics.stockStatus,
+        items: stockItems,
+        metrics: metrics
+      },
+      category: metrics.category,
+      lastRestock: product.lastRestock || null,
+      terms: product.snk || null
+    };
+
+    res.json({
+      success: true,
+      data: response
+    });
+
+  } catch (error) {
+    console.error('Error getting product stock details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
       error: error.message
     });
   }
