@@ -2715,7 +2715,7 @@ Ada yang deposit nih kak, coba dicek saldonya`
           footer: `${botName} © ${ownerName}`,
           buttons: [
             {
-              buttonId: 'ceksaldo', buttonText: { displayText: 'Cek Saldo' }, type: 1,
+              buttonId: 'ceksaldo', buttonText: { displayText: 'ceksaldo' }, type: 1,
             }
           ],
           headerType: 1,
