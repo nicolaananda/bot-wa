@@ -1593,9 +1593,21 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         break
 
       case 'stok': case 'stock': {
-        if (Object.keys(db.data.produk).length == 0) return reply("Belum ada produk di database")
+        try {
+          console.log('🔄 Executing stok command...');
+          
+          // Check database structure
+          if (!db || !db.data || !db.data.produk) {
+            console.log('❌ Database tidak tersedia');
+            return reply("❌ Database tidak tersedia atau rusak");
+          }
+          
+          if (Object.keys(db.data.produk).length == 0) {
+            console.log('⚠️ Tidak ada produk di database');
+            return reply("📦 Belum ada produk di database")
+          }
 
-        let teks = `*╭────〔 PRODUCT LIST📦 〕─* 
+          let teks = `*╭────〔 PRODUCT LIST📦 〕─* 
 *┊・* Cara membeli produk ketik perintah berikut
 *┊・* ${prefix}buy kodeproduk jumlah
 *┊・* Contoh: ${prefix}buy netflix 2
@@ -1603,18 +1615,54 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 *┊・* Kontak Admin: @${ownerNomer}
 *╰┈┈┈┈┈┈┈┈*\n\n`
 
-        Object.keys(db.data.produk).forEach(i => {
-          teks += `*╭──〔 ${db.data.produk[i].name} 〕─*
-*┊・ 🔐| Kode:* ${db.data.produk[i].id}
-*┊・ 🏷️| Harga:* Rp${toRupiah(hargaProduk(i, db.data.users[sender].role))}
-*┊・ 📦| Stok Tersedia:* ${db.data.produk[i].stok.length}
-*┊・ 🧾| Stok Terjual:* ${db.data.produk[i].terjual}
-*┊・ 📝| Desk:* ${db.data.produk[i].desc}
-*┊・ ✍️| Ketik:* ${prefix}buy ${db.data.produk[i].id} 1
+          Object.keys(db.data.produk).forEach(i => {
+            try {
+              const produk = db.data.produk[i];
+              if (!produk) return;
+              
+              // Safe access to product properties
+              const name = produk.name || 'Unknown';
+              const id = produk.id || i;
+              const desc = produk.desc || 'Tidak ada deskripsi';
+              const stokLength = produk.stok && Array.isArray(produk.stok) ? produk.stok.length : 0;
+              const terjual = produk.terjual || 0;
+              
+              // Get price safely
+              let harga = 'Harga tidak tersedia';
+              try {
+                if (typeof hargaProduk === 'function') {
+                  const userRole = db.data.users && db.data.users[sender] ? db.data.users[sender].role : 'bronze';
+                  const hargaValue = hargaProduk(i, userRole);
+                  if (hargaValue && typeof toRupiah === 'function') {
+                    harga = `Rp${toRupiah(hargaValue)}`;
+                  } else {
+                    harga = 'Harga tidak tersedia';
+                  }
+                }
+              } catch (error) {
+                console.log('⚠️ Error getting price for product', i, ':', error.message);
+                harga = 'Harga tidak tersedia';
+              }
+              
+              teks += `*╭──〔 ${name} 〕─*
+*┊・ 🔐| Kode:* ${id}
+*┊・ 🏷️| Harga:* ${harga}
+*┊・ 📦| Stok Tersedia:* ${stokLength}
+*┊・ 🧾| Stok Terjual:* ${terjual}
+*┊・ 📝| Desk:* ${desc}
+*┊・ ✍️| Ketik:* ${prefix}buy ${id} 1
 *╰┈┈┈┈┈┈┈┈*\n\n`
-        })
+            } catch (error) {
+              console.log('⚠️ Error processing product', i, ':', error.message);
+            }
+          })
 
-        ronzz.sendMessage(from, { text: teks, mentions: [ownerNomer + "@s.whatsapp.net"] }, { quoted: m })
+          console.log('✅ Stok command executed successfully');
+          ronzz.sendMessage(from, { text: teks, mentions: [ownerNomer + "@s.whatsapp.net"] }, { quoted: m })
+        } catch (error) {
+          console.error('❌ Error in stok command:', error);
+          reply(`❌ Terjadi kesalahan pada command stok: ${error.message}`)
+        }
       }
         break
 
