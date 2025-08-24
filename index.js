@@ -1627,73 +1627,72 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
       case 'stok': case 'stock': {
         try {
-          console.log('🔄 Executing stok command...');
-          
           // Check database structure
-          if (!db || !db.data || !db.data.produk) {
-            console.log('❌ Database tidak tersedia');
-            return reply("❌ Database tidak tersedia atau rusak");
+          if (!db?.data?.produk) {
+            return reply("❌ Database tidak tersedia atau rusak")
           }
           
-          if (Object.keys(db.data.produk).length == 0) {
-            console.log('⚠️ Tidak ada produk di database');
+          const products = db.data.produk
+          if (Object.keys(products).length === 0) {
             return reply("📦 Belum ada produk di database")
           }
 
-          let teks = `*╭────〔 PRODUCT LIST📦 〕─* 
-*┊・* Cara membeli produk ketik perintah berikut
-*┊・* ${prefix}buy kodeproduk jumlah
-*┊・* Contoh: ${prefix}buy netflix 2
-*┊・* Pastikan kode dan jumlah akun sudah benar
-*┊・* Kontak Admin: @${ownerNomer}
-*╰┈┈┈┈┈┈┈┈*\n\n`
+          let teks = `*╭────〔 PRODUCT LIST📦 〕─*\n`
+          teks += `*┊・* Cara membeli: ${prefix}buy kodeproduk jumlah\n`
+          teks += `*┊・* Contoh: ${prefix}buy netflix 2\n`
+          teks += `*┊・* Kontak Admin: @${ownerNomer}\n`
+          teks += `*╰┈┈┈┈┈┈┈┈*\n\n`
 
-          Object.keys(db.data.produk).forEach(i => {
+          // Process each product safely
+          for (const productId of Object.keys(products)) {
             try {
-              const produk = db.data.produk[i];
-              if (!produk) return;
+              const produk = products[productId]
+              if (!produk) continue
               
-              // Safe access to product properties
-              const name = produk.name || 'Unknown';
-              const id = produk.id || i;
-              const desc = produk.desc || 'Tidak ada deskripsi';
-              const stokLength = produk.stok && Array.isArray(produk.stok) ? produk.stok.length : 0;
-              const terjual = produk.terjual || 0;
+              // Safe property access with defaults
+              const name = produk.name || 'Unknown'
+              const desc = produk.desc || 'Tidak ada deskripsi'
+              const stokLength = Array.isArray(produk.stok) ? produk.stok.length : 0
+              const terjual = produk.terjual || 0
               
               // Get price safely
-              let harga = 'Harga tidak tersedia';
+              let harga = 'Harga tidak tersedia'
               try {
-                if (typeof hargaProduk === 'function') {
-                  const userRole = db.data.users && db.data.users[sender] ? db.data.users[sender].role : 'bronze';
-                  const hargaValue = hargaProduk(i, userRole);
-                  if (hargaValue && typeof toRupiah === 'function') {
-                    harga = `Rp${toRupiah(hargaValue)}`;
-                  } else {
-                    harga = 'Harga tidak tersedia';
+                if (typeof hargaProduk === 'function' && typeof toRupiah === 'function') {
+                  const userRole = db.data.users?.[sender]?.role || 'bronze'
+                  const hargaValue = hargaProduk(productId, userRole)
+                  if (hargaValue && !isNaN(hargaValue)) {
+                    harga = `Rp${toRupiah(hargaValue)}`
                   }
                 }
               } catch (error) {
-                console.log('⚠️ Error getting price for product', i, ':', error.message);
-                harga = 'Harga tidak tersedia';
+                console.log(`⚠️ Error getting price for product ${productId}:`, error.message)
               }
               
-              teks += `*╭──〔 ${name} 〕─*
-*┊・ 🔐| Kode:* ${id}
-*┊・ 🏷️| Harga:* ${harga}
-*┊・ 📦| Stok Tersedia:* ${stokLength}
-*┊・ 🧾| Stok Terjual:* ${terjual}
-*┊・ 📝| Desk:* ${desc}
-*┊・ ✍️| Ketik:* ${prefix}buy ${id} 1
-*╰┈┈┈┈┈┈┈┈*\n\n`
+              // Build product info
+              teks += `*╭──〔 ${name} 〕─*\n`
+              teks += `*┊・ 🔐| Kode:* ${productId}\n`
+              teks += `*┊・ 🏷️| Harga:* ${harga}\n`
+              teks += `*┊・ 📦| Stok:* ${stokLength}\n`
+              teks += `*┊・ 🧾| Terjual:* ${terjual}\n`
+              teks += `*┊・ 📝| Desk:* ${desc}\n`
+              teks += `*┊・ ✍️| Beli:* ${prefix}buy ${productId} 1\n`
+              teks += `*╰┈┈┈┈┈┈┈┈*\n\n`
+              
             } catch (error) {
-              console.log('⚠️ Error processing product', i, ':', error.message);
+              console.log(`⚠️ Error processing product ${productId}:`, error.message)
+              // Continue with next product instead of breaking
             }
-          })
+          }
 
-          console.log('✅ Stok command executed successfully');
-          ronzz.sendMessage(from, { text: teks, mentions: [ownerNomer + "@s.whatsapp.net"] }, { quoted: m })
+          // Send the message
+          ronzz.sendMessage(from, { 
+            text: teks, 
+            mentions: [ownerNomer + "@s.whatsapp.net"] 
+          }, { quoted: m })
+          
         } catch (error) {
-          console.error('❌ Error in stok command:', error);
+          console.error('❌ Error in stok command:', error)
           reply(`❌ Terjadi kesalahan pada command stok: ${error.message}`)
         }
       }
@@ -2001,24 +2000,42 @@ Ada transaksi yang telah dibayar!
 
         let reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
         
-        // Buat teks detail akun
-        let detailAkun = `*───「 ACCOUNT DETAIL 」───*\n\n`
+        // Buat teks detail akun yang lebih rapi
+        let detailAkun = `*╭────「 ACCOUNT DETAIL 」────╮*\n\n`
+        detailAkun += `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
+        detailAkun += `*🛍️ Jumlah:* ${data[1]} akun\n`
+        detailAkun += `*🧾 Reff ID:* ${reffId}\n`
+        detailAkun += `*📅 Tanggal:* ${tanggal}\n`
+        detailAkun += `*⏰ Jam:* ${jamwib} WIB\n\n`
+        detailAkun += `*╭────「 DETAIL AKUN 」────╮*\n\n`
+        
         dataStok.forEach((i, index) => {
           let dataAkun = i.split("|")
-          detailAkun += `*📱 Akun ${index + 1}*\n`
-          detailAkun += `• Email: ${dataAkun[0]}\n`
-          detailAkun += `• Password: ${dataAkun[1]}\n`
-          detailAkun += `• Profil: ${dataAkun[2] ? dataAkun[2] : "-"}\n`
-          detailAkun += `• Pin: ${dataAkun[3] ? dataAkun[3] : "-"}\n`
-          detailAkun += `• 2FA: ${dataAkun[4] ? dataAkun[4] : "-"}\n\n`
+          detailAkun += `*📱 AKUN ${index + 1}*\n`
+          detailAkun += `┌─────────────────────────\n`
+          detailAkun += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
+          detailAkun += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
+          detailAkun += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`
+          detailAkun += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`
+          detailAkun += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n`
+          detailAkun += `└─────────────────────────\n\n`
         })
+        
+        detailAkun += `*╰────「 END ACCOUNT 」────╯*\n\n`
+        detailAkun += `*💡 Tips:* Simpan informasi akun dengan aman dan jangan bagikan kepada siapapun!`
         
         // Kirim detail akun ke chat pribadi user
         await ronzz.sendMessage(sender, { text: detailAkun }, { quoted: m })
         
-        // Kirim SNK produk ke chat pribadi user
-        let snkProduk = `*───「 SNK PRODUK 」───*\n\n`
-        snkProduk += `${db.data.produk[data[0]].snk}`
+        // Buat teks SNK produk yang lebih rapi
+        let snkProduk = `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`
+        snkProduk += `*📋 SNK PRODUK: ${db.data.produk[data[0]].name}*\n\n`
+        snkProduk += `${db.data.produk[data[0]].snk}\n\n`
+        snkProduk += `*⚠️ PENTING:*\n`
+        snkProduk += `• Baca dan pahami SNK sebelum menggunakan akun\n`
+        snkProduk += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`
+        snkProduk += `• Hubungi admin jika ada masalah dengan akun\n\n`
+        snkProduk += `*╰────「 END SNK 」────╯*`
         
         await ronzz.sendMessage(sender, { text: snkProduk }, { quoted: m })
         
@@ -2732,13 +2749,31 @@ OVO | GOPAY | SHOPEEPAY | DANA
         if (!q) return reply(`Contoh: ${prefix + command} 628xx,20000`)
         if (!q.split(",")[0]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
         if (!q.split(",")[1]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
+        
         let nomorNya = q.split(",")[0].replace(/[^0-9]/g, '') + "@s.whatsapp.net"
-        if (db.data.users[nomorNya].saldo <= 0) return reply("Dia belum terdaftar di database saldo.")
-        if (db.data.users[nomorNya].saldo < q.split(",")[1] && db.data.saldo[nomorNya] !== 0) return reply(`Dia saldonya ${db.data.users[nomorNya].saldo}, jadi jangan melebihi ${db.data.users[nomorNya].saldo} yah kak??`)
-        db.data.users[nomorNya].saldo -= Number(q.split(",")[1])
+        let nominal = Number(q.split(",")[1])
+        
+        // Check if user exists, if not create them
+        if (!db.data.users[nomorNya]) {
+          db.data.users[nomorNya] = {
+            saldo: 0,
+            role: 'bronze'
+          }
+        }
+        
+        // Validate saldo before deduction
+        if (db.data.users[nomorNya].saldo <= 0) return reply("User belum terdaftar di database saldo atau saldo 0.")
+        if (db.data.users[nomorNya].saldo < nominal) return reply(`Saldo user tidak cukup! Saldo: Rp${toRupiah(db.data.users[nomorNya].saldo)}, yang ingin dikurangi: Rp${toRupiah(nominal)}`)
+        
+        db.data.users[nomorNya].saldo -= nominal
         await db.save() // Force save database
         await sleep(50)
-        ronzz.sendMessage(from, { text: `*SALDO USER*\nID: ${nomorNya.split('@')[0]}\nNomer: @${nomorNya.split('@')[0]}\nSaldo: Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
+        
+        // Notifikasi ke admin
+        ronzz.sendMessage(from, { text: `*SALDO BERHASIL DIKURANGI!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
+        
+        // Notifikasi ke user yang dikurangi saldonya
+        ronzz.sendMessage(nomorNya, { text: `⚠️ *SALDO TELAH DIKURANGI!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
       }
         break
 
