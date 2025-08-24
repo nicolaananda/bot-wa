@@ -25,6 +25,39 @@ const { expiredCheck, getAllSewa } = require("./function/sewa");
 const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
 const { qrisDinamis } = require("./function/dinamis");
+
+// Performance optimization: Cache for user saldo
+const saldoCache = new Map();
+const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+
+// Cache management functions
+function getCachedSaldo(userId) {
+  const cached = saldoCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY) {
+    return cached.saldo;
+  }
+  return null;
+}
+
+function setCachedSaldo(userId, saldo) {
+  saldoCache.set(userId, {
+    saldo: saldo,
+    timestamp: Date.now()
+  });
+}
+
+function clearExpiredCache() {
+  const now = Date.now();
+  for (const [userId, data] of saldoCache.entries()) {
+    if (now - data.timestamp > CACHE_EXPIRY) {
+      saldoCache.delete(userId);
+    }
+  }
+}
+
+// Clear expired cache every 10 minutes
+setInterval(clearExpiredCache, 10 * 60 * 1000);
+
 global.prefa = ['', '.']
 
 moment.tz.setDefault("Asia/Jakarta").locale("id");
@@ -2020,7 +2053,11 @@ Ada transaksi dengan saldo yang telah selesai!
           totalBayar: totalHarga
         })
         
-        reply("Pembelian berhasil! Detail akun telah dikirim ke chat.")
+        // Beri notifikasi pembelian berhasil hanya jika di grup
+        if (isGroup) {
+          reply("Pembelian berhasil! Detail akun telah dikirim ke chat.")
+        }
+        // Jika di private chat (PC), tidak perlu notifikasi
       }
         break
 
@@ -2521,7 +2558,15 @@ Ada yang deposit nih kak, coba dicek saldonya`
             // Check if user exists in database
             if (db.data.users && db.data.users[targetUserId]) {
               const targetUser = db.data.users[targetUserId];
-              const saldo = parseInt(targetUser.saldo) || 0;
+              
+              // Try to get saldo from cache first for better performance
+              let saldo = getCachedSaldo(targetUserId);
+              if (saldo === null) {
+                // If not in cache, get from database and cache it
+                saldo = parseInt(targetUser.saldo) || 0;
+                setCachedSaldo(targetUserId, saldo);
+              }
+              
               const username = targetUser.username || `User ${targetUserId.slice(-4)}`;
               
               reply(`*💰 Cek Saldo User Lain (Owner Only)*\n\n👤 *User:* ${username}\n🆔 *ID:* ${targetUserId}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`, { quoted: m });
@@ -2535,10 +2580,18 @@ Ada yang deposit nih kak, coba dicek saldonya`
           // If not reply, check own saldo (all users can do this)
           if (db.data.users && db.data.users[sender]) {
             const user = db.data.users[sender];
-            const saldo = parseInt(user.saldo) || 0;
+            
+            // Try to get saldo from cache first for better performance
+            let saldo = getCachedSaldo(sender);
+            if (saldo === null) {
+              // If not in cache, get from database and cache it
+              saldo = parseInt(user.saldo) || 0;
+              setCachedSaldo(sender, saldo);
+            }
+            
             const username = user.username || `User ${sender.slice(-4)}`;
             
-            reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* ${username}\n🆔 *ID:* ${sender}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n💡 *Tips Owner:* Reply/quote reply pesan user lain untuk cek saldo mereka.`);
+            reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* ${username}\n🆔 *ID:* ${sender}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n💡 *Saldo hanya untuk transaksi dibot ini.*`);
           } else {
             reply(`❌ Data user tidak ditemukan.\n\n💡 *Tips:* User harus sudah pernah melakukan transaksi untuk tersimpan dalam database.`);
           }
@@ -2551,7 +2604,7 @@ Ada yang deposit nih kak, coba dicek saldonya`
           footer: `${botName} © ${ownerName}`,
           buttons: [
             {
-              buttonId: 'saldo', buttonText: { displayText: 'Cek Saldo' }, type: 1,
+              buttonId: 'ceksaldo', buttonText: { displayText: 'Cek Saldo' }, type: 1,
             }
           ],
           headerType: 1,

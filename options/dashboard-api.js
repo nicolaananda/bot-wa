@@ -18,10 +18,24 @@ app.use(express.json());
 function loadDatabase() {
   try {
     const dbPath = path.join(__dirname, 'database.json');
+    console.log('Loading database from:', dbPath);
+    console.log('Current directory:', __dirname);
+    console.log('File exists:', fs.existsSync(dbPath));
+    
+    if (!fs.existsSync(dbPath)) {
+      console.error('Database file not found at:', dbPath);
+      return null;
+    }
+    
     const dbContent = fs.readFileSync(dbPath, 'utf8');
-    return JSON.parse(dbContent);
+    console.log('File size:', dbContent.length, 'characters');
+    
+    const parsed = JSON.parse(dbContent);
+    console.log('Database loaded successfully with keys:', Object.keys(parsed));
+    return parsed;
   } catch (error) {
     console.error('Error loading database:', error);
+    console.error('Error stack:', error.stack);
     return null;
   }
 }
@@ -370,8 +384,10 @@ app.get('/api/dashboard/users/:userId/transactions', (req, res) => {
       });
     }
     
-    // Get user info
-    const user = db.data.users[userId];
+    // Get user info - search with and without @s.whatsapp.net
+    const userWithDomain = `${userId}@s.whatsapp.net`;
+    const user = db.data.users[userId] || db.data.users[userWithDomain];
+    
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -379,45 +395,50 @@ app.get('/api/dashboard/users/:userId/transactions', (req, res) => {
       });
     }
     
-    // Filter transaksi berdasarkan userId
-    const userTransactions = db.data.transaksi.filter(t => t.user === userId);
-    const totalTransaksi = userTransactions.length;
-    const totalSpent = userTransactions.reduce((sum, t) => sum + (t.totalBayar || (parseInt(t.price) * t.jumlah)), 0);
+    // Filter transaksi berdasarkan userId (both formats)
+    const userTransactions = db.data.transaksi.filter(t => 
+      t.user === userId || t.user === userWithDomain
+    );
     
-    // Transform data sesuai dengan spesifikasi frontend
+    const totalTransaksi = userTransactions.length;
+    const totalSpent = userTransactions.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
+    
+    // Transform data sesuai dengan kontrak API
     const transformedTransactions = userTransactions.map(t => ({
-      id: t.id || `trans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: t.id || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      referenceId: t.reffId || `REF-${userId}-${Date.now()}`,
+      reffId: t.reffId || `REF-${userId}-${Date.now()}`,
+      order_id: t.order_id || t.reffId || `ORD-${Date.now()}`,
       name: t.name || 'Unknown Product',
+      jumlah: parseInt(t.jumlah) || 1,
       price: parseInt(t.price) || 0,
-      date: t.date || new Date().toISOString(),
-      jumlah: t.jumlah || 1,
-      user_name: user.username || `User ${userId}`,
-      user_id: userId,
-      payment_method: t.payment_method || t.metodeBayar || 'Not specified',
-      totalBayar: t.totalBayar || (parseInt(t.price) * (t.jumlah || 1)),
-      reffId: t.order_id || t.reffId || `REF${Date.now()}`,
-      order_id: t.order_id || t.reffId || `ORD${Date.now()}`,
+      totalBayar: parseInt(t.totalBayar) || 0,
+      date: t.date ? new Date(t.date).toISOString() : new Date().toISOString(),
+      payment_method: t.metodeBayar || 'Not specified',
+      metodeBayar: t.metodeBayar || 'Not specified',
       status: t.status || 'completed'
     }));
+    
+    // Sort transactions by date (newest first)
+    transformedTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
     
     res.json({
       success: true,
       data: {
-        user: user.username || `User ${userId}`,
+        user: `User ${userId}@s.whatsapp.net`,
         userId: userId,
         totalTransaksi: totalTransaksi,
         totalSpent: totalSpent,
         currentSaldo: parseInt(user.saldo) || 0,
         transaksi: transformedTransactions
-      },
-      message: "User transactions retrieved successfully"
+      }
     });
     
   } catch (error) {
     console.error('Error in user transactions endpoint:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Internal server error'
     });
   }
 });
