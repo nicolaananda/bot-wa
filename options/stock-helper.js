@@ -54,14 +54,28 @@ function getProductCategory(productId, productName) {
   const id = productId.toLowerCase();
   
   // Streaming services
-  if (name.includes('netflix') || name.includes('viu') || name.includes('vidio') || 
-      name.includes('youtube') || name.includes('spotify') || name.includes('deezer')) {
+  if (
+    name.includes('netflix') ||
+    name.includes('viu') ||
+    name.includes('vidio') ||
+    name.includes('youtube') ||
+    name.includes('spotify') ||
+    name.includes('deezer') ||
+    name.includes('wetv') ||
+    name.includes('prime')
+  ) {
     return 'Streaming';
   }
   
   // Software tools
-  if (name.includes('capcut') || name.includes('canva') || name.includes('adobe') || 
-      name.includes('office') || name.includes('microsoft')) {
+  if (
+    name.includes('capcut') ||
+    name.includes('canva') ||
+    name.includes('adobe') ||
+    name.includes('office') ||
+    name.includes('microsoft') ||
+    name.includes('chatgpt')
+  ) {
     return 'Software';
   }
   
