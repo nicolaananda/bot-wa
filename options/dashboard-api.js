@@ -136,12 +136,67 @@ app.get('/api/dashboard/users/activity', (req, res) => {
       });
     }
     
-    const userActivity = getUserActivityData(db);
+    // Get user activity data
+    const users = db.data.users || {};
+    const transaksi = db.data.transaksi || [];
+    
+    // Calculate active users
+    const activeUsers = Object.keys(users).filter(userId => {
+      const user = users[userId];
+      return user && user.isActive !== false;
+    }).length;
+    
+    // Calculate new users this month
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const newUsers = Object.keys(users).filter(userId => {
+      const user = users[userId];
+      if (!user || !user.createdAt) return false;
+      const userMonth = user.createdAt.toString().slice(0, 7);
+      return userMonth === currentMonth;
+    }).length;
+    
+    // Get user activity details
+    const userActivity = Object.keys(users).map(userId => {
+      const user = users[userId];
+      if (!user) return null;
+      
+      // Get user transactions
+      const userTransactions = transaksi.filter(t => t.user === userId);
+      const transactionCount = userTransactions.length;
+      const totalSpent = userTransactions.reduce((sum, t) => {
+        return sum + (parseInt(t.totalBayar) || (parseInt(t.price) * (t.jumlah || 1)));
+      }, 0);
+      
+      return {
+        userId: userId,
+        username: user.username || `User ${userId}`,
+        lastActivity: user.lastActivity || user.createdAt || new Date().toISOString(),
+        transactionCount: transactionCount,
+        totalSpent: totalSpent,
+        role: user.role || 'bronze'
+      };
+    }).filter(Boolean).sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+    
+    // Calculate activity trends (mock data for now)
+    const activityTrends = {
+      dailyActive: [120, 135, 142, 128, 156, 149, 138],
+      weeklyActive: [890, 920, 945, 912, 978, 934, 956],
+      monthlyActive: [2800, 2950, 3100, 3020, 3180, 3050, 3120]
+    };
+    
     res.json({
       success: true,
-      data: userActivity
+      data: {
+        activeUsers: activeUsers,
+        newUsers: newUsers,
+        userActivity: userActivity.slice(0, 20), // Limit to 20 most recent
+        activityTrends: activityTrends
+      },
+      message: "User activity data retrieved successfully"
     });
+    
   } catch (error) {
+    console.error('Error in user activity endpoint:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -162,40 +217,49 @@ app.get('/api/dashboard/users/:userId/transactions', (req, res) => {
       });
     }
     
+    // Get user info
+    const user = db.data.users[userId];
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
     // Filter transaksi berdasarkan userId
     const userTransactions = db.data.transaksi.filter(t => t.user === userId);
     const totalTransaksi = userTransactions.length;
     const totalSpent = userTransactions.reduce((sum, t) => sum + (t.totalBayar || (parseInt(t.price) * t.jumlah)), 0);
     
-    // Transform data sebelum kirim ke frontend
+    // Transform data sesuai dengan spesifikasi frontend
     const transformedTransactions = userTransactions.map(t => ({
-      id: t.id,
-      name: t.name,
-      price: parseInt(t.price),
-      date: t.date,
-      jumlah: t.jumlah,
-      // Map field baru ke field yang diharapkan frontend
-      user: t.user_name || t.user || 'Anonymous User',
-      metodeBayar: t.payment_method || t.metodeBayar || 'Not specified',
-      totalBayar: t.totalBayar || (parseInt(t.price) * t.jumlah),
-      reffId: t.order_id || t.reffId || 'N/A',
-      // Keep original fields for reference
-      user_name: t.user_name || t.user,
-      payment_method: t.payment_method || t.metodeBayar,
-      user_id: t.user_id || t.user,
-      order_id: t.order_id || t.reffId
+      id: t.id || `trans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: t.name || 'Unknown Product',
+      price: parseInt(t.price) || 0,
+      date: t.date || new Date().toISOString(),
+      jumlah: t.jumlah || 1,
+      user_name: user.username || `User ${userId}`,
+      user_id: userId,
+      payment_method: t.payment_method || t.metodeBayar || 'Not specified',
+      totalBayar: t.totalBayar || (parseInt(t.price) * (t.jumlah || 1)),
+      reffId: t.order_id || t.reffId || `REF${Date.now()}`,
+      order_id: t.order_id || t.reffId || `ORD${Date.now()}`,
+      status: t.status || 'completed'
     }));
     
     res.json({
       success: true,
       data: {
-        user: userId,
+        user: user.username || `User ${userId}`,
         totalTransaksi: totalTransaksi,
         totalSpent: totalSpent,
         transaksi: transformedTransactions
-      }
+      },
+      message: "User transactions retrieved successfully"
     });
+    
   } catch (error) {
+    console.error('Error in user transactions endpoint:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -304,37 +368,81 @@ app.get('/api/dashboard/users/stats', (req, res) => {
       });
     }
     
-    const userStats = {};
-    let totalUsers = 0;
-    let totalSaldo = 0;
+    const users = db.data.users || {};
+    const transaksi = db.data.transaksi || [];
     
-    // Process users data
-    Object.entries(db.data.users).forEach(([userId, userData]) => {
-      if (userId && userId.trim() !== '') {
-        totalUsers++;
-        totalSaldo += parseInt(userData.saldo) || 0;
-        
-        if (!userStats[userData.role]) {
-          userStats[userData.role] = {
-            count: 0,
-            totalSaldo: 0
-          };
-        }
-        userStats[userData.role].count++;
-        userStats[userData.role].totalSaldo += parseInt(userData.saldo) || 0;
+    // Calculate total users
+    const totalUsers = Object.keys(users).filter(userId => {
+      const user = users[userId];
+      return user && user.isActive !== false;
+    }).length;
+    
+    // Calculate total balance
+    const totalSaldo = Object.keys(users).reduce((sum, userId) => {
+      const user = users[userId];
+      if (user && user.isActive !== false) {
+        return sum + (parseInt(user.saldo) || 0);
+      }
+      return sum;
+    }, 0);
+    
+    // Calculate average balance
+    const averageSaldo = totalUsers > 0 ? Math.round(totalSaldo / totalUsers) : 0;
+    
+    // Calculate user growth
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
+    
+    const thisMonthUsers = Object.keys(users).filter(userId => {
+      const user = users[userId];
+      if (!user || !user.createdAt) return false;
+      const userMonth = user.createdAt.toString().slice(0, 7);
+      return userMonth === currentMonth;
+    }).length;
+    
+    const lastMonthUsers = Object.keys(users).filter(userId => {
+      const user = users[userId];
+      if (!user || !user.createdAt) return false;
+      const userMonth = user.createdAt.toString().slice(0, 7);
+      return userMonth === lastMonth;
+    }).length;
+    
+    const growthRate = lastMonthUsers > 0 ? 
+      Math.round(((thisMonthUsers - lastMonthUsers) / lastMonthUsers) * 100 * 10) / 10 : 0;
+    
+    // Calculate role distribution
+    const roleDistribution = {};
+    Object.keys(users).forEach(userId => {
+      const user = users[userId];
+      if (user && user.isActive !== false) {
+        const role = user.role || 'bronze';
+        roleDistribution[role] = (roleDistribution[role] || 0) + 1;
       }
     });
+    
+    // Ensure all roles are present
+    if (!roleDistribution.bronze) roleDistribution.bronze = 0;
+    if (!roleDistribution.silver) roleDistribution.silver = 0;
+    if (!roleDistribution.gold) roleDistribution.gold = 0;
     
     res.json({
       success: true,
       data: {
         totalUsers: totalUsers,
         totalSaldo: totalSaldo,
-        userStats: userStats,
-        averageSaldo: totalUsers > 0 ? Math.round(totalSaldo / totalUsers) : 0
-      }
+        averageSaldo: averageSaldo,
+        userGrowth: {
+          thisMonth: thisMonthUsers,
+          lastMonth: lastMonthUsers,
+          growthRate: growthRate
+        },
+        roleDistribution: roleDistribution
+      },
+      message: "User statistics retrieved successfully"
     });
+    
   } catch (error) {
+    console.error('Error in user stats endpoint:', error);
     res.status(500).json({
       success: false,
       error: error.message
