@@ -2706,12 +2706,21 @@ OVO | GOPAY | SHOPEEPAY | DANA
         if (!q.split(",")[1]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
         let nomorNya = q.split(",")[0].replace(/[^0-9]/g, '') + "@s.whatsapp.net"
         let nominal = Number(q.split(",")[1])
+        
+        // Check if user exists, if not create them
+        if (!db.data.users[nomorNya]) {
+          db.data.users[nomorNya] = {
+            saldo: 0,
+            role: 'bronze'
+          }
+        }
+        
         db.data.users[nomorNya].saldo += nominal
         await db.save() // Force save database
         await sleep(50)
         
         // Notifikasi ke admin
-        ronzz.sendMessage(from, { text: `*SALDO USER*\nID: ${nomorNya.split('@')[0]}\nNomer: @${nomorNya.split('@')[0]}\nSaldo: Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
+        ronzz.sendMessage(from, { text: `*SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
         
         // Notifikasi ke user yang ditambahkan saldonya
         ronzz.sendMessage(nomorNya, { text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
