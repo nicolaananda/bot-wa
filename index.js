@@ -1953,9 +1953,9 @@ Ada transaksi yang telah dibayar!
                 totalBayar: totalAmount
               })
 
-              // Cek apakah stok habis dan kirim notifikasi ke owner
+              // Cek apakah stok habis dan kirim notifikasi ke admin
               if (db.data.produk[data[0]].stok.length === 0) {
-                await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
+                const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
                   `*📦 Produk:* ${db.data.produk[data[0]].name}\n` +
                   `*🆔 ID Produk:* ${data[0]}\n` +
                   `*📊 Stok Sebelumnya:* ${Number(data[1])}\n` +
@@ -1969,7 +1969,11 @@ Ada transaksi yang telah dibayar!
                   `• Segera restok produk ini\n` +
                   `• Update harga jika diperlukan\n` +
                   `• Cek profit margin\n\n` +
-                  `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`, mentions: [sender] })
+                  `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`
+                
+                // Kirim notifikasi ke admin yang ditentukan
+                await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+                await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
               }
               
               fs.unlinkSync(`./options/TRX-${reffId}.txt`)
@@ -2080,9 +2084,9 @@ Ada transaksi dengan saldo yang telah selesai!
           totalBayar: totalHarga
         })
         
-        // Cek apakah stok habis dan kirim notifikasi ke owner
+        // Cek apakah stok habis dan kirim notifikasi ke admin
         if (db.data.produk[data[0]].stok.length === 0) {
-          await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
+          const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
             `*📦 Produk:* ${db.data.produk[data[0]].name}\n` +
             `*🆔 ID Produk:* ${data[0]}\n` +
             `*📊 Stok Sebelumnya:* ${Number(data[1])}\n` +
@@ -2096,7 +2100,11 @@ Ada transaksi dengan saldo yang telah selesai!
             `• Segera restok produk ini\n` +
             `• Update harga jika diperlukan\n` +
             `• Cek profit margin\n\n` +
-            `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`, mentions: [sender] })
+            `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`
+          
+          // Kirim notifikasi ke admin yang ditentukan
+          await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+          await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
         }
         
         // Beri notifikasi pembelian berhasil hanya jika di grup
