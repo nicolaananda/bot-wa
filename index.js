@@ -2502,16 +2502,47 @@ Ada yang deposit nih kak, coba dicek saldonya`
       }
         break
 
-      case 'saldo': {
-        reply(`*CHECK YOUR INFO*
-  
-   _• *Name:* ${pushname}_
-   _• *Nomer:* ${sender.split('@')[0]}_
-   _• *Role:* ${isOwner ? "Owner" : db.data.users[sender].role.slice(0, 1).toUpperCase() + db.data.users[sender].role.slice(1)}_
-   _• *Saldo:* Rp${toRupiah(db.data.users[sender].saldo)}_
-  
-*Note:*
-_Saldo bisa digunakan untuk membeli produk di bot ini_`)
+      case 'ceksaldo': {
+        // Check if this is a reply/quote reply
+        if (m.quoted) {
+          // Only owner can check other people's saldo
+          if (!isOwner) {
+            reply(`❌ Maaf, hanya owner yang bisa cek saldo user lain.\n\n💡 *Tips:* Gunakan command ini tanpa reply untuk cek saldo sendiri.`, { quoted: m });
+            return;
+          }
+          
+          // Get the quoted message sender
+          const quotedSender = m.quoted.participant || m.quoted.key.participant || m.quoted.key.remoteJid;
+          
+          if (quotedSender) {
+            // Extract user ID from quoted sender
+            const targetUserId = quotedSender.split('@')[0];
+            
+            // Check if user exists in database
+            if (db.data.users && db.data.users[targetUserId]) {
+              const targetUser = db.data.users[targetUserId];
+              const saldo = parseInt(targetUser.saldo) || 0;
+              const username = targetUser.username || `User ${targetUserId.slice(-4)}`;
+              
+              reply(`*💰 Cek Saldo User Lain (Owner Only)*\n\n👤 *User:* ${username}\n🆔 *ID:* ${targetUserId}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`, { quoted: m });
+            } else {
+              reply(`❌ User dengan ID ${targetUserId} tidak ditemukan dalam database.\n\n💡 *Tips:* User harus sudah pernah melakukan transaksi untuk tersimpan dalam database.`, { quoted: m });
+            }
+          } else {
+            reply(`❌ Tidak bisa mendapatkan informasi user dari pesan yang di-reply.\n\n💡 *Tips:* Reply/quote reply pesan user lain yang ingin di-cek saldonya.`, { quoted: m });
+          }
+        } else {
+          // If not reply, check own saldo (all users can do this)
+          if (db.data.users && db.data.users[sender]) {
+            const user = db.data.users[sender];
+            const saldo = parseInt(user.saldo) || 0;
+            const username = user.username || `User ${sender.slice(-4)}`;
+            
+            reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* ${username}\n🆔 *ID:* ${sender}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n💡 *Tips Owner:* Reply/quote reply pesan user lain untuk cek saldo mereka.`);
+          } else {
+            reply(`❌ Data user tidak ditemukan.\n\n💡 *Tips:* User harus sudah pernah melakukan transaksi untuk tersimpan dalam database.`);
+          }
+        }
       }
         break
 
@@ -5922,7 +5953,7 @@ Ada yang upgrade role!
       }
         break
 
-      case 'ceksaldo': {
+      case 'ceksaldooke': {
         if (!isOwner) return reply(mess.owner)
         axios.get(`https://b2b.okeconnect.com/trx-v2/balance?memberID=${memberId}&pin=${pin}&password=${pw}`)
           .then(response => response.data)
@@ -5930,50 +5961,6 @@ Ada yang upgrade role!
             if (res.status.includes('GAGAL')) return reply('Silahkan sambungkan ip (' + res.message.replace(/[^0-9.]+/g, '') + ') tersebut ke provider')
             reply(`*Sisa saldo Order Kuota kamu :*\nRp${toRupiah(res.message.replace(/[^0-9]+/g, ''))}`)
           })
-      }
-        break
-
-      case 'ceksaldo': {
-        // Check if this is a reply/quote reply
-        if (m.quoted) {
-          // Only owner can check other people's saldo
-          if (!isOwner) {
-            reply(`❌ Maaf, hanya owner yang bisa cek saldo user lain.\n\n💡 *Tips:* Gunakan command ini tanpa reply untuk cek saldo sendiri.`, { quoted: m });
-            return;
-          }
-          
-          // Get the quoted message sender
-          const quotedSender = m.quoted.participant || m.quoted.key.participant || m.quoted.key.remoteJid;
-          
-          if (quotedSender) {
-            // Extract user ID from quoted sender
-            const targetUserId = quotedSender.split('@')[0];
-            
-            // Check if user exists in database
-            if (db.data.users && db.data.users[targetUserId]) {
-              const targetUser = db.data.users[targetUserId];
-              const saldo = parseInt(targetUser.saldo) || 0;
-              const username = targetUser.username || `User ${targetUserId.slice(-4)}`;
-              
-              reply(`*💰 Cek Saldo User Lain (Owner Only)*\n\n👤 *User:* ${username}\n🆔 *ID:* ${targetUserId}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`, { quoted: m });
-            } else {
-              reply(`❌ User dengan ID ${targetUserId} tidak ditemukan dalam database.\n\n💡 *Tips:* User harus sudah pernah melakukan transaksi untuk tersimpan dalam database.`, { quoted: m });
-            }
-          } else {
-            reply(`❌ Tidak bisa mendapatkan informasi user dari pesan yang di-reply.\n\n💡 *Tips:* Reply/quote reply pesan user lain yang ingin di-cek saldonya.`, { quoted: m });
-          }
-        } else {
-          // If not reply, check own saldo
-          if (db.data.users && db.data.users[sender]) {
-            const user = db.data.users[sender];
-            const saldo = parseInt(user.saldo) || 0;
-            const username = user.username || `User ${sender.slice(-4)}`;
-            
-            reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* ${username}\n🆔 *ID:* ${sender}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n💡 *Tips Owner:* Reply/quote reply pesan user lain untuk cek saldo mereka.`);
-          } else {
-            reply(`❌ Data user tidak ditemukan.\n\n💡 *Tips:* User harus sudah pernah melakukan transaksi untuk tersimpan dalam database.`);
-          }
-        }
       }
         break
         
