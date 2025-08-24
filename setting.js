@@ -178,6 +178,7 @@ ${readmore}
 │☛ ${prefix}customprofit
 │☛ ${prefix}delcustomprofit
 │☛ ${prefix}setrole
+│☛ ${prefix}ubahrole
 │☛ ${prefix}addproduk
 │☛ ${prefix}delproduk
 │☛ ${prefix}setkode
@@ -249,6 +250,7 @@ ${readmore}
 │☛ ${prefix}cari <reff_id>
 │☛ ${prefix}statistik
 │☛ ${prefix}export <format>
+│☛ ${prefix}ubahrole
 │☛ ${prefix}dashboard
 ╰─────╼
 
@@ -371,6 +373,7 @@ ${readmore}
 │☛ ${prefix}customprofit
 │☛ ${prefix}delcustomprofit
 │☛ ${prefix}setrole
+│☛ ${prefix}ubahrole
 │☛ ${prefix}addproduk
 │☛ ${prefix}delproduk
 │☛ ${prefix}setkode

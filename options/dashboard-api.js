@@ -63,6 +63,38 @@ function getFormattedData() {
   };
 }
 
+// Role Management Functions
+function saveDatabase(db) {
+  try {
+    const dbPath = path.join(__dirname, 'database.json');
+    fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error('Error saving database:', error);
+    return false;
+  }
+}
+
+function validateRole(role) {
+  const validRoles = ['user', 'admin', 'moderator', 'superadmin'];
+  return validRoles.includes(role);
+}
+
+function hasPermission(userRole, requiredRole) {
+  const roleHierarchy = {
+    'user': 1,
+    'moderator': 2,
+    'admin': 3,
+    'superadmin': 4
+  };
+  
+  return roleHierarchy[userRole] >= roleHierarchy[requiredRole];
+}
+
+function generateUserId() {
+  return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
 // API Endpoints
 
 // 1. Dashboard Overview

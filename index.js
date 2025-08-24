@@ -2208,6 +2208,63 @@ Ada transaksi dengan saldo yang telah selesai!
       }
         break
         
+      case 'ubahrole': {
+        if (!isOwner) return reply(mess.owner)
+        
+        // Cek apakah ada quote/reply message
+        if (!m.quoted) {
+          return reply(`Contoh penggunaan:\n\n1. Reply/quote pesan user: ${prefix + command} <tiperole>\n2. Ubah role sendiri: ${prefix + command} saya <tiperole>\n\nRole tersedia: bronze, silver, gold`)
+        }
+        
+        let args = q.split(' ')
+        let targetUser, newRole
+        
+        // Cek apakah user ingin mengubah role sendiri
+        if (args[0] === 'saya') {
+          targetUser = sender
+          newRole = args[1]
+        } else {
+          // Ambil user dari quoted message
+          targetUser = m.quoted.participant || m.quoted.sender
+          newRole = args[0]
+        }
+        
+        if (!newRole) {
+          return reply(`Contoh penggunaan:\n\n1. Reply/quote pesan user: ${prefix + command} <tiperole>\n2. Ubah role sendiri: ${prefix + command} saya <tiperole>\n\nRole tersedia: bronze, silver, gold`)
+        }
+        
+        // Validasi role
+        const validRoles = ['bronze', 'silver', 'gold']
+        if (!validRoles.includes(newRole.toLowerCase())) {
+          return reply(`Role tidak valid! Role tersedia: ${validRoles.join(', ')}`)
+        }
+        
+        // Cek apakah user ada di database
+        if (!db.data.users[targetUser]) {
+          db.data.users[targetUser] = {
+            saldo: 0,
+            role: 'bronze'
+          }
+        }
+        
+        // Simpan role lama untuk notifikasi
+        let oldRole = db.data.users[targetUser].role || 'bronze'
+        
+        // Update role
+        db.data.users[targetUser].role = newRole.toLowerCase()
+        
+        // Kirim notifikasi
+        let teks = `*🔄 ROLE BERHASIL DIUBAH*\n\n`
+        teks += `*👤 User:* ${targetUser.split('@')[0]}\n`
+        teks += `*👑 Role Lama:* ${oldRole}\n`
+        teks += `*👑 Role Baru:* ${newRole}\n`
+        teks += `*👨‍💼 Diubah oleh:* ${sender.split('@')[0]}\n`
+        teks += `*⏰ Waktu:* ${moment.tz("Asia/Jakarta").format("HH:mm:ss")}`
+        
+        reply(teks)
+      }
+        break
+        
       case 'dashboard': {
         if (!isOwner) return reply(mess.owner)
         
