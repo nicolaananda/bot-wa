@@ -14,6 +14,7 @@ const stockHelper = require('./stock-helper');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 
 // Middleware
 app.use(cors({
@@ -805,46 +806,13 @@ app.get('/api/dashboard/transactions/recent', (req, res) => {
 
 // Stock Management API Endpoints
 
-// Helper function to determine stock status
-function getStockStatus(stockCount) {
-  if (stockCount === 0) return 'out';
-  if (stockCount <= 3) return 'low';
-  if (stockCount <= 10) return 'medium';
-  return 'good';
-}
+// Use stock helper functions instead of local duplicates
+const { getStockStatus, getProductCategory, parseStockItem, calculateStockMetrics } = stockHelper;
 
-// Helper function to determine product category
-function getProductCategory(productId, productName) {
-  const name = productName.toLowerCase();
-  if (name.includes('netflix') || name.includes('viu') || name.includes('vidio') || name.includes('youtube')) {
-    return 'Streaming';
-  } else if (name.includes('capcut') || name.includes('canva')) {
-    return 'Software';
-  } else if (name.includes('game') || name.includes('gaming')) {
-    return 'Gaming';
-  }
-  return 'Uncategorized';
-}
-
-// Helper function to parse stock item
-function parseStockItem(stockString) {
-  const parts = stockString.split('|');
-  if (parts.length >= 4) {
-    return {
-      email: parts[0] || '',
-      password: parts[1] || '',
-      profile: parts[2] || '',
-      pin: parts[3] || '',
-      notes: parts[4] || '-'
-    };
-  }
-  return {
-    email: stockString,
-    password: '',
-    profile: '',
-    pin: '',
-    notes: '-'
-  };
+// Calculate stock utilization percentage
+function calculateUtilization(terjual, stockCount) {
+  if (stockCount <= 0) return 0;
+  return Math.min(100, Math.round((terjual / (terjual + stockCount)) * 100));
 }
 
 // 1. Get Product Stock Data
@@ -865,6 +833,11 @@ app.get('/api/dashboard/products/stock', async (req, res) => {
       const stockCount = product.stok ? product.stok.length : 0;
       totalSold += product.terjual || 0;
 
+      // Calculate stock metrics using helper functions
+      const stockMetrics = calculateStockMetrics(product);
+      const minStock = product.minStock || 5; // Default minimum stock
+      const utilization = calculateUtilization(product.terjual || 0, stockCount);
+      
       const formattedProduct = {
         id: product.id,
         name: product.name,
@@ -875,9 +848,11 @@ app.get('/api/dashboard/products/stock', async (req, res) => {
         terjual: product.terjual || 0,
         stockCount: stockCount,
         stok: product.stok || [],
-        stockStatus: getStockStatus(stockCount),
-        category: getProductCategory(productId, product.name),
-        lastRestock: product.lastRestock || null
+        stockStatus: stockMetrics.stockStatus,
+        category: stockMetrics.category,
+        minStock: minStock,
+        lastRestock: product.lastRestock || null,
+        utilization: utilization
       };
 
       products.push(formattedProduct);
@@ -1454,32 +1429,49 @@ app.use('*', (req, res) => {
 // Start server
 if (require.main === module) {
   // HTTP Server
-  const httpServer = http.createServer(app);
-  httpServer.listen(PORT, () => {
-    console.log(`🚀 Dashboard API HTTP server running on port ${PORT}`);
-    console.log(`📱 Access via: http://localhost:${PORT} or http://dash.nicola.id:${PORT}`);
-  });
-
-  // HTTPS Server (if SSL certificates exist)
   try {
-    const privateKey = fs.readFileSync('/etc/letsencrypt/live/dash.nicola.id/privkey.pem', 'utf8');
-    const certificate = fs.readFileSync('/etc/letsencrypt/live/dash.nicola.id/cert.pem', 'utf8');
-    const ca = fs.readFileSync('/etc/letsencrypt/live/dash.nicola.id/chain.pem', 'utf8');
-
-    const credentials = {
-      key: privateKey,
-      cert: certificate,
-      ca: ca
-    };
-
-    const httpsServer = https.createServer(credentials, app);
-    httpsServer.listen(HTTPS_PORT, () => {
-      console.log(`🔒 Dashboard API HTTPS server running on port ${HTTPS_PORT}`);
-      console.log(`🌐 Access via: https://dash.nicola.id:${HTTPS_PORT}`);
+    const httpServer = http.createServer(app);
+    httpServer.listen(PORT, () => {
+      console.log(`🚀 Dashboard API HTTP server running on port ${PORT}`);
+      console.log(`📱 Access via: http://localhost:${PORT} or http://dash.nicola.id:${PORT}`);
+    });
+    
+    httpServer.on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use. Please use a different port.`);
+      } else {
+        console.error(`❌ HTTP server error:`, error);
+      }
     });
   } catch (error) {
-    console.log(`⚠️  HTTPS server not started: SSL certificates not found`);
-    console.log(`💡 To enable HTTPS, ensure SSL certificates are available at /etc/letsencrypt/live/dash.nicola.id/`);
+    console.error(`❌ Failed to start HTTP server:`, error);
+  }
+
+  // HTTPS Server (if SSL certificates exist - Linux/Unix only)
+  if (process.platform !== 'win32') {
+    try {
+      const privateKey = fs.readFileSync('/etc/letsencrypt/live/dash.nicola.id/privkey.pem', 'utf8');
+      const certificate = fs.readFileSync('/etc/letsencrypt/live/dash.nicola.id/cert.pem', 'utf8');
+      const ca = fs.readFileSync('/etc/letsencrypt/live/dash.nicola.id/chain.pem', 'utf8');
+
+      const credentials = {
+        key: privateKey,
+        cert: certificate,
+        ca: ca
+      };
+
+      const httpsServer = https.createServer(credentials, app);
+      httpsServer.listen(HTTPS_PORT, () => {
+        console.log(`🔒 Dashboard API HTTPS server running on port ${HTTPS_PORT}`);
+        console.log(`🌐 Access via: https://dash.nicola.id:${HTTPS_PORT}`);
+      });
+    } catch (error) {
+      console.log(`⚠️  HTTPS server not started: SSL certificates not found`);
+      console.log(`💡 To enable HTTPS, ensure SSL certificates are available at /etc/letsencrypt/live/dash.nicola.id/`);
+    }
+  } else {
+    console.log(`⚠️  HTTPS server not started: Windows platform detected`);
+    console.log(`💡 HTTPS is not supported on Windows in this configuration`);
   }
 
   console.log(`\n📚 API Documentation:`);
@@ -1492,6 +1484,7 @@ if (require.main === module) {
   console.log(`- GET /api/dashboard/export/:format`);
   console.log(`- GET /api/dashboard/users/stats`);
   console.log(`- GET /api/dashboard/products/stats`);
+  console.log(`- GET /api/dashboard/products/stock`);
   console.log(`- GET /api/dashboard/transactions/recent?limit=20`);
 }
 
