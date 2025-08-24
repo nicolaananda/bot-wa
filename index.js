@@ -1898,7 +1898,7 @@ Ada transaksi yang telah dibayar!
         // Cek saldo user
         let totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * Number(data[1])
         if (db.data.users[sender].saldo < totalHarga) {
-          return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(db.data.users[sender].saldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}topup*`)
+          return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(db.data.users[sender].saldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}payment*`)
         }
 
         reply("Sedang memproses pembelian dengan saldo...")
