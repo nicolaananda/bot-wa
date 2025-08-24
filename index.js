@@ -1953,6 +1953,25 @@ Ada transaksi yang telah dibayar!
                 totalBayar: totalAmount
               })
 
+              // Cek apakah stok habis dan kirim notifikasi ke owner
+              if (db.data.produk[data[0]].stok.length === 0) {
+                await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
+                  `*📦 Produk:* ${db.data.produk[data[0]].name}\n` +
+                  `*🆔 ID Produk:* ${data[0]}\n` +
+                  `*📊 Stok Sebelumnya:* ${Number(data[1])}\n` +
+                  `*📉 Stok Sekarang:* 0 (HABIS)\n` +
+                  `*🛒 Terjual Terakhir:* ${data[1]} akun\n` +
+                  `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
+                  `*💰 Total Transaksi:* Rp${toRupiah(totalAmount)}\n` +
+                  `*📅 Tanggal:* ${tanggal}\n` +
+                  `*⏰ Jam:* ${jamwib} WIB\n\n` +
+                  `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
+                  `• Segera restok produk ini\n` +
+                  `• Update harga jika diperlukan\n` +
+                  `• Cek profit margin\n\n` +
+                  `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`, mentions: [sender] })
+              }
+              
               fs.unlinkSync(`./options/TRX-${reffId}.txt`)
               delete db.data.order[sender]
             }
@@ -2060,6 +2079,25 @@ Ada transaksi dengan saldo yang telah selesai!
           metodeBayar: "Saldo",
           totalBayar: totalHarga
         })
+        
+        // Cek apakah stok habis dan kirim notifikasi ke owner
+        if (db.data.produk[data[0]].stok.length === 0) {
+          await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
+            `*📦 Produk:* ${db.data.produk[data[0]].name}\n` +
+            `*🆔 ID Produk:* ${data[0]}\n` +
+            `*📊 Stok Sebelumnya:* ${Number(data[1])}\n` +
+            `*📉 Stok Sekarang:* 0 (HABIS)\n` +
+            `*🛒 Terjual Terakhir:* ${data[1]} akun\n` +
+            `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
+            `*💰 Total Transaksi:* Rp${toRupiah(totalHarga)}\n` +
+            `*📅 Tanggal:* ${tanggal}\n` +
+            `*⏰ Jam:* ${jamwib} WIB\n\n` +
+            `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
+            `• Segera restok produk ini\n` +
+            `• Update harga jika diperlukan\n` +
+            `• Cek profit margin\n\n` +
+            `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`, mentions: [sender] })
+        }
         
         // Beri notifikasi pembelian berhasil hanya jika di grup
         if (isGroup) {
@@ -2604,7 +2642,7 @@ Ada yang deposit nih kak, coba dicek saldonya`
       }
         break
 
-      case 'ceksaldo': {
+      case 'ceksaldo': case 'saldo': {
         // Check if this is a reply/quote reply
         if (m.quoted) {
           // Only owner can check other people's saldo
