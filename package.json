@@ -6,6 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node nicola",
+    "dashboard": "node options/dashboard-api.js",
+    "dashboard:dev": "nodemon options/dashboard-api.js",
     "backup": "node auto-backup.js backup",
     "restore": "node auto-backup.js restore",
     "backup-list": "node auto-backup.js list",

@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+const http = require('http');
 const { getDashboardData, getDailyChartData, getMonthlyChartData, getUserActivityData } = require('./dashboard-helper');
 
 // Contoh API endpoint untuk dashboard web
@@ -11,7 +13,10 @@ const app = express();
 const PORT = process.env.PORT || 3002;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://dash.nicola.id', 'https://dash.nicola.id', 'http://localhost:3000', 'http://localhost:3002'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Function untuk membaca database.json
@@ -782,20 +787,46 @@ app.use('*', (req, res) => {
 
 // Start server
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`Dashboard API server running on port ${PORT}`);
-    console.log(`API Documentation:`);
-    console.log(`- GET /api/dashboard/overview`);
-    console.log(`- GET /api/dashboard/chart/daily`);
-    console.log(`- GET /api/dashboard/chart/monthly`);
-    console.log(`- GET /api/dashboard/users/activity`);
-    console.log(`- GET /api/dashboard/users/:userId/transactions`);
-    console.log(`- GET /api/dashboard/transactions/search/:reffId`);
-    console.log(`- GET /api/dashboard/export/:format`);
-    console.log(`- GET /api/dashboard/users/stats`);
-    console.log(`- GET /api/dashboard/products/stats`);
-    console.log(`- GET /api/dashboard/transactions/recent?limit=20`);
+  // HTTP Server
+  const httpServer = http.createServer(app);
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 Dashboard API HTTP server running on port ${PORT}`);
+    console.log(`📱 Access via: http://localhost:${PORT} or http://dash.nicola.id:${PORT}`);
   });
+
+  // HTTPS Server (if SSL certificates exist)
+  try {
+    const privateKey = fs.readFileSync('/etc/letsencrypt/live/dash.nicola.id/privkey.pem', 'utf8');
+    const certificate = fs.readFileSync('/etc/letsencrypt/live/dash.nicola.id/cert.pem', 'utf8');
+    const ca = fs.readFileSync('/etc/letsencrypt/live/dash.nicola.id/chain.pem', 'utf8');
+
+    const credentials = {
+      key: privateKey,
+      cert: certificate,
+      ca: ca
+    };
+
+    const httpsServer = https.createServer(credentials, app);
+    httpsServer.listen(HTTPS_PORT, () => {
+      console.log(`🔒 Dashboard API HTTPS server running on port ${HTTPS_PORT}`);
+      console.log(`🌐 Access via: https://dash.nicola.id:${HTTPS_PORT}`);
+    });
+  } catch (error) {
+    console.log(`⚠️  HTTPS server not started: SSL certificates not found`);
+    console.log(`💡 To enable HTTPS, ensure SSL certificates are available at /etc/letsencrypt/live/dash.nicola.id/`);
+  }
+
+  console.log(`\n📚 API Documentation:`);
+  console.log(`- GET /api/dashboard/overview`);
+  console.log(`- GET /api/dashboard/chart/daily`);
+  console.log(`- GET /api/dashboard/chart/monthly`);
+  console.log(`- GET /api/dashboard/users/activity`);
+  console.log(`- GET /api/dashboard/users/:userId/transactions`);
+  console.log(`- GET /api/dashboard/transactions/search/:reffId`);
+  console.log(`- GET /api/dashboard/export/:format`);
+  console.log(`- GET /api/dashboard/users/stats`);
+  console.log(`- GET /api/dashboard/products/stats`);
+  console.log(`- GET /api/dashboard/transactions/recent?limit=20`);
 }
 
 module.exports = app; 
