@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 3002;
 
 // Middleware
 app.use(cors({
-  origin: ['http://dash.nicola.id', 'https://dash.nicola.id', 'http://localhost:3000', 'http://localhost:3002'],
+  origin: ['http://dash.nicola.id', 'https://dash.nicola.id', 'http://localhost:8080', 'http://localhost:3002'],
   credentials: true
 }));
 app.use(express.json());
