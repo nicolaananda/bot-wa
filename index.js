@@ -5932,6 +5932,50 @@ Ada yang upgrade role!
           })
       }
         break
+
+      case 'ceksaldo': {
+        // Check if this is a reply/quote reply
+        if (m.quoted) {
+          // Only owner can check other people's saldo
+          if (!isOwner) {
+            reply(`❌ Maaf, hanya owner yang bisa cek saldo user lain.\n\n💡 *Tips:* Gunakan command ini tanpa reply untuk cek saldo sendiri.`, { quoted: m });
+            return;
+          }
+          
+          // Get the quoted message sender
+          const quotedSender = m.quoted.participant || m.quoted.key.participant || m.quoted.key.remoteJid;
+          
+          if (quotedSender) {
+            // Extract user ID from quoted sender
+            const targetUserId = quotedSender.split('@')[0];
+            
+            // Check if user exists in database
+            if (db.data.users && db.data.users[targetUserId]) {
+              const targetUser = db.data.users[targetUserId];
+              const saldo = parseInt(targetUser.saldo) || 0;
+              const username = targetUser.username || `User ${targetUserId.slice(-4)}`;
+              
+              reply(`*💰 Cek Saldo User Lain (Owner Only)*\n\n👤 *User:* ${username}\n🆔 *ID:* ${targetUserId}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`, { quoted: m });
+            } else {
+              reply(`❌ User dengan ID ${targetUserId} tidak ditemukan dalam database.\n\n💡 *Tips:* User harus sudah pernah melakukan transaksi untuk tersimpan dalam database.`, { quoted: m });
+            }
+          } else {
+            reply(`❌ Tidak bisa mendapatkan informasi user dari pesan yang di-reply.\n\n💡 *Tips:* Reply/quote reply pesan user lain yang ingin di-cek saldonya.`, { quoted: m });
+          }
+        } else {
+          // If not reply, check own saldo
+          if (db.data.users && db.data.users[sender]) {
+            const user = db.data.users[sender];
+            const saldo = parseInt(user.saldo) || 0;
+            const username = user.username || `User ${sender.slice(-4)}`;
+            
+            reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* ${username}\n🆔 *ID:* ${sender}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n💡 *Tips Owner:* Reply/quote reply pesan user lain untuk cek saldo mereka.`);
+          } else {
+            reply(`❌ Data user tidak ditemukan.\n\n💡 *Tips:* User harus sudah pernah melakukan transaksi untuk tersimpan dalam database.`);
+          }
+        }
+      }
+        break
         
       case 'loginorkut': {
         if (!isOwner) return reply(mess.owner)

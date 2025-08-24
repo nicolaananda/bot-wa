@@ -5,7 +5,12 @@
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node nicola"
+    "start": "node nicola",
+    "backup": "node auto-backup.js backup",
+    "restore": "node auto-backup.js restore",
+    "backup-list": "node auto-backup.js list",
+    "backup-health": "node auto-backup.js health",
+    "start-safe": "npm run backup && npm run start"
   },
   "author": "Ronzz YT",
   "license": "ISC",

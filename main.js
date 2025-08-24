@@ -40,6 +40,8 @@ require('./options/graceful-shutdown')
 // Load database helper
 global.dbHelper = require('./options/db-helper')
 
+// Initialize database structure only if it doesn't exist
+// Don't overwrite existing data
 if (!db.data.list) db.data.list = []
 if (!db.data.testi) db.data.testi = []
 if (!db.data.chat) db.data.chat = {}
@@ -55,6 +57,9 @@ if (!db.data.order) db.data.order = {}
 if (!db.data.transaksi) db.data.transaksi = []
 if (!db.data.persentase) db.data.persentase = {}
 if (!db.data.customProfit) db.data.customProfit = {}
+
+// Log database status
+console.log(`📊 Database loaded: ${Object.keys(db.data.users).length} users, ${db.data.transaksi.length} transactions`)
 
 let lastJSON = JSON.stringify(db.data)
 if (!opts['test']) setInterval(async () => {
