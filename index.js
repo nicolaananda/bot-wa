@@ -2001,28 +2001,19 @@ Ada transaksi yang telah dibayar!
         let reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
         
         // Buat teks detail akun yang lebih rapi
-        let detailAkun = `*╭────「 ACCOUNT DETAIL 」────╮*\n\n`
-        detailAkun += `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
-        detailAkun += `*🛍️ Jumlah:* ${data[1]} akun\n`
-        detailAkun += `*🧾 Reff ID:* ${reffId}\n`
+        let detailAkun = `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
         detailAkun += `*📅 Tanggal:* ${tanggal}\n`
         detailAkun += `*⏰ Jam:* ${jamwib} WIB\n\n`
-        detailAkun += `*╭────「 DETAIL AKUN 」────╮*\n\n`
         
         dataStok.forEach((i, index) => {
           let dataAkun = i.split("|")
-          detailAkun += `*📱 AKUN ${index + 1}*\n`
-          detailAkun += `┌─────────────────────────\n`
           detailAkun += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
           detailAkun += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
           detailAkun += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`
           detailAkun += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`
           detailAkun += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n`
-          detailAkun += `└─────────────────────────\n\n`
         })
         
-        detailAkun += `*╰────「 END ACCOUNT 」────╯*\n\n`
-        detailAkun += `*💡 Tips:* Simpan informasi akun dengan aman dan jangan bagikan kepada siapapun!`
         
         // Kirim detail akun ke chat pribadi user
         await ronzz.sendMessage(sender, { text: detailAkun }, { quoted: m })
