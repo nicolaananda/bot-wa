@@ -167,22 +167,32 @@ app.get('/api/dashboard/users/:userId/transactions', (req, res) => {
     const totalTransaksi = userTransactions.length;
     const totalSpent = userTransactions.reduce((sum, t) => sum + (t.totalBayar || (parseInt(t.price) * t.jumlah)), 0);
     
+    // Transform data sebelum kirim ke frontend
+    const transformedTransactions = userTransactions.map(t => ({
+      id: t.id,
+      name: t.name,
+      price: parseInt(t.price),
+      date: t.date,
+      jumlah: t.jumlah,
+      // Map field baru ke field yang diharapkan frontend
+      user: t.user_name || t.user || 'Anonymous User',
+      metodeBayar: t.payment_method || t.metodeBayar || 'Not specified',
+      totalBayar: t.totalBayar || (parseInt(t.price) * t.jumlah),
+      reffId: t.order_id || t.reffId || 'N/A',
+      // Keep original fields for reference
+      user_name: t.user_name || t.user,
+      payment_method: t.payment_method || t.metodeBayar,
+      user_id: t.user_id || t.user,
+      order_id: t.order_id || t.reffId
+    }));
+    
     res.json({
       success: true,
       data: {
         user: userId,
         totalTransaksi: totalTransaksi,
         totalSpent: totalSpent,
-        transaksi: userTransactions.map(t => ({
-          id: t.id,
-          name: t.name,
-          price: parseInt(t.price),
-          date: t.date,
-          jumlah: t.jumlah,
-          metodeBayar: t.metodeBayar || "Unknown",
-          totalBayar: t.totalBayar || (parseInt(t.price) * t.jumlah),
-          reffId: t.reffId || "N/A"
-        }))
+        transaksi: transformedTransactions
       }
     });
   } catch (error) {
@@ -221,21 +231,30 @@ app.get('/api/dashboard/transactions/search/:reffId', (req, res) => {
     const profitPercentage = db.data.persentase[userRole] || 2;
     const profit = Math.floor((parseInt(transaction.price) * transaction.jumlah) * (profitPercentage / 100));
     
+    // Transform data sebelum kirim ke frontend
+    const transformedTransaction = {
+      reffId: reffId,
+      // Map field baru ke field yang diharapkan frontend
+      user: transaction.user_name || transaction.user || 'Anonymous User',
+      metodeBayar: transaction.payment_method || transaction.metodeBayar || 'Not specified',
+      userRole: userRole,
+      produk: transaction.name,
+      idProduk: transaction.id,
+      harga: parseInt(transaction.price),
+      jumlah: transaction.jumlah,
+      totalBayar: transaction.totalBayar || (parseInt(transaction.price) * transaction.jumlah),
+      tanggal: transaction.date,
+      profit: profit,
+      // Keep original fields for reference
+      user_name: transaction.user_name || transaction.user,
+      payment_method: transaction.payment_method || transaction.metodeBayar,
+      user_id: transaction.user_id || transaction.user,
+      order_id: transaction.order_id || transaction.reffId
+    };
+    
     res.json({
       success: true,
-      data: {
-        reffId: reffId,
-        user: transaction.user || "Unknown",
-        userRole: userRole,
-        produk: transaction.name,
-        idProduk: transaction.id,
-        harga: parseInt(transaction.price),
-        jumlah: transaction.jumlah,
-        totalBayar: transaction.totalBayar || (parseInt(transaction.price) * transaction.jumlah),
-        metodeBayar: transaction.metodeBayar || "Unknown",
-        tanggal: transaction.date,
-        profit: profit
-      }
+      data: transformedTransaction
     });
   } catch (error) {
     res.status(500).json({
@@ -410,10 +429,16 @@ app.get('/api/dashboard/transactions/recent', (req, res) => {
         price: parseInt(t.price) || 0,
         date: t.date,
         jumlah: t.jumlah || 1,
-        user: t.user || "Unknown",
-        metodeBayar: t.metodeBayar || "Unknown",
+        // Map field baru ke field yang diharapkan frontend
+        user: t.user_name || t.user || 'Anonymous User',
+        metodeBayar: t.payment_method || t.metodeBayar || 'Not specified',
         totalBayar: t.totalBayar || (parseInt(t.price) * (t.jumlah || 1)),
-        reffId: t.reffId || "N/A"
+        reffId: t.order_id || t.reffId || 'N/A',
+        // Keep original fields for reference
+        user_name: t.user_name || t.user,
+        payment_method: t.payment_method || t.metodeBayar,
+        user_id: t.user_id || t.user,
+        order_id: t.order_id || t.reffId
       }));
     
     res.json({
