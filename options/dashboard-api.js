@@ -155,25 +155,58 @@ app.get('/api/dashboard/users/activity', (req, res) => {
       return userMonth === currentMonth;
     }).length;
     
-    // Get user activity details
+    // Get user activity details with saldo, username, and role
     const userActivity = Object.keys(users).map(userId => {
       const user = users[userId];
       if (!user) return null;
       
       // Get user transactions
       const userTransactions = transaksi.filter(t => t.user === userId);
-      const transactionCount = userTransactions.length;
+      const totalTransaksi = userTransactions.length;
       const totalSpent = userTransactions.reduce((sum, t) => {
         return sum + (parseInt(t.totalBayar) || (parseInt(t.price) * (t.jumlah || 1)));
       }, 0);
       
+      // Calculate payment method breakdown
+      const metodeBayar = {
+        saldo: 0,
+        qris: 0,
+        unknown: 0
+      };
+      
+      userTransactions.forEach(t => {
+        const paymentMethod = (t.payment_method || t.metodeBayar || '').toLowerCase();
+        if (paymentMethod.includes('saldo')) {
+          metodeBayar.saldo++;
+        } else if (paymentMethod.includes('qris')) {
+          metodeBayar.qris++;
+        } else {
+          metodeBayar.unknown++;
+        }
+      });
+      
+      // Auto-generate username if not exists
+      const username = user.username || `User ${userId.slice(-4)}`;
+      
+      // Auto-calculate role based on total spending
+      let role = user.role || 'bronze';
+      if (totalSpent >= 1000000) {
+        role = 'gold';
+      } else if (totalSpent >= 500000) {
+        role = 'silver';
+      } else {
+        role = 'bronze';
+      }
+      
       return {
-        userId: userId,
-        username: user.username || `User ${userId}`,
-        lastActivity: user.lastActivity || user.createdAt || new Date().toISOString(),
-        transactionCount: transactionCount,
+        user: userId,
+        username: username,
+        totalTransaksi: totalTransaksi,
         totalSpent: totalSpent,
-        role: user.role || 'bronze'
+        saldo: parseInt(user.saldo) || 0,
+        lastActivity: user.lastActivity || user.createdAt || new Date().toISOString(),
+        role: role,
+        metodeBayar: metodeBayar
       };
     }).filter(Boolean).sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
     
@@ -204,7 +237,127 @@ app.get('/api/dashboard/users/activity', (req, res) => {
   }
 });
 
-// 5. Transaksi by User
+// 5. Get All Users with Pagination
+app.get('/api/dashboard/users/all', (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = '', role = 'all' } = req.query;
+    const db = getFormattedData();
+    
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load database'
+      });
+    }
+    
+    const users = db.data.users || {};
+    const transaksi = db.data.transaksi || [];
+    
+    // Parse pagination parameters
+    const currentPage = parseInt(page);
+    const usersPerPage = Math.min(parseInt(limit), 50); // Max 50 users per page
+    const offset = (currentPage - 1) * usersPerPage;
+    
+    // Filter users based on search and role
+    let filteredUsers = Object.keys(users).filter(userId => {
+      const user = users[userId];
+      if (!user || user.isActive === false) return false;
+      
+      // Role filter
+      if (role !== 'all' && user.role !== role) return false;
+      
+      // Search filter
+      if (search) {
+        const searchLower = search.toLowerCase();
+        const username = (user.username || `User ${userId.slice(-4)}`).toLowerCase();
+        const userIdLower = userId.toLowerCase();
+        if (!username.includes(searchLower) && !userIdLower.includes(searchLower)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+    
+    // Get total count for pagination
+    const totalUsers = filteredUsers.length;
+    const totalPages = Math.ceil(totalUsers / usersPerPage);
+    
+    // Apply pagination
+    const paginatedUsers = filteredUsers.slice(offset, offset + usersPerPage);
+    
+    // Transform user data
+    const transformedUsers = paginatedUsers.map(userId => {
+      const user = users[userId];
+      
+      // Get user transactions
+      const userTransactions = transaksi.filter(t => t.user === userId);
+      const transactionCount = userTransactions.length;
+      const totalSpent = userTransactions.reduce((sum, t) => {
+        return sum + (parseInt(t.totalBayar) || (parseInt(t.price) * (t.jumlah || 1)));
+      }, 0);
+      
+      // Auto-generate username if not exists
+      const username = user.username || `User ${userId.slice(-4)}`;
+      
+      // Auto-calculate role based on total spending
+      let calculatedRole = user.role || 'bronze';
+      if (totalSpent >= 1000000) {
+        calculatedRole = 'gold';
+      } else if (totalSpent >= 500000) {
+        calculatedRole = 'silver';
+      } else {
+        calculatedRole = 'bronze';
+      }
+      
+      return {
+        userId: userId,
+        username: username,
+        phone: userId, // Using userId as phone for now
+        email: user.email || `user${userId.slice(-4)}@example.com`,
+        saldo: parseInt(user.saldo) || 0,
+        role: calculatedRole,
+        isActive: user.isActive !== false,
+        lastActivity: user.lastActivity || user.createdAt || null,
+        createdAt: user.createdAt || new Date().toISOString(),
+        transactionCount: transactionCount,
+        totalSpent: totalSpent,
+        hasTransactions: transactionCount > 0
+      };
+    });
+    
+    // Sort by creation date (newest first)
+    transformedUsers.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    // Pagination info
+    const pagination = {
+      currentPage: currentPage,
+      totalPages: totalPages,
+      totalUsers: totalUsers,
+      usersPerPage: usersPerPage,
+      hasNextPage: currentPage < totalPages,
+      hasPrevPage: currentPage > 1
+    };
+    
+    res.json({
+      success: true,
+      data: {
+        users: transformedUsers,
+        pagination: pagination
+      },
+      message: "All users retrieved successfully"
+    });
+    
+  } catch (error) {
+    console.error('Error in get all users endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 6. Transaksi by User
 app.get('/api/dashboard/users/:userId/transactions', (req, res) => {
   try {
     const { userId } = req.params;
@@ -251,8 +404,10 @@ app.get('/api/dashboard/users/:userId/transactions', (req, res) => {
       success: true,
       data: {
         user: user.username || `User ${userId}`,
+        userId: userId,
         totalTransaksi: totalTransaksi,
         totalSpent: totalSpent,
+        currentSaldo: parseInt(user.saldo) || 0,
         transaksi: transformedTransactions
       },
       message: "User transactions retrieved successfully"
@@ -425,6 +580,27 @@ app.get('/api/dashboard/users/stats', (req, res) => {
     if (!roleDistribution.silver) roleDistribution.silver = 0;
     if (!roleDistribution.gold) roleDistribution.gold = 0;
     
+    // Calculate balance distribution
+    const balanceDistribution = {
+      high: 0,
+      medium: 0,
+      low: 0
+    };
+    
+    Object.keys(users).forEach(userId => {
+      const user = users[userId];
+      if (user && user.isActive !== false) {
+        const saldo = parseInt(user.saldo) || 0;
+        if (saldo >= 100000) {
+          balanceDistribution.high++;
+        } else if (saldo >= 50000) {
+          balanceDistribution.medium++;
+        } else {
+          balanceDistribution.low++;
+        }
+      }
+    });
+    
     res.json({
       success: true,
       data: {
@@ -436,7 +612,8 @@ app.get('/api/dashboard/users/stats', (req, res) => {
           lastMonth: lastMonthUsers,
           growthRate: growthRate
         },
-        roleDistribution: roleDistribution
+        roleDistribution: roleDistribution,
+        balanceDistribution: balanceDistribution
       },
       message: "User statistics retrieved successfully"
     });
