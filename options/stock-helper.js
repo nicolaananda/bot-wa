@@ -74,7 +74,9 @@ function getProductCategory(productId, productName) {
     name.includes('adobe') ||
     name.includes('office') ||
     name.includes('microsoft') ||
-    name.includes('chatgpt')
+    name.includes('chatgpt') ||
+    name.includes('ZOOM') ||
+    name.includes('SEWA')
   ) {
     return 'Software';
   }
