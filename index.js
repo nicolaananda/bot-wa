@@ -2787,26 +2787,41 @@ OVO | GOPAY | SHOPEEPAY | DANA
         await db.save() // Force save database
         await sleep(50)
         
-        // Notifikasi ke admin
-        ronzz.sendMessage(from, { text: `*SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
+        // Notifikasi ke admin (chat saat ini)
+        await ronzz.sendMessage(from, { text: `*SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
+        
+        const sendTasks = []
         
         // Notifikasi ke user yang ditambahkan saldonya
-        ronzz.sendMessage(nomorNya, { text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
+        sendTasks.push(
+          ronzz.sendMessage(nomorNya, { text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
+        )
 
-        // Notifikasi ke grup realtime
-        const groupJid = "120363190222186282@g.us"; // ID grup dari link https://chat.whatsapp.com/GO2a2ty2n5JAz5b6E9HpEs
-        ronzz.sendMessage(groupJid, { 
-          text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, 
-          mentions: [nomorNya, sender] 
-        })
-
-        // Notifikasi ke WA 6281389592985 dan 6285235540944
-        const notifNumbers = ["6281389592985@s.whatsapp.net", "6285235540944@s.whatsapp.net"];
-        for (const adminJid of notifNumbers) {
-          ronzz.sendMessage(adminJid, { 
+        // Notifikasi ke grup realtime (abaikan error 404 jika bukan member)
+        const groupJid = "120363190222186282@g.us"
+        sendTasks.push(
+          ronzz.sendMessage(groupJid, { 
             text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, 
             mentions: [nomorNya, sender] 
-          });
+          })
+        )
+
+        // Notifikasi ke WA 6281389592985 dan 6285235540944 (abaikan error jika nomor tidak valid)
+        const notifNumbers = ["6281389592985@s.whatsapp.net", "6285235540944@s.whatsapp.net"]
+        for (const adminJid of notifNumbers) {
+          sendTasks.push(
+            ronzz.sendMessage(adminJid, { 
+              text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, 
+              mentions: [nomorNya, sender] 
+            })
+          )
+        }
+
+        const results = await Promise.allSettled(sendTasks)
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            console.log('Notif addsaldo gagal:', r.reason)
+          }
         }
       }
         break
