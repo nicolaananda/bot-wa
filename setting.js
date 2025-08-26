@@ -32,13 +32,13 @@ global.uGold = 200000
 
 //Other
 global.botName = "GiHa Smart Bot" //Nama bot
-global.owner = ["6287777657944", "6281389592985","6287887842985","6285235540944"] //Ganti agar fitur owner bisa digunakan
+global.owner = ["6287777657944","6281389592985","6287887842985"] //Ganti agar fitur owner bisa digunakan
 global.ownerNomer = "6287777657944" //Nomor lu
 global.ownerName = "Owner" //Nama lu
 global.packname = "" //Seterah
 global.author = "Owner" //Seterah
 global.sessionName = "session" //Ngga usah di ganti
-global.linkGroup = ["https://chat.whatsapp.com/L0LR1HBOFKJAiQv5Busd9t?mode=ems_copy_t","https://chat.whatsapp.com/KwBA0yxcwl0JGpL6uN7L9i?mode=ems_copy_t"] //Link gc lu
+global.linkGroup = ["https://chat.whatsapp.com/L0LR1HBOFKJAiQv5Busd9t?mode=ems_copy_t","https://chat.whatsapp.com/KwBA0yxcwl0JGpL6uN7L9i?mode=ems_copy_t","https://chat.whatsapp.com/GO2a2ty2n5JAz5b6E9HpEs"] //Link gc lu
 
 //Image
 global.thumbnail = "./options/image/payment.jpg"
