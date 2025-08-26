@@ -38,7 +38,7 @@ global.ownerName = "Owner" //Nama lu
 global.packname = "" //Seterah
 global.author = "Owner" //Seterah
 global.sessionName = "session" //Ngga usah di ganti
-global.linkGroup = ["https://chat.whatsapp.com/L0LR1HBOFKJAiQv5Busd9t?mode=ems_copy_t","https://chat.whatsapp.com/KwBA0yxcwl0JGpL6uN7L9i?mode=ems_copy_t","https://chat.whatsapp.com/GO2a2ty2n5JAz5b6E9HpEs"] //Link gc lu
+global.linkGroup = ["https://chat.whatsapp.com/L0LR1HBOFKJAiQv5Busd9t?mode=ems_copy_t","https://chat.whatsapp.com/KwBA0yxcwl0JGpL6uN7L9i?mode=ems_copy_t","https://chat.whatsapp.com/GO2a2ty2n5JAz5b6E9HpEs?mode=ems_copy_c"] //Link gc lu
 
 //Image
 global.thumbnail = "./options/image/payment.jpg"

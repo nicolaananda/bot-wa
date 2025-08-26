@@ -65,13 +65,6 @@
       "antilink2": false,
       "sDone": "",
       "sProses": ""
-    },
-    "120363401515498538@g.us": {
-      "welcome": false,
-      "antilink": false,
-      "antilink2": false,
-      "sDone": "",
-      "sProses": ""
     }
   },
   "users": {
@@ -80,7 +73,7 @@
       "role": "gold"
     },
     "6281389592985@s.whatsapp.net": {
-      "saldo": 956900,
+      "saldo": 936900,
       "role": "bronze"
     },
     "6285235540944@s.whatsapp.net": {
@@ -588,14 +581,6 @@
       "role": "bronze"
     },
     "6282149866650@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6282137192101@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285713218548@s.whatsapp.net": {
       "saldo": 0,
       "role": "bronze"
     }
@@ -3069,7 +3054,6 @@
     "198",
     "83",
     "147",
-    "78",
-    "93"
+    "78"
   ]
 }
