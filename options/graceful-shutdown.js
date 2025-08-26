@@ -7,16 +7,13 @@ function gracefulShutdown() {
   // Save database sebelum shutdown
   if (global.db) {
     console.log('Saving database...');
-    (async () => {
-      try {
-        await global.db.save();
-        console.log('Database saved successfully');
-        process.exit(0);
-      } catch (error) {
-        console.error('Error saving database:', error);
-        process.exit(1);
-      }
-    })();
+    global.db.save().then(() => {
+      console.log('Database saved successfully');
+      process.exit(0);
+    }).catch((error) => {
+      console.error('Error saving database:', error);
+      process.exit(1);
+    });
   } else {
     process.exit(0);
   }
@@ -33,15 +30,12 @@ process.on('uncaughtException', (error) => {
   
   // Save database sebelum crash
   if (global.db) {
-    (async () => {
-      try {
-        await global.db.save();
-        console.log('Database saved before crash');
-        process.exit(1);
-      } catch (e) {
-        process.exit(1);
-      }
-    })();
+    global.db.save().then(() => {
+      console.log('Database saved before crash');
+      process.exit(1);
+    }).catch(() => {
+      process.exit(1);
+    });
   } else {
     process.exit(1);
   }
@@ -53,15 +47,12 @@ process.on('unhandledRejection', (reason, promise) => {
   
   // Save database sebelum crash
   if (global.db) {
-    (async () => {
-      try {
-        await global.db.save();
-        console.log('Database saved before crash');
-        process.exit(1);
-      } catch (e) {
-        process.exit(1);
-      }
-    })();
+    global.db.save().then(() => {
+      console.log('Database saved before crash');
+      process.exit(1);
+    }).catch(() => {
+      process.exit(1);
+    });
   } else {
     process.exit(1);
   }
