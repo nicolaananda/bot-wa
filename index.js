@@ -1994,67 +1994,73 @@ Ada transaksi yang telah dibayar!
         if (!data[1]) return reply(`Contoh: ${prefix + command} idproduk jumlah`)
         if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
 
+        const jumlah = Number(data[1])
+        if (!Number.isFinite(jumlah) || jumlah <= 0) return reply("Jumlah harus berupa angka lebih dari 0")
+
         let stok = db.data.produk[data[0]].stok
         if (stok.length <= 0) return reply("Stok habis, silahkan hubungi Owner untuk restok")
-        if (stok.length < data[1]) return reply(`Stok tersedia ${stok.length}, jadi harap jumlah tidak melebihi stok`)
+        if (stok.length < jumlah) return reply(`Stok tersedia ${stok.length}, jadi harap jumlah tidak melebihi stok`)
 
-        // Cek saldo user
-        let totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * Number(data[1])
-        if (db.data.users[sender].saldo < totalHarga) {
-          return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(db.data.users[sender].saldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}payment*`)
-        }
+        const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
+        db.data.order[sender] = { status: 'processing', reffId, idProduk: data[0], jumlah, metode: 'Saldo', startedAt: Date.now() }
 
-        reply("Sedang memproses pembelian dengan saldo...")
+        try {
+          // Cek saldo user
+          let totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * jumlah
+          if (db.data.users[sender].saldo < totalHarga) {
+            delete db.data.order[sender]
+            return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(db.data.users[sender].saldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}payment*`)
+          }
 
-        // Kurangi saldo user
-        db.data.users[sender].saldo -= totalHarga
-        
-        // Force save database setelah perubahan saldo
-        await db.save()
+          reply("Sedang memproses pembelian dengan saldo...")
 
-        await sleep(1000)
-        
-        // Proses pembelian langsung
-        db.data.produk[data[0]].terjual += Number(data[1])
-        let dataStok = []
-        for (let i = 0; i < data[1]; i++) {
-          dataStok.push(db.data.produk[data[0]].stok.shift())
-        }
+          // Kurangi saldo user
+          db.data.users[sender].saldo -= totalHarga
+          
+          // Force save database setelah perubahan saldo
+          await db.save()
 
-        let reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
-        
-        // Buat teks detail akun yang lebih rapi
-        let detailAkun = `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
-        detailAkun += `*📅 Tanggal:* ${tanggal}\n`
-        detailAkun += `*⏰ Jam:* ${jamwib} WIB\n\n`
-        
-        dataStok.forEach((i, index) => {
-          let dataAkun = i.split("|")
-          detailAkun += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
-          detailAkun += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
-          detailAkun += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`
-          detailAkun += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`
-          detailAkun += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n`
-        })
-        
-        
-        // Kirim detail akun ke chat pribadi user
-        await ronzz.sendMessage(sender, { text: detailAkun }, { quoted: m })
-        
-        // Buat teks SNK produk yang lebih rapi
-        let snkProduk = `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`
-        snkProduk += `*📋 SNK PRODUK: ${db.data.produk[data[0]].name}*\n\n`
-        snkProduk += `${db.data.produk[data[0]].snk}\n\n`
-        snkProduk += `*⚠️ PENTING:*\n`
-        snkProduk += `• Baca dan pahami SNK sebelum menggunakan akun\n`
-        snkProduk += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`
-        snkProduk += `• Hubungi admin jika ada masalah dengan akun\n\n`
-        snkProduk += `*╰────「 END SNK 」────╯*`
-        
-        await ronzz.sendMessage(sender, { text: snkProduk }, { quoted: m })
-        
-        // Kirim notifikasi ke owner
-        await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
+          await sleep(1000)
+          
+          // Proses pembelian langsung
+          db.data.produk[data[0]].terjual += jumlah
+          let dataStok = []
+          for (let i = 0; i < jumlah; i++) {
+            dataStok.push(db.data.produk[data[0]].stok.shift())
+          }
+
+          // Buat teks detail akun yang lebih rapi
+          let detailAkun = `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
+          detailAkun += `*📅 Tanggal:* ${tanggal}\n`
+          detailAkun += `*⏰ Jam:* ${jamwib} WIB\n\n`
+          
+          dataStok.forEach((i, index) => {
+            let dataAkun = i.split("|")
+            detailAkun += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
+            detailAkun += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
+            detailAkun += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`
+            detailAkun += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`
+            detailAkun += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n`
+          })
+          
+          
+          // Kirim detail akun ke chat pribadi user
+          await ronzz.sendMessage(sender, { text: detailAkun }, { quoted: m })
+          
+          // Buat teks SNK produk yang lebih rapi
+          let snkProduk = `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`
+          snkProduk += `*📋 SNK PRODUK: ${db.data.produk[data[0]].name}*\n\n`
+          snkProduk += `${db.data.produk[data[0]].snk}\n\n`
+          snkProduk += `*⚠️ PENTING:*\n`
+          snkProduk += `• Baca dan pahami SNK sebelum menggunakan akun\n`
+          snkProduk += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`
+          snkProduk += `• Hubungi admin jika ada masalah dengan akun\n\n`
+          snkProduk += `*╰────「 END SNK 」────╯*`
+          
+          await ronzz.sendMessage(sender, { text: snkProduk }, { quoted: m })
+          
+          // Kirim notifikasi ke owner
+          await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
 Ada transaksi dengan saldo yang telah selesai!
 
 *╭────「 TRANSAKSI DETAIL 」───*
@@ -2062,56 +2068,64 @@ Ada transaksi dengan saldo yang telah selesai!
 *┊・ 📮| Nomor:* @${sender.split("@")[0]}
 *┊・ 📦| Nama Barang:* ${db.data.produk[data[0]].name}
 *┊・ 🏷️️| Harga Barang:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}
-*┊・ 🛍️| Jumlah Order:* ${data[1]}
+*┊・ 🛍️| Jumlah Order:* ${jumlah}
 *┊・ 💰| Total Bayar:* Rp${toRupiah(totalHarga)}
 *┊・ 💳| Metode Bayar:* Saldo
 *┊・ 📅| Tanggal:* ${tanggal}
 *┊・ ⏰| Jam:* ${jamwib} WIB
 *╰┈┈┈┈┈┈┈┈*`, mentions: [sender] })
 
-        // Tambah ke database transaksi
-        db.data.transaksi.push({
-          id: data[0],
-          name: db.data.produk[data[0]].name,
-          price: hargaProduk(data[0], db.data.users[sender].role),
-          date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
-          profit: db.data.produk[data[0]].profit,
-          jumlah: Number(data[1]),
-          user: sender.split("@")[0],
-          userRole: db.data.users[sender].role,
-          reffId: reffId,
-          metodeBayar: "Saldo",
-          totalBayar: totalHarga
-        })
-        
-        // Cek apakah stok habis dan kirim notifikasi ke admin
-        if (db.data.produk[data[0]].stok.length === 0) {
-          const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
-            `*📦 Produk:* ${db.data.produk[data[0]].name}\n` +
-            `*🆔 ID Produk:* ${data[0]}\n` +
-            `*📊 Stok Sebelumnya:* ${Number(data[1])}\n` +
-            `*📉 Stok Sekarang:* 0 (HABIS)\n` +
-            `*🛒 Terjual Terakhir:* ${data[1]} akun\n` +
-            `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
-            `*💰 Total Transaksi:* Rp${toRupiah(totalHarga)}\n` +
-            `*📅 Tanggal:* ${tanggal}\n` +
-            `*⏰ Jam:* ${jamwib} WIB\n\n` +
-            `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
-            `• Segera restok produk ini\n` +
-            `• Update harga jika diperlukan\n` +
-            `• Cek profit margin\n\n` +
-            `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`
+          // Tambah ke database transaksi
+          db.data.transaksi.push({
+            id: data[0],
+            name: db.data.produk[data[0]].name,
+            price: hargaProduk(data[0], db.data.users[sender].role),
+            date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+            profit: db.data.produk[data[0]].profit,
+            jumlah: jumlah,
+            user: sender.split("@")[0],
+            userRole: db.data.users[sender].role,
+            reffId: reffId,
+            metodeBayar: "Saldo",
+            totalBayar: totalHarga
+          })
+
+          await db.save()
           
-          // Kirim notifikasi ke admin yang ditentukan
-          await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
-          await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+          // Cek apakah stok habis dan kirim notifikasi ke admin
+          if (db.data.produk[data[0]].stok.length === 0) {
+            const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
+              `*📦 Produk:* ${db.data.produk[data[0]].name}\n` +
+              `*🆔 ID Produk:* ${data[0]}\n` +
+              `*📊 Stok Sebelumnya:* ${jumlah}\n` +
+              `*📉 Stok Sekarang:* 0 (HABIS)\n` +
+              `*🛒 Terjual Terakhir:* ${jumlah} akun\n` +
+              `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
+              `*💰 Total Transaksi:* Rp${toRupiah(totalHarga)}\n` +
+              `*📅 Tanggal:* ${tanggal}\n` +
+              `*⏰ Jam:* ${jamwib} WIB\n\n` +
+              `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
+              `• Segera restok produk ini\n` +
+              `• Update harga jika diperlukan\n` +
+              `• Cek profit margin\n\n` +
+              `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`
+            
+            // Kirim notifikasi ke admin yang ditentukan
+            await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+            await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+          }
+          
+          // Beri notifikasi pembelian berhasil hanya jika di grup
+          if (isGroup) {
+            reply("Pembelian berhasil! Detail akun telah dikirim ke chat.")
+          }
+        } catch (error) {
+          console.log("Error processing buy:", error)
+          reply("Terjadi kesalahan saat memproses pembelian. Silakan coba lagi atau hubungi admin.")
+        } finally {
+          delete db.data.order[sender]
+          await db.save()
         }
-        
-        // Beri notifikasi pembelian berhasil hanya jika di grup
-        if (isGroup) {
-          reply("Pembelian berhasil! Detail akun telah dikirim ke chat.")
-        }
-        // Jika di private chat (PC), tidak perlu notifikasi
       }
         break
 
