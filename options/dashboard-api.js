@@ -549,21 +549,6 @@ app.get('/api/dashboard/transactions/search/:reffId', (req, res) => {
     // Parse delivered account if exists
     const deliveredAccount = parseDeliveredAccountFromFile(reffId);
     
-    // Load delivered accounts from database-transaksi.json if available
-    let deliveredAccounts = null;
-    try {
-      const txPath = path.join(__dirname, 'database-transaksi.json');
-      if (fs.existsSync(txPath)) {
-        const arr = JSON.parse(fs.readFileSync(txPath, 'utf8'));
-        if (Array.isArray(arr)) {
-          const rec = arr.find(r => r && r.reffId === reffId);
-          if (rec && Array.isArray(rec.deliveredAccounts)) deliveredAccounts = rec.deliveredAccounts;
-        }
-      }
-    } catch (e) {
-      deliveredAccounts = null;
-    }
-    
     // Transform data sebelum kirim ke frontend
     const transformedTransaction = {
       reffId: reffId,
@@ -579,7 +564,6 @@ app.get('/api/dashboard/transactions/search/:reffId', (req, res) => {
       tanggal: transaction.date,
       profit: profit,
       deliveredAccount: deliveredAccount || null,
-      deliveredAccounts: deliveredAccounts || (deliveredAccount ? [deliveredAccount] : null),
       // Keep original fields for reference
       user_name: transaction.user_name || transaction.user,
       payment_method: transaction.payment_method || transaction.metodeBayar,
@@ -596,65 +580,6 @@ app.get('/api/dashboard/transactions/search/:reffId', (req, res) => {
       success: false,
       error: error.message
     });
-  }
-});
-
-// 6b. Get Transaksi Detail by Reff ID (rich)
-app.get('/api/dashboard/transactions/:reffId', (req, res) => {
-  try {
-    const { reffId } = req.params;
-    const db = getFormattedData();
-    
-    if (!db) {
-      return res.status(500).json({ success: false, error: 'Failed to load database' });
-    }
-
-    const transaction = db.data.transaksi.find(t => t.reffId === reffId || t.order_id === reffId);
-    if (!transaction) {
-      return res.status(404).json({ success: false, error: 'Transaction not found' });
-    }
-
-    const userRole = db.data.users[transaction.user]?.role || 'bronze';
-    const profitPercentage = db.data.persentase[userRole] || 2;
-    const profit = Math.floor((parseInt(transaction.price) * (transaction.jumlah || 1)) * (profitPercentage / 100));
-
-    // Load delivered accounts file
-    let deliveredAccounts = null;
-    try {
-      const txPath = path.join(__dirname, 'database-transaksi.json');
-      if (fs.existsSync(txPath)) {
-        const arr = JSON.parse(fs.readFileSync(txPath, 'utf8'));
-        if (Array.isArray(arr)) {
-          const rec = arr.find(r => r && r.reffId === reffId);
-          if (rec && Array.isArray(rec.deliveredAccounts)) deliveredAccounts = rec.deliveredAccounts;
-        }
-      }
-    } catch (e) {}
-
-    // Fallback to TRX log parse
-    const deliveredAccount = parseDeliveredAccountFromFile(reffId);
-    if (!deliveredAccounts && deliveredAccount) deliveredAccounts = [deliveredAccount];
-
-    return res.json({
-      success: true,
-      data: {
-        reffId: reffId,
-        user: transaction.user_name || transaction.user || 'Anonymous User',
-        userId: transaction.user || null,
-        userRole: userRole,
-        metodeBayar: transaction.payment_method || transaction.metodeBayar || 'Not specified',
-        produk: transaction.name,
-        idProduk: transaction.id,
-        hargaSatuan: parseInt(transaction.price) || 0,
-        jumlah: transaction.jumlah || 1,
-        totalBayar: transaction.totalBayar || (parseInt(transaction.price) * (transaction.jumlah || 1)),
-        tanggal: transaction.date,
-        profit,
-        deliveredAccounts: deliveredAccounts,
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
   }
 });
 
