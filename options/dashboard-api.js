@@ -67,6 +67,40 @@ function getFormattedData() {
   };
 }
 
+// Helper: Parse delivered account from TRX file if available
+function parseDeliveredAccountFromFile(reffId) {
+  try {
+    const filePath = path.join(__dirname, `TRX-${reffId}.txt`);
+    if (!fs.existsSync(filePath)) return null;
+
+    const content = fs.readFileSync(filePath, 'utf8');
+    // Attempt to extract the first account block
+    const lines = content.split(/\r?\n/).map(l => l.trim());
+    const acc = {};
+    for (const line of lines) {
+      if (line.toLowerCase().startsWith('• email:')) acc.email = line.split(':').slice(1).join(':').trim();
+      else if (line.toLowerCase().startsWith('• password:')) acc.password = line.split(':').slice(1).join(':').trim();
+      else if (line.toLowerCase().startsWith('• profil:')) acc.profile = line.split(':').slice(1).join(':').trim();
+      else if (line.toLowerCase().startsWith('• pin:')) acc.pin = line.split(':').slice(1).join(':').trim();
+      else if (line.toLowerCase().startsWith('• 2fa:')) acc.twofa = line.split(':').slice(1).join(':').trim();
+    }
+
+    if (Object.keys(acc).length === 0) return null;
+
+    return {
+      email: acc.email || null,
+      akun: null,
+      username: null,
+      password: acc.password || null,
+      pin: acc.pin || null,
+      profile: acc.profile || null,
+      notes: acc.twofa ? `2FA: ${acc.twofa}` : null
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 // Role Management Functions
 function saveDatabase(db) {
   try {
@@ -512,6 +546,9 @@ app.get('/api/dashboard/transactions/search/:reffId', (req, res) => {
     const profitPercentage = db.data.persentase[userRole] || 2;
     const profit = Math.floor((parseInt(transaction.price) * transaction.jumlah) * (profitPercentage / 100));
     
+    // Parse delivered account if exists
+    const deliveredAccount = parseDeliveredAccountFromFile(reffId);
+    
     // Transform data sebelum kirim ke frontend
     const transformedTransaction = {
       reffId: reffId,
@@ -526,6 +563,7 @@ app.get('/api/dashboard/transactions/search/:reffId', (req, res) => {
       totalBayar: transaction.totalBayar || (parseInt(transaction.price) * transaction.jumlah),
       tanggal: transaction.date,
       profit: profit,
+      deliveredAccount: deliveredAccount || null,
       // Keep original fields for reference
       user_name: transaction.user_name || transaction.user,
       payment_method: transaction.payment_method || transaction.metodeBayar,
