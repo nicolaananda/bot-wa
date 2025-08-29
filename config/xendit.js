@@ -251,12 +251,12 @@ async function getQRISStatus(externalId) {
       console.log(`Found payment with status: ${payment.status}`);
       console.log(`Payment details: ID=${payment.id}, Amount=${payment.amount}, Status=${payment.status}`);
       
-      // Update cache with latest data
+      // IMPORTANT: Update cache with latest data from Xendit
       storePaymentData(externalId, payment);
+      console.log(`✅ Cache updated with latest data for ${externalId}`);
       
       return payment;
     } else {
-      // If not found by external_id, try to get by invoice ID if we have it stored
       console.log(`No payment found with external_id: ${externalId}`);
       console.log('Response data:', JSON.stringify(result, null, 2));
       
