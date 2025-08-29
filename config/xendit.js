@@ -251,7 +251,7 @@ async function getQRISStatus(externalId) {
       console.log(`Found payment with status: ${payment.status}`);
       console.log(`Payment details: ID=${payment.id}, Amount=${payment.amount}, Status=${payment.status}`);
       
-      // Update cache
+      // Update cache with latest data
       storePaymentData(externalId, payment);
       
       return payment;
