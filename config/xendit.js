@@ -1,6 +1,6 @@
-const { Xendit } = require('xendit-node');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
 // Load environment variables if .env file exists
 let envConfig = {};
@@ -20,16 +20,76 @@ try {
 }
 
 // Xendit configuration
-const xendit = new Xendit({
-  secretKey: envConfig.XENDIT_SECRET_KEY || 'xnd_development_JCGzwsaBwnsBS3wPrSIIynK8Ygw93foCsPVBfAYWTz6Y1ZY3KeFUITs5ZH5K',
-  xenditURL: envConfig.XENDIT_BASE_URL || 'https://api.xendit.co'
-});
-
-// QRIS service
-const qrisService = new xendit.QRCode();
+const XENDIT_SECRET_KEY = envConfig.XENDIT_SECRET_KEY || 'xnd_development_JCGzwsaBwnsBS3wPrSIIynK8Ygw93foCsPVBfAYWTz6Y1ZY3KeFUITs5ZH5K';
+const XENDIT_BASE_URL = envConfig.XENDIT_BASE_URL || 'https://api.xendit.co';
 
 /**
- * Create QRIS payment using Xendit API
+ * Make HTTP request to Xendit API
+ * @param {string} endpoint - API endpoint
+ * @param {string} method - HTTP method
+ * @param {Object} data - Request data
+ * @returns {Promise<Object>} Response data
+ */
+function makeXenditRequest(endpoint, method = 'GET', data = null) {
+  return new Promise((resolve, reject) => {
+    const auth = Buffer.from(`${XENDIT_SECRET_KEY}:`).toString('base64');
+    
+    const options = {
+      hostname: 'api.xendit.co',
+      port: 443,
+      path: endpoint,
+      method: method,
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Xendit-Node-Client/1.0'
+      }
+    };
+
+    if (data && method !== 'GET') {
+      const postData = JSON.stringify(data);
+      options.headers['Content-Length'] = Buffer.byteLength(postData);
+    }
+
+    const req = https.request(options, (res) => {
+      let responseData = '';
+      
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+      
+      res.on('end', () => {
+        try {
+          const parsedData = JSON.parse(responseData);
+          
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(parsedData);
+          } else {
+            const error = new Error(parsedData.message || `HTTP ${res.statusCode}`);
+            error.status = res.statusCode;
+            error.response = parsedData;
+            reject(error);
+          }
+        } catch (parseError) {
+          reject(new Error(`Failed to parse response: ${responseData}`));
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      reject(error);
+    });
+
+    if (data && method !== 'GET') {
+      req.write(JSON.stringify(data));
+    }
+    
+    req.end();
+  });
+}
+
+/**
+ * Create QRIS payment using Xendit Invoice API
  * @param {number} amount - Amount in IDR
  * @param {string} externalId - Unique external ID for the transaction
  * @param {string} callbackUrl - Callback URL (optional)
@@ -39,31 +99,43 @@ async function createQRISPayment(amount, externalId, callbackUrl = null) {
   try {
     console.log(`Creating QRIS payment for amount: ${amount}, externalId: ${externalId}`);
     
-    const qrisData = {
+    // Try to create invoice with QRIS payment method
+    const invoiceData = {
       external_id: externalId,
-      type: 'DYNAMIC',
-      callback_url: callbackUrl,
       amount: amount,
       description: `Pembayaran produk - ${externalId}`,
-      success_redirect_url: callbackUrl,
-      failure_redirect_url: callbackUrl
+      currency: 'IDR',
+      payment_methods: ['QRIS'],
+      success_redirect_url: callbackUrl || 'https://example.com/success',
+      failure_redirect_url: callbackUrl || 'https://example.com/failure'
     };
 
-    console.log('QRIS data:', JSON.stringify(qrisData, null, 2));
+    console.log('Invoice data:', JSON.stringify(invoiceData, null, 2));
     
-    const result = await qrisService.createCode(qrisData);
-    console.log('Xendit QRIS payment created successfully:', result);
+    const result = await makeXenditRequest('/v2/invoices', 'POST', invoiceData);
+    console.log('Xendit Invoice with QRIS created successfully:', result);
     
-    return result;
+    return {
+      id: result.id,
+      external_id: result.external_id,
+      amount: result.amount,
+      status: result.status,
+      qr_string: result.qr_string || result.invoice_url,
+      created: result.created,
+      updated: result.updated
+    };
+    
   } catch (error) {
-    console.error('Error creating QRIS payment:', error);
+    console.error('Error creating Xendit Invoice with QRIS:', error);
     console.error('Error details:', {
       message: error.message,
       status: error.status,
       code: error.code,
       response: error.response
     });
-    throw error;
+    
+    // If Xendit fails, throw error - no fallback to mock
+    throw new Error(`Failed to create Xendit payment: ${error.message}`);
   }
 }
 
@@ -74,14 +146,20 @@ async function createQRISPayment(amount, externalId, callbackUrl = null) {
  */
 async function getQRISStatus(externalId) {
   try {
-    console.log(`Getting QRIS status for externalId: ${externalId}`);
+    console.log(`Getting payment status for externalId: ${externalId}`);
     
-    const result = await qrisService.getCode(externalId);
-    console.log('Xendit QRIS status retrieved:', result);
+    // Try to get invoice status
+    const result = await makeXenditRequest(`/v2/invoices?external_id=${externalId}`, 'GET');
+    console.log('Xendit payment status retrieved:', result);
     
-    return result;
+    if (result.data && result.data.length > 0) {
+      return result.data[0];
+    } else {
+      throw new Error('Payment not found');
+    }
+    
   } catch (error) {
-    console.error('Error getting QRIS status:', error);
+    console.error('Error getting payment status:', error);
     console.error('Error details:', {
       message: error.message,
       status: error.status,
@@ -126,7 +204,7 @@ async function getPaymentDetails(externalId) {
       description: status.description || `Payment for ${externalId}`,
       created: status.created,
       updated: status.updated,
-      qrString: status.qr_string
+      qrString: status.qr_string || status.invoice_url
     };
   } catch (error) {
     console.error('Error getting payment details:', error);
@@ -143,7 +221,8 @@ function getServiceStatus() {
     xenditAvailable: true,
     secretKey: envConfig.XENDIT_SECRET_KEY ? 'Configured' : 'Using Default',
     environment: envConfig.XENDIT_SECRET_KEY?.includes('development') ? 'Development' : 'Production',
-    baseUrl: envConfig.XENDIT_BASE_URL || 'https://api.xendit.co'
+    baseUrl: envConfig.XENDIT_BASE_URL || 'https://api.xendit.co',
+    implementation: 'Xendit Invoice API with QRIS'
   };
 }
 
