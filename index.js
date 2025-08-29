@@ -2132,6 +2132,84 @@ Ada transaksi dengan saldo yang telah selesai!
       }
         break
 
+      case 'netflix': {
+        try {
+          // Check database structure
+          if (!db?.data?.produk) {
+            return reply("❌ Database tidak tersedia atau rusak")
+          }
+          
+          const products = db.data.produk
+          if (Object.keys(products).length === 0) {
+            return reply("📦 Belum ada produk di database")
+          }
+
+          // Filter products that contain "netflix" in their name (case insensitive)
+          const netflixProducts = Object.entries(products).filter(([id, product]) => {
+            return product.name && product.name.toLowerCase().includes('netflix')
+          })
+
+          if (netflixProducts.length === 0) {
+            return reply("❌ Tidak ada produk Netflix yang tersedia saat ini")
+          }
+
+          let teks = `*╭────〔 NETFLIX PRODUCTS 🎬 〕────╮*\n\n`
+          teks += `*📋 Daftar Produk Netflix yang Tersedia:*\n\n`
+
+          // Process each Netflix product
+          netflixProducts.forEach(([productId, product], index) => {
+            try {
+              // Safe property access with defaults
+              const name = product.name || 'Unknown'
+              const desc = product.desc || 'Tidak ada deskripsi'
+              const stokLength = Array.isArray(product.stok) ? product.stok.length : 0
+              const terjual = product.terjual || 0
+              
+              // Get price safely
+              let harga = 'Harga tidak tersedia'
+              try {
+                if (typeof hargaProduk === 'function' && typeof toRupiah === 'function') {
+                  const userRole = db.data.users?.[sender]?.role || 'bronze'
+                  const hargaValue = hargaProduk(productId, userRole)
+                  if (hargaValue && !isNaN(hargaValue)) {
+                    harga = `Rp${toRupiah(hargaValue)}`
+                  }
+                }
+              } catch (error) {
+                console.log(`⚠️ Error getting price for product ${productId}:`, error.message)
+              }
+              
+              // Build product info
+              teks += `*${index + 1}. ${name}*\n`
+              teks += `   🔐 Kode: ${productId}\n`
+              teks += `   🏷️ Harga: ${harga}\n`
+              teks += `   📦 Stok: ${stokLength}\n`
+              teks += `   🧾 Terjual: ${terjual}\n`
+              teks += `   📝 Deskripsi: ${desc}\n`
+              teks += `   ✍️ Beli: ${prefix}buy ${productId} 1\n\n`
+              
+            } catch (error) {
+              console.log(`⚠️ Error processing Netflix product ${productId}:`, error.message)
+            }
+          })
+
+          teks += `*╰────「 END NETFLIX PRODUCTS 」────╯*\n\n`
+          teks += `*💡 Cara membeli:* ${prefix}buy kodeproduk jumlah\n`
+          teks += `*📞 Kontak Admin:* @${ownerNomer}`
+
+          // Send the message
+          ronzz.sendMessage(from, { 
+            text: teks, 
+            mentions: [ownerNomer + "@s.whatsapp.net"] 
+          }, { quoted: m })
+          
+        } catch (error) {
+          console.error('❌ Error in netflix command:', error)
+          reply(`❌ Terjadi kesalahan pada command netflix: ${error.message}`)
+        }
+      }
+        break
+
       case 'batal': {
         if (db.data.order[sender] == undefined) return
         
