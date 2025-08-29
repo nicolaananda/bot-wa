@@ -48,6 +48,7 @@
     "qrcode-terminal": "^0.12.0",
     "qs": "^6.11.2",
     "readline": "latest",
+    "xendit-node": "^7.0.0",
     "yargs": "^17.2.1"
   }
 }

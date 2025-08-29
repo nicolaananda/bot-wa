@@ -1850,64 +1850,82 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         let fee = digit()
         let totalAmount = Number(amount) + Number(fee)
 
-        let pay = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg")
-        let time = Date.now() + toMs("5m");
-        let expirationTime = new Date(time);
-        let timeLeft = Math.max(0, Math.floor((expirationTime - new Date()) / 60000));
-        let currentTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
-        let expireTimeJakarta = new Date(currentTime.getTime() + timeLeft * 60000);
-        let hours = expireTimeJakarta.getHours().toString().padStart(2, '0');
-        let minutes = expireTimeJakarta.getMinutes().toString().padStart(2, '0');
-        let formattedTime = `${hours}:${minutes}`
+        // Generate unique external ID for Xendit
+        let reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
+        let externalId = `TRX-${reffId}-${Date.now()}`
 
-        await sleep(1000)
-        let cap = `*🧾 MENUNGGU PEMBAYARAN 🧾*\n\n*Produk ID:* ${data[0]}\n*Produk Name:* ${db.data.produk[data[0]].name}\n*Harga:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}\n*Jumlah:* ${data[1]}\n*Biaya Admin:* Rp${toRupiah(Number(fee))}\n*Total:* Rp${toRupiah(totalAmount)}\n*Waktu:* ${timeLeft} menit\n\nSilahkan scan Qris di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n\nJika ingin membatalkan pembayaran ketik *${prefix}batal*`;
-        let mess = await ronzz.sendMessage(from, { image: fs.readFileSync(pay), caption: Styles(cap) }, { quoted: m })
-
-        db.data.order[sender] = {
-          id: data[0],
-          jumlah: data[1],
-          from: from,
-          key: mess.key
-        }
-
-        while (db.data.order[sender] !== undefined) {
-          await sleep(10000)
-          if (Date.now() >= time) {
-            await ronzz.sendMessage(from, { delete: mess.key })
-            reply("Pembayaran dibatalkan karena telah melewati batas expired.")
-            delete db.data.order[sender]
+        try {
+          // Import Xendit service
+          const { createQRISPayment, isPaymentCompleted } = require('./config/xendit')
+          
+          // Create QRIS payment via Xendit
+          let qrisPayment = await createQRISPayment(totalAmount, externalId)
+          
+          if (!qrisPayment || !qrisPayment.qr_string) {
+            throw new Error('Failed to create QRIS payment')
           }
-          try {
-            let orkut = new OrderKuota(db.data.orkut["username"], db.data.orkut["authToken"])
-            let response = await orkut.getTransactionQris()
-            let result = response.qris_history.results.find(i => i.status == "IN" && Number(i.kredit.replace(/[.]/g, '')) == parseInt(totalAmount))
 
-            if (result !== undefined) {
+          // Generate QR code image from Xendit QR string
+          let pay = await qrisDinamis(qrisPayment.qr_string, "./options/sticker/qris.jpg")
+          
+          let time = Date.now() + toMs("5m");
+          let expirationTime = new Date(time);
+          let timeLeft = Math.max(0, Math.floor((expirationTime - new Date()) / 60000));
+          let currentTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
+          let expireTimeJakarta = new Date(currentTime.getTime() + timeLeft * 60000);
+          let hours = expireTimeJakarta.getHours().toString().padStart(2, '0');
+          let minutes = expireTimeJakarta.getMinutes().toString().padStart(2, '0');
+          let formattedTime = `${hours}:${minutes}`
+
+          await sleep(1000)
+          let cap = `*🧾 MENUNGGU PEMBAYARAN 🧾*\n\n*Produk ID:* ${data[0]}\n*Produk Name:* ${db.data.produk[data[0]].name}\n*Harga:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}\n*Jumlah:* ${data[1]}\n*Biaya Admin:* Rp${toRupiah(Number(fee))}\n*Total:* Rp${toRupiah(totalAmount)}\n*Waktu:* ${timeLeft} menit\n\nSilahkan scan Qris di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n\nJika ingin membatalkan pembayaran ketik *${prefix}batal*`;
+          let mess = await ronzz.sendMessage(from, { image: fs.readFileSync(pay), caption: Styles(cap) }, { quoted: m })
+
+          db.data.order[sender] = {
+            id: data[0],
+            jumlah: data[1],
+            from: from,
+            key: mess.key,
+            externalId: externalId,
+            reffId: reffId
+          }
+
+          while (db.data.order[sender] !== undefined) {
+            await sleep(10000)
+            if (Date.now() >= time) {
               await ronzz.sendMessage(from, { delete: mess.key })
-              reply("Pembayaran berhasil, data akun akan segera diproses, silahkan tunggu")
+              reply("Pembayaran dibatalkan karena telah melewati batas expired.")
+              delete db.data.order[sender]
+            }
+            
+            try {
+              // Check payment status via Xendit
+              let isCompleted = await isPaymentCompleted(externalId)
+              
+              if (isCompleted) {
+                await ronzz.sendMessage(from, { delete: mess.key })
+                reply("Pembayaran berhasil, data akun akan segera diproses, silahkan tunggu")
 
-              await sleep(500)
-              db.data.produk[data[0]].terjual += Number(data[1])
-              let dataStok = []
-              for (let i = 0; i < data[1]; i++) {
-                dataStok.push(db.data.produk[data[0]].stok.shift())
-              }
+                await sleep(500)
+                db.data.produk[data[0]].terjual += Number(data[1])
+                let dataStok = []
+                for (let i = 0; i < data[1]; i++) {
+                  dataStok.push(db.data.produk[data[0]].stok.shift())
+                }
 
-              let reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
-              let teks = `Tanggal Transaksi: ${tanggal}\n\n----- ACCOUNT DETAIL -----\n`
+                let teks = `Tanggal Transaksi: ${tanggal}\n\n----- ACCOUNT DETAIL -----\n`
 
-              dataStok.forEach(i => {
-                let dataAkun = i.split("|")
-                teks += `• Email: ${dataAkun[0]}\n• Password: ${dataAkun[1]}\n• Profil: ${dataAkun[2] ? dataAkun[2] : "-"}\n• Pin: ${dataAkun[3] ? dataAkun[3] : "-"}\n• 2FA: ${dataAkun[4] ? dataAkun[4] : "-"}\n\n`
-              })
+                dataStok.forEach(i => {
+                  let dataAkun = i.split("|")
+                  teks += `• Email: ${dataAkun[0]}\n• Password: ${dataAkun[1]}\n• Profil: ${dataAkun[2] ? dataAkun[2] : "-"}\n• Pin: ${dataAkun[3] ? dataAkun[3] : "-"}\n• 2FA: ${dataAkun[4] ? dataAkun[4] : "-"}\n\n`
+                })
 
-              fs.writeFileSync(`./options/TRX-${reffId}.txt`, teks, "utf8")
-              ronzz.sendMessage(sender, {
-                document: fs.readFileSync(`./options/TRX-${reffId}.txt`),
-                mimetype: "text/plain",
-                fileName: `TRX-${reffId}.txt`,
-                caption: `*───「 ACCOUNT DETAIL 」───*
+                fs.writeFileSync(`./options/TRX-${reffId}.txt`, teks, "utf8")
+                ronzz.sendMessage(sender, {
+                  document: fs.readFileSync(`./options/TRX-${reffId}.txt`),
+                  mimetype: "text/plain",
+                  fileName: `TRX-${reffId}.txt`,
+                  caption: `*───「 ACCOUNT DETAIL 」───*
 Silahkan buka file txt yang sudah diberikan
 
 *╭────「 TRANSAKSI DETAIL 」───*
@@ -1923,9 +1941,9 @@ Silahkan buka file txt yang sudah diberikan
 *───「 SNK PRODUK 」───*
 
 ${db.data.produk[data[0]].snk}`
-              }, { quoted: m })
-              
-              await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
+                }, { quoted: m })
+                
+                await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
 Ada transaksi yang telah dibayar!
 
 *╭────「 TRANSAKSI DETAIL 」───*
@@ -1939,51 +1957,55 @@ Ada transaksi yang telah dibayar!
 *┊・ ⏰| Jam:* ${jamwib} WIB
 *╰┈┈┈┈┈┈┈┈*`, mentions: [sender] })
 
-              db.data.transaksi.push({
-                id: data[0],
-                name: db.data.produk[data[0]].name,
-                price: hargaProduk(data[0], db.data.users[sender].role),
-                date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
-                profit: db.data.produk[data[0]].profit,
-                jumlah: Number(data[1]),
-                user: sender.split("@")[0],
-                userRole: db.data.users[sender].role,
-                reffId: reffId,
-                metodeBayar: "QRIS",
-                totalBayar: totalAmount
-              })
+                db.data.transaksi.push({
+                  id: data[0],
+                  name: db.data.produk[data[0]].name,
+                  price: hargaProduk(data[0], db.data.users[sender].role),
+                  date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+                  profit: db.data.produk[data[0]].profit,
+                  jumlah: Number(data[1]),
+                  user: sender.split("@")[0],
+                  userRole: db.data.users[sender].role,
+                  reffId: reffId,
+                  metodeBayar: "QRIS-XENDIT",
+                  totalBayar: totalAmount
+                })
 
-              // Cek apakah stok habis dan kirim notifikasi ke admin
-              if (db.data.produk[data[0]].stok.length === 0) {
-                const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
-                  `*📦 Produk:* ${db.data.produk[data[0]].name}\n` +
-                  `*🆔 ID Produk:* ${data[0]}\n` +
-                  `*📊 Stok Sebelumnya:* ${Number(data[1])}\n` +
-                  `*📉 Stok Sekarang:* 0 (HABIS)\n` +
-                  `*🛒 Terjual Terakhir:* ${data[1]} akun\n` +
-                  `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
-                  `*💰 Total Transaksi:* Rp${toRupiah(totalAmount)}\n` +
-                  `*📅 Tanggal:* ${tanggal}\n` +
-                  `*⏰ Jam:* ${jamwib} WIB\n\n` +
-                  `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
-                  `• Segera restok produk ini\n` +
-                  `• Update harga jika diperlukan\n` +
-                  `• Cek profit margin\n\n` +
-                  `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`
+                // Cek apakah stok habis dan kirim notifikasi ke admin
+                if (db.data.produk[data[0]].stok.length === 0) {
+                  const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
+                    `*📦 Produk:* ${db.data.produk[data[0]].name}\n` +
+                    `*🆔 ID Produk:* ${data[0]}\n` +
+                    `*📊 Stok Sebelumnya:* ${Number(data[1])}\n` +
+                    `*📉 Stok Sekarang:* 0 (HABIS)\n` +
+                    `*🛒 Terjual Terakhir:* ${data[1]} akun\n` +
+                    `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
+                    `*💰 Total Transaksi:* Rp${toRupiah(totalAmount)}\n` +
+                    `*📅 Tanggal:* ${tanggal}\n` +
+                    `*⏰ Jam:* ${jamwib} WIB\n\n` +
+                    `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
+                    `• Segera restok produk ini\n` +
+                    `• Update harga jika diperlukan\n` +
+                    `• Cek profit margin\n\n` +
+                    `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`
+                  
+                  // Kirim notifikasi ke admin yang ditentukan
+                  await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+                  await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+                }
                 
-                // Kirim notifikasi ke admin yang ditentukan
-                await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
-                await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+                fs.unlinkSync(`./options/TRX-${reffId}.txt`)
+                delete db.data.order[sender]
               }
-              
-              fs.unlinkSync(`./options/TRX-${reffId}.txt`)
+            } catch (error) {
+              reply("Pesanan dibatalkan!")
+              console.log("Error checking Xendit payment status:", error);
               delete db.data.order[sender]
             }
-          } catch (error) {
-            reply("Pesanan dibatalkan!")
-            console.log("Error checking transaction status:", error);
-            delete db.data.order[sender]
           }
+        } catch (error) {
+          reply("Gagal membuat QR Code pembayaran. Silahkan coba lagi.")
+          console.log("Error creating Xendit QRIS payment:", error);
         }
       }
         break
