@@ -1834,7 +1834,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       }
         break
 
-        case 'xendit': {
+        case 'buynow': {
           // Validasi order yang sedang berlangsung
           if (db.data.order[sender]) {
               return reply(`Kamu sedang melakukan order. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`);
@@ -1879,7 +1879,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
               const externalId = `TRX-${reffId}-${Date.now()}`;
       
               // Import Xendit service
-              const { createQRISPayment, isPaymentCompleted } = require('./config/xendit');
+              const { createQRISPayment, isPaymentCompleted, clearCachedPaymentData } = require('./config/xendit');
       
               // Buat QRIS payment
               const qrisPayment = await createQRISPayment(totalAmount, externalId);
@@ -1890,8 +1890,8 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
               // Generate QR code image
               const qrImagePath = await qrisDinamis(qrisPayment.qr_string, "./options/sticker/qris.jpg");
       
-              // Hitung waktu kedaluwarsa (sesuaikan dengan Xendit atau lokal)
-              const expirationTime = Date.now() + toMs("5m"); // 5 menit lokal
+              // Hitung waktu kedaluwarsa
+              const expirationTime = new Date(qrisPayment.expiry_date).getTime();
               const expireDate = new Date(expirationTime);
               const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
               const currentTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
@@ -1906,7 +1906,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                   `*Jumlah:* ${quantityNum}\n` +
                   `*Biaya Admin:* Rp${toRupiah(fee)}\n` +
                   `*Total:* Rp${toRupiah(totalAmount)}\n` +
-                  `*Waktu:* ${timeLeft} menit\n\n` +
+                  `*Waktu:* ${timeLeft} menit (QRIS valid hingga ${expireDate.toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })})\n\n` +
                   `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n` +
                   `Jika ingin membatalkan, ketik *${prefix}batal*`;
       
@@ -1929,22 +1929,23 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
               while (db.data.order[sender]) {
                   await sleep(10000);
       
-                  // Cek waktu kedaluwarsa lokal
+                  // Cek waktu kedaluwarsa
                   if (Date.now() >= expirationTime) {
                       await ronzz.sendMessage(from, { delete: message.key });
-                      reply("Pembayaran dibatalkan karena melewati batas waktu 5 menit.");
+                      reply("Pembayaran dibatalkan karena melewati batas waktu.");
                       delete db.data.order[sender];
+                      clearCachedPaymentData(externalId);
+                      await db.save();
                       break;
                   }
       
                   try {
-                      // Cek status pembayaran dengan Xendit
+                      // Cek status pembayaran
                       const paymentStatus = await isPaymentCompleted(externalId);
-      
-                      // Log untuk debugging
+                      
                       console.log(`Checking payment status for ${externalId}:`, paymentStatus);
       
-                      if (paymentStatus.status === "PAID" && paymentStatus.paid_amount === totalAmount) {
+                      if (paymentStatus.isCompleted && paymentStatus.paid_amount === totalAmount) {
                           await ronzz.sendMessage(from, { delete: message.key });
                           reply("Pembayaran berhasil, data akun akan segera diproses.");
       
@@ -1952,43 +1953,41 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                           product.terjual += quantityNum;
                           const soldItems = stock.splice(0, quantityNum);
       
-                          // Buat detail akun
-                          let accountDetails = `Tanggal Transaksi: ${tanggal}\n\n----- ACCOUNT DETAIL -----\n`;
-                          soldItems.forEach(item => {
-                              const [email, password, profile = "-", pin = "-", twoFA = "-"] = item.split("|");
-                              accountDetails += `• Email: ${email}\n` +
-                                  `• Password: ${password}\n` +
-                                  `• Profil: ${profile}\n` +
-                                  `• Pin: ${pin}\n` +
-                                  `• 2FA: ${twoFA}\n\n`;
+                          // Buat teks detail akun yang lebih rapi
+                          let detailAkun = `*📦 Produk:* ${product.name}\n` +
+                              `*📅 Tanggal:* ${tanggal}\n` +
+                              `*⏰ Jam:* ${jamwib} WIB\n\n`;
+                          
+                          soldItems.forEach((item, index) => {
+                              const [email = 'Tidak ada', password = 'Tidak ada', profile = 'Tidak ada', pin = 'Tidak ada', twoFA = 'Tidak ada'] = item.split("|");
+                              detailAkun += `│ 📧 Email: ${email}\n` +
+                                  `│ 🔐 Password: ${password}\n` +
+                                  `│ 👤 Profil: ${profile}\n` +
+                                  `│ 🔢 Pin: ${pin}\n` +
+                                  `│ 🔒 2FA: ${twoFA}\n\n`;
                           });
       
-                          // Simpan detail transaksi ke file
-                          const filePath = `./options/TRX-${reffId}.txt`;
-                          fs.writeFileSync(filePath, accountDetails, "utf8");
+                          // Kirim detail akun ke chat pribadi user dan admin
+                          await Promise.all([
+                              ronzz.sendMessage(sender, { text: detailAkun }, { quoted: m }),
+                              ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkun }, { quoted: m })
+                          ]);
       
-                          // Kirim detail akun ke pengguna
-                          await ronzz.sendMessage(sender, {
-                              document: fs.readFileSync(filePath),
-                              mimetype: "text/plain",
-                              fileName: `TRX-${reffId}.txt`,
-                              caption: `*───「 ACCOUNT DETAIL 」───*\n` +
-                                  `Silakan buka file txt yang sudah diberikan\n\n` +
-                                  `*╭────「 TRANSAKSI DETAIL 」───*\n` +
-                                  `*┊・ 🧾| Reff Id:* ${reffId}\n` +
-                                  `*┊・ 📦| Nama Barang:* ${product.name}\n` +
-                                  `*┊・ 🏷️| Harga Barang:* Rp${toRupiah(unitPrice)}\n` +
-                                  `*┊・ 🛍️| Jumlah Order:* ${quantityNum}\n` +
-                                  `*┊・ 💰| Total Bayar:* Rp${toRupiah(totalAmount)}\n` +
-                                  `*┊・ 📅| Tanggal:* ${tanggal}\n` +
-                                  `*┊・ ⏰| Jam:* ${jamwib} WIB\n` +
-                                  `*╰┈┈┈┈┈┈┈┈*\n\n` +
-                                  `*───「 SNK PRODUK 」───*\n\n${product.snk}`
-                          }, { quoted: m });
+                          // Buat teks SNK produk yang lebih rapi
+                          let snkProduk = `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n` +
+                              `*📋 SNK PRODUK: ${product.name}*\n\n` +
+                              `${product.snk}\n\n` +
+                              `*⚠️ PENTING:*\n` +
+                              `• Baca dan pahami SNK sebelum menggunakan akun\n` +
+                              `• Akun yang sudah dibeli tidak dapat dikembalikan\n` +
+                              `• Hubungi admin jika ada masalah dengan akun\n\n` +
+                              `*╰────「 END SNK 」────╯*`;
+      
+                          await ronzz.sendMessage(sender, { text: snkProduk }, { quoted: m });
       
                           // Kirim notifikasi ke owner
                           await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", {
-                              text: `Hai Owner,\nAda transaksi yang telah dibayar!\n\n` +
+                              text: `Hai Owner,\nAda transaksi yang telah selesai!\n\n` +
                                   `*╭────「 TRANSAKSI DETAIL 」───*\n` +
                                   `*┊・ 🧾| Reff Id:* ${reffId}\n` +
                                   `*┊・ 📮| Nomor:* @${sender.split("@")[0]}\n` +
@@ -1996,13 +1995,14 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                                   `*┊・ 🏷️| Harga Barang:* Rp${toRupiah(unitPrice)}\n` +
                                   `*┊・ 🛍️| Jumlah Order:* ${quantityNum}\n` +
                                   `*┊・ 💰| Total Bayar:* Rp${toRupiah(totalAmount)}\n` +
+                                  `*┊・ 💳| Metode Bayar:* QRIS-XENDIT\n` +
                                   `*┊・ 📅| Tanggal:* ${tanggal}\n` +
                                   `*┊・ ⏰| Jam:* ${jamwib} WIB\n` +
                                   `*╰┈┈┈┈┈┈┈┈*`,
                               mentions: [sender]
                           });
       
-                          // Simpan data transaksi
+                          // Tambah ke database transaksi
                           db.data.transaksi.push({
                               id: productId,
                               name: product.name,
@@ -2041,9 +2041,15 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                               ]);
                           }
       
+                          // Beri notifikasi pembelian berhasil hanya jika di grup
+                          if (isGroup) {
+                              reply("Pembelian berhasil! Detail akun telah dikirim ke chat.");
+                          }
+      
                           // Cleanup
-                          fs.unlinkSync(filePath);
                           delete db.data.order[sender];
+                          clearCachedPaymentData(externalId);
+                          await db.save();
                           break;
                       }
                   } catch (error) {
@@ -2051,12 +2057,16 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                       await ronzz.sendMessage(from, { delete: message.key });
                       reply("Pesanan dibatalkan karena error sistem.");
                       delete db.data.order[sender];
+                      clearCachedPaymentData(externalId);
+                      await db.save();
                       break;
                   }
               }
           } catch (error) {
               console.error(`Error creating QRIS payment for ${externalId}:`, error);
               reply("Gagal membuat QR Code pembayaran. Silakan coba lagi.");
+              delete db.data.order[sender];
+              await db.save();
           }
       }
       break;
