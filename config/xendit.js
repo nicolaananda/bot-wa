@@ -26,6 +26,7 @@ const XENDIT_BASE_URL = envConfig.XENDIT_BASE_URL || 'https://api.xendit.co';
 // Local payment storage to avoid repeated API calls
 const paymentCache = new Map();
 const PAYMENT_CACHE_FILE = path.join(__dirname, 'payment-cache.json');
+const CACHE_TTL = 5 * 60 * 1000; // Cache TTL: 5 minutes
 
 // Load payment cache from file
 function loadPaymentCache() {
@@ -35,12 +36,15 @@ function loadPaymentCache() {
       const cache = JSON.parse(data);
       paymentCache.clear();
       Object.entries(cache).forEach(([key, value]) => {
-        paymentCache.set(key, value);
+        // Hanya muat cache yang belum kedaluwarsa
+        if (new Date().toISOString() < new Date(value.cachedAt).getTime() + CACHE_TTL) {
+          paymentCache.set(key, value);
+        }
       });
       console.log(`Loaded ${paymentCache.size} cached payments`);
     }
   } catch (error) {
-    console.log('No payment cache found or error loading cache');
+    console.log('No payment cache found or error loading cache:', error);
   }
 }
 
@@ -71,11 +75,21 @@ function storePaymentData(externalId, paymentData) {
 // Get payment data from cache
 function getCachedPaymentData(externalId) {
   const cached = paymentCache.get(externalId);
-  if (cached) {
-    console.log(`Found cached payment data for ${externalId}`);
+  if (cached && new Date().getTime() < new Date(cached.cachedAt).getTime() + CACHE_TTL) {
+    console.log(`Found valid cached payment data for ${externalId}`);
     return cached;
   }
+  console.log(`No valid cached payment data for ${externalId}`);
+  paymentCache.delete(externalId); // Hapus cache yang kedaluwarsa
+  savePaymentCache();
   return null;
+}
+
+// Clear payment cache
+function clearCachedPaymentData(externalId) {
+  paymentCache.delete(externalId);
+  savePaymentCache();
+  console.log(`Cleared cache for ${externalId}`);
 }
 
 // Load cache on startup
@@ -157,7 +171,6 @@ async function createQRISPayment(amount, externalId, callbackUrl = null) {
   try {
     console.log(`Creating QRIS payment for amount: ${amount}, externalId: ${externalId}`);
     
-    // Try to create invoice with QRIS payment method
     const invoiceData = {
       external_id: externalId,
       amount: amount,
@@ -165,7 +178,9 @@ async function createQRISPayment(amount, externalId, callbackUrl = null) {
       currency: 'IDR',
       payment_methods: ['QRIS'],
       success_redirect_url: callbackUrl || 'https://example.com/success',
-      failure_redirect_url: callbackUrl || 'https://example.com/failure'
+      failure_redirect_url: callbackUrl || 'https://example.com/failure',
+      should_exclude_credit_card: true,
+      should_send_email: false
     };
 
     console.log('Invoice data:', JSON.stringify(invoiceData, null, 2));
@@ -178,32 +193,22 @@ async function createQRISPayment(amount, externalId, callbackUrl = null) {
       external_id: result.external_id,
       amount: result.amount,
       status: result.status,
-      qr_string: result.qr_string || result.invoice_url,
+      qr_string: result.invoice_url, // Gunakan invoice_url sebagai qr_string
       created: result.created,
-      updated: result.updated
+      updated: result.updated,
+      expiry_date: result.expiry_date
     };
     
-    // Store payment data locally
     storePaymentData(externalId, paymentData);
-    
     return paymentData;
-    
   } catch (error) {
     console.error('Error creating Xendit Invoice with QRIS:', error);
-    console.error('Error details:', {
-      message: error.message,
-      status: error.status,
-      code: error.code,
-      response: error.response
-    });
-    
-    // If Xendit fails, throw error - no fallback to mock
     throw new Error(`Failed to create Xendit payment: ${error.message}`);
   }
 }
 
 /**
- * Get payment by invoice ID (alternative method)
+ * Get payment by invoice ID
  * @param {string} invoiceId - Xendit invoice ID
  * @returns {Promise<Object>} Payment object
  */
@@ -214,7 +219,6 @@ async function getPaymentByInvoiceId(invoiceId) {
     const result = await makeXenditRequest(`/v2/invoices/${invoiceId}`, 'GET');
     console.log('Payment by invoice ID retrieved:', JSON.stringify(result, null, 2));
     
-    // Store in cache if we have external_id
     if (result.external_id) {
       storePaymentData(result.external_id, result);
     }
@@ -235,32 +239,24 @@ async function getQRISStatus(externalId) {
   try {
     console.log(`Getting payment status for externalId: ${externalId}`);
     
-    // First check cache
+    // Cek cache, tetapi hanya gunakan jika masih valid
     const cached = getCachedPaymentData(externalId);
-    if (cached && cached.status === 'PAID') {
+    if (cached && cached.status === 'PAID' && cached.paid_amount === cached.amount) {
       console.log(`Using cached PAID payment for ${externalId}`);
       return cached;
     }
     
-    // Try to get invoice status by external_id
+    // Ambil status dari Xendit
     const result = await makeXenditRequest(`/v2/invoices?external_id=${externalId}`, 'GET');
     console.log('Xendit payment status retrieved:', JSON.stringify(result, null, 2));
     
-    if (result.data && result.data.length > 0) {
-      const payment = result.data[0];
-      console.log(`Found payment with status: ${payment.status}`);
-      console.log(`Payment details: ID=${payment.id}, Amount=${payment.amount}, Status=${payment.status}`);
-      
-      // IMPORTANT: Update cache with latest data from Xendit
-      storePaymentData(externalId, payment);
-      console.log(`✅ Cache updated with latest data for ${externalId}`);
-      
-      return payment;
-    } else {
+    // Respons Xendit adalah array, ambil elemen pertama
+    const payment = Array.isArray(result) ? result[0] : result;
+    
+    if (!payment) {
       console.log(`No payment found with external_id: ${externalId}`);
       console.log('Response data:', JSON.stringify(result, null, 2));
       
-      // Check if we have cached data
       if (cached) {
         console.log(`Using cached payment data for ${externalId}`);
         return cached;
@@ -269,22 +265,20 @@ async function getQRISStatus(externalId) {
       throw new Error(`Payment not found with external_id: ${externalId}`);
     }
     
+    // Perbarui cache
+    storePaymentData(externalId, payment);
+    console.log(`✅ Cache updated with latest data for ${externalId}`);
+    
+    return payment;
   } catch (error) {
     console.error('Error getting payment status:', error);
     
-    // If API fails, try to use cached data
     const cached = getCachedPaymentData(externalId);
     if (cached) {
       console.log(`Using cached payment data due to API error for ${externalId}`);
       return cached;
     }
     
-    console.error('Error details:', {
-      message: error.message,
-      status: error.status,
-      code: error.code,
-      response: error.response
-    });
     throw error;
   }
 }
@@ -292,25 +286,38 @@ async function getQRISStatus(externalId) {
 /**
  * Check if payment is completed
  * @param {string} externalId - External ID of the transaction
- * @returns {Promise<boolean>} True if payment is completed
+ * @returns {Promise<Object>} Payment status object with isCompleted flag
  */
 async function isPaymentCompleted(externalId) {
   try {
-    const status = await getQRISStatus(externalId);
+    const payment = await getQRISStatus(externalId);
     
-    // Check multiple possible status values
-    const isCompleted = status.status === 'PAID' || 
-                       status.status === 'COMPLETED' || 
-                       status.status === 'SETTLED';
+    const isCompleted = payment.status === 'PAID' || 
+                       payment.status === 'COMPLETED' || 
+                       payment.status === 'SETTLED';
     
-    console.log(`Payment status for ${externalId}: ${status.status} (Completed: ${isCompleted})`);
-    console.log(`Payment amount: ${status.amount}, Paid amount: ${status.paid_amount}`);
-    console.log(`Payment channel: ${status.payment_channel}, Method: ${status.payment_method}`);
+    console.log(`Payment status for ${externalId}: ${payment.status} (Completed: ${isCompleted})`);
+    console.log(`Payment amount: ${payment.amount}, Paid amount: ${payment.paid_amount || 'undefined'}`);
+    console.log(`Payment channel: ${payment.payment_channel || 'undefined'}, Method: ${payment.payment_method || 'undefined'}`);
     
-    return isCompleted;
+    return {
+      isCompleted,
+      status: payment.status,
+      paid_amount: payment.paid_amount || 0,
+      amount: payment.amount,
+      payment_channel: payment.payment_channel || 'UNKNOWN',
+      payment_method: payment.payment_method || 'UNKNOWN'
+    };
   } catch (error) {
     console.error('Error checking payment status:', error);
-    return false;
+    return {
+      isCompleted: false,
+      status: 'ERROR',
+      paid_amount: 0,
+      amount: 0,
+      payment_channel: 'UNKNOWN',
+      payment_method: 'UNKNOWN'
+    };
   }
 }
 
@@ -321,20 +328,20 @@ async function isPaymentCompleted(externalId) {
  */
 async function getPaymentDetails(externalId) {
   try {
-    const status = await getQRISStatus(externalId);
+    const payment = await getQRISStatus(externalId);
     return {
-      externalId: status.external_id,
-      invoiceId: status.id,
-      status: status.status,
-      amount: status.amount,
-      paidAmount: status.paid_amount,
-      description: status.description || `Payment for ${externalId}`,
-      created: status.created,
-      updated: status.updated,
-      paidAt: status.paid_at,
-      qrString: status.qr_string || status.invoice_url,
-      paymentChannel: status.payment_channel,
-      paymentMethod: status.payment_method
+      externalId: payment.external_id,
+      invoiceId: payment.id,
+      status: payment.status,
+      amount: payment.amount,
+      paidAmount: payment.paid_amount,
+      description: payment.description || `Payment for ${externalId}`,
+      created: payment.created,
+      updated: payment.updated,
+      paidAt: payment.paid_at,
+      qrString: payment.qr_string || payment.invoice_url,
+      paymentChannel: payment.payment_channel,
+      paymentMethod: payment.payment_method
     };
   } catch (error) {
     console.error('Error getting payment details:', error);
@@ -364,4 +371,4 @@ module.exports = {
   isPaymentCompleted,
   getPaymentDetails,
   getServiceStatus
-}; 
+};

@@ -1871,8 +1871,8 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
               // Hitung total biaya
               const unitPrice = Number(hargaProduk(productId, db.data.users[sender].role));
               const amount = unitPrice * quantityNum;
-              const fee = digit(); // Pastikan fungsi digit() mengembalikan nilai numerik
-              const totalAmount = amount + Number(fee);
+              const fee = Number(digit()); // Pastikan digit() mengembalikan nilai numerik
+              const totalAmount = amount + fee;
       
               // Generate unique external ID
               const reffId = crypto.randomBytes(5).toString("hex").toUpperCase();
@@ -1890,8 +1890,8 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
               // Generate QR code image
               const qrImagePath = await qrisDinamis(qrisPayment.qr_string, "./options/sticker/qris.jpg");
       
-              // Hitung waktu kedaluwarsa
-              const expirationTime = Date.now() + toMs("5m");
+              // Hitung waktu kedaluwarsa (sesuaikan dengan Xendit atau lokal)
+              const expirationTime = Date.now() + toMs("5m"); // 5 menit lokal
               const expireDate = new Date(expirationTime);
               const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
               const currentTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
@@ -1928,20 +1928,23 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
               // Polling status pembayaran
               while (db.data.order[sender]) {
                   await sleep(10000);
-                  
-                  // Cek waktu kedaluwarsa
+      
+                  // Cek waktu kedaluwarsa lokal
                   if (Date.now() >= expirationTime) {
                       await ronzz.sendMessage(from, { delete: message.key });
-                      reply("Pembayaran dibatalkan karena melewati batas waktu.");
+                      reply("Pembayaran dibatalkan karena melewati batas waktu 5 menit.");
                       delete db.data.order[sender];
                       break;
                   }
       
                   try {
-                      // Cek status pembayaran
-                      const isCompleted = await isPaymentCompleted(externalId);
-                      
-                      if (isCompleted) {
+                      // Cek status pembayaran dengan Xendit
+                      const paymentStatus = await isPaymentCompleted(externalId);
+      
+                      // Log untuk debugging
+                      console.log(`Checking payment status for ${externalId}:`, paymentStatus);
+      
+                      if (paymentStatus.status === "PAID" && paymentStatus.paid_amount === totalAmount) {
                           await ronzz.sendMessage(from, { delete: message.key });
                           reply("Pembayaran berhasil, data akun akan segera diproses.");
       
@@ -2032,7 +2035,6 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                                   `• Cek profit margin\n\n` +
                                   `*💡 Tips:* Gunakan command *${prefix}addstok ${productId} jumlah* untuk menambah stok`;
       
-                              // Kirim notifikasi ke admin
                               await Promise.all([
                                   ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] }),
                                   ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
@@ -2042,9 +2044,10 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                           // Cleanup
                           fs.unlinkSync(filePath);
                           delete db.data.order[sender];
+                          break;
                       }
                   } catch (error) {
-                      console.error("Error checking Xendit payment status:", error);
+                      console.error(`Error checking payment status for ${externalId}:`, error);
                       await ronzz.sendMessage(from, { delete: message.key });
                       reply("Pesanan dibatalkan karena error sistem.");
                       delete db.data.order[sender];
@@ -2052,7 +2055,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                   }
               }
           } catch (error) {
-              console.error("Error creating Xendit QRIS payment:", error);
+              console.error(`Error creating QRIS payment for ${externalId}:`, error);
               reply("Gagal membuat QR Code pembayaran. Silakan coba lagi.");
           }
       }
