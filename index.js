@@ -1871,7 +1871,10 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
               // Hitung total biaya
               const unitPrice = Number(hargaProduk(productId, db.data.users[sender].role));
               const amount = unitPrice * quantityNum;
-              const fee = Number(digit()); // Pastikan digit() mengembalikan nilai numerik
+              
+              // Hitung fee Xendit menggunakan rumus: Harga Jual = Jumlah Bersih ÷ (1 - 0,007) + Rp0,20
+              // Fee = (amount * 0.007) + 0.20
+              const fee = Math.ceil((amount * 0.007) + 0.20);
               const totalAmount = amount + fee;
       
               // Generate unique external ID
