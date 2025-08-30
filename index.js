@@ -1834,182 +1834,229 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       }
         break
 
-      case 'buynow': {
-        if (db.data.order[sender] !== undefined) return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
-        let data = q.split(" ")
-        if (!data[1]) return reply(`Contoh: ${prefix + command} idproduk jumlah`)
-        if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
-
-        let stok = db.data.produk[data[0]].stok
-        if (stok.length <= 0) return reply("Stok habis, silahkan hubungi Owner untuk restok")
-        if (stok.length < data[1]) return reply(`Stok tersedia ${stok.length}, jadi harap jumlah tidak melebihi stok`)
-
-        reply("Sedang membuat QR Code...")
-
-        let amount = Number(hargaProduk(data[0], db.data.users[sender].role)) * Number(data[1])
-        let fee = digit()
-        let totalAmount = Number(amount) + Number(fee)
-
-        // Generate unique external ID for Xendit
-        let reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
-        let externalId = `TRX-${reffId}-${Date.now()}`
-
-        try {
-          // Import Xendit service
-          const { createQRISPayment, isPaymentCompleted } = require('./config/xendit')
-          
-          // Create QRIS payment via Xendit
-          let qrisPayment = await createQRISPayment(totalAmount, externalId)
-          
-          if (!qrisPayment || !qrisPayment.qr_string) {
-            throw new Error('Failed to create QRIS payment')
+        case 'xendit': {
+          // Validasi order yang sedang berlangsung
+          if (db.data.order[sender]) {
+              return reply(`Kamu sedang melakukan order. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`);
           }
-
-          // Generate QR code image from Xendit QR string
-          let pay = await qrisDinamis(qrisPayment.qr_string, "./options/sticker/qris.jpg")
-          
-          let time = Date.now() + toMs("5m");
-          let expirationTime = new Date(time);
-          let timeLeft = Math.max(0, Math.floor((expirationTime - new Date()) / 60000));
-          let currentTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
-          let expireTimeJakarta = new Date(currentTime.getTime() + timeLeft * 60000);
-          let hours = expireTimeJakarta.getHours().toString().padStart(2, '0');
-          let minutes = expireTimeJakarta.getMinutes().toString().padStart(2, '0');
-          let formattedTime = `${hours}:${minutes}`
-
-          await sleep(1000)
-          let cap = `*🧾 MENUNGGU PEMBAYARAN 🧾*\n\n*Produk ID:* ${data[0]}\n*Produk Name:* ${db.data.produk[data[0]].name}\n*Harga:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}\n*Jumlah:* ${data[1]}\n*Biaya Admin:* Rp${toRupiah(Number(fee))}\n*Total:* Rp${toRupiah(totalAmount)}\n*Waktu:* ${timeLeft} menit\n\nSilahkan scan Qris di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n\nJika ingin membatalkan pembayaran ketik *${prefix}batal*`;
-          let mess = await ronzz.sendMessage(from, { image: fs.readFileSync(pay), caption: Styles(cap) }, { quoted: m })
-
-          db.data.order[sender] = {
-            id: data[0],
-            jumlah: data[1],
-            from: from,
-            key: mess.key,
-            externalId: externalId,
-            reffId: reffId
+      
+          // Validasi input
+          const [productId, quantity] = q.split(" ");
+          if (!productId || !quantity) {
+              return reply(`Contoh: ${prefix + command} idproduk jumlah`);
           }
-
-          while (db.data.order[sender] !== undefined) {
-            await sleep(10000)
-            if (Date.now() >= time) {
-              await ronzz.sendMessage(from, { delete: mess.key })
-              reply("Pembayaran dibatalkan karena telah melewati batas expired.")
-              delete db.data.order[sender]
-            }
-            
-            try {
-              // Check payment status via Xendit
-              let isCompleted = await isPaymentCompleted(externalId)
-              
-              if (isCompleted) {
-                await ronzz.sendMessage(from, { delete: mess.key })
-                reply("Pembayaran berhasil, data akun akan segera diproses, silahkan tunggu")
-
-                await sleep(500)
-                db.data.produk[data[0]].terjual += Number(data[1])
-                let dataStok = []
-                for (let i = 0; i < data[1]; i++) {
-                  dataStok.push(db.data.produk[data[0]].stok.shift())
-                }
-
-                let teks = `Tanggal Transaksi: ${tanggal}\n\n----- ACCOUNT DETAIL -----\n`
-
-                dataStok.forEach(i => {
-                  let dataAkun = i.split("|")
-                  teks += `• Email: ${dataAkun[0]}\n• Password: ${dataAkun[1]}\n• Profil: ${dataAkun[2] ? dataAkun[2] : "-"}\n• Pin: ${dataAkun[3] ? dataAkun[3] : "-"}\n• 2FA: ${dataAkun[4] ? dataAkun[4] : "-"}\n\n`
-                })
-
-                fs.writeFileSync(`./options/TRX-${reffId}.txt`, teks, "utf8")
-                ronzz.sendMessage(sender, {
-                  document: fs.readFileSync(`./options/TRX-${reffId}.txt`),
-                  mimetype: "text/plain",
-                  fileName: `TRX-${reffId}.txt`,
-                  caption: `*───「 ACCOUNT DETAIL 」───*
-Silahkan buka file txt yang sudah diberikan
-
-*╭────「 TRANSAKSI DETAIL 」───*
-*┊・ 🧾| Reff Id:* ${reffId}
-*┊・ 📦| Nama Barang:* ${db.data.produk[data[0]].name}
-*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}
-*┊・ 🛍️| Jumlah Order:* ${data[1]}
-*┊・ 💰| Total Bayar:* Rp${toRupiah(totalAmount)}
-*┊・ 📅| Tanggal:* ${tanggal}
-*┊・ ⏰| Jam:* ${jamwib} WIB
-*╰┈┈┈┈┈┈┈┈*
-
-*───「 SNK PRODUK 」───*
-
-${db.data.produk[data[0]].snk}`
-                }, { quoted: m })
-                
-                await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
-Ada transaksi yang telah dibayar!
-
-*╭────「 TRANSAKSI DETAIL 」───*
-*┊・ 🧾| Reff Id:* ${reffId}
-*┊・ 📮| Nomor:* @${sender.split("@")[0]}
-*┊・ 📦| Nama Barang:* ${db.data.produk[data[0]].name}
-*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}
-*┊・ 🛍️| Jumlah Order:* ${data[1]}
-*┊・ 💰| Total Bayar:* Rp${toRupiah(totalAmount)}
-*┊・ 📅| Tanggal:* ${tanggal}
-*┊・ ⏰| Jam:* ${jamwib} WIB
-*╰┈┈┈┈┈┈┈┈*`, mentions: [sender] })
-
-                db.data.transaksi.push({
-                  id: data[0],
-                  name: db.data.produk[data[0]].name,
-                  price: hargaProduk(data[0], db.data.users[sender].role),
-                  date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
-                  profit: db.data.produk[data[0]].profit,
-                  jumlah: Number(data[1]),
-                  user: sender.split("@")[0],
-                  userRole: db.data.users[sender].role,
-                  reffId: reffId,
-                  metodeBayar: "QRIS-XENDIT",
-                  totalBayar: totalAmount
-                })
-
-                // Cek apakah stok habis dan kirim notifikasi ke admin
-                if (db.data.produk[data[0]].stok.length === 0) {
-                  const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
-                    `*📦 Produk:* ${db.data.produk[data[0]].name}\n` +
-                    `*🆔 ID Produk:* ${data[0]}\n` +
-                    `*📊 Stok Sebelumnya:* ${Number(data[1])}\n` +
-                    `*📉 Stok Sekarang:* 0 (HABIS)\n` +
-                    `*🛒 Terjual Terakhir:* ${data[1]} akun\n` +
-                    `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
-                    `*💰 Total Transaksi:* Rp${toRupiah(totalAmount)}\n` +
-                    `*📅 Tanggal:* ${tanggal}\n` +
-                    `*⏰ Jam:* ${jamwib} WIB\n\n` +
-                    `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
-                    `• Segera restok produk ini\n` +
-                    `• Update harga jika diperlukan\n` +
-                    `• Cek profit margin\n\n` +
-                    `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`
-                  
-                  // Kirim notifikasi ke admin yang ditentukan
-                  await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
-                  await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
-                }
-                
-                fs.unlinkSync(`./options/TRX-${reffId}.txt`)
-                delete db.data.order[sender]
+      
+          // Validasi produk
+          const product = db.data.produk[productId];
+          if (!product) {
+              return reply(`Produk dengan ID *${productId}* tidak ditemukan.`);
+          }
+      
+          // Validasi stok
+          const stock = product.stok;
+          const quantityNum = Number(quantity);
+          if (!Number.isInteger(quantityNum) || quantityNum <= 0) {
+              return reply(`Jumlah harus berupa angka positif.`);
+          }
+          if (stock.length === 0) {
+              return reply("Stok habis, silakan hubungi Owner untuk restok.");
+          }
+          if (stock.length < quantityNum) {
+              return reply(`Stok tersedia ${stock.length}, jumlah pesanan tidak boleh melebihi stok.`);
+          }
+      
+          reply("Sedang membuat QR Code...");
+      
+          try {
+              // Hitung total biaya
+              const unitPrice = Number(hargaProduk(productId, db.data.users[sender].role));
+              const amount = unitPrice * quantityNum;
+              const fee = digit(); // Pastikan fungsi digit() mengembalikan nilai numerik
+              const totalAmount = amount + Number(fee);
+      
+              // Generate unique external ID
+              const reffId = crypto.randomBytes(5).toString("hex").toUpperCase();
+              const externalId = `TRX-${reffId}-${Date.now()}`;
+      
+              // Import Xendit service
+              const { createQRISPayment, isPaymentCompleted } = require('./config/xendit');
+      
+              // Buat QRIS payment
+              const qrisPayment = await createQRISPayment(totalAmount, externalId);
+              if (!qrisPayment?.qr_string) {
+                  throw new Error('Gagal membuat QRIS payment');
               }
-            } catch (error) {
-              reply("Pesanan dibatalkan!")
-              console.log("Error checking Xendit payment status:", error);
-              delete db.data.order[sender]
-            }
+      
+              // Generate QR code image
+              const qrImagePath = await qrisDinamis(qrisPayment.qr_string, "./options/sticker/qris.jpg");
+      
+              // Hitung waktu kedaluwarsa
+              const expirationTime = Date.now() + toMs("5m");
+              const expireDate = new Date(expirationTime);
+              const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
+              const currentTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+              const expireTimeJakarta = new Date(new Date(currentTime).getTime() + timeLeft * 60000);
+              const formattedTime = `${expireTimeJakarta.getHours().toString().padStart(2, '0')}:${expireTimeJakarta.getMinutes().toString().padStart(2, '0')}`;
+      
+              // Kirim pesan dengan QR code
+              const caption = `*🧾 MENUNGGU PEMBAYARAN 🧾*\n\n` +
+                  `*Produk ID:* ${productId}\n` +
+                  `*Nama Produk:* ${product.name}\n` +
+                  `*Harga:* Rp${toRupiah(unitPrice)}\n` +
+                  `*Jumlah:* ${quantityNum}\n` +
+                  `*Biaya Admin:* Rp${toRupiah(fee)}\n` +
+                  `*Total:* Rp${toRupiah(totalAmount)}\n` +
+                  `*Waktu:* ${timeLeft} menit\n\n` +
+                  `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n` +
+                  `Jika ingin membatalkan, ketik *${prefix}batal*`;
+      
+              const message = await ronzz.sendMessage(from, {
+                  image: fs.readFileSync(qrImagePath),
+                  caption: Styles(caption)
+              }, { quoted: m });
+      
+              // Simpan data order
+              db.data.order[sender] = {
+                  id: productId,
+                  jumlah: quantityNum,
+                  from,
+                  key: message.key,
+                  externalId,
+                  reffId
+              };
+      
+              // Polling status pembayaran
+              while (db.data.order[sender]) {
+                  await sleep(10000);
+                  
+                  // Cek waktu kedaluwarsa
+                  if (Date.now() >= expirationTime) {
+                      await ronzz.sendMessage(from, { delete: message.key });
+                      reply("Pembayaran dibatalkan karena melewati batas waktu.");
+                      delete db.data.order[sender];
+                      break;
+                  }
+      
+                  try {
+                      // Cek status pembayaran
+                      const isCompleted = await isPaymentCompleted(externalId);
+                      
+                      if (isCompleted) {
+                          await ronzz.sendMessage(from, { delete: message.key });
+                          reply("Pembayaran berhasil, data akun akan segera diproses.");
+      
+                          // Update stok dan data transaksi
+                          product.terjual += quantityNum;
+                          const soldItems = stock.splice(0, quantityNum);
+      
+                          // Buat detail akun
+                          let accountDetails = `Tanggal Transaksi: ${tanggal}\n\n----- ACCOUNT DETAIL -----\n`;
+                          soldItems.forEach(item => {
+                              const [email, password, profile = "-", pin = "-", twoFA = "-"] = item.split("|");
+                              accountDetails += `• Email: ${email}\n` +
+                                  `• Password: ${password}\n` +
+                                  `• Profil: ${profile}\n` +
+                                  `• Pin: ${pin}\n` +
+                                  `• 2FA: ${twoFA}\n\n`;
+                          });
+      
+                          // Simpan detail transaksi ke file
+                          const filePath = `./options/TRX-${reffId}.txt`;
+                          fs.writeFileSync(filePath, accountDetails, "utf8");
+      
+                          // Kirim detail akun ke pengguna
+                          await ronzz.sendMessage(sender, {
+                              document: fs.readFileSync(filePath),
+                              mimetype: "text/plain",
+                              fileName: `TRX-${reffId}.txt`,
+                              caption: `*───「 ACCOUNT DETAIL 」───*\n` +
+                                  `Silakan buka file txt yang sudah diberikan\n\n` +
+                                  `*╭────「 TRANSAKSI DETAIL 」───*\n` +
+                                  `*┊・ 🧾| Reff Id:* ${reffId}\n` +
+                                  `*┊・ 📦| Nama Barang:* ${product.name}\n` +
+                                  `*┊・ 🏷️| Harga Barang:* Rp${toRupiah(unitPrice)}\n` +
+                                  `*┊・ 🛍️| Jumlah Order:* ${quantityNum}\n` +
+                                  `*┊・ 💰| Total Bayar:* Rp${toRupiah(totalAmount)}\n` +
+                                  `*┊・ 📅| Tanggal:* ${tanggal}\n` +
+                                  `*┊・ ⏰| Jam:* ${jamwib} WIB\n` +
+                                  `*╰┈┈┈┈┈┈┈┈*\n\n` +
+                                  `*───「 SNK PRODUK 」───*\n\n${product.snk}`
+                          }, { quoted: m });
+      
+                          // Kirim notifikasi ke owner
+                          await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", {
+                              text: `Hai Owner,\nAda transaksi yang telah dibayar!\n\n` +
+                                  `*╭────「 TRANSAKSI DETAIL 」───*\n` +
+                                  `*┊・ 🧾| Reff Id:* ${reffId}\n` +
+                                  `*┊・ 📮| Nomor:* @${sender.split("@")[0]}\n` +
+                                  `*┊・ 📦| Nama Barang:* ${product.name}\n` +
+                                  `*┊・ 🏷️| Harga Barang:* Rp${toRupiah(unitPrice)}\n` +
+                                  `*┊・ 🛍️| Jumlah Order:* ${quantityNum}\n` +
+                                  `*┊・ 💰| Total Bayar:* Rp${toRupiah(totalAmount)}\n` +
+                                  `*┊・ 📅| Tanggal:* ${tanggal}\n` +
+                                  `*┊・ ⏰| Jam:* ${jamwib} WIB\n` +
+                                  `*╰┈┈┈┈┈┈┈┈*`,
+                              mentions: [sender]
+                          });
+      
+                          // Simpan data transaksi
+                          db.data.transaksi.push({
+                              id: productId,
+                              name: product.name,
+                              price: unitPrice,
+                              date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+                              profit: product.profit,
+                              jumlah: quantityNum,
+                              user: sender.split("@")[0],
+                              userRole: db.data.users[sender].role,
+                              reffId,
+                              metodeBayar: "QRIS-XENDIT",
+                              totalBayar: totalAmount
+                          });
+      
+                          // Cek stok dan kirim notifikasi jika habis
+                          if (stock.length === 0) {
+                              const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
+                                  `*📦 Produk:* ${product.name}\n` +
+                                  `*🆔 ID Produk:* ${productId}\n` +
+                                  `*📊 Stok Sebelumnya:* ${quantityNum}\n` +
+                                  `*📉 Stok Sekarang:* 0 (HABIS)\n` +
+                                  `*🛒 Terjual Terakhir:* ${quantityNum} akun\n` +
+                                  `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
+                                  `*💰 Total Transaksi:* Rp${toRupiah(totalAmount)}\n` +
+                                  `*📅 Tanggal:* ${tanggal}\n` +
+                                  `*⏰ Jam:* ${jamwib} WIB\n\n` +
+                                  `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
+                                  `• Segera restok produk ini\n` +
+                                  `• Update harga jika diperlukan\n` +
+                                  `• Cek profit margin\n\n` +
+                                  `*💡 Tips:* Gunakan command *${prefix}addstok ${productId} jumlah* untuk menambah stok`;
+      
+                              // Kirim notifikasi ke admin
+                              await Promise.all([
+                                  ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] }),
+                                  ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+                              ]);
+                          }
+      
+                          // Cleanup
+                          fs.unlinkSync(filePath);
+                          delete db.data.order[sender];
+                      }
+                  } catch (error) {
+                      console.error("Error checking Xendit payment status:", error);
+                      await ronzz.sendMessage(from, { delete: message.key });
+                      reply("Pesanan dibatalkan karena error sistem.");
+                      delete db.data.order[sender];
+                      break;
+                  }
+              }
+          } catch (error) {
+              console.error("Error creating Xendit QRIS payment:", error);
+              reply("Gagal membuat QR Code pembayaran. Silakan coba lagi.");
           }
-        } catch (error) {
-          reply("Gagal membuat QR Code pembayaran. Silahkan coba lagi.")
-          console.log("Error creating Xendit QRIS payment:", error);
-        }
       }
-        break
-
+      break;
       case 'buy': {
         if (db.data.order[sender] !== undefined) return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
         let data = q.split(" ")
@@ -2154,84 +2201,80 @@ Ada transaksi dengan saldo yang telah selesai!
       }
         break
 
-      case 'netflix': {
-        try {
-          // Check database structure
-          if (!db?.data?.produk) {
-            return reply("❌ Database tidak tersedia atau rusak")
-          }
-          
-          const products = db.data.produk
-          if (Object.keys(products).length === 0) {
-            return reply("📦 Belum ada produk di database")
-          }
-
-          // Filter products that contain "netflix" in their name (case insensitive)
-          const netflixProducts = Object.entries(products).filter(([id, product]) => {
-            return product.name && product.name.toLowerCase().includes('netflix')
-          })
-
-          if (netflixProducts.length === 0) {
-            return reply("❌ Tidak ada produk Netflix yang tersedia saat ini")
-          }
-
-          let teks = `*╭────〔 NETFLIX PRODUCTS 🎬 〕────╮*\n\n`
-          teks += `*📋 Daftar Produk Netflix yang Tersedia:*\n\n`
-
-          // Process each Netflix product
-          netflixProducts.forEach(([productId, product], index) => {
-            try {
-              // Safe property access with defaults
-              const name = product.name || 'Unknown'
-              const desc = product.desc || 'Tidak ada deskripsi'
-              const stokLength = Array.isArray(product.stok) ? product.stok.length : 0
-              const terjual = product.terjual || 0
-              
-              // Get price safely
-              let harga = 'Harga tidak tersedia'
-              try {
-                if (typeof hargaProduk === 'function' && typeof toRupiah === 'function') {
-                  const userRole = db.data.users?.[sender]?.role || 'bronze'
-                  const hargaValue = hargaProduk(productId, userRole)
-                  if (hargaValue && !isNaN(hargaValue)) {
-                    harga = `Rp${toRupiah(hargaValue)}`
-                  }
-                }
-              } catch (error) {
-                console.log(`⚠️ Error getting price for product ${productId}:`, error.message)
-              }
-              
-              // Build product info
-              teks += `*${index + 1}. ${name}*\n`
-              teks += `   🔐 Kode: ${productId}\n`
-              teks += `   🏷️ Harga: ${harga}\n`
-              teks += `   📦 Stok: ${stokLength}\n`
-              teks += `   🧾 Terjual: ${terjual}\n`
-              teks += `   📝 Deskripsi: ${desc}\n`
-              teks += `   ✍️ Beli: ${prefix}buy ${productId} 1\n\n`
-              
-            } catch (error) {
-              console.log(`⚠️ Error processing Netflix product ${productId}:`, error.message)
-            }
-          })
-
-          teks += `*╰────「 END NETFLIX PRODUCTS 」────╯*\n\n`
-          teks += `*💡 Cara membeli:* ${prefix}buy kodeproduk jumlah\n`
-          teks += `*📞 Kontak Admin:* @${ownerNomer}`
-
-          // Send the message
-          ronzz.sendMessage(from, { 
-            text: teks, 
-            mentions: [ownerNomer + "@s.whatsapp.net"] 
-          }, { quoted: m })
-          
-        } catch (error) {
-          console.error('❌ Error in netflix command:', error)
-          reply(`❌ Terjadi kesalahan pada command netflix: ${error.message}`)
-        }
+      // Handler umum: user bisa ketik "netflix", "canva", "viu", dll
+  case 'netflix':
+  case 'canva':
+  case 'viu':
+  case 'vidio':
+  case 'wetv':
+  case 'prime':
+  case 'youtube':
+  case 'zoom':
+  case 'capcut':
+  case 'gpt':
+    try {
+      if (!db?.data?.produk) return reply("❌ Database tidak tersedia atau rusak")
+      const products = db.data.produk
+      if (Object.keys(products).length === 0) return reply("📦 Belum ada produk di database")
+  
+      // ambil keyword dari command
+      const keyword = command.toLowerCase()
+  
+      // cari produk yang mengandung keyword di nama
+      const matchedProducts = Object.entries(products).filter(([id, product]) =>
+        product.name && product.name.toLowerCase().includes(keyword)
+      )
+  
+      if (matchedProducts.length === 0) {
+        return reply(`❌ Tidak ada produk *${command}* yang tersedia saat ini`)
       }
-        break
-
+  
+      // format teks hasil
+      let teks = `*╭────〔 ${command.toUpperCase()} PRODUCTS 📦 〕────╮*\n\n`
+      teks += `*📋 Daftar Produk ${command.toUpperCase()} yang Tersedia:*\n\n`
+  
+      matchedProducts.forEach(([productId, product], index) => {
+        const name = product.name || 'Unknown'
+        const desc = product.desc || 'Tidak ada deskripsi'
+        const stokLength = Array.isArray(product.stok) ? product.stok.length : 0
+        const terjual = product.terjual || 0
+  
+        // cek harga sesuai role
+        let harga = 'Harga tidak tersedia'
+        try {
+          if (typeof hargaProduk === 'function' && typeof toRupiah === 'function') {
+            const userRole = db.data.users?.[sender]?.role || 'bronze'
+            const hargaValue = hargaProduk(productId, userRole)
+            if (hargaValue && !isNaN(hargaValue)) {
+              harga = `Rp${toRupiah(hargaValue)}`
+            }
+          }
+        } catch {}
+  
+        teks += `*${index + 1}. ${name}*\n`
+        teks += `   🔐 Kode: ${productId}\n`
+        teks += `   🏷️ Harga: ${harga}\n`
+        teks += `   📦 Stok: ${stokLength}\n`
+        teks += `   🧾 Terjual: ${terjual}\n`
+        teks += `   📝 Deskripsi: ${desc}\n`
+        teks += `   ✍️ Beli: ${prefix}buy ${productId} 1\n\n`
+      })
+  
+      teks += `*╰────「 END LIST 」────╯*\n\n`
+      teks += `*💡 Cara membeli:* ${prefix}buy kodeproduk jumlah\n`
+      teks += `*📞 Kontak Admin:* @${ownerNomer}`
+  
+      ronzz.sendMessage(from, {
+        text: teks,
+        mentions: [ownerNomer + "@s.whatsapp.net"]
+      }, { quoted: m })
+  
+    } catch (e) {
+      console.error(`❌ Error in ${command} command:`, e)
+      reply(`❌ Terjadi kesalahan pada command ${command}: ${e.message}`)
+    }
+    break
+  
       case 'batal': {
         if (db.data.order[sender] == undefined) return
         
