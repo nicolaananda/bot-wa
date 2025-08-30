@@ -2014,7 +2014,7 @@ Ada transaksi dengan QRIS-XENDIT yang telah selesai!
                               user: sender.split("@")[0],
                               userRole: db.data.users[sender].role,
                               reffId,
-                              metodeBayar: "QRIS-XENDIT",
+                              metodeBayar: "QRIS",
                               totalBayar: totalAmount
                           });
       
