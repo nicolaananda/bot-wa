@@ -2882,21 +2882,42 @@ Ada yang deposit nih kak, coba dicek saldonya`
             foundKey = targetUserIdWithSuffix;
           }
           
-          if (targetUser) {
-            // Try to get saldo from cache first for better performance
-            let saldo = getCachedSaldo(foundKey);
-            if (saldo === null) {
-              // If not in cache, get from database and cache it
-              saldo = parseInt(targetUser.saldo) || 0;
-              setCachedSaldo(foundKey, saldo);
+                      if (targetUser) {
+              // Try to get saldo from cache first for better performance
+              let saldo = getCachedSaldo(foundKey);
+              if (saldo === null) {
+                // If not in cache, get from database and cache it
+                saldo = parseInt(targetUser.saldo) || 0;
+                setCachedSaldo(foundKey, saldo);
+              }
+              
+              const username = targetUser.username || `User ${cleanPhoneNumber.slice(-4)}`;
+              
+              reply(`*💰 Cek Saldo User (Owner Only)*\n\n👤 *User:* ${username}\n📱 *Nomor HP:* ${cleanPhoneNumber}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`);
+            } else {
+              // User not found, create new user with 0 saldo
+              if (!db.data.users) db.data.users = {};
+              
+              // Create user with both formats
+              db.data.users[cleanPhoneNumber] = {
+                saldo: 0,
+                role: 'bronze',
+                username: `User ${cleanPhoneNumber.slice(-4)}`,
+                createdAt: new Date().toISOString()
+              };
+              
+              // Also create with suffix format for consistency
+              db.data.users[targetUserIdWithSuffix] = {
+                saldo: 0,
+                role: 'bronze',
+                username: `User ${cleanPhoneNumber.slice(-4)}`,
+                createdAt: new Date().toISOString()
+              };
+              
+              await db.save();
+              
+              reply(`*💰 Cek Saldo User (Owner Only)*\n\n👤 *User:* User ${cleanPhoneNumber.slice(-4)}\n📱 *Nomor HP:* ${cleanPhoneNumber}\n💳 *Saldo:* Rp0\n\n👑 *Checked by:* Owner\n\n💡 *Info:* User baru dibuat dengan saldo 0`);
             }
-            
-            const username = targetUser.username || `User ${cleanPhoneNumber.slice(-4)}`;
-            
-            reply(`*💰 Cek Saldo User (Owner Only)*\n\n👤 *User:* ${username}\n📱 *Nomor HP:* ${cleanPhoneNumber}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`);
-          } else {
-            reply(`❌ User dengan nomor HP ${cleanPhoneNumber} tidak ditemukan dalam database.\n\n💡 *Tips:* User harus sudah pernah melakukan transaksi untuk tersimpan dalam database.`);
-          }
         }
         // Check if this is a reply/quote reply
         else if (m.quoted) {
@@ -2906,8 +2927,19 @@ Ada yang deposit nih kak, coba dicek saldonya`
             return;
           }
           
-          // Get the quoted message sender
-          const quotedSender = m.quoted.participant || m.quoted.key.participant || m.quoted.key.remoteJid;
+          // Get the quoted message sender - use m.quoted.sender which is processed by myfunc.js
+          const quotedSender = m.quoted.sender;
+          
+          // Debug: Log the quoted message structure
+          console.log('🔍 Quote Debug:', {
+            quotedSender,
+            quoted: m.quoted,
+            participant: m.quoted.participant,
+            key: m.quoted.key,
+            sender: m.quoted.sender,
+            isQuotedMsg: m.isQuotedMsg,
+            contextInfo: m.msg?.contextInfo
+          });
           
           if (quotedSender) {
             // Extract user ID from quoted sender
@@ -2926,6 +2958,15 @@ Ada yang deposit nih kak, coba dicek saldonya`
               foundKey = targetUserIdWithSuffix;
             }
             
+            // Debug: Log database search
+            console.log('🔍 Database Search:', {
+              targetUserId,
+              targetUserIdWithSuffix,
+              foundInDB: !!targetUser,
+              foundKey,
+              availableKeys: Object.keys(db.data.users || {}).slice(0, 5) // Show first 5 keys
+            });
+            
             if (targetUser) {
               // Try to get saldo from cache first for better performance
               let saldo = getCachedSaldo(foundKey);
@@ -2939,10 +2980,31 @@ Ada yang deposit nih kak, coba dicek saldonya`
               
               reply(`*💰 Cek Saldo User Lain (Owner Only)*\n\n👤 *User:* ${username}\n🆔 *ID:* ${targetUserId}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`, { quoted: m });
             } else {
-              reply(`❌ User dengan ID ${targetUserId} tidak ditemukan dalam database.\n\n💡 *Tips:* User harus sudah pernah melakukan transaksi untuk tersimpan dalam database.`, { quoted: m });
+              // User not found, create new user with 0 saldo
+              if (!db.data.users) db.data.users = {};
+              
+              // Create user with both formats
+              db.data.users[targetUserId] = {
+                saldo: 0,
+                role: 'bronze',
+                username: `User ${targetUserId.slice(-4)}`,
+                createdAt: new Date().toISOString()
+              };
+              
+              // Also create with suffix format for consistency
+              db.data.users[targetUserIdWithSuffix] = {
+                saldo: 0,
+                role: 'bronze',
+                username: `User ${targetUserId.slice(-4)}`,
+                createdAt: new Date().toISOString()
+              };
+              
+              await db.save();
+              
+              reply(`*💰 Cek Saldo User Lain (Owner Only)*\n\n👤 *User:* User ${targetUserId.slice(-4)}\n🆔 *ID:* ${targetUserId}\n💳 *Saldo:* Rp0\n\n👑 *Checked by:* Owner\n\n💡 *Info:* User baru dibuat dengan saldo 0`, { quoted: m });
             }
           } else {
-            reply(`❌ Tidak bisa mendapatkan informasi user dari pesan yang di-reply.\n\n💡 *Tips:* Reply/quote reply pesan user lain yang ingin di-cek saldonya.`, { quoted: m });
+            reply(`❌ Tidak bisa mendapatkan informasi user dari pesan yang di-reply.\n\n💡 *Tips:* Reply/quote reply pesan user lain yang ingin di-cek saldonya.\n\n🔍 *Debug Info:*\n• Quoted Structure: ${JSON.stringify(m.quoted, null, 2)}`, { quoted: m });
           }
         } else {
           // If not reply and no parameter, check own saldo (all users can do this)
@@ -2975,7 +3037,29 @@ Ada yang deposit nih kak, coba dicek saldonya`
             
             reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* ${username}\n🆔 *ID:* ${foundKey}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n💡 *Saldo hanya untuk transaksi dibot ini.*`);
           } else {
-            reply(`❌ Data user tidak ditemukan.\n\n💡 *Tips:* User harus sudah pernah melakukan transaksi untuk tersimpan dalam database.`);
+            // User not found, create new user with 0 saldo
+            if (!db.data.users) db.data.users = {};
+            
+            // Create user with both formats
+            const senderWithoutSuffix = sender.split('@')[0];
+            db.data.users[senderWithoutSuffix] = {
+              saldo: 0,
+              role: 'bronze',
+              username: `User ${senderWithoutSuffix.slice(-4)}`,
+              createdAt: new Date().toISOString()
+            };
+            
+            // Also create with suffix format for consistency
+            db.data.users[sender] = {
+              saldo: 0,
+              role: 'bronze',
+              username: `User ${senderWithoutSuffix.slice(-4)}`,
+              createdAt: new Date().toISOString()
+            };
+            
+            await db.save();
+            
+            reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* User ${senderWithoutSuffix.slice(-4)}\n🆔 *ID:* ${senderWithoutSuffix}\n💳 *Saldo:* Rp0\n\n💡 *Info:* User baru dibuat dengan saldo 0`);
           }
         }
       }
