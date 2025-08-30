@@ -2853,8 +2853,44 @@ Ada yang deposit nih kak, coba dicek saldonya`
         break
 
       case 'ceksaldo': case 'saldo': {
+        // Check if there's a phone number parameter
+        if (args.length > 0) {
+          // Only owner can check other people's saldo by phone number
+          if (!isOwner) {
+            reply(`❌ Maaf, hanya owner yang bisa cek saldo user lain dengan nomor HP.\n\n💡 *Tips:* Gunakan command ini tanpa parameter untuk cek saldo sendiri.`);
+            return;
+          }
+          
+          let phoneNumber = args[0];
+          
+          // Clean phone number (remove +, -, spaces, etc)
+          phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+          
+          // Add @s.whatsapp.net suffix if not present
+          const targetUserId = phoneNumber.includes('@s.whatsapp.net') ? phoneNumber : phoneNumber + '@s.whatsapp.net';
+          const cleanPhoneNumber = phoneNumber.includes('@s.whatsapp.net') ? phoneNumber.split('@')[0] : phoneNumber;
+          
+          // Check if user exists in database
+          if (db.data.users && db.data.users[cleanPhoneNumber]) {
+            const targetUser = db.data.users[cleanPhoneNumber];
+            
+            // Try to get saldo from cache first for better performance
+            let saldo = getCachedSaldo(cleanPhoneNumber);
+            if (saldo === null) {
+              // If not in cache, get from database and cache it
+              saldo = parseInt(targetUser.saldo) || 0;
+              setCachedSaldo(cleanPhoneNumber, saldo);
+            }
+            
+            const username = targetUser.username || `User ${cleanPhoneNumber.slice(-4)}`;
+            
+            reply(`*💰 Cek Saldo User (Owner Only)*\n\n👤 *User:* ${username}\n📱 *Nomor HP:* ${cleanPhoneNumber}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`);
+          } else {
+            reply(`❌ User dengan nomor HP ${cleanPhoneNumber} tidak ditemukan dalam database.\n\n💡 *Tips:* User harus sudah pernah melakukan transaksi untuk tersimpan dalam database.`);
+          }
+        }
         // Check if this is a reply/quote reply
-        if (m.quoted) {
+        else if (m.quoted) {
           // Only owner can check other people's saldo
           if (!isOwner) {
             reply(`❌ Maaf, hanya owner yang bisa cek saldo user lain.\n\n💡 *Tips:* Gunakan command ini tanpa reply untuk cek saldo sendiri.`, { quoted: m });
@@ -2890,7 +2926,7 @@ Ada yang deposit nih kak, coba dicek saldonya`
             reply(`❌ Tidak bisa mendapatkan informasi user dari pesan yang di-reply.\n\n💡 *Tips:* Reply/quote reply pesan user lain yang ingin di-cek saldonya.`, { quoted: m });
           }
         } else {
-          // If not reply, check own saldo (all users can do this)
+          // If not reply and no parameter, check own saldo (all users can do this)
           if (db.data.users && db.data.users[sender]) {
             const user = db.data.users[sender];
             
