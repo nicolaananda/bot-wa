@@ -1894,7 +1894,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
               const qrImagePath = await qrisDinamis(qrisPayment.qr_string, "./options/sticker/qris.jpg");
       
               // Hitung waktu kedaluwarsa (sesuaikan dengan Xendit atau lokal)
-              const expirationTime = Date.now() + toMs("5m"); // 5 menit lokal
+              const expirationTime = Date.now() + toMs("10m"); // 10 menit lokal
               const expireDate = new Date(expirationTime);
               const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
               const currentTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
