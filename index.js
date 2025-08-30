@@ -2866,20 +2866,29 @@ Ada yang deposit nih kak, coba dicek saldonya`
           // Clean phone number (remove +, -, spaces, etc)
           phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
           
-          // Add @s.whatsapp.net suffix if not present
-          const targetUserId = phoneNumber.includes('@s.whatsapp.net') ? phoneNumber : phoneNumber + '@s.whatsapp.net';
-          const cleanPhoneNumber = phoneNumber.includes('@s.whatsapp.net') ? phoneNumber.split('@')[0] : phoneNumber;
+          // Check both formats: with and without @s.whatsapp.net suffix
+          const cleanPhoneNumber = phoneNumber;
+          const targetUserIdWithSuffix = phoneNumber + '@s.whatsapp.net';
           
-          // Check if user exists in database
+          // Try to find user in database with both formats
+          let targetUser = null;
+          let foundKey = null;
+          
           if (db.data.users && db.data.users[cleanPhoneNumber]) {
-            const targetUser = db.data.users[cleanPhoneNumber];
-            
+            targetUser = db.data.users[cleanPhoneNumber];
+            foundKey = cleanPhoneNumber;
+          } else if (db.data.users && db.data.users[targetUserIdWithSuffix]) {
+            targetUser = db.data.users[targetUserIdWithSuffix];
+            foundKey = targetUserIdWithSuffix;
+          }
+          
+          if (targetUser) {
             // Try to get saldo from cache first for better performance
-            let saldo = getCachedSaldo(cleanPhoneNumber);
+            let saldo = getCachedSaldo(foundKey);
             if (saldo === null) {
               // If not in cache, get from database and cache it
               saldo = parseInt(targetUser.saldo) || 0;
-              setCachedSaldo(cleanPhoneNumber, saldo);
+              setCachedSaldo(foundKey, saldo);
             }
             
             const username = targetUser.username || `User ${cleanPhoneNumber.slice(-4)}`;
@@ -2903,17 +2912,27 @@ Ada yang deposit nih kak, coba dicek saldonya`
           if (quotedSender) {
             // Extract user ID from quoted sender
             const targetUserId = quotedSender.split('@')[0];
+            const targetUserIdWithSuffix = quotedSender;
             
-            // Check if user exists in database
+            // Try to find user in database with both formats
+            let targetUser = null;
+            let foundKey = null;
+            
             if (db.data.users && db.data.users[targetUserId]) {
-              const targetUser = db.data.users[targetUserId];
-              
+              targetUser = db.data.users[targetUserId];
+              foundKey = targetUserId;
+            } else if (db.data.users && db.data.users[targetUserIdWithSuffix]) {
+              targetUser = db.data.users[targetUserIdWithSuffix];
+              foundKey = targetUserIdWithSuffix;
+            }
+            
+            if (targetUser) {
               // Try to get saldo from cache first for better performance
-              let saldo = getCachedSaldo(targetUserId);
+              let saldo = getCachedSaldo(foundKey);
               if (saldo === null) {
                 // If not in cache, get from database and cache it
                 saldo = parseInt(targetUser.saldo) || 0;
-                setCachedSaldo(targetUserId, saldo);
+                setCachedSaldo(foundKey, saldo);
               }
               
               const username = targetUser.username || `User ${targetUserId.slice(-4)}`;
@@ -2927,20 +2946,34 @@ Ada yang deposit nih kak, coba dicek saldonya`
           }
         } else {
           // If not reply and no parameter, check own saldo (all users can do this)
+          // Try to find user in database with both formats
+          let user = null;
+          let foundKey = null;
+          
           if (db.data.users && db.data.users[sender]) {
-            const user = db.data.users[sender];
-            
+            user = db.data.users[sender];
+            foundKey = sender;
+          } else {
+            // Try without @s.whatsapp.net suffix
+            const senderWithoutSuffix = sender.split('@')[0];
+            if (db.data.users && db.data.users[senderWithoutSuffix]) {
+              user = db.data.users[senderWithoutSuffix];
+              foundKey = senderWithoutSuffix;
+            }
+          }
+          
+          if (user) {
             // Try to get saldo from cache first for better performance
-            let saldo = getCachedSaldo(sender);
+            let saldo = getCachedSaldo(foundKey);
             if (saldo === null) {
               // If not in cache, get from database and cache it
               saldo = parseInt(user.saldo) || 0;
-              setCachedSaldo(sender, saldo);
+              setCachedSaldo(foundKey, saldo);
             }
             
-            const username = user.username || `User ${sender.slice(-4)}`;
+            const username = user.username || `User ${foundKey.slice(-4)}`;
             
-            reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* ${username}\n🆔 *ID:* ${sender}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n💡 *Saldo hanya untuk transaksi dibot ini.*`);
+            reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* ${username}\n🆔 *ID:* ${foundKey}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n💡 *Saldo hanya untuk transaksi dibot ini.*`);
           } else {
             reply(`❌ Data user tidak ditemukan.\n\n💡 *Tips:* User harus sudah pernah melakukan transaksi untuk tersimpan dalam database.`);
           }
