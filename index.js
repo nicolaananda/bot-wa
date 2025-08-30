@@ -1876,9 +1876,11 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
               
               const amount = unitPrice * quantityNum;
               
-              // Hitung fee Xendit menggunakan rumus: Harga Jual = Jumlah Bersih ÷ (1 - 0,007) + Rp0,20
-              // Fee = (amount * 0.007) + 0.20
-              const fee = Math.ceil((amount * 0.007) + 0.20);
+              // Hitung fee Xendit dengan subsidi 50%
+              // Fee asli = (amount * 0.007) + 0.20
+              // Fee setelah subsidi = ((amount * 0.007) + 0.20) * 0.5
+              const feeOriginal = (amount * 0.007) + 0.20;
+              const fee = Math.ceil(feeOriginal * 0.5);
               const totalAmount = amount + fee;
               
               // Validasi total amount
