@@ -1913,7 +1913,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       
               const message = await ronzz.sendMessage(from, {
                   image: fs.readFileSync(qrImagePath),
-                  caption: Styles(caption)
+                  caption: caption
               }, { quoted: m });
       
               // Simpan data order
