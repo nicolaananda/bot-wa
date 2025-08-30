@@ -1,0 +1,62 @@
+{
+  "totalTransaksi": 48,
+  "totalPendapatan": 774600,
+  "transaksiHariIni": 41,
+  "pendapatanHariIni": 678700,
+  "metodeBayar": {
+    "saldo": 48,
+    "qris": 0
+  },
+  "topUsers": [
+    {
+      "user": "6282143003950",
+      "transaksi": 10,
+      "totalSpent": 114100
+    },
+    {
+      "user": "6287887842985",
+      "transaksi": 9,
+      "totalSpent": 124200
+    },
+    {
+      "user": "6281389592985",
+      "transaksi": 8,
+      "totalSpent": 187700
+    },
+    {
+      "user": "6287777657944",
+      "transaksi": 7,
+      "totalSpent": 208500
+    },
+    {
+      "user": "6285235540944",
+      "transaksi": 5,
+      "totalSpent": 57900
+    },
+    {
+      "user": "6287883940775",
+      "transaksi": 1,
+      "totalSpent": 13700
+    },
+    {
+      "user": "6281359417389",
+      "transaksi": 1,
+      "totalSpent": 13700
+    },
+    {
+      "user": "218189220855971",
+      "transaksi": 1,
+      "totalSpent": 13700
+    },
+    {
+      "user": "6281295393025",
+      "transaksi": 1,
+      "totalSpent": 8000
+    },
+    {
+      "user": "6281343313399",
+      "transaksi": 1,
+      "totalSpent": 13700
+    }
+  ]
+}
