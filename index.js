@@ -1907,7 +1907,8 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                   `*Biaya Admin:* Rp${toRupiah(fee)}\n` +
                   `*Total:* Rp${toRupiah(totalAmount)}\n` +
                   `*Waktu:* ${timeLeft} menit\n\n` +
-                  `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n` +
+                  `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n\n` +
+                  `*🔗 Link Invoice:* https://checkout-staging.xendit.co/web/${externalId}\n\n` +
                   `Jika ingin membatalkan, ketik *${prefix}batal*`;
       
               const message = await ronzz.sendMessage(from, {
