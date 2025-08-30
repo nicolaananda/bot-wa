@@ -1868,14 +1868,23 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           reply("Sedang membuat QR Code...");
       
           try {
-              // Hitung total biaya
+              // Validasi harga produk
               const unitPrice = Number(hargaProduk(productId, db.data.users[sender].role));
+              if (!unitPrice || unitPrice <= 0) {
+                  throw new Error('Harga produk tidak valid');
+              }
+              
               const amount = unitPrice * quantityNum;
               
               // Hitung fee Xendit menggunakan rumus: Harga Jual = Jumlah Bersih ÷ (1 - 0,007) + Rp0,20
               // Fee = (amount * 0.007) + 0.20
               const fee = Math.ceil((amount * 0.007) + 0.20);
               const totalAmount = amount + fee;
+              
+              // Validasi total amount
+              if (totalAmount <= 0) {
+                  throw new Error('Total amount tidak valid');
+              }
       
               // Generate unique external ID
               const reffId = crypto.randomBytes(5).toString("hex").toUpperCase();
@@ -1929,21 +1938,26 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                   reffId
               };
       
-              // Polling status pembayaran
+              // Polling status pembayaran dengan interval yang dioptimasi
               while (db.data.order[sender]) {
-                  await sleep(10000);
+                  await sleep(15000); // 15 detik untuk mengurangi beban server
       
                   // Cek waktu kedaluwarsa lokal
                   if (Date.now() >= expirationTime) {
                       await ronzz.sendMessage(from, { delete: message.key });
-                      reply("Pembayaran dibatalkan karena melewati batas waktu 5 menit.");
+                      reply("Pembayaran dibatalkan karena melewati batas waktu 10 menit.");
                       delete db.data.order[sender];
                       break;
                   }
       
                   try {
-                      // Cek status pembayaran dengan Xendit
-                      const paymentStatus = await isPaymentCompleted(externalId);
+                      // Cek status pembayaran dengan Xendit dengan timeout
+                      const paymentStatus = await Promise.race([
+                          isPaymentCompleted(externalId),
+                          new Promise((_, reject) => 
+                              setTimeout(() => reject(new Error('API Timeout')), 10000)
+                          )
+                      ]);
       
                       // Log untuk debugging
                       console.log(`Checking payment status for ${externalId}:`, paymentStatus);
@@ -1955,6 +1969,9 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                           // Update stok dan data transaksi
                           product.terjual += quantityNum;
                           const soldItems = stock.splice(0, quantityNum);
+                          
+                          // Save database setelah update stok
+                          await db.save();
       
                           // Buat teks detail akun yang lebih rapi
                           let detailAkun = `*📦 Produk:* ${product.name}\n`
@@ -2021,6 +2038,9 @@ Ada transaksi dengan QRIS-XENDIT yang telah selesai!
                               metodeBayar: "QRIS",
                               totalBayar: totalAmount
                           });
+                          
+                          // Save database setelah menambah transaksi
+                          await db.save();
       
                           // Cek stok dan kirim notifikasi jika habis
                           if (stock.length === 0) {
@@ -2046,12 +2066,24 @@ Ada transaksi dengan QRIS-XENDIT yang telah selesai!
                               ]);
                           }
       
-                          // Cleanup
+                          // Cleanup dan save final state
                           delete db.data.order[sender];
+                          await db.save();
+                          
+                          // Log transaksi berhasil
+                          console.log(`✅ Transaction completed: ${externalId} - ${reffId}`);
                           break;
                       }
                   } catch (error) {
                       console.error(`Error checking payment status for ${externalId}:`, error);
+                      
+                      // Jika error karena timeout, lanjutkan polling
+                      if (error.message === 'API Timeout') {
+                          console.log(`API timeout for ${externalId}, continuing...`);
+                          continue;
+                      }
+                      
+                      // Jika error lain, batalkan pesanan
                       await ronzz.sendMessage(from, { delete: message.key });
                       reply("Pesanan dibatalkan karena error sistem.");
                       delete db.data.order[sender];
