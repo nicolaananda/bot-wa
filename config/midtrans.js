@@ -155,11 +155,11 @@ function makeMidtransRequest(endpoint, method = 'GET', data = null) {
 }
 
 /**
- * Create QRIS payment using Midtrans Core API
+ * Create QRIS payment using Midtrans Snap API with multiple payment options
  */
 async function createQRISPayment(amount, orderId, customerDetails = {}) {
   try {
-    console.log(`Creating Midtrans QRIS payment for amount: ${amount}, orderId: ${orderId}`);
+    console.log(`Creating Midtrans Snap payment for amount: ${amount}, orderId: ${orderId}`);
     
     const transactionDetails = {
       order_id: orderId,
@@ -180,32 +180,53 @@ async function createQRISPayment(amount, orderId, customerDetails = {}) {
       phone: customerDetails.phone || '08123456789'
     };
 
-    // Gunakan Core API untuk QRIS
-    const coreRequest = {
-      payment_type: 'qris',
+    // Gunakan Snap API untuk multiple payment options
+    const snapRequest = {
       transaction_details: transactionDetails,
       item_details: itemDetails,
       customer_details: customerDetailsObj,
-      qris: {
-        acquirer: 'gopay'
+      enabled_payments: [
+        'qris',
+        'gopay',
+        'shopeepay',
+        'bca_va',
+        'bni_va',
+        'bri_va',
+        'echannel',
+        'permata_va',
+        'other_va',
+        'credit_card',
+        'bca_klikbca',
+        'bca_klikpay',
+        'bri_epay',
+        'telkomsel_cash',
+        'mandiri_clickpay',
+        'cimb_clicks',
+        'danamon_online',
+        'akulaku'
+      ],
+      callbacks: {
+        finish: 'https://example.com/finish',
+        pending: 'https://example.com/pending',
+        error: 'https://example.com/error'
       }
     };
 
-    console.log('Midtrans Core request:', JSON.stringify(coreRequest, null, 2));
+    console.log('Midtrans Snap request:', JSON.stringify(snapRequest, null, 2));
     
-    // Gunakan Core API untuk create QRIS
-    const result = await makeMidtransRequest('/v2/charge', 'POST', coreRequest);
-    console.log('Midtrans Core created successfully:', result);
+    // Gunakan Snap API untuk create payment
+    const result = await makeMidtransRequest('/snap/v1/transactions', 'POST', snapRequest);
+    console.log('Midtrans Snap created successfully:', result);
     
-    // Buat URL Payment Link yang user-friendly seperti yang diinginkan
-    const invoiceUrl = `https://app.sandbox.midtrans.com/payment-links/${orderId}`;
+    // Buat URL Snap yang memberikan opsi pembayaran lengkap
+    const invoiceUrl = result.redirect_url;
     
     const paymentData = {
-      transaction_id: result.transaction_id,
+      token: result.token,
       order_id: orderId,
       amount: amount,
-      status: result.transaction_status || 'pending',
-      qr_string: result.qr_string,
+      status: 'pending',
+      qr_string: result.token, // Snap token untuk QR code
       created: new Date().toISOString(),
       snap_url: invoiceUrl
     };
@@ -213,7 +234,7 @@ async function createQRISPayment(amount, orderId, customerDetails = {}) {
     storePaymentData(orderId, paymentData);
     return paymentData;
   } catch (error) {
-    console.error('Error creating Midtrans Core payment:', error);
+    console.error('Error creating Midtrans Snap payment:', error);
     throw new Error(`Failed to create Midtrans payment: ${error.message}`);
   }
 }
