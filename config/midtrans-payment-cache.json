@@ -8,5 +8,15 @@
     "created": "2025-09-01T16:40:53.308Z",
     "snap_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/eaf131e0-f60b-4755-8226-479a8b5a03ee",
     "cachedAt": "2025-09-01T16:40:53.309Z"
+  },
+  "TEST-MIDTRANS-1756745089853": {
+    "transaction_id": "8fc9db38-6053-4bc0-82a3-9a17cb468610",
+    "order_id": "TEST-MIDTRANS-1756745089853",
+    "amount": 50000,
+    "status": "pending",
+    "qr_string": "00020101021226620014COM.GO-JEK.WWW011993600914363627816550210G6362781650303UKE51440014ID.CO.QRIS.WWW0215AID7201280358460303UKE5204503953033605405500005802ID5910iNyx Store6006MADIUN61056313962395028A120250901164450JiOvwPvSrKID0703A016304696F",
+    "created": "2025-09-01T16:44:50.204Z",
+    "snap_url": "https://api.sandbox.midtrans.com/v2/qris/8fc9db38-6053-4bc0-82a3-9a17cb468610/qr-code",
+    "cachedAt": "2025-09-01T16:44:50.206Z"
   }
 }
