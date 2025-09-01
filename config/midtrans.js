@@ -197,14 +197,17 @@ async function createQRISPayment(amount, orderId, customerDetails = {}) {
     const result = await makeMidtransRequest('/v2/charge', 'POST', coreRequest);
     console.log('Midtrans Core created successfully:', result);
     
+    // Buat URL yang user-friendly untuk invoice
+    const invoiceUrl = `https://app.sandbox.midtrans.com/snap/v2/vtweb/${result.transaction_id}`;
+    
     const paymentData = {
       transaction_id: result.transaction_id,
       order_id: orderId,
       amount: amount,
       status: result.transaction_status || 'pending',
-      qr_string: result.qr_string || result.actions?.[0]?.url || `https://app.sandbox.midtrans.com/qris/${result.transaction_id}`,
+      qr_string: result.qr_string,
       created: new Date().toISOString(),
-      snap_url: result.actions?.[0]?.url || `https://app.sandbox.midtrans.com/qris/${result.transaction_id}`
+      snap_url: invoiceUrl
     };
     
     storePaymentData(orderId, paymentData);
