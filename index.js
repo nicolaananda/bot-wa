@@ -1834,7 +1834,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       }
         break
 
-        case 'xendit': {
+        case 'midtrans': {
           // Validasi order yang sedang berlangsung
           if (db.data.order[sender]) {
               return reply(`Kamu sedang melakukan order. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`);
@@ -1890,13 +1890,13 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       
               // Generate unique external ID
               const reffId = crypto.randomBytes(5).toString("hex").toUpperCase();
-              const externalId = `TRX-${reffId}-${Date.now()}`;
+              const orderId = `TRX-${reffId}-${Date.now()}`;
       
               // Import Xendit service
-              const { createQRISPayment, isPaymentCompleted } = require('./config/xendit');
+              const { createQRISPayment, isPaymentCompleted } = require('./config/midtrans');
       
               // Buat QRIS payment
-              const qrisPayment = await createQRISPayment(totalAmount, externalId);
+              const qrisPayment = await createQRISPayment(totalAmount, orderId);
               if (!qrisPayment?.qr_string) {
                   throw new Error('Gagal membuat QRIS payment');
               }
@@ -1922,7 +1922,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                   `*Total:* Rp${toRupiah(totalAmount)}\n` +
                   `*Waktu:* ${timeLeft} menit\n\n` +
                   `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n\n` +
-                  `*🔗 Link Invoice:* ${qrisPayment.invoice_url || qrisPayment.qr_string}\n\n` +
+                  `*🔗 Link Invoice:* ${qrisPayment.snap_url || qrisPayment.qr_string}\n\n` +
                   `Jika ingin membatalkan, ketik *${prefix}batal*`;
       
               const message = await ronzz.sendMessage(from, {
@@ -1936,7 +1936,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                   jumlah: quantityNum,
                   from,
                   key: message.key,
-                  externalId,
+                  orderId,
                   reffId
               };
       
@@ -1955,14 +1955,14 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                   try {
                       // Cek status pembayaran dengan Xendit dengan timeout
                       const paymentStatus = await Promise.race([
-                          isPaymentCompleted(externalId),
+                          isPaymentCompleted(orderId),
                           new Promise((_, reject) => 
                               setTimeout(() => reject(new Error('API Timeout')), 10000)
                           )
                       ]);
       
                       // Log untuk debugging
-                      console.log(`Checking payment status for ${externalId}:`, paymentStatus);
+                      console.log(`Checking payment status for ${orderId}:`, paymentStatus);
       
                       if (paymentStatus.status === "PAID" && paymentStatus.paid_amount === totalAmount) {
                           await ronzz.sendMessage(from, { delete: message.key });
@@ -2012,7 +2012,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       
                           // Kirim notifikasi ke owner
                           await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
-Ada transaksi dengan QRIS-XENDIT yang telah selesai!
+Ada transaksi dengan QRIS-MIDTRANS yang telah selesai!
 
 *╭────「 TRANSAKSI DETAIL 」───*
 *┊・ 🧾| Reff Id:* ${reffId}
@@ -2021,7 +2021,7 @@ Ada transaksi dengan QRIS-XENDIT yang telah selesai!
 *┊・ 🏷️️| Harga Barang:* Rp${toRupiah(unitPrice)}
 *┊・ 🛍️| Jumlah Order:* ${quantityNum}
 *┊・ 💰| Total Bayar:* Rp${toRupiah(totalAmount)}
-*┊・ 💳| Metode Bayar:* QRIS-XENDIT
+*┊・ 💳| Metode Bayar:* QRIS-MIDTRANS
 *┊・ 📅| Tanggal:* ${tanggal}
 *┊・ ⏰| Jam:* ${jamwib} WIB
 *╰┈┈┈┈┈┈┈┈*`, mentions: [sender] })
@@ -2073,15 +2073,15 @@ Ada transaksi dengan QRIS-XENDIT yang telah selesai!
                           await db.save();
                           
                           // Log transaksi berhasil
-                          console.log(`✅ Transaction completed: ${externalId} - ${reffId}`);
+                          console.log(`✅ Transaction completed: ${orderId} - ${reffId}`);
                           break;
                       }
                   } catch (error) {
-                      console.error(`Error checking payment status for ${externalId}:`, error);
+                      console.error(`Error checking payment status for ${orderId}:`, error);
                       
                       // Jika error karena timeout, lanjutkan polling
                       if (error.message === 'API Timeout') {
-                          console.log(`API timeout for ${externalId}, continuing...`);
+                          console.log(`API timeout for ${orderId}, continuing...`);
                           continue;
                       }
                       
@@ -2093,7 +2093,7 @@ Ada transaksi dengan QRIS-XENDIT yang telah selesai!
                   }
               }
           } catch (error) {
-              console.error(`Error creating QRIS payment for ${externalId}:`, error);
+              console.error(`Error creating QRIS payment for ${orderId}:`, error);
               reply("Gagal membuat QR Code pembayaran. Silakan coba lagi.");
           }
       }
@@ -7519,3 +7519,4 @@ Ada yang upgrade role!
     console.log(color('[ERROR]', 'red'), err)
   }
 }
+
