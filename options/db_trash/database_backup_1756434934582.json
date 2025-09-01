@@ -75,15 +75,9 @@
     }
   },
   "users": {
-    "62": {
-      "saldo": 0,
-      "role": "bronze",
-      "username": "User 62",
-      "createdAt": "2025-08-31T13:41:35.850Z"
-    },
     "6287777657944@s.whatsapp.net": {
-      "saldo": 490400,
-      "role": "bronze"
+      "saldo": 612000,
+      "role": "gold"
     },
     "6281389592985@s.whatsapp.net": {
       "saldo": 1076900,
@@ -106,8 +100,8 @@
       "role": "bronze"
     },
     "6287887842985@s.whatsapp.net": {
-      "saldo": 506800,
-      "role": "bronze"
+      "saldo": 610300,
+      "role": "gold"
     },
     "": {
       "saldo": 0,
@@ -118,11 +112,11 @@
       "role": "bronze"
     },
     "6282143003950@s.whatsapp.net": {
-      "saldo": 211800,
+      "saldo": 433900,
       "role": "bronze"
     },
     "6285774967393@s.whatsapp.net": {
-      "saldo": 1600,
+      "saldo": 1100,
       "role": "bronze"
     },
     "93978665988318@lid": {
@@ -134,7 +128,7 @@
       "role": "bronze"
     },
     "6289621519545@s.whatsapp.net": {
-      "saldo": 10000,
+      "saldo": 0,
       "role": "bronze"
     },
     "6285656192551@s.whatsapp.net": {
@@ -150,7 +144,7 @@
       "role": "bronze"
     },
     "6282180432159@s.whatsapp.net": {
-      "saldo": 30100,
+      "saldo": 100,
       "role": "bronze"
     },
     "66991678164@s.whatsapp.net": {
@@ -170,7 +164,7 @@
       "role": "bronze"
     },
     "62881027673568@s.whatsapp.net": {
-      "saldo": 400,
+      "saldo": 19500,
       "role": "bronze"
     },
     "6283117414957@s.whatsapp.net": {
@@ -182,7 +176,7 @@
       "role": "bronze"
     },
     "6285210702043@s.whatsapp.net": {
-      "saldo": 30100,
+      "saldo": 116800,
       "role": "bronze"
     },
     "6285770950038@s.whatsapp.net": {
@@ -246,7 +240,7 @@
       "role": "bronze"
     },
     "62895422605032@s.whatsapp.net": {
-      "saldo": 2000,
+      "saldo": 0,
       "role": "bronze"
     },
     "6287786336825@s.whatsapp.net": {
@@ -290,7 +284,7 @@
       "role": "bronze"
     },
     "6288268376813@s.whatsapp.net": {
-      "saldo": 600,
+      "saldo": 8600,
       "role": "bronze"
     },
     "6285714784965@s.whatsapp.net": {
@@ -302,7 +296,7 @@
       "role": "bronze"
     },
     "6281913718740@s.whatsapp.net": {
-      "saldo": 2000,
+      "saldo": 0,
       "role": "bronze"
     },
     "62895415426040@s.whatsapp.net": {
@@ -362,7 +356,7 @@
       "role": "bronze"
     },
     "6285171031709@s.whatsapp.net": {
-      "saldo": 34000,
+      "saldo": 42000,
       "role": "bronze"
     },
     "628982662705@s.whatsapp.net": {
@@ -546,7 +540,7 @@
       "role": "bronze"
     },
     "6285945186784@s.whatsapp.net": {
-      "saldo": 5000,
+      "saldo": 12000,
       "role": "bronze"
     },
     "62895366755098@s.whatsapp.net": {
@@ -562,7 +556,7 @@
       "role": "bronze"
     },
     "6285954778884@s.whatsapp.net": {
-      "saldo": 22500,
+      "saldo": 37500,
       "role": "bronze"
     },
     "6285600572700@s.whatsapp.net": {
@@ -586,7 +580,7 @@
       "role": "bronze"
     },
     "6289646333443@s.whatsapp.net": {
-      "saldo": 25000,
+      "saldo": 36000,
       "role": "bronze"
     },
     "6285712331764@s.whatsapp.net": {
@@ -630,7 +624,7 @@
       "role": "bronze"
     },
     "6281298158794@s.whatsapp.net": {
-      "saldo": 0,
+      "saldo": 2500,
       "role": "bronze"
     },
     "6289504552953@s.whatsapp.net": {
@@ -646,7 +640,7 @@
       "role": "bronze"
     },
     "6285291252338@s.whatsapp.net": {
-      "saldo": 28000,
+      "saldo": 52000,
       "role": "bronze"
     },
     "6287722543719@s.whatsapp.net": {
@@ -746,7 +740,7 @@
       "role": "bronze"
     },
     "6287776551905@s.whatsapp.net": {
-      "saldo": 1700,
+      "saldo": 0,
       "role": "bronze"
     },
     "6282178118419@s.whatsapp.net": {
@@ -880,264 +874,6 @@
     "6282287926141@s.whatsapp.net": {
       "saldo": 0,
       "role": "bronze"
-    },
-    "75174930071710@lid": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "279825726079081@lid": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6287786570192@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285739036085@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "54916005535792@lid": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285157132440@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "62895616200808@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6281905398214@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285169932313@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285704047150@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6283820375014@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6289668193298@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6282144673465@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285893133787@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6287789501382@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "208000987975783@lid": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6287860226067@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285182593002@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285156575718@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6281938173490@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6281329983555@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285220970603@s.whatsapp.net": {
-      "saldo": 13000,
-      "role": "bronze"
-    },
-    "628812995231@s.whatsapp.net": {
-      "saldo": 3000,
-      "role": "bronze"
-    },
-    "6283853990108@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6281399672368@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6282339437553@s.whatsapp.net": {
-      "saldo": 38000,
-      "role": "bronze"
-    },
-    "6281311286646@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "62895809663500@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6281233751264@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285234494103@s.whatsapp.net": {
-      "saldo": 20000,
-      "role": "bronze"
-    },
-    "6281315746513@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6283866944611@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "628811265611@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285802339901@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285117074180@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6282139906440@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6281230805203@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6288239953672@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6281377863450@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6287704429446@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285755622387@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6282143163047@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "62895365367322@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6288228134082@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6287863488620@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "62@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze",
-      "username": "User 62",
-      "createdAt": "2025-08-31T13:41:35.850Z"
-    },
-    "6285722555795@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6281548592777@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6281779134428@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285697467612@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6283879974817@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285704210377@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "62881027308221@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6287737649007@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6287771875733@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6281322328702@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "628998504186@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285158641142@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285158859669@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "62895373886872@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6282189495455@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6287880869863@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6287850458985@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285138888899@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
     }
   },
   "sewa": {},
@@ -1175,14 +911,14 @@
     },
     "6281380312297@s.whatsapp.net": {
       "ID": "F05C002FD9",
-      "session": "konfirmasi_deposit",
+      "session": "amount",
       "name": "mprstan (jual aplikasi premium)",
       "date": "27 Agustus 2025",
       "number": "6281380312297@s.whatsapp.net",
       "payment": "E-WALLET",
       "data": {
-        "amount_deposit": 1,
-        "total_deposit": 197
+        "amount_deposit": "",
+        "total_deposit": ""
       }
     },
     "6287776551905@s.whatsapp.net": {
@@ -1208,30 +944,6 @@
         "amount_deposit": 1,
         "total_deposit": 175
       }
-    },
-    "208000987975783@lid": {
-      "ID": "8957D5B73F",
-      "session": "amount",
-      "name": "⋆˚࿔stary's store",
-      "date": "29 Agustus 2025",
-      "number": "208000987975783@lid",
-      "payment": "QRIS",
-      "data": {
-        "amount_deposit": "",
-        "total_deposit": ""
-      }
-    },
-    "6287789501382@s.whatsapp.net": {
-      "ID": "14109F501A",
-      "session": "amount",
-      "name": "⋆˚࿔stary's store",
-      "date": "29 Agustus 2025",
-      "number": "6287789501382@s.whatsapp.net",
-      "payment": "QRIS",
-      "data": {
-        "amount_deposit": "",
-        "total_deposit": ""
-      }
     }
   },
   "produk": {
@@ -1240,24 +952,22 @@
       "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
       "desc": "FREE VIU 1 TAHUN/CANVA 1 BULAN CHAT ADMIN GIGI, Netflix sharing 1p2u durasi 1 bulan fullgar 28-30d",
       "snk": "\nSEBELUM KASIH KE CUST CEK GETCONTACT, RAWAN DICURI EMAIL! KENA CURI/CHANGE EMAIL = DENDA (ditanggung FH & reseller).\n📋 Wajib isi monitoring Netflix\n— No. telp CUST :\n— Device :\n— Lokasi :\n— Durasi :\n— Tgl beli :\n— Sharing : 1u/2u/semiprivate\n\n=POTONG=\nSEND KE ADMIN GIGI KARENA DIPANTAU, GAK SEND? NOGAR 🥰\nNETFLIX PREMIUM\n➖➖📩 S&K➖➖\n⚠️ Jangan ganti email/pass/atur billing🔥\n⚠️ 1 profile = 1 device & Dilarang pakai VPN\n⚠️ Jangan spam login/logout\n⚠️ Jika muncul bayar → klik X / Not now / Lain kali\n⚠️ Email notfound → langsung lapor admin!\n{Durasi 28–30 hari}\n🛡 Garansi penuh jika kirim bukti login + merk device ke admin max 1x24 jam (tanpa itu garansi hangus). Full garansi, kesalahan user = hangus.\n✨ Thanks for order & happy watching!",
-      "priceB": 12000,
+      "priceB": "13700",
       "priceS": "13700",
       "priceG": "13700",
-      "terjual": 284,
+      "terjual": 247,
       "stok": [
-        "netkirana819@postm.net|Jangangantibos|c|8888",
-        "netkirana819@postm.net|Jangangantibos|d|8888",
-        "netkirana819@postm.net|Jangangantibos|e|8888",
-        "dickiopsi@gmail.com|bacasnkyas|1|8888",
-        "dickiopsi@gmail.com|bacasnkyas|3|8888",
-        "dickiopsi@gmail.com|bacasnkyas|4|8888",
-        "dickiopsi@gmail.com|bacasnkyas|5|8888",
-        "dickiopsi@gmail.com|bacasnkyas|han|8888",
-        "dickiopsi@gmail.com|bacasnkyas|1|8888",
-        "dickiopsi@gmail.com|bacasnkyas|3|8888",
-        "dickiopsi@gmail.com|bacasnkyas|4|8888",
-        "dickiopsi@gmail.com|bacasnkyas|5|8888",
-        "dickiopsi@gmail.com|bacasnkyas|han|8888"
+        "uhhuyy@exdonuts.com|jgngantibos|e|8888",
+        "martinmadrazo@ichigo.me|bacasnk100|A|8888",
+        "martinmadrazo@ichigo.me|bacasnk100|b|8888",
+        "martinmadrazo@ichigo.me|bacasnk100|c|8888",
+        "martinmadrazo@ichigo.me|bacasnk100|d|8888",
+        "martinmadrazo@ichigo.me|bacasnk100|e|8888",
+        "uhhuyy@exdonuts.com|jgngantibos|a|8888",
+        "uhhuyy@exdonuts.com|jgngantibos|b|8888",
+        "uhhuyy@exdonuts.com|jgngantibos|c|8888",
+        "uhhuyy@exdonuts.com|jgngantibos|d|8888",
+        "uhhuyy@exdonuts.com|jgngantibos|e|8888"
       ]
     },
     "net1u": {
@@ -1265,18 +975,16 @@
       "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
       "desc": "FREE VIU 1 TAHUN/CANVA 1 BULAN CHAT ADMIN GIGI, Netflix sharing 1p2u durasi 1 bulan fullgar 28-30d",
       "snk": "\nSEBELUM KASIH KE CUST CEK GETCONTACT, RAWAN DICURI EMAIL! KENA CURI/CHANGE EMAIL = DENDA (ditanggung FH & reseller).\n📋 Wajib isi monitoring Netflix\n— No. telp CUST :\n— Device :\n— Lokasi :\n— Durasi :\n— Tgl beli :\n— Sharing : 1u/2u/semiprivate\n\n=POTONG=\nSEND KE ADMIN GIGI KARENA DIPANTAU, GAK SEND? NOGAR 🥰\nNETFLIX PREMIUM\n➖➖📩 S&K➖➖\n⚠️ Jangan ganti email/pass/atur billing🔥\n⚠️ 1 profile = 1 device & Dilarang pakai VPN\n⚠️ Jangan spam login/logout\n⚠️ Jika muncul bayar → klik X / Not now / Lain kali\n⚠️ Email notfound → langsung lapor admin!\n{Durasi 28–30 hari}\n🛡 Garansi penuh jika kirim bukti login + merk device ke admin max 1x24 jam (tanpa itu garansi hangus). Full garansi, kesalahan user = hangus.\n➖➖➖➖➖➖\n✨ Thanks for order & happy watching!",
-      "priceB": 24000,
+      "priceB": "25000",
       "priceS": "25000",
       "priceG": "25000",
-      "terjual": 65,
+      "terjual": 42,
       "stok": [
-        "rampage@ghzm.us|Jangangantibos|e|1212",
-        "rampage@ghzm.us|Jangangantibos|dantjie|1212",
-        "holymoly@ghzm.us|ikutirulesbos|a|8888",
-        "holymoly@ghzm.us|ikutirulesbos|b|8888",
-        "holymoly@ghzm.us|ikutirulesbos|c|8888",
-        "holymoly@ghzm.us|ikutirulesbos|d|8888",
-        "holymoly@ghzm.us|ikutirulesbos|uhuy|8888"
+        "nelinetlox882@exwa.org|JANGANGANTI|z1|0101",
+        "nelinetlox882@exwa.org|JANGANGANTI|koca|0101",
+        "nelinetlox882@exwa.org|JANGANGANTI|litas|0101",
+        "nelinetlox882@exwa.org|JANGANGANTI|z2|0101",
+        "nelinetlox882@exwa.org|JANGANGANTI|sasa|0101"
       ]
     },
     "net1m": {
@@ -1284,15 +992,14 @@
       "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
       "desc": "Netflix Sharing 1 minggu 1p1u FULLGAR",
       "snk": "\nSEBELUM KASIH KE CUST CEK GETCONTACT, RAWAN DICURI EMAIL! KENA CURI/CHANGE EMAIL = DENDA (ditanggung FH & reseller).\n📋 Wajib isi monitoring Netflix\n— No. telp CUST :\n— Device :\n— Lokasi :\n— Durasi :\n— Tgl beli :\n— Sharing : 1u/2u/semiprivate\n\n=POTONG=\nSEND KE ADMIN GIGI KARENA DIPANTAU, GAK SEND? NOGAR 🥰\nNETFLIX PREMIUM\n➖➖📩 S&K➖➖\n⚠️ Jangan ganti email/pass/atur billing🔥\n⚠️ 1 profile = 1 device & Dilarang pakai VPN\n⚠️ Jangan spam login/logout\n⚠️ Jika muncul bayar → klik X / Not now / Lain kali\n⚠️ Email notfound → langsung lapor admin!\n{Durasi 28–30 hari}\n🛡 Garansi penuh jika kirim bukti login + merk device ke admin max 1x24 jam (tanpa itu garansi hangus). Full garansi, kesalahan user = hangus.\n✨ Thanks for order & happy watching!",
-      "priceB": 7000,
+      "priceB": "8000",
       "priceS": "8000",
       "priceG": "8000",
-      "terjual": 63,
+      "terjual": 38,
       "stok": [
-        "Vila151@thxmail.net|bacasnkbos1|17|8888",
-        "Vila151@thxmail.net|bacasnkbos1|18|8888",
-        "Vila151@thxmail.net|bacasnkbos1|19|8888",
-        "Vila151@thxmail.net|bacasnkbos1|20|8888"
+        "healing6.cc@apeollo.my.id|bacasnk5900|c|8888",
+        "healing6.cc@apeollo.my.id|bacasnk5900|d|8888",
+        "healing6.cc@apeollo.my.id|bacasnk5900|e|8888"
       ]
     },
     "capcutshr": {
@@ -1303,15 +1010,15 @@
       "priceB": "5000",
       "priceS": "5000",
       "priceG": "5000",
-      "terjual": 14,
+      "terjual": 8,
       "stok": [
+        "on1lr0e1cn@haylo.network|masuk123",
+        "jvgsenvaso@easygbd.com|masuk123",
+        "jvgsenvaso@easygbd.com|masuk123",
+        "jvgsenvaso@easygbd.com|masuk123",
         "jik63zcywj@hatanet.network|masuk123",
-        "isadore4307z@hubinstant.com|masuk123",
-        "isaias8i@muagicungre.com|masuk123",
-        "isadore4307z@hubinstant.com|masuk123",
-        "isaias8i@muagicungre.com|masuk123",
-        "isadore4307z@hubinstant.com|masuk123",
-        "isaias8i@muagicungre.com|masuk123"
+        "jik63zcywj@hatanet.network|masuk123",
+        "jik63zcywj@hatanet.network|masuk123"
       ]
     },
     "capcut2u": {
@@ -1319,40 +1026,33 @@
       "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
       "desc": "Capcut sharing full garansi 25-30 FULLGAR, LIMIT?BISA GANTI AKUN",
       "snk": "\nSYARAT DAN KETENTUAN CAPCUT\nbisa ganti akun jika awal login lgsg limit\nlaptop login di web [https://www.capcut.com/signup]\n1. DURASI ANTARA 26-30 HARI, GARANSI SEMENJAK PEMBELIAN\n2. DILARANG GANTI EMAIL SELAMA DURASI GARANSI, CE = HANGUS\n🍷 LOGIN Max 1 DEVICE, limit ditanggung Cust\n📌 LOGIN LANGSUNG DI APLIKASI CAPCUT LEWAT *EMAIL* bukan gmail/google/fb/tiktok!\n📌 resiko kehilangan ditanggung bersama!",
-      "priceB": 7000,
+      "priceB": "8000",
       "priceS": "8000",
       "priceG": "8000",
-      "terjual": 40,
+      "terjual": 26,
       "stok": [
-        "isac72384o@sieuthiclone.com|masuk123",
-        "netti@gimail.cloud|masuk123",
-        "seth5@healthsoulger.com|masuk123",
-        "briav@alightmotion.id|masuk123",
-        "netti@gimail.cloud|masuk123",
-        "seth5@healthsoulger.com|masuk123",
-        "briav@alightmotion.id|masuk123",
-        "znsszwogew@email-very.com|masuk123"
+        "dj8mgg3r9o@easygbd.com|masuk123",
+        "707u3sivxn@linkjetdata.com|masuk123",
+        "3zimylrqfq@daisycouture.shop|masuk123",
+        "awzrubzjkv@ferrer-lozano.es|masuk123",
+        "dj8mgg3r9o@easygbd.com|masuk123"
       ]
     },
     "capcutpriv": {
       "id": "capcutpriv",
       "name": "CAPCUT 1 BULAN PRIVATE ",
       "desc": "Capcut sharing full garansi 25-30 FULLGAR, LIMIT?BISA GANTI AKUN",
-      "snk": "\nSYARAT DAN KETENTUAN CAPCUT PRIVATE\nlaptop login di web [https://www.capcut.com/signup] hp lgsg di APLIKASI\n1. DURASI ANTARA 26-30 HARI, GARANSI SEMENJAK PEMBELIAN\n2. DILARANG GANTI EMAIL SELAMA DURASI GARANSI, CE = HANGUS\n🍷 LOGIN Max 2 DEVICE, limit ditanggung Cust\n📌 LOGIN LANGSUNG CAPCUT LEWAT *EMAIL* bukan gmail/google/fb/tiktok!\n📌 resiko kehilangan ditanggung bersama!",
-      "priceB": 14000,
+      "snk": "snk",
+      "priceB": "14500",
       "priceS": "14500",
       "priceG": "14500",
-      "terjual": 43,
+      "terjual": 28,
       "stok": [
-        "gjjmpeqoobq2s@corefitrun.com|masuk123",
-        "rduy0c91dsxrw@viavuive.net|masuk123",
-        "tvcm5oy3jaave@corefitrun.com|masuk123",
-        "rsc6ocultr0ji@corefitrun.com|masuk123",
-        "d2s264r13jjc1@adsensekorea.com|masuk123",
-        "prs49u4fh2@tryhivekey.com|masuk123",
-        "vcqubs2t5t@nguyendanhkietisocial.com|masuk123",
-        "0zvq8myhah@properevod.ru|masuk123",
-        "wgr7sdbtc6@jarringsafri.biz|masuk123"
+        "ufg9mktsxp@chantellegribbon.com|masuk123",
+        "hjb6dt44tb@lovelynazar.net|masuk123",
+        "decfjp3xxd@rajaiblis.com|masuk123",
+        "pat8yl8hc3@gmailot.com|masuk123",
+        "mzx13d8qc1@ecoverseworld.com|masuk123"
       ]
     },
     "canva1b": {
@@ -1363,8 +1063,22 @@
       "priceB": "1900",
       "priceS": "1900",
       "priceG": "1900",
-      "terjual": 40,
+      "terjual": 26,
       "stok": [
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
         "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
         "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
         "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
@@ -1453,8 +1167,9 @@
       "priceB": "800",
       "priceS": "800",
       "priceG": "800",
-      "terjual": 3,
+      "terjual": 2,
       "stok": [
+        "https://www.canva.com/brand/join?token=f0-z-IayD83fGVTJp7L_0g&referrer=team-invite|cust klik link",
         "https://www.canva.com/brand/join?token=f0-z-IayD83fGVTJp7L_0g&referrer=team-invite|cust klik link",
         "https://www.canva.com/brand/join?token=f0-z-IayD83fGVTJp7L_0g&referrer=team-invite|cust klik link",
         "https://www.canva.com/brand/join?token=f0-z-IayD83fGVTJp7L_0g&referrer=team-invite|cust klik link",
@@ -1466,12 +1181,13 @@
       "id": "gptshr",
       "name": " AI CHAT GPT+ SHARING FULLGAR",
       "desc": "Durasi 1 bulan Bisa menggunakan hingga GPT 4.5\n",
-      "snk": " OTP GPT email.nicola.id\nCEK DISITU\n‼️ TERMS & CONDITION ‼️\nJangan ubah email, pass, atau billing\n1 akun hanya untuk 1 device (gunakan aplikasi, bukan web)\nAkses GPT-5 limit lebih tinggi, jika limit pakai GPT-4.5/4.1\nDilarang share akun\nDurasi 28–30 hari = 1 bulan\nMembeli = setuju SNK, no refund\nMelanggar = garansi hangus untuk semua anggota sharing\nSupport all device\n📌 Void Garansi jika:\n— Tidak kirim proof login dalam 1x24 jam\n— Melanggar aturan di atas",
+      "snk": "\n‼️ TERMS & CONDITION ‼️\nJangan ubah email, pass, atau billing\n1 akun hanya untuk 1 device (gunakan aplikasi, bukan web)\nAkses GPT-5 limit lebih tinggi, jika limit pakai GPT-4.5/4.1\nDilarang share akun\nDurasi 28–30 hari = 1 bulan\nMembeli = setuju SNK, no refund\nMelanggar = garansi hangus untuk semua anggota sharing\nSupport all device\n📌 Void Garansi jika:\n— Tidak kirim proof login dalam 1x24 jam\n— Melanggar aturan di atas",
       "priceB": "23000",
       "priceS": "23000",
       "priceG": "23000",
-      "terjual": 2,
+      "terjual": 1,
       "stok": [
+        "chesa@ghzm.us|freepalestine",
         "chesa@ghzm.us|freepalestine",
         "chesa@ghzm.us|freepalestine"
       ]
@@ -1484,8 +1200,13 @@
       "priceB": "1000",
       "priceS": "1000",
       "priceG": "1000",
-      "terjual": 7,
+      "terjual": 2,
       "stok": [
+        "dominic132@ghzm.us|viuku123",
+        "percy152@ghzm.us|viuku123",
+        "romeo133@ghzm.us|viuku123",
+        "karly411@ghzm.us|viuku123",
+        "billi89@ghzm.us|viuku123",
         "dell34@ghzm.us|viuku123",
         "shelby160@ghzm.us|viuku123",
         "marlena248@ghzm.us|viuku123",
@@ -1504,8 +1225,23 @@
       "priceB": "3500",
       "priceS": "3500",
       "priceG": "3500",
-      "terjual": 61,
+      "terjual": 46,
       "stok": [
+        "desiree38@ghzm.us|viuku123",
+        "quiana114@ghzm.us|viuku123",
+        "mitzi430@ghzm.us|viuku123",
+        "julietta142@ghzm.us|viuku123",
+        "rocco408@ghzm.us|viuku123",
+        "alane470@ghzm.us|viuku123",
+        "chauncey173@ghzm.us|viuku123",
+        "cary463@ghzm.us|viuku123",
+        "odell94@ghzm.us|viuku123",
+        "everett467@ghzm.us|viuku123",
+        "dario390@ghzm.us|viuku123",
+        "john70@ghzm.us|viuku123",
+        "nakita43@ghzm.us|viuku123",
+        "carolyne190@ghzm.us|viuku123",
+        "laurence376@ghzm.us|viuku123",
         "reita209@ghzm.us|viuku123",
         "august409@ghzm.us|viuku123",
         "royce432@ghzm.us|viuku123",
@@ -1539,8 +1275,7 @@
         "cathryn373@ghzm.us|viuku123",
         "jerrold371@ghzm.us|viuku123",
         "michell414@ghzm.us|viuku123",
-        "israel87@ghzm.us|viuku123",
-        "everett467@ghzm.us|viuku123"
+        "israel87@ghzm.us|viuku123"
       ]
     },
     "vid3u": {
@@ -1551,10 +1286,11 @@
       "priceB": "8000",
       "priceS": "8000",
       "priceG": "8000",
-      "terjual": 7,
+      "terjual": 3,
       "stok": [
-        "qemsv249@gmail.com|0lolipop",
-        "qemsv249@gmail.com|0lolipop"
+        "mdqol195@gmail.com|0lolipop",
+        "mdqol195@gmail.com|0lolipop",
+        "mdqol195@gmail.com|0lolipop"
       ]
     },
     "vid2u": {
@@ -1565,9 +1301,11 @@
       "priceB": "11000",
       "priceS": "11000",
       "priceG": "11000",
-      "terjual": 18,
+      "terjual": 9,
       "stok": [
-        "yehxa350@gmail.com|0lolipop"
+        "mamss988@gmail.com|0lolipop",
+        "yjzpk258@gmail.com|0lolipop",
+        "yjzpk258@gmail.com|0lolipop"
       ]
     },
     "vidpriv": {
@@ -1578,7 +1316,7 @@
       "priceB": "21000",
       "priceS": "21000",
       "priceG": "21000",
-      "terjual": 11,
+      "terjual": 4,
       "stok": []
     },
     "wetv": {
@@ -1603,19 +1341,30 @@
       "priceB": "3500",
       "priceS": "3500",
       "priceG": "3500",
-      "terjual": 23,
-      "stok": []
+      "terjual": 16,
+      "stok": [
+        "mmy171@muahetbienhoa.com|masuk1234",
+        "mmy171@muahetbienhoa.com|masuk1234",
+        "zal9lorlpt@sigmadee.com|Lowkey123",
+        "zal9lorlpt@sigmadee.com|Lowkey123",
+        "zal9lorlpt@sigmadee.com|Lowkey123",
+        "zal9lorlpt@sigmadee.com|Lowkey123",
+        "zal9lorlpt@sigmadee.com|Lowkey123"
+      ]
     },
     "capcut7d": {
       "id": "capcut7d",
       "name": "CAPCUT 1 MINGGU SHARING 3U ",
       "desc": "sharing 7d",
       "snk": "\nSYARAT DAN KETENTUAN CAPCUT\n1. GARANSI 7d SEMENJAK PEMBELIAN\n2. DILARANG GANTI EMAIL SELAMA DURASI GARANSI, CE = HANGUS\n🍷 LOGIN Max 1 DEVICE, limit ditanggung Cust\n𝗠𝗢𝗛𝗢𝗡 𝗗𝗜𝗕𝗔𝗖𝗔 𝗦𝗔𝗠𝗣𝗔𝗜 𝗛𝗔𝗕𝗜𝗦!\n📌 LOGIN LANGSUNG DI APLIKASI CAPCUT LEWAT *EMAIL* bukan gmail/google/fb/tiktok!\n📌 resiko kehilangan ditanggung bersama!",
-      "priceB": 2500,
+      "priceB": "3000",
       "priceS": "3000",
       "priceG": "3000",
-      "terjual": 5,
-      "stok": []
+      "terjual": 2,
+      "stok": [
+        "saige@tandlplith.se|masak123",
+        "desti@abdullaaaa.online|masak123"
+      ]
     },
     "capcut3d": {
       "id": "capcut3d",
@@ -1625,8 +1374,10 @@
       "priceB": "1500",
       "priceS": "1500",
       "priceG": "1500",
-      "terjual": 11,
-      "stok": []
+      "terjual": 5,
+      "stok": [
+        "jackh@gmail2.gq|masak123"
+      ]
     },
     "capcutpriv7d": {
       "id": "capcutpriv7d",
@@ -1636,8 +1387,12 @@
       "priceB": "5000",
       "priceS": "5000",
       "priceG": "5000",
-      "terjual": 13,
-      "stok": []
+      "terjual": 8,
+      "stok": [
+        "willa@00jac.com | masak123",
+        "payto@selaciptama.com | masak123",
+        "riley@besnetor.com | masak123"
+      ]
     },
     "yt3b": {
       "id": "yt3b",
@@ -1647,11 +1402,8 @@
       "priceB": "15000",
       "priceS": "15000",
       "priceG": "15000",
-      "terjual": 7,
-      "stok": [
-        "Gsubrotoo21@gmail.com|labalaba",
-        "Butokuning9@gmail.com|labalaba"
-      ]
+      "terjual": 2,
+      "stok": []
     },
     "vidtvpriv": {
       "id": "vidtvpriv",
@@ -1661,7 +1413,7 @@
       "priceB": "5000",
       "priceS": "5000",
       "priceG": "5000",
-      "terjual": 4,
+      "terjual": 2,
       "stok": []
     },
     "zoom1h": {
@@ -1819,30 +1571,6 @@
         "fromMe": true,
         "id": "3EB002D36383D7451DC69E"
       }
-    },
-    "6283175577522@s.whatsapp.net": {
-      "id": "net2u",
-      "jumlah": "1",
-      "from": "6283175577522@s.whatsapp.net",
-      "key": {
-        "remoteJid": "6283175577522@s.whatsapp.net",
-        "fromMe": true,
-        "id": "3EB0A013310231AA025D61"
-      },
-      "externalId": "TRX-142008D942-1756482565196",
-      "reffId": "142008D942"
-    },
-    "6285880099323@s.whatsapp.net": {
-      "id": "net2u",
-      "jumlah": 1,
-      "from": "6285880099323@s.whatsapp.net",
-      "key": {
-        "remoteJid": "6285880099323@s.whatsapp.net",
-        "fromMe": true,
-        "id": "3EB07EC87F3F95205FB1E5"
-      },
-      "externalId": "TRX-C21CFD5D75-1756566473753",
-      "reffId": "C21CFD5D75"
     }
   },
   "transaksi": [
@@ -5086,2358 +4814,6 @@
       "reffId": "E0FCE6806A",
       "metodeBayar": "Saldo",
       "totalBayar": 3500
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": "8000",
-      "date": "2025-08-29 11:12:36",
-      "jumlah": 1,
-      "user": "6288268376813",
-      "userRole": "bronze",
-      "reffId": "859AC1FA18",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-08-29 13:19:45",
-      "jumlah": 1,
-      "user": "62881027673568",
-      "userRole": "bronze",
-      "reffId": "DE783146CD",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": "8000",
-      "date": "2025-08-29 13:24:37",
-      "jumlah": 1,
-      "user": "6285210702043",
-      "userRole": "bronze",
-      "reffId": "6ECB0303F4",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "vid3u",
-      "name": "VIDIO SHARING 3USER ",
-      "price": "8000",
-      "date": "2025-08-29 13:42:51",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "BAC92E27BD",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": "13700",
-      "date": "2025-08-29 15:33:24",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "02EEF5D470",
-      "metodeBayar": "Saldo",
-      "totalBayar": 13700
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": "13700",
-      "date": "2025-08-29 16:33:04",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "C95F8ED421",
-      "metodeBayar": "Saldo",
-      "totalBayar": 13700
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": "3500",
-      "date": "2025-08-29 16:47:40",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "C6CF557965",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "capcutpriv",
-      "name": "CAPCUT 1 BULAN PRIVATE ",
-      "price": "14500",
-      "date": "2025-08-29 17:55:07",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "F70AED8595",
-      "metodeBayar": "Saldo",
-      "totalBayar": 14500
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": "8000",
-      "date": "2025-08-29 18:35:41",
-      "jumlah": 1,
-      "user": "6285210702043",
-      "userRole": "bronze",
-      "reffId": "63906C932E",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "vid2u",
-      "name": "VIDIO SHARING 2 USER ",
-      "price": "11000",
-      "date": "2025-08-29 18:42:47",
-      "jumlah": 1,
-      "user": "6285932833238",
-      "userRole": "bronze",
-      "reffId": "DAFB3E57C2",
-      "metodeBayar": "Saldo",
-      "totalBayar": 11000
-    },
-    {
-      "id": "vidpriv",
-      "name": "VIDIO PRIVATE ",
-      "price": "21000",
-      "date": "2025-08-29 19:43:18",
-      "jumlah": 1,
-      "user": "6287776551905",
-      "userRole": "bronze",
-      "reffId": "D0BCC8C11E",
-      "metodeBayar": "Saldo",
-      "totalBayar": 21000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": "25000",
-      "date": "2025-08-29 19:49:04",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "41797EBC6B",
-      "metodeBayar": "Saldo",
-      "totalBayar": 25000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": "8000",
-      "date": "2025-08-29 19:50:32",
-      "jumlah": 1,
-      "user": "6285210702043",
-      "userRole": "bronze",
-      "reffId": "899139ED50",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": "13700",
-      "date": "2025-08-29 20:24:31",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "6349E1772E",
-      "metodeBayar": "Saldo",
-      "totalBayar": 13700
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": "13700",
-      "date": "2025-08-29 20:28:49",
-      "jumlah": 2,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "E6188FBE9F",
-      "metodeBayar": "Saldo",
-      "totalBayar": 27400
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": "8000",
-      "date": "2025-08-29 21:14:12",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "5C191103FA",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "capcut7d",
-      "name": "CAPCUT 1 MINGGU SHARING 3U ",
-      "price": "3000",
-      "date": "2025-08-29 21:23:00",
-      "jumlah": 1,
-      "user": "6285774967393",
-      "userRole": "bronze",
-      "reffId": "08D859634D",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": "8000",
-      "date": "2025-08-29 21:44:34",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "514D72FB74",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": "13700",
-      "date": "2025-08-29 21:47:16",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "C4E438AB93",
-      "metodeBayar": "Saldo",
-      "totalBayar": 13700
-    },
-    {
-      "id": "vid3u",
-      "name": "VIDIO SHARING 3USER ",
-      "price": "8000",
-      "date": "2025-08-29 22:09:37",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "6FA0F2767B",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": "13700",
-      "date": "2025-08-29 22:09:37",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "3236FF16D3",
-      "metodeBayar": "Saldo",
-      "totalBayar": 13700
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": "8000",
-      "date": "2025-08-29 22:09:40",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "F9F81D57C2",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "prime",
-      "name": "PRIME SHARING 1 BULAN",
-      "price": "3500",
-      "date": "2025-08-29 22:10:25",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "42F0CACE58",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "capcutpriv",
-      "name": "CAPCUT 1 BULAN PRIVATE ",
-      "price": "14500",
-      "date": "2025-08-30 01:41:25",
-      "jumlah": 2,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "55BD657B20",
-      "metodeBayar": "Saldo",
-      "totalBayar": 29000
-    },
-    {
-      "id": "vid3u",
-      "name": "VIDIO SHARING 3USER ",
-      "price": "8000",
-      "date": "2025-08-30 08:28:54",
-      "jumlah": 1,
-      "user": "62895422605032",
-      "userRole": "bronze",
-      "reffId": "59D8603320",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "gptshr",
-      "name": " AI CHAT GPT+ SHARING FULLGAR",
-      "price": "23000",
-      "date": "2025-08-30 08:55:45",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "BFC6B97344",
-      "metodeBayar": "Saldo",
-      "totalBayar": 23000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": "25000",
-      "date": "2025-08-30 10:52:17",
-      "jumlah": 1,
-      "user": "6285220970603",
-      "userRole": "bronze",
-      "reffId": "19C7DB81D5",
-      "metodeBayar": "Saldo",
-      "totalBayar": 25000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": "25000",
-      "date": "2025-08-30 11:02:48",
-      "jumlah": 1,
-      "user": "6288232466834",
-      "userRole": "bronze",
-      "reffId": "96BD87D91E",
-      "metodeBayar": "Saldo",
-      "totalBayar": 25000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": "13700",
-      "date": "2025-08-30 12:54:59",
-      "jumlah": 1,
-      "user": "6285210702043",
-      "userRole": "bronze",
-      "reffId": "C270EAD53E",
-      "metodeBayar": "Saldo",
-      "totalBayar": 13700
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-08-30 13:08:09",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "F5541346CD",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": "13700",
-      "date": "2025-08-30 13:08:29",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "CC85E9DFB4",
-      "metodeBayar": "Saldo",
-      "totalBayar": 13700
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": "3500",
-      "date": "2025-08-30 13:19:08",
-      "jumlah": 1,
-      "user": "62881027673568",
-      "userRole": "bronze",
-      "reffId": "ACC5665356",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "vid2u",
-      "name": "VIDIO SHARING 2 USER ",
-      "price": "11000",
-      "date": "2025-08-30 13:52:29",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "gold",
-      "reffId": "949766277A",
-      "metodeBayar": "Saldo",
-      "totalBayar": 11000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": "8000",
-      "date": "2025-08-30 14:01:02",
-      "jumlah": 1,
-      "user": "6281913718740",
-      "userRole": "bronze",
-      "reffId": "46BAE91F96",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "vidpriv",
-      "name": "VIDIO PRIVATE ",
-      "price": "21000",
-      "date": "2025-08-30 14:32:59",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "gold",
-      "reffId": "5A6ED8EFC7",
-      "metodeBayar": "Saldo",
-      "totalBayar": 21000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-08-30 14:40:00",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "BD58655534",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "capcutshr",
-      "name": "CAPCUT 1 BULAN SHARING 3U ",
-      "price": "5000",
-      "date": "2025-08-30 14:48:28",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "BD72032489",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "capcutshr",
-      "name": "CAPCUT 1 BULAN SHARING 3U ",
-      "price": "5000",
-      "date": "2025-08-30 14:50:09",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "C94647C376",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "viu1b",
-      "name": "VIU 1 BULAN ",
-      "price": "1000",
-      "date": "2025-08-30 15:19:11",
-      "jumlah": 1,
-      "user": "6285210702043",
-      "userRole": "bronze",
-      "reffId": "DF1C21DB6C",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1000
-    },
-    {
-      "id": "vidpriv",
-      "name": "VIDIO PRIVATE ",
-      "price": "21000",
-      "date": "2025-08-30 15:56:00",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "555FEC0561",
-      "metodeBayar": "Saldo",
-      "totalBayar": 21000
-    },
-    {
-      "id": "capcut7d",
-      "name": "CAPCUT 1 MINGGU SHARING 3U ",
-      "price": "3000",
-      "date": "2025-08-30 16:12:07",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "4EC7C4C312",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": "13700",
-      "date": "2025-08-30 16:40:40",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "52CF224D32",
-      "metodeBayar": "Saldo",
-      "totalBayar": 13700
-    },
-    {
-      "id": "viu1b",
-      "name": "VIU 1 BULAN ",
-      "price": "1000",
-      "date": "2025-08-30 16:52:14",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "C3B2CCED0C",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1000
-    },
-    {
-      "id": "viu1b",
-      "name": "VIU 1 BULAN ",
-      "price": "1000",
-      "date": "2025-08-30 16:52:35",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "A572394D65",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1000
-    },
-    {
-      "id": "vidpriv",
-      "name": "VIDIO PRIVATE ",
-      "price": "21000",
-      "date": "2025-08-30 16:59:38",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "60FBBD1E7B",
-      "metodeBayar": "Saldo",
-      "totalBayar": 21000
-    },
-    {
-      "id": "prime",
-      "name": "PRIME SHARING 1 BULAN",
-      "price": "3500",
-      "date": "2025-08-30 17:25:01",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "3782BF5D23",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "vid2u",
-      "name": "VIDIO SHARING 2 USER ",
-      "price": "11000",
-      "date": "2025-08-30 18:20:39",
-      "jumlah": 1,
-      "user": "6289646333443",
-      "userRole": "bronze",
-      "reffId": "67249C42EB",
-      "metodeBayar": "Saldo",
-      "totalBayar": 11000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": "13700",
-      "date": "2025-08-30 18:48:44",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "732EE2505F",
-      "metodeBayar": "Saldo",
-      "totalBayar": 13700
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": "13700",
-      "date": "2025-08-30 18:59:08",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "69CDA95DAF",
-      "metodeBayar": "Saldo",
-      "totalBayar": 13700
-    },
-    {
-      "id": "prime",
-      "name": "PRIME SHARING 1 BULAN",
-      "price": "3500",
-      "date": "2025-08-30 19:00:00",
-      "jumlah": 1,
-      "user": "6282180432159",
-      "userRole": "bronze",
-      "reffId": "EEC556601F",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "vidtvpriv",
-      "name": "VIDIO TV ONLY PRIV ",
-      "price": "5000",
-      "date": "2025-08-30 19:04:45",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "F80EF9F294",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": "25000",
-      "date": "2025-08-30 19:12:38",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "634F9669B8",
-      "metodeBayar": "Saldo",
-      "totalBayar": 25000
-    },
-    {
-      "id": "capcutshr",
-      "name": "CAPCUT 1 BULAN SHARING 3U ",
-      "price": "5000",
-      "date": "2025-08-30 19:16:03",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "547A5B7016",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": "25000",
-      "date": "2025-08-30 19:20:31",
-      "jumlah": 1,
-      "user": "6282180432159",
-      "userRole": "bronze",
-      "reffId": "ECB7568745",
-      "metodeBayar": "Saldo",
-      "totalBayar": 25000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": "8000",
-      "date": "2025-08-30 19:57:32",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "707A7878CB",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": 3500,
-      "date": "2025-08-30 20:47:30",
-      "jumlah": 1,
-      "user": "6281389592985",
-      "userRole": "bronze",
-      "reffId": "25DF6C99F9",
-      "metodeBayar": "QRIS-XENDIT",
-      "totalBayar": 3546
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": 3500,
-      "date": "2025-08-30 20:52:58",
-      "jumlah": 1,
-      "user": "6281389592985",
-      "userRole": "bronze",
-      "reffId": "6B05083EB0",
-      "metodeBayar": "QRIS-XENDIT",
-      "totalBayar": 3638
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": 3500,
-      "date": "2025-08-30 20:55:09",
-      "jumlah": 1,
-      "user": "6281389592985",
-      "userRole": "bronze",
-      "reffId": "34A67A64D4",
-      "metodeBayar": "QRIS-XENDIT",
-      "totalBayar": 3605
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": 3500,
-      "date": "2025-08-30 21:03:07",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "gold",
-      "reffId": "188F001816",
-      "metodeBayar": "QRIS",
-      "totalBayar": 3517
-    },
-    {
-      "id": "prime",
-      "name": "PRIME SHARING 1 BULAN",
-      "price": "3500",
-      "date": "2025-08-30 21:20:23",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "F847C995D8",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": "3500",
-      "date": "2025-08-30 21:37:46",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "gold",
-      "reffId": "0F5AD90994",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "capcutpriv",
-      "name": "CAPCUT 1 BULAN PRIVATE ",
-      "price": "14500",
-      "date": "2025-08-30 21:38:39",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "A2B609692E",
-      "metodeBayar": "Saldo",
-      "totalBayar": 14500
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": "8000",
-      "date": "2025-08-30 21:38:54",
-      "jumlah": 1,
-      "user": "6282180432159",
-      "userRole": "bronze",
-      "reffId": "166A7E6D3A",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "vidpriv",
-      "name": "VIDIO PRIVATE ",
-      "price": "21000",
-      "date": "2025-08-30 21:40:39",
-      "jumlah": 1,
-      "user": "6287776551905",
-      "userRole": "bronze",
-      "reffId": "1666B52C55",
-      "metodeBayar": "Saldo",
-      "totalBayar": 21000
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": 3500,
-      "date": "2025-08-30 21:42:52",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "gold",
-      "reffId": "FDA1C20580",
-      "metodeBayar": "QRIS",
-      "totalBayar": 3501
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": 3500,
-      "date": "2025-08-30 21:51:27",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "gold",
-      "reffId": "0675C605F8",
-      "metodeBayar": "QRIS",
-      "totalBayar": 3563
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": "25000",
-      "date": "2025-08-30 21:57:24",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "gold",
-      "reffId": "40675111B2",
-      "metodeBayar": "Saldo",
-      "totalBayar": 25000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-08-30 22:08:24",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "60E6233F43",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": "8000",
-      "date": "2025-08-30 22:08:29",
-      "jumlah": 1,
-      "user": "6281913718740",
-      "userRole": "bronze",
-      "reffId": "77B2AD7836",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": "13700",
-      "date": "2025-08-30 22:08:31",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "gold",
-      "reffId": "876460C058",
-      "metodeBayar": "Saldo",
-      "totalBayar": 13700
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-08-30 22:08:33",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "71A3E53C0D",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": "8000",
-      "date": "2025-08-30 22:11:55",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "gold",
-      "reffId": "962178AAF1",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "capcutpriv",
-      "name": "CAPCUT 1 BULAN PRIVATE ",
-      "price": "14500",
-      "date": "2025-08-30 23:27:51",
-      "jumlah": 1,
-      "user": "6285774967393",
-      "userRole": "bronze",
-      "reffId": "49EBD560EE",
-      "metodeBayar": "Saldo",
-      "totalBayar": 14500
-    },
-    {
-      "id": "capcutpriv",
-      "name": "CAPCUT 1 BULAN PRIVATE ",
-      "price": "14500",
-      "date": "2025-08-31 00:30:40",
-      "jumlah": 5,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "5EB4B820EC",
-      "metodeBayar": "Saldo",
-      "totalBayar": 72500
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 01:16:37",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "BD95137C27",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 06:26:31",
-      "jumlah": 1,
-      "user": "6285945186784",
-      "userRole": "bronze",
-      "reffId": "A5C7D04BD7",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-08-31 08:22:04",
-      "jumlah": 1,
-      "user": "62881027673568",
-      "userRole": "bronze",
-      "reffId": "406D4B5066",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 08:30:42",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "120CF8DDD8",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 08:31:48",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "BF862E1969",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 08:33:34",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "37A7D5FB92",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 08:37:42",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "3081AB5F04",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "vid2u",
-      "name": "VIDIO SHARING 2 USER ",
-      "price": "11000",
-      "date": "2025-08-31 08:43:48",
-      "jumlah": 1,
-      "user": "6285171031709",
-      "userRole": "bronze",
-      "reffId": "0B42E637C7",
-      "metodeBayar": "Saldo",
-      "totalBayar": 11000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 09:09:55",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "EADF42C411",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-08-31 09:11:34",
-      "jumlah": 1,
-      "user": "6282111531409",
-      "userRole": "bronze",
-      "reffId": "F55005A802",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": 7000,
-      "date": "2025-08-31 10:13:05",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "AD67E99A54",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 10:14:33",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "BBBD9F46D9",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "vid2u",
-      "name": "VIDIO SHARING 2 USER ",
-      "price": "11000",
-      "date": "2025-08-31 10:19:35",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "DE4F05EDD7",
-      "metodeBayar": "Saldo",
-      "totalBayar": 11000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 10:28:35",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "9EFEE0BA59",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 10:41:01",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "5FA758F10C",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-08-31 10:45:28",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "6D620438B7",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "vid2u",
-      "name": "VIDIO SHARING 2 USER ",
-      "price": "11000",
-      "date": "2025-08-31 10:55:36",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "DBAA45FC32",
-      "metodeBayar": "Saldo",
-      "totalBayar": 11000
-    },
-    {
-      "id": "capcutpriv7d",
-      "name": "CAPCUT 1 MINGGU PRIVATE ",
-      "price": "5000",
-      "date": "2025-08-31 11:20:05",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "50C3F6D1B7",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-08-31 12:07:48",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "FC6FE889EB",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 12:39:45",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "1718793F92",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "canva1m",
-      "name": "CANVA PRO 1 MINGGU ",
-      "price": "800",
-      "date": "2025-08-31 12:39:58",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "B35E2E317E",
-      "metodeBayar": "Saldo",
-      "totalBayar": 800
-    },
-    {
-      "id": "vid2u",
-      "name": "VIDIO SHARING 2 USER ",
-      "price": "11000",
-      "date": "2025-08-31 12:43:16",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "0345F9D783",
-      "metodeBayar": "Saldo",
-      "totalBayar": 11000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 12:43:48",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "2EFB4F8311",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": 7000,
-      "date": "2025-08-31 13:06:28",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "bronze",
-      "reffId": "01C92968BB",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": 3500,
-      "date": "2025-08-31 13:11:21",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "22E24B3DBE",
-      "metodeBayar": "QRIS",
-      "totalBayar": 3513
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-08-31 13:17:13",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "62ED4ACEA0",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 13:17:35",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "FFF2D21BAD",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 13:26:00",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "55E1750B24",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "viu1b",
-      "name": "VIU 1 BULAN ",
-      "price": "1000",
-      "date": "2025-08-31 13:32:12",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "EA38CFA258",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 13:35:27",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "E0AAD01A1D",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": 3500,
-      "date": "2025-08-31 13:56:24",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "68BB1144D9",
-      "metodeBayar": "QRIS",
-      "totalBayar": 3513
-    },
-    {
-      "id": "capcut3d",
-      "name": "CAPCUT 3-6 hari SHARING ",
-      "price": "1500",
-      "date": "2025-08-31 13:58:08",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "460CB1D660",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1500
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-08-31 14:05:18",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "2B8FC700A8",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 14:44:22",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "2FA3EE86DC",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-08-31 15:19:33",
-      "jumlah": 1,
-      "user": "6282111531409",
-      "userRole": "bronze",
-      "reffId": "A9805B370F",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "capcutshr",
-      "name": "CAPCUT 1 BULAN SHARING 3U ",
-      "price": "5000",
-      "date": "2025-08-31 15:48:07",
-      "jumlah": 1,
-      "user": "6285755622387",
-      "userRole": "bronze",
-      "reffId": "A99F2FF969",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 16:10:59",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "67EB5B8679",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": 7000,
-      "date": "2025-08-31 16:19:41",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "368A5E4EEC",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-08-31 16:24:06",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "1BB656F4E6",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 16:26:46",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "DED88E5291",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "capcut7d",
-      "name": "CAPCUT 1 MINGGU SHARING 3U ",
-      "price": 2500,
-      "date": "2025-08-31 16:43:58",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "F831512C6C",
-      "metodeBayar": "Saldo",
-      "totalBayar": 2500
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-08-31 16:45:58",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "7DB31CBA6C",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-08-31 16:51:53",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "71E20418D1",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-08-31 17:05:46",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "91181D1115",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 17:06:24",
-      "jumlah": 1,
-      "user": "628812995231",
-      "userRole": "bronze",
-      "reffId": "029BD6F182",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 17:06:30",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "09CE6D3DED",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": 7000,
-      "date": "2025-08-31 17:14:48",
-      "jumlah": 1,
-      "user": "6285774967393",
-      "userRole": "bronze",
-      "reffId": "0FF5B90600",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "vid2u",
-      "name": "VIDIO SHARING 2 USER ",
-      "price": "11000",
-      "date": "2025-08-31 17:24:21",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "56B270866F",
-      "metodeBayar": "Saldo",
-      "totalBayar": 11000
-    },
-    {
-      "id": "capcutpriv7d",
-      "name": "CAPCUT 1 MINGGU PRIVATE ",
-      "price": "5000",
-      "date": "2025-08-31 17:32:17",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "FF923156DD",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 18:05:35",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "9DC4D7962E",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "vidpriv",
-      "name": "VIDIO PRIVATE ",
-      "price": "21000",
-      "date": "2025-08-31 18:05:59",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "3C376601E9",
-      "metodeBayar": "Saldo",
-      "totalBayar": 21000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 18:06:44",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "17D8FD5D4F",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-08-31 18:57:50",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "94EFEF55A8",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-08-31 19:10:21",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "7534BBB8F3",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "capcut3d",
-      "name": "CAPCUT 3-6 hari SHARING ",
-      "price": "1500",
-      "date": "2025-08-31 19:46:15",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "62071CEA7D",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1500
-    },
-    {
-      "id": "capcutpriv",
-      "name": "CAPCUT 1 BULAN PRIVATE ",
-      "price": 14000,
-      "date": "2025-08-31 19:49:46",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "bronze",
-      "reffId": "37FAD8E1DA",
-      "metodeBayar": "Saldo",
-      "totalBayar": 14000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 19:57:00",
-      "jumlah": 1,
-      "user": "62881027673568",
-      "userRole": "bronze",
-      "reffId": "DF98E6A1C6",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 20:29:06",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "10142F7E36",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 21:00:09",
-      "jumlah": 1,
-      "user": "6285722555795",
-      "userRole": "bronze",
-      "reffId": "FB507A9181",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "capcut3d",
-      "name": "CAPCUT 3-6 hari SHARING ",
-      "price": "1500",
-      "date": "2025-08-31 21:00:35",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "7F5BD037BA",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1500
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 21:02:17",
-      "jumlah": 2,
-      "user": "6285774967393",
-      "userRole": "bronze",
-      "reffId": "2A03BBF614",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-08-31 21:02:55",
-      "jumlah": 1,
-      "user": "6285210702043",
-      "userRole": "bronze",
-      "reffId": "3826C378F2",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "capcutpriv7d",
-      "name": "CAPCUT 1 MINGGU PRIVATE ",
-      "price": "5000",
-      "date": "2025-08-31 21:19:42",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "34FB044552",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "capcutpriv",
-      "name": "CAPCUT 1 BULAN PRIVATE ",
-      "price": 14000,
-      "date": "2025-08-31 21:22:55",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "360E2868A5",
-      "metodeBayar": "Saldo",
-      "totalBayar": 14000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 21:29:21",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "56E7DDF857",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-08-31 21:41:52",
-      "jumlah": 1,
-      "user": "6281298158794",
-      "userRole": "bronze",
-      "reffId": "71B9F14192",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-08-31 21:50:44",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "403B67BB9C",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": 7000,
-      "date": "2025-08-31 21:53:36",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "A2BB005CD4",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-08-31 22:04:33",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "2D330D11AC",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 22:08:17",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "E81630FF0D",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "capcut3d",
-      "name": "CAPCUT 3-6 hari SHARING ",
-      "price": "1500",
-      "date": "2025-08-31 22:09:59",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "308959518D",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1500
-    },
-    {
-      "id": "vidtvpriv",
-      "name": "VIDIO TV ONLY PRIV ",
-      "price": "5000",
-      "date": "2025-08-31 22:19:20",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "1E74866985",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 22:28:57",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "5889EC1C6A",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-08-31 23:07:58",
-      "jumlah": 1,
-      "user": "6289621519545",
-      "userRole": "bronze",
-      "reffId": "881734CFF5",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-08-31 23:47:48",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "5F16846712",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": "3500",
-      "date": "2025-08-31 23:53:02",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "EE5C19D304",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "prime",
-      "name": "PRIME SHARING 1 BULAN",
-      "price": "3500",
-      "date": "2025-09-01 07:41:26",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "352A801D4C",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "capcutpriv7d",
-      "name": "CAPCUT 1 MINGGU PRIVATE ",
-      "price": "5000",
-      "date": "2025-09-01 07:43:43",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "AC3384617D",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": 7000,
-      "date": "2025-09-01 09:20:59",
-      "jumlah": 1,
-      "user": "6289621519545",
-      "userRole": "bronze",
-      "reffId": "A251DCC2CF",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 10:20:47",
-      "jumlah": 1,
-      "user": "6285291252338",
-      "userRole": "bronze",
-      "reffId": "C5AE63970F",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 10:32:54",
-      "jumlah": 1,
-      "user": "6282180432159",
-      "userRole": "bronze",
-      "reffId": "3594AD8425",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "yt3b",
-      "name": "YOUTUBE PREMIUM 3 BULAN ",
-      "price": "15000",
-      "date": "2025-09-01 11:19:56",
-      "jumlah": 1,
-      "user": "6285954778884",
-      "userRole": "bronze",
-      "reffId": "C8EBBBD0A6",
-      "metodeBayar": "Saldo",
-      "totalBayar": 15000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-09-01 11:34:22",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "2B47C8ED65",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "vid2u",
-      "name": "VIDIO SHARING 2 USER ",
-      "price": "11000",
-      "date": "2025-09-01 11:43:00",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "428F944CAB",
-      "metodeBayar": "Saldo",
-      "totalBayar": 11000
-    },
-    {
-      "id": "yt3b",
-      "name": "YOUTUBE PREMIUM 3 BULAN ",
-      "price": "15000",
-      "date": "2025-09-01 11:51:42",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "58D8A1AAC0",
-      "metodeBayar": "Saldo",
-      "totalBayar": 15000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 11:55:23",
-      "jumlah": 1,
-      "user": "6282180432159",
-      "userRole": "bronze",
-      "reffId": "7BF1CA1AA6",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": "3500",
-      "date": "2025-09-01 11:56:33",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "29FFBB43EA",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "yt3b",
-      "name": "YOUTUBE PREMIUM 3 BULAN ",
-      "price": "15000",
-      "date": "2025-09-01 11:56:37",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "E977672A6A",
-      "metodeBayar": "Saldo",
-      "totalBayar": 15000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-09-01 11:57:41",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "1EF33807EE",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-09-01 12:01:28",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "5F435D7A4C",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "viu1b",
-      "name": "VIU 1 BULAN ",
-      "price": "1000",
-      "date": "2025-09-01 12:34:53",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "202E61BE80",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1000
-    },
-    {
-      "id": "capcutpriv7d",
-      "name": "CAPCUT 1 MINGGU PRIVATE ",
-      "price": "5000",
-      "date": "2025-09-01 13:23:08",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "8CA932C784",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "capcutpriv",
-      "name": "CAPCUT 1 BULAN PRIVATE ",
-      "price": 14000,
-      "date": "2025-09-01 13:23:08",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "bronze",
-      "reffId": "3E1549EA89",
-      "metodeBayar": "Saldo",
-      "totalBayar": 14000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-09-01 13:32:57",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "9D1B0C78E5",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": "3500",
-      "date": "2025-09-01 13:36:27",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "B4F7B22F94",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": 7000,
-      "date": "2025-09-01 13:37:06",
-      "jumlah": 2,
-      "user": "6285774967393",
-      "userRole": "bronze",
-      "reffId": "A97CADF667",
-      "metodeBayar": "Saldo",
-      "totalBayar": 14000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-09-01 13:39:37",
-      "jumlah": 1,
-      "user": "62881027673568",
-      "userRole": "bronze",
-      "reffId": "03963FA2ED",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-09-01 13:39:39",
-      "jumlah": 1,
-      "user": "62881027673568",
-      "userRole": "bronze",
-      "reffId": "C7FA2E1700",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "yt3b",
-      "name": "YOUTUBE PREMIUM 3 BULAN ",
-      "price": "15000",
-      "date": "2025-09-01 13:46:27",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "0250D0C54A",
-      "metodeBayar": "Saldo",
-      "totalBayar": 15000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 14:05:29",
-      "jumlah": 1,
-      "user": "6285210702043",
-      "userRole": "bronze",
-      "reffId": "F833AB844E",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-09-01 14:11:51",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "72A17DABCB",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "capcut3d",
-      "name": "CAPCUT 3-6 hari SHARING ",
-      "price": "1500",
-      "date": "2025-09-01 14:19:03",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "14048EA58C",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1500
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": 7000,
-      "date": "2025-09-01 14:21:56",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "1239B97C9E",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "vidpriv",
-      "name": "VIDIO PRIVATE ",
-      "price": "21000",
-      "date": "2025-09-01 14:22:25",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "3D2202470D",
-      "metodeBayar": "Saldo",
-      "totalBayar": 21000
-    },
-    {
-      "id": "vid3u",
-      "name": "VIDIO SHARING 3USER ",
-      "price": "8000",
-      "date": "2025-09-01 14:22:51",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "56126285E7",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 14:24:26",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "CDA32E6DE4",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "capcutpriv",
-      "name": "CAPCUT 1 BULAN PRIVATE ",
-      "price": 14000,
-      "date": "2025-09-01 14:26:05",
-      "jumlah": 1,
-      "user": "62881027673568",
-      "userRole": "bronze",
-      "reffId": "6CE746EB09",
-      "metodeBayar": "Saldo",
-      "totalBayar": 14000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 14:41:55",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "1CFFA14E05",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "prime",
-      "name": "PRIME SHARING 1 BULAN",
-      "price": "3500",
-      "date": "2025-09-01 14:42:20",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "730215C982",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "capcutshr",
-      "name": "CAPCUT 1 BULAN SHARING 3U ",
-      "price": "5000",
-      "date": "2025-09-01 14:55:22",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "76260AE288",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "capcut3d",
-      "name": "CAPCUT 3-6 hari SHARING ",
-      "price": "1500",
-      "date": "2025-09-01 15:29:27",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "E96FEE21B7",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1500
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-09-01 15:45:28",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "6948470037",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "prime",
-      "name": "PRIME SHARING 1 BULAN",
-      "price": "3500",
-      "date": "2025-09-01 16:10:19",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "5011DCEE48",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-09-01 16:51:14",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "C825B39E4E",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "capcut2u",
-      "name": "CAPCUT 1 BULAN SHARING 2U ANTI LIMIT",
-      "price": 7000,
-      "date": "2025-09-01 17:14:42",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "09C24E35AF",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "yt3b",
-      "name": "YOUTUBE PREMIUM 3 BULAN ",
-      "price": "15000",
-      "date": "2025-09-01 17:40:23",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "6F54DAE1A8",
-      "metodeBayar": "Saldo",
-      "totalBayar": 15000
-    },
-    {
-      "id": "capcutpriv",
-      "name": "CAPCUT 1 BULAN PRIVATE ",
-      "price": 14000,
-      "date": "2025-09-01 18:05:20",
-      "jumlah": 1,
-      "user": "6285220970603",
-      "userRole": "bronze",
-      "reffId": "79F16207FA",
-      "metodeBayar": "Saldo",
-      "totalBayar": 14000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-09-01 18:22:58",
-      "jumlah": 1,
-      "user": "6282339437553",
-      "userRole": "bronze",
-      "reffId": "1ECF1C465C",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-09-01 18:23:00",
-      "jumlah": 1,
-      "user": "6282339437553",
-      "userRole": "bronze",
-      "reffId": "349B368EB9",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "capcutshr",
-      "name": "CAPCUT 1 BULAN SHARING 3U ",
-      "price": "5000",
-      "date": "2025-09-01 18:58:52",
-      "jumlah": 1,
-      "user": "6287880869863",
-      "userRole": "bronze",
-      "reffId": "0F0B2D2CAD",
-      "metodeBayar": "Saldo",
-      "totalBayar": 5000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-09-01 19:00:36",
-      "jumlah": 1,
-      "user": "6285645635218",
-      "userRole": "bronze",
-      "reffId": "C4B34324B6",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": "3500",
-      "date": "2025-09-01 19:18:04",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "7641F518D4",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
     }
   ],
   "persentase": {
@@ -7453,24 +4829,180 @@
   },
   "unik": [
     "0",
-    "5",
-    "88",
-    "57",
-    "45",
-    "195",
-    "97",
-    "18",
-    "113",
-    "61",
-    "46",
-    "138",
-    "105",
-    "17",
-    "34",
+    "128",
+    "9",
+    "169",
+    "111",
     "178",
-    "183",
+    "112",
+    "51",
+    "191",
+    "170",
+    "90",
+    "186",
+    "17",
+    "88",
+    "107",
+    "19",
+    "10",
+    "7",
+    "101",
+    "66",
+    "62",
+    "42",
+    "171",
+    "72",
+    "177",
+    "35",
+    "126",
+    "76",
+    "133",
+    "71",
+    "34",
+    "33",
+    "92",
+    "114",
+    "194",
+    "23",
+    "103",
+    "149",
+    "53",
+    "162",
+    "52",
+    "110",
+    "153",
+    "143",
+    "117",
     "142",
+    "69",
+    "65",
+    "81",
+    "166",
+    "138",
+    "31",
+    "63",
+    "131",
+    "144",
+    "122",
+    "73",
+    "8",
+    "168",
+    "29",
+    "86",
+    "193",
+    "105",
+    "136",
+    "48",
+    "46",
+    "183",
+    "181",
+    "106",
+    "185",
+    "56",
+    "67",
+    "160",
+    "140",
+    "5",
+    "141",
+    "94",
+    "104",
+    "95",
+    "121",
+    "199",
+    "148",
+    "146",
+    "16",
+    "55",
+    "80",
+    "85",
+    "61",
+    "3",
+    "124",
+    "115",
+    "100",
+    "57",
+    "159",
+    "120",
+    "40",
+    "75",
+    "129",
+    "28",
+    "198",
+    "83",
+    "147",
+    "78",
+    "93",
+    "30",
+    "82",
+    "97",
+    "37",
+    "22",
+    "15",
+    "18",
+    "26",
+    "2",
+    "179",
+    "39",
+    "70",
+    "175",
+    "91",
+    "60",
+    "36",
+    "87",
+    "113",
+    "102",
+    "196",
+    "154",
+    "38",
+    "109",
+    "190",
+    "123",
+    "172",
+    "27",
+    "134",
+    "43",
+    "49",
+    "116",
+    "192",
+    "98",
+    "157",
+    "156",
+    "176",
+    "89",
+    "68",
+    "4",
+    "163",
+    "45",
+    "137",
+    "20",
+    "167",
+    "145",
+    "108",
+    "14",
+    "24",
+    "174",
+    "187",
     "1",
-    "63"
+    "118",
+    "151",
+    "189",
+    "11",
+    "184",
+    "180",
+    "155",
+    "96",
+    "6",
+    "54",
+    "25",
+    "21",
+    "173",
+    "127",
+    "44",
+    "119",
+    "64",
+    "135",
+    "161",
+    "47",
+    "99"
   ]
 }

@@ -1834,7 +1834,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       }
         break
 
-        case 'buynow': {
+        case 'xendit': {
           // Validasi order yang sedang berlangsung
           if (db.data.order[sender]) {
               return reply(`Kamu sedang melakukan order. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`);
