@@ -1,0 +1,12 @@
+{
+  "TEST-MIDTRANS-1756744853111": {
+    "token": "eaf131e0-f60b-4755-8226-479a8b5a03ee",
+    "order_id": "TEST-MIDTRANS-1756744853111",
+    "amount": 50000,
+    "status": "pending",
+    "qr_string": "https://app.sandbox.midtrans.com/snap/v2/vtweb/eaf131e0-f60b-4755-8226-479a8b5a03ee",
+    "created": "2025-09-01T16:40:53.308Z",
+    "snap_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/eaf131e0-f60b-4755-8226-479a8b5a03ee",
+    "cachedAt": "2025-09-01T16:40:53.309Z"
+  }
+}
