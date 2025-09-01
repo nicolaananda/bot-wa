@@ -155,7 +155,7 @@ function makeMidtransRequest(endpoint, method = 'GET', data = null) {
 }
 
 /**
- * Create QRIS payment using Midtrans Snap API with multiple payment options
+ * Create QRIS payment using Midtrans Snap API with multiple payment options including DANA
  */
 async function createQRISPayment(amount, orderId, customerDetails = {}) {
   try {
@@ -180,7 +180,7 @@ async function createQRISPayment(amount, orderId, customerDetails = {}) {
       phone: customerDetails.phone || '08123456789'
     };
 
-    // Gunakan Snap API untuk multiple payment options
+    // Gunakan Snap API untuk multiple payment options termasuk DANA
     const snapRequest = {
       transaction_details: transactionDetails,
       item_details: itemDetails,
@@ -189,6 +189,9 @@ async function createQRISPayment(amount, orderId, customerDetails = {}) {
         'qris',
         'gopay',
         'shopeepay',
+        'dana',
+        'ovo',
+        'linkaja',
         'bca_va',
         'bni_va',
         'bri_va',
