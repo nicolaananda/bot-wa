@@ -1,18 +1,18 @@
 {
-  "TRX-68BB1144D9-1756623349062": {
-    "id": "68b3f1f5b1c8612abbf1a980",
-    "external_id": "TRX-68BB1144D9-1756623349062",
+  "TRX-A6F44C6ED9-1756731379261": {
+    "id": "68b597f300ce1ba36489ea3a",
+    "external_id": "TRX-A6F44C6ED9-1756731379261",
     "user_id": "68b18117d06ae5ac92169254",
     "payment_method": "QR_CODE",
     "status": "PAID",
     "merchant_name": "iNyx Store",
     "merchant_profile_picture_url": "https://du8nwjtfkinx.cloudfront.net/xendit.png",
-    "amount": 3513,
-    "paid_amount": 3513,
-    "paid_at": "2025-08-31T06:56:06.630Z",
-    "description": "Pembayaran produk - TRX-68BB1144D9-1756623349062",
-    "expiry_date": "2025-09-01T06:55:49.513Z",
-    "invoice_url": "https://checkout-staging.xendit.co/web/68b3f1f5b1c8612abbf1a980",
+    "amount": 1907,
+    "paid_amount": 1907,
+    "paid_at": "2025-09-01T12:56:26.607Z",
+    "description": "Pembayaran produk - TRX-A6F44C6ED9-1756731379261",
+    "expiry_date": "2025-09-02T12:56:19.824Z",
+    "invoice_url": "https://checkout-staging.xendit.co/web/68b597f300ce1ba36489ea3a",
     "available_banks": [],
     "available_retail_outlets": [],
     "available_ewallets": [],
@@ -27,13 +27,13 @@
     "should_send_email": false,
     "success_redirect_url": "https://example.com/success",
     "failure_redirect_url": "https://example.com/failure",
-    "created": "2025-08-31T06:55:49.655Z",
-    "updated": "2025-08-31T06:56:08.299Z",
+    "created": "2025-09-01T12:56:19.980Z",
+    "updated": "2025-09-01T12:56:28.230Z",
     "currency": "IDR",
     "payment_channel": "QRIS",
-    "payment_id": "qrpy_be583936-89a6-4a1b-b69c-4c004617f1ef",
-    "payment_method_id": "pm-69b78930-a668-4291-abc4-96cdd5735b59",
+    "payment_id": "qrpy_b3329961-95ad-478f-8630-b6a4c0a43614",
+    "payment_method_id": "pm-ee9e30e0-6e66-47c4-b595-fd1b484867be",
     "metadata": null,
-    "cachedAt": "2025-08-31T06:56:22.950Z"
+    "cachedAt": "2025-09-01T12:56:37.572Z"
   }
 }

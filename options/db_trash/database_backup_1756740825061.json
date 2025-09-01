@@ -82,7 +82,7 @@
       "createdAt": "2025-08-31T13:41:35.850Z"
     },
     "6287777657944@s.whatsapp.net": {
-      "saldo": 244800,
+      "saldo": 251800,
       "role": "bronze"
     },
     "6281389592985@s.whatsapp.net": {
@@ -1299,8 +1299,9 @@
       "priceB": 7000,
       "priceS": "8000",
       "priceG": "8000",
-      "terjual": 67,
+      "terjual": 66,
       "stok": [
+        "Vila151@thxmail.net|bacasnkbos1|20|8888",
         "eleanor5.aus@apeollo.my.id|readsnk|1|1212",
         "eleanor5.aus@apeollo.my.id|readsnk|2|1212",
         "eleanor5.aus@apeollo.my.id|readsnk|3|1212",
@@ -1692,9 +1693,7 @@
       "priceS": "5000",
       "priceG": "5000",
       "terjual": 4,
-      "stok": [
-        "qvpmskis@gmail.com|jelas12345"
-      ]
+      "stok": []
     },
     "zoom1h": {
       "id": "zoom1h",
@@ -8152,18 +8151,6 @@
       "reffId": "EA57794F80",
       "metodeBayar": "Saldo",
       "totalBayar": 12000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-09-01 22:43:15",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "0D0282BBCC",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
     }
   ],
   "persentase": {

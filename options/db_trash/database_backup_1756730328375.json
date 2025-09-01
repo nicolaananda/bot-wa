@@ -82,7 +82,7 @@
       "createdAt": "2025-08-31T13:41:35.850Z"
     },
     "6287777657944@s.whatsapp.net": {
-      "saldo": 244800,
+      "saldo": 490400,
       "role": "bronze"
     },
     "6281389592985@s.whatsapp.net": {
@@ -106,7 +106,7 @@
       "role": "bronze"
     },
     "6287887842985@s.whatsapp.net": {
-      "saldo": 499800,
+      "saldo": 506800,
       "role": "bronze"
     },
     "": {
@@ -118,7 +118,7 @@
       "role": "bronze"
     },
     "6282143003950@s.whatsapp.net": {
-      "saldo": 185900,
+      "saldo": 211800,
       "role": "bronze"
     },
     "6285774967393@s.whatsapp.net": {
@@ -134,7 +134,7 @@
       "role": "bronze"
     },
     "6289621519545@s.whatsapp.net": {
-      "saldo": 62000,
+      "saldo": 10000,
       "role": "bronze"
     },
     "6285656192551@s.whatsapp.net": {
@@ -170,7 +170,7 @@
       "role": "bronze"
     },
     "62881027673568@s.whatsapp.net": {
-      "saldo": 1400,
+      "saldo": 400,
       "role": "bronze"
     },
     "6283117414957@s.whatsapp.net": {
@@ -298,7 +298,7 @@
       "role": "bronze"
     },
     "628976327279@s.whatsapp.net": {
-      "saldo": 400,
+      "saldo": 7400,
       "role": "bronze"
     },
     "6281913718740@s.whatsapp.net": {
@@ -646,7 +646,7 @@
       "role": "bronze"
     },
     "6285291252338@s.whatsapp.net": {
-      "saldo": 4000,
+      "saldo": 28000,
       "role": "bronze"
     },
     "6287722543719@s.whatsapp.net": {
@@ -846,7 +846,7 @@
       "role": "bronze"
     },
     "628812378527@s.whatsapp.net": {
-      "saldo": 1700,
+      "saldo": 0,
       "role": "bronze"
     },
     "628562705715@s.whatsapp.net": {
@@ -1140,22 +1140,10 @@
       "role": "bronze"
     },
     "6289689992924@s.whatsapp.net": {
-      "saldo": 11100,
+      "saldo": 0,
       "role": "bronze"
     },
     "6283197539759@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285784622788@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6282140054557@s.whatsapp.net": {
-      "saldo": 0,
-      "role": "bronze"
-    },
-    "6285720320411@s.whatsapp.net": {
       "saldo": 0,
       "role": "bronze"
     }
@@ -1263,8 +1251,13 @@
       "priceB": 12000,
       "priceS": "13700",
       "priceG": "13700",
-      "terjual": 289,
+      "terjual": 284,
       "stok": [
+        "netkirana819@postm.net|Jangangantibos|c|8888",
+        "netkirana819@postm.net|Jangangantibos|d|8888",
+        "netkirana819@postm.net|Jangangantibos|e|8888",
+        "dickiopsi@gmail.com|bacasnkyas|1|8888",
+        "dickiopsi@gmail.com|bacasnkyas|3|8888",
         "dickiopsi@gmail.com|bacasnkyas|4|8888",
         "dickiopsi@gmail.com|bacasnkyas|5|8888",
         "dickiopsi@gmail.com|bacasnkyas|han|8888",
@@ -1283,12 +1276,15 @@
       "priceB": 24000,
       "priceS": "25000",
       "priceG": "25000",
-      "terjual": 73,
+      "terjual": 65,
       "stok": [
-        "kidspanda@ghzm.us | janganotakatik59|b|8888",
-        "kidspanda@ghzm.us | janganotakatik59|maruko|8888",
-        "kidspanda@ghzm.us | janganotakatik59|d|8888",
-        "kidspanda@ghzm.us | janganotakatik59|e|8888"
+        "rampage@ghzm.us|Jangangantibos|e|1212",
+        "rampage@ghzm.us|Jangangantibos|dantjie|1212",
+        "holymoly@ghzm.us|ikutirulesbos|a|8888",
+        "holymoly@ghzm.us|ikutirulesbos|b|8888",
+        "holymoly@ghzm.us|ikutirulesbos|c|8888",
+        "holymoly@ghzm.us|ikutirulesbos|d|8888",
+        "holymoly@ghzm.us|ikutirulesbos|uhuy|8888"
       ]
     },
     "net1m": {
@@ -1299,13 +1295,12 @@
       "priceB": 7000,
       "priceS": "8000",
       "priceG": "8000",
-      "terjual": 67,
+      "terjual": 63,
       "stok": [
-        "eleanor5.aus@apeollo.my.id|readsnk|1|1212",
-        "eleanor5.aus@apeollo.my.id|readsnk|2|1212",
-        "eleanor5.aus@apeollo.my.id|readsnk|3|1212",
-        "eleanor5.aus@apeollo.my.id|readsnk|4|1212",
-        "eleanor5.aus@apeollo.my.id|readsnk|5|1212"
+        "Vila151@thxmail.net|bacasnkbos1|17|8888",
+        "Vila151@thxmail.net|bacasnkbos1|18|8888",
+        "Vila151@thxmail.net|bacasnkbos1|19|8888",
+        "Vila151@thxmail.net|bacasnkbos1|20|8888"
       ]
     },
     "capcutshr": {
@@ -1355,8 +1350,9 @@
       "priceB": 14000,
       "priceS": "14500",
       "priceG": "14500",
-      "terjual": 44,
+      "terjual": 43,
       "stok": [
+        "gjjmpeqoobq2s@corefitrun.com|masuk123",
         "rduy0c91dsxrw@viavuive.net|masuk123",
         "tvcm5oy3jaave@corefitrun.com|masuk123",
         "rsc6ocultr0ji@corefitrun.com|masuk123",
@@ -1375,8 +1371,15 @@
       "priceB": "1900",
       "priceS": "1900",
       "priceG": "1900",
-      "terjual": 47,
+      "terjual": 40,
       "stok": [
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
+        "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
         "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
         "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
         "https://www.canva.com/brand/join?token=ty5IUJkAuLlIEvvP091f4A&referrer=team-invite|cust klik link",
@@ -1509,8 +1512,13 @@
       "priceB": "3500",
       "priceS": "3500",
       "priceG": "3500",
-      "terjual": 66,
+      "terjual": 61,
       "stok": [
+        "reita209@ghzm.us|viuku123",
+        "august409@ghzm.us|viuku123",
+        "royce432@ghzm.us|viuku123",
+        "rayna3@ghzm.us|viuku123",
+        "janet428@ghzm.us|viuku123",
         "bobby479@ghzm.us|viuku123",
         "annita485@ghzm.us|viuku123",
         "britney485@ghzm.us|viuku123",
@@ -1540,28 +1548,7 @@
         "jerrold371@ghzm.us|viuku123",
         "michell414@ghzm.us|viuku123",
         "israel87@ghzm.us|viuku123",
-        "everett467@ghzm.us|viuku123",
-        "reita209@ghzm.us|viuku123",
-        "josphine406@ghzm.us|viuku123",
-        "joette212@ghzm.us|viuku123",
-        "afton275@ghzm.us|viuku123",
-        "jonathon157@ghzm.us|viuku123",
-        "aurelio496@ghzm.us|viuku123",
-        "clifton442@ghzm.us|viuku123",
-        "venus415@ghzm.us|viuku123",
-        "jacquiline291@ghzm.us|viuku123",
-        "franklin39@ghzm.us|viuku123",
-        "lura386@ghzm.us|viuku123",
-        "geraldo242@ghzm.us|viuku123",
-        "carey264@ghzm.us|viuku123",
-        "leif343@ghzm.us|viuku123",
-        "silvia80@ghzm.us|viuku123",
-        "lesa482@ghzm.us|viuku123",
-        "fredric287@ghzm.us|viuku123",
-        "sixta373@ghzm.us|viuku123",
-        "jerrod133@ghzm.us|viuku123",
-        "kelly91@ghzm.us|viuku123",
-        "mohamed202@ghzm.us|viuku123"
+        "everett467@ghzm.us|viuku123"
       ]
     },
     "vid3u": {
@@ -1572,8 +1559,9 @@
       "priceB": "8000",
       "priceS": "8000",
       "priceG": "8000",
-      "terjual": 8,
+      "terjual": 7,
       "stok": [
+        "qemsv249@gmail.com|0lolipop",
         "qemsv249@gmail.com|0lolipop"
       ]
     },
@@ -1624,13 +1612,7 @@
       "priceS": "3500",
       "priceG": "3500",
       "terjual": 23,
-      "stok": [
-        "im7pjvxzit@sigmadee.com|Lowkey123",
-        "im7pjvxzit@sigmadee.com|Lowkey123",
-        "im7pjvxzit@sigmadee.com|Lowkey123",
-        "im7pjvxzit@sigmadee.com|Lowkey123",
-        "im7pjvxzit@sigmadee.com|Lowkey123"
-      ]
+      "stok": []
     },
     "capcut7d": {
       "id": "capcut7d",
@@ -1640,13 +1622,8 @@
       "priceB": 2500,
       "priceS": "3000",
       "priceG": "3000",
-      "terjual": 6,
-      "stok": [
-        "elect@vamflowers.com|masak123",
-        "annet@healthsoulger.com|masak123",
-        "maryj@kemerlice.cfd|masak123",
-        "deonk@baseflowpro.com|masak123"
-      ]
+      "terjual": 5,
+      "stok": []
     },
     "capcut3d": {
       "id": "capcut3d",
@@ -1678,8 +1655,9 @@
       "priceB": "15000",
       "priceS": "15000",
       "priceG": "15000",
-      "terjual": 8,
+      "terjual": 7,
       "stok": [
+        "Gsubrotoo21@gmail.com|labalaba",
         "Butokuning9@gmail.com|labalaba"
       ]
     },
@@ -1692,9 +1670,7 @@
       "priceS": "5000",
       "priceG": "5000",
       "terjual": 4,
-      "stok": [
-        "qvpmskis@gmail.com|jelas12345"
-      ]
+      "stok": []
     },
     "zoom1h": {
       "id": "zoom1h",
@@ -1838,304 +1814,6 @@
         "hubungi@admin.ya|sschatini|-|-|-",
         "hubungi@admin.ya|sschatini|-|-|-",
         "hubungi@admin.ya|sschatini|-|-|-"
-      ]
-    },
-    "canva1h": {
-      "id": "canva1h",
-      "name": "CANVA PRO 1 HARI",
-      "desc": "Canva Pro Premium 1 Hari FULLGAR",
-      "snk": "⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "100",
-      "priceS": "100",
-      "priceG": "100",
-      "profit": "0",
-      "terjual": 0,
-      "stok": [
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-"
-      ]
-    },
-    "canva2b": {
-      "id": "canva2b",
-      "name": "CANVA PRO 2 BULAN",
-      "desc": "Canva Pro Premium 2 Bulan FULLGAR",
-      "snk": "⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "3000",
-      "priceS": "3000",
-      "priceG": "3000",
-      "profit": "0",
-      "terjual": 0,
-      "stok": [
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-"
-      ]
-    },
-    "canva3b": {
-      "id": "canva3b",
-      "name": "CANVA PRO 3 BULAN",
-      "desc": "Canva Pro Premium 3 Bulan FULLGAR",
-      "snk": "⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "4000",
-      "priceS": "4000",
-      "priceG": "4000",
-      "profit": "0",
-      "terjual": 0,
-      "stok": [
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-"
-      ]
-    },
-    "canva6b": {
-      "id": "canva6b",
-      "name": "CANVA PRO 6 BULAN",
-      "desc": "Canva Pro Premium 6 Bulan FULLGAR",
-      "snk": "⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "5000",
-      "priceS": "5000",
-      "priceG": "5000",
-      "profit": "0",
-      "terjual": 0,
-      "stok": [
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-"
-      ]
-    },
-    "canva1y": {
-      "id": "canva1y",
-      "name": "CANVA PRO 1 TAHUN",
-      "desc": "Canva Pro Premium 1 Tahun BIASA",
-      "snk": "⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "5500",
-      "priceS": "5500",
-      "priceG": "5500",
-      "profit": "0",
-      "terjual": 0,
-      "stok": [
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-"
-      ]
-    },
-    "canvalt": {
-      "id": "canvalt",
-      "name": "CANVA PRO LIFETIME",
-      "desc": "Canva Pro Premium Lifetime GARANSI 6 BULAN",
-      "snk": "⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "6000",
-      "priceS": "6000",
-      "priceG": "6000",
-      "profit": "0",
-      "terjual": 0,
-      "stok": [
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-"
-      ]
-    },
-    "canva1yg": {
-      "id": "canva1yg",
-      "name": "CANVA PRO 1 TAHUN GARANSI 1 TAHUN",
-      "desc": "Canva Pro Premium 1 Tahun + Garansi 1 Tahun",
-      "snk": "⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "9000",
-      "priceS": "9000",
-      "priceG": "9000",
-      "profit": "0",
-      "terjual": 0,
-      "stok": [
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "",
-        "addstok canvaltg",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-"
-      ]
-    },
-    "canvaltg": {
-      "id": "canvaltg",
-      "name": "CANVA PRO LIFETIME GARANSI 1 TAHUN",
-      "desc": "Canva Pro Premium Lifetime + Garansi 1 Tahun",
-      "snk": "⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "10000",
-      "priceS": "10000",
-      "priceG": "10000",
-      "profit": "0",
-      "terjual": 0,
-      "stok": [
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-",
-        "send email ke admin karena akan di invite|ss send ke admin|-|-|-"
-      ]
-    },
-    "viu1h": {
-      "id": "viu1h",
-      "name": "VIU 1 HARI",
-      "desc": "VIU Premium 1 Hari FULLGAR",
-      "snk": "*📋 SNK PRODUK: VIU 1 TAHUN *\n\n 🍿 S&K VIU ANLIM PRIVATE 1 TAHUN\n\n📌 Max login 2 device (lebih = no garansi)\n📌 Wajib kirim bukti login 1x24 jam (tanpa bukti = no garansi)\n❌ Jangan ubah email/pass\n❌ Jangan sering login/logout pindah device\n❌ Jangan otak-atik billing/payment\n1-6b fullgar\n12 Bulan garansi 6b\n(gar hanya jika akun balik free, tidak berlaku jika melanggar S&K)\nTerima kasih 💝\n\n⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "100",
-      "priceS": "100",
-      "priceG": "100",
-      "profit": "0",
-      "terjual": 0,
-      "stok": []
-    },
-    "viu1m": {
-      "id": "viu1m",
-      "name": "VIU 1 MINGGU",
-      "desc": "VIU Premium 1 Minggu FULLGAR",
-      "snk": "*📋 SNK PRODUK: VIU 1 TAHUN *\n\n 🍿 S&K VIU ANLIM PRIVATE 1 TAHUN\n\n📌 Max login 2 device (lebih = no garansi)\n📌 Wajib kirim bukti login 1x24 jam (tanpa bukti = no garansi)\n❌ Jangan ubah email/pass\n❌ Jangan sering login/logout pindah device\n❌ Jangan otak-atik billing/payment\n1-6b fullgar\n12 Bulan garansi 6b\n(gar hanya jika akun balik free, tidak berlaku jika melanggar S&K)\nTerima kasih 💝\n\n⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "500",
-      "priceS": "500",
-      "priceG": "500",
-      "profit": "0",
-      "terjual": 0,
-      "stok": []
-    },
-    "viu2b": {
-      "id": "viu2b",
-      "name": "VIU 2 BULAN",
-      "desc": "VIU Premium 2 Bulan FULLGAR",
-      "snk": "*📋 SNK PRODUK: VIU 1 TAHUN *\n\n 🍿 S&K VIU ANLIM PRIVATE 1 TAHUN\n\n📌 Max login 2 device (lebih = no garansi)\n📌 Wajib kirim bukti login 1x24 jam (tanpa bukti = no garansi)\n❌ Jangan ubah email/pass\n❌ Jangan sering login/logout pindah device\n❌ Jangan otak-atik billing/payment\n1-6b fullgar\n12 Bulan garansi 6b\n(gar hanya jika akun balik free, tidak berlaku jika melanggar S&K)\nTerima kasih 💝\n\n⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "2000",
-      "priceS": "2000",
-      "priceG": "2000",
-      "profit": "0",
-      "terjual": 0,
-      "stok": []
-    },
-    "viu3b": {
-      "id": "viu3b",
-      "name": "VIU 3 BULAN",
-      "desc": "VIU Premium 3 Bulan FULLGAR",
-      "snk": "*📋 SNK PRODUK: VIU 1 TAHUN *\n\n 🍿 S&K VIU ANLIM PRIVATE 1 TAHUN\n\n📌 Max login 2 device (lebih = no garansi)\n📌 Wajib kirim bukti login 1x24 jam (tanpa bukti = no garansi)\n❌ Jangan ubah email/pass\n❌ Jangan sering login/logout pindah device\n❌ Jangan otak-atik billing/payment\n1-6b fullgar\n12 Bulan garansi 6b\n(gar hanya jika akun balik free, tidak berlaku jika melanggar S&K)\nTerima kasih 💝\n\n⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "2300",
-      "priceS": "2300",
-      "priceG": "2300",
-      "profit": "0",
-      "terjual": 0,
-      "stok": [
-        "erasmo268@ghzm.us|viuku123",
-        "farrah65@ghzm.us|viuku123",
-        "anthony91@ghzm.us|viuku123",
-        "dominique151@ghzm.us|viuku123",
-        "reatha398@ghzm.us|viuku123",
-        "doria476@ghzm.us|viuku123",
-        "frieda425@ghzm.us|viuku123",
-        "hassie480@ghzm.us|viuku123",
-        "titus209@ghzm.us|viuku123",
-        "michel160@ghzm.us|viuku123",
-        "francisco234@ghzm.us|viuku123",
-        "jaime288@ghzm.us|viuku123",
-        "cami197@ghzm.us|viuku123",
-        "ailene144@ghzm.us|viuku123",
-        "valentine468@ghzm.us|viuku123",
-        "maxwell262@ghzm.us|viuku123",
-        "dewitt322@ghzm.us|viuku123",
-        "scot390@ghzm.us|viuku123",
-        "april204@ghzm.us|viuku123",
-        "gwyneth295@ghzm.us|viuku123"
-      ]
-    },
-    "viu6b": {
-      "id": "viu6b",
-      "name": "VIU 6 BULAN",
-      "desc": "VIU Premium 6 Bulan FULLGAR",
-      "snk": "*📋 SNK PRODUK: VIU 1 TAHUN *\n\n 🍿 S&K VIU ANLIM PRIVATE 1 TAHUN\n\n📌 Max login 2 device (lebih = no garansi)\n📌 Wajib kirim bukti login 1x24 jam (tanpa bukti = no garansi)\n❌ Jangan ubah email/pass\n❌ Jangan sering login/logout pindah device\n❌ Jangan otak-atik billing/payment\n1-6b fullgar\n12 Bulan garansi 6b\n(gar hanya jika akun balik free, tidak berlaku jika melanggar S&K)\nTerima kasih 💝\n\n⚠️ PENTING:\n* Baca dan pahami SNK sebelum menggunakan akun\n* Akun yang sudah dibeli tidak dapat dikembalikan\n* Hubungi admin jika ada masalah dengan akun",
-      "priceB": "2500",
-      "priceS": "2500",
-      "priceG": "2500",
-      "profit": "0",
-      "terjual": 0,
-      "stok": [
-        "danilo111@ghzm.us|viuku123",
-        "bernadette126@ghzm.us|viuku123",
-        "fidel346@ghzm.us|viuku123",
-        "christia181@ghzm.us|viuku123",
-        "jacalyn210@ghzm.us|viuku123",
-        "kali121@ghzm.us|viuku123",
-        "lanny446@ghzm.us|viuku123",
-        "jenell173@ghzm.us|viuku123",
-        "jen439@ghzm.us|viuku123",
-        "cole139@ghzm.us|viuku123",
-        "lionel371@ghzm.us|viuku123",
-        "isaiah96@ghzm.us|viuku123",
-        "raelene40@ghzm.us|viuku123",
-        "ginger181@ghzm.us|viuku123",
-        "dalton365@ghzm.us|viuku123",
-        "faustino40@ghzm.us|viuku123",
-        "abbey443@ghzm.us|viuku123",
-        "alfonzo428@ghzm.us|viuku123",
-        "jena62@ghzm.us|viuku123",
-        "colton16@ghzm.us|viuku123"
       ]
     }
   },
@@ -7768,402 +7446,6 @@
       "reffId": "7641F518D4",
       "metodeBayar": "Saldo",
       "totalBayar": 3500
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": "3500",
-      "date": "2025-09-01 19:39:23",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "bronze",
-      "reffId": "049D2BD792",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-09-01 19:40:53",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "5A1B5EE1A6",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-09-01 19:49:05",
-      "jumlah": 1,
-      "user": "6289689992924",
-      "userRole": "bronze",
-      "reffId": "D8FEF01BE6",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-09-01 19:50:13",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "35C0E09694",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-09-01 19:50:47",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "2CC09EF388",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": 1900,
-      "date": "2025-09-01 19:56:38",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "bronze",
-      "reffId": "A6F44C6ED9",
-      "metodeBayar": "QRIS",
-      "totalBayar": 1907
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 20:00:54",
-      "jumlah": 1,
-      "user": "6285291252338",
-      "userRole": "bronze",
-      "reffId": "B2CC069059",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": "3500",
-      "date": "2025-09-01 20:04:55",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "68380EA0EC",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": "3500",
-      "date": "2025-09-01 20:06:28",
-      "jumlah": 1,
-      "user": "6287887842985",
-      "userRole": "bronze",
-      "reffId": "4F0AEBF528",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 20:10:00",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "8392D807B1",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 20:12:12",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "BB91D45DED",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 20:12:23",
-      "jumlah": 1,
-      "user": "6282143003950",
-      "userRole": "bronze",
-      "reffId": "DF315EAA1F",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 20:28:33",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "6ABDADF147",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "capcutpriv",
-      "name": "CAPCUT 1 BULAN PRIVATE ",
-      "price": 14000,
-      "date": "2025-09-01 20:30:48",
-      "jumlah": 1,
-      "user": "628976327279",
-      "userRole": "bronze",
-      "reffId": "05C4DE6666",
-      "metodeBayar": "Saldo",
-      "totalBayar": 14000
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 20:33:10",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "EFEA360CD4",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-09-01 20:38:18",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "3EE7D3AB49",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "vid3u",
-      "name": "VIDIO SHARING 3USER ",
-      "price": "8000",
-      "date": "2025-09-01 20:43:19",
-      "jumlah": 1,
-      "user": "62881027673568",
-      "userRole": "bronze",
-      "reffId": "E5B17F6ADA",
-      "metodeBayar": "Saldo",
-      "totalBayar": 8000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-09-01 20:48:15",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "4E6D0B7890",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": "3500",
-      "date": "2025-09-01 20:51:06",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "C6FF55CB9A",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 20:54:26",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "6B3DC93A23",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "yt3b",
-      "name": "YOUTUBE PREMIUM 3 BULAN ",
-      "price": "15000",
-      "date": "2025-09-01 20:59:38",
-      "jumlah": 1,
-      "user": "6285945186784",
-      "userRole": "bronze",
-      "reffId": "47D98B572E",
-      "metodeBayar": "Saldo",
-      "totalBayar": 15000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-09-01 21:02:33",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "EEBCE195DA",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-09-01 21:12:03",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "EBA9FDA411",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "canva1b",
-      "name": "CANVA PRO SEBULAN ",
-      "price": "1900",
-      "date": "2025-09-01 21:12:09",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "1000658355",
-      "metodeBayar": "Saldo",
-      "totalBayar": 1900
-    },
-    {
-      "id": "viu1t",
-      "name": "VIU 1 TAHUN ",
-      "price": "3500",
-      "date": "2025-09-01 21:12:36",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "CD49D53B25",
-      "metodeBayar": "Saldo",
-      "totalBayar": 3500
-    },
-    {
-      "id": "net1u",
-      "name": "NETFLIX 1 BULAN 1P1U BEST SELLER🔥",
-      "price": 24000,
-      "date": "2025-09-01 21:22:44",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "207CF9A14B",
-      "metodeBayar": "Saldo",
-      "totalBayar": 24000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-09-01 21:28:33",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "3063317CFC",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-09-01 21:40:37",
-      "jumlah": 1,
-      "user": "62881027673568",
-      "userRole": "bronze",
-      "reffId": "4B77B41256",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
-    },
-    {
-      "id": "capcut7d",
-      "name": "CAPCUT 1 MINGGU SHARING 3U ",
-      "price": 2500,
-      "date": "2025-09-01 22:03:14",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "01983C128B",
-      "metodeBayar": "Saldo",
-      "totalBayar": 2500
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-09-01 22:10:47",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "1A8671768B",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-09-01 22:19:44",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "B4BDEB0C86",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "net2u",
-      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
-      "price": 12000,
-      "date": "2025-09-01 22:23:31",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "EA57794F80",
-      "metodeBayar": "Saldo",
-      "totalBayar": 12000
-    },
-    {
-      "id": "net1m",
-      "name": "NETFLIX 1 MINGGU 1P1U BEST SELLER🔥",
-      "price": 7000,
-      "date": "2025-09-01 22:43:15",
-      "jumlah": 1,
-      "user": "6287777657944",
-      "userRole": "bronze",
-      "reffId": "0D0282BBCC",
-      "metodeBayar": "Saldo",
-      "totalBayar": 7000
     }
   ],
   "persentase": {
