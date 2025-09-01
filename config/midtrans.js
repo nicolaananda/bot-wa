@@ -197,8 +197,8 @@ async function createQRISPayment(amount, orderId, customerDetails = {}) {
     const result = await makeMidtransRequest('/v2/charge', 'POST', coreRequest);
     console.log('Midtrans Core created successfully:', result);
     
-    // Buat URL yang sesuai dengan Core API - menggunakan QR code URL dari response
-    const invoiceUrl = result.actions && result.actions[0] ? result.actions[0].url : `https://app.sandbox.midtrans.com/qris/${result.transaction_id}`;
+    // Buat URL Payment Link yang user-friendly seperti yang diinginkan
+    const invoiceUrl = `https://app.sandbox.midtrans.com/payment-links/${orderId}`;
     
     const paymentData = {
       transaction_id: result.transaction_id,
