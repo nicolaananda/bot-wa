@@ -155,7 +155,7 @@ function makeMidtransRequest(endpoint, method = 'GET', data = null) {
 }
 
 /**
- * Create QRIS payment using Midtrans Snap API
+ * Create QRIS payment using Midtrans Core API
  */
 async function createQRISPayment(amount, orderId, customerDetails = {}) {
   try {
@@ -180,33 +180,37 @@ async function createQRISPayment(amount, orderId, customerDetails = {}) {
       phone: customerDetails.phone || '08123456789'
     };
 
-    const snapRequest = {
+    // Gunakan Core API untuk QRIS
+    const coreRequest = {
+      payment_type: 'qris',
       transaction_details: transactionDetails,
       item_details: itemDetails,
       customer_details: customerDetailsObj,
-      enabled_payments: ['qris']
+      qris: {
+        acquirer: 'gopay'
+      }
     };
 
-    console.log('Midtrans Snap request:', JSON.stringify(snapRequest, null, 2));
+    console.log('Midtrans Core request:', JSON.stringify(coreRequest, null, 2));
     
-    // Gunakan Snap API untuk create token
-    const result = await makeMidtransRequest('/snap/v1/transactions', 'POST', snapRequest);
-    console.log('Midtrans Snap created successfully:', result);
+    // Gunakan Core API untuk create QRIS
+    const result = await makeMidtransRequest('/v2/charge', 'POST', coreRequest);
+    console.log('Midtrans Core created successfully:', result);
     
     const paymentData = {
-      token: result.token,
+      transaction_id: result.transaction_id,
       order_id: orderId,
       amount: amount,
-      status: 'pending',
-      qr_string: `https://app.sandbox.midtrans.com/snap/v2/vtweb/${result.token}`, // Snap URL untuk QR
+      status: result.transaction_status || 'pending',
+      qr_string: result.qr_string || result.actions?.[0]?.url || `https://app.sandbox.midtrans.com/qris/${result.transaction_id}`,
       created: new Date().toISOString(),
-      snap_url: result.redirect_url
+      snap_url: result.actions?.[0]?.url || `https://app.sandbox.midtrans.com/qris/${result.transaction_id}`
     };
     
     storePaymentData(orderId, paymentData);
     return paymentData;
   } catch (error) {
-    console.error('Error creating Midtrans Snap payment:', error);
+    console.error('Error creating Midtrans Core payment:', error);
     throw new Error(`Failed to create Midtrans payment: ${error.message}`);
   }
 }
