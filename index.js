@@ -1834,6 +1834,348 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       }
         break
 
+        // ====== CONFIG & IMPORT ======
+const fs = require("fs");
+const axios = require("axios");
+const crypto = require("crypto");
+const moment = require("moment-timezone");
+
+// Ganti sesuai punyamu / .env
+const PG_ENDPOINT = process.env.PG_ENDPOINT || "https://api-pg.nicola.id";
+const PG_API_KEY  = process.env.PG_API_KEY  || "kodeku";
+
+// QRIS statis DANA dari kamu (JANGAN DIUBAH)
+const BASE_QRIS_DANA = "00020101021126570011ID.DANA.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
+
+// ====== UTIL: Rupiah (fallback kalau belum ada) ======
+function toRupiahLocal(num) {
+  try {
+    if (typeof toRupiah === "function") return toRupiah(num);
+  } catch {}
+  const n = Number(num) || 0;
+  return n.toLocaleString("id-ID");
+}
+
+// ====== UTIL: Waktu Indonesia ======
+function nowJakarta() {
+  return moment.tz("Asia/Jakarta");
+}
+function formatClockJakarta(ts) {
+  return moment(ts).tz("Asia/Jakarta").format("HH:mm");
+}
+
+// ====== UTIL: CRC16-CCITT (0x1021) untuk EMV ======
+function crc16ccitt(payload) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < payload.length; i++) {
+    crc ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) crc = (crc << 1) ^ 0x1021;
+      else crc <<= 1;
+      crc &= 0xFFFF;
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, "0");
+}
+
+// ====== UTIL: Build TLV ======
+function tlv(tag, value) {
+  const len = String(value.length).padStart(2, "0");
+  return `${tag}${len}${value}`;
+}
+
+// ====== QRIS Dinamis dari QRIS statis ======
+// - Set Tag 54 (Amount)
+// - Set Tag 62 (Additional Data) sub-tag 01 (Bill Number) & 05 (Reference ID) = reffId
+// - Recompute CRC Tag 63
+function generateDynamicQrisFromStatic(baseQris, amount, reffId) {
+  if (!baseQris || !amount || amount <= 0) throw new Error("QRIS/amount invalid");
+
+  // Buang CRC lama: cari "6304" (Tag 63 len 04)
+  const idxCrc = baseQris.indexOf("6304");
+  const withoutCRC = idxCrc > -1 ? baseQris.slice(0, idxCrc) : baseQris;
+
+  // Bersihkan Tag 54 (Amount) & Tag 62 (Additional Data) jika ada
+  let payload = withoutCRC
+    .replace(/54\d{2}[\d.]+/g, "")      // amount
+    .replace(/62\d{2}[0-9A-Za-z]+/g, ""); // additional data
+
+  // Pastikan amount tanpa desimal (IDR)
+  const amountStr = String(Math.floor(Number(amount)));
+
+  // Build Tag 62 (01=Bill Number, 05=Reference ID)
+  const tag62Value = tlv("01", reffId) + tlv("05", reffId);
+  const tag62 = tlv("62", tag62Value);
+
+  // Sisipkan Tag 54 dan Tag 62 di akhir (sebelum CRC)
+  payload = payload + tlv("54", amountStr) + tag62;
+
+  // Hitung CRC baru
+  const withCrcHeader = payload + "6304";
+  const crc = crc16ccitt(withCrcHeader);
+
+  // Hasil final
+  return withCrcHeader + crc;
+}
+
+// ====== Validasi pembayaran via backend listener ======
+// Strategi: cari notifikasi terbaru setelah pembuatan QR, dengan:
+// - amountDetected == totalAmount (string/number sama2 dibandingkan)
+// - package_name "id.dana" atau appName "DANA" (kalau ada)
+// - posted_at >= createdAt
+async function checkPaymentViaPG({ totalAmount, createdAtISO, deviceId = null }) {
+  const url = `${PG_ENDPOINT}/notifications?limit=50` + (deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : "");
+  const headers = { "X-API-Key": PG_API_KEY };
+
+  const res = await axios.get(url, { headers, timeout: 10000 });
+  const items = Array.isArray(res.data) ? res.data : [];
+
+  const createdAt = new Date(createdAtISO).getTime();
+
+  const match = items.find(n => {
+    try {
+      const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0;
+      const amt = String(n.amountDetected || "").replace(/\D/g, "");
+      const want = String(totalAmount);
+      const appOk = (n.packageName === "id.dana") || (String(n.appName || "").toUpperCase().includes("DANA"));
+      const textOk = /menerima|received/i.test(String(n.text || "")) || /masuk/i.test(String(n.text || ""));
+      return appOk && textOk && postedAt >= createdAt && amt === want;
+    } catch {
+      return false;
+    }
+  });
+
+  return !!match;
+}
+
+// ====== CASE: QRIS Dinamis + Validasi PG ======
+case 'qris': {
+  // Validasi order berjalan
+  if (db.data.order[sender]) {
+    return reply(`Kamu sedang melakukan order. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`);
+  }
+
+  // Validasi input
+  const [productId, quantity] = q.split(" ");
+  if (!productId || !quantity) {
+    return reply(`Contoh: ${prefix + command} idproduk jumlah`);
+  }
+
+  // Validasi produk
+  const product = db.data.produk[productId];
+  if (!product) return reply(`Produk dengan ID *${productId}* tidak ditemukan.`);
+
+  // Validasi stok
+  const stock = product.stok;
+  const quantityNum = Number(quantity);
+  if (!Number.isInteger(quantityNum) || quantityNum <= 0) return reply(`Jumlah harus berupa angka positif.`);
+  if (stock.length === 0) return reply("Stok habis, silakan hubungi Owner untuk restok.");
+  if (stock.length < quantityNum) return reply(`Stok tersedia ${stock.length}, jumlah pesanan tidak boleh melebihi stok.`);
+
+  reply("Sedang membuat QR Code...");
+
+  // Proses
+  const tanggal = nowJakarta().format("YYYY-MM-DD");
+  const jamwib  = nowJakarta().format("HH:mm");
+
+  try {
+    // Harga
+    const unitPrice = Number(hargaProduk(productId, db.data.users[sender]?.role));
+    if (!unitPrice || unitPrice <= 0) throw new Error('Harga produk tidak valid');
+
+    const amount = unitPrice * quantityNum;
+
+    // (Opsional) Subsidi biaya admin — kalau mau hapus, set fee=0
+    const feeOriginal = (amount * 0.007) + 0.20;
+    const fee = Math.ceil(feeOriginal * 0.5);
+    const totalAmount = amount + fee;
+    if (totalAmount <= 0) throw new Error('Total amount tidak valid');
+
+    // Reff & Order ID
+    const reffId = crypto.randomBytes(5).toString("hex").toUpperCase(); // singkat untuk dicantumkan di Tag 62
+    const orderId = `TRX-${reffId}-${Date.now()}`;
+
+    // Buat QRIS dinamis dari QR statis DANA
+    const qrisString = generateDynamicQrisFromStatic(BASE_QRIS_DANA, totalAmount, reffId);
+
+    // Generate image QR (pakai fungsi kamu)
+    const qrImagePath = await qrisDinamis(qrisString, "./options/sticker/qris.jpg");
+
+    // Expired lokal 10 menit
+    const expirationTime = Date.now() + (10 * 60 * 1000);
+    const timeLeftMin = Math.max(0, Math.floor((expirationTime - Date.now()) / 60000));
+    const formattedExpire = formatClockJakarta(expirationTime);
+
+    // Kirim pesan QR
+    const caption = `*🧾 MENUNGGU PEMBAYARAN (QRIS DANA) 🧾*\n\n` +
+      `*Produk ID:* ${productId}\n` +
+      `*Nama Produk:* ${product.name}\n` +
+      `*Harga:* Rp${toRupiahLocal(unitPrice)}\n` +
+      `*Jumlah:* ${quantityNum}\n` +
+      `*Biaya Admin:* Rp${toRupiahLocal(fee)}\n` +
+      `*Total:* Rp${toRupiahLocal(totalAmount)}\n` +
+      `*Waktu:* ${timeLeftMin} menit\n\n` +
+      `Silakan scan QRIS di atas sebelum ${formattedExpire} WIB untuk melakukan pembayaran.\n\n` +
+      `*ℹ️ Catatan:* Jangan ubah nominal. Reff: ${reffId}\n\n` +
+      `Jika ingin membatalkan, ketik *${prefix}batal*`;
+
+    const message = await ronzz.sendMessage(from, {
+      image: fs.readFileSync(qrImagePath),
+      caption
+    }, { quoted: m });
+
+    // Simpan data order
+    db.data.order[sender] = {
+      id: productId,
+      jumlah: quantityNum,
+      from,
+      key: message.key,
+      orderId,
+      reffId,
+      totalAmount,
+      createdAtISO: new Date().toISOString()
+    };
+
+    // Polling status pembayaran (tiap 15 detik)
+    while (db.data.order[sender]) {
+      await sleep(15000);
+
+      // Cek expired
+      if (Date.now() >= expirationTime) {
+        await ronzz.sendMessage(from, { delete: message.key });
+        reply("Pembayaran dibatalkan karena melewati batas waktu 10 menit.");
+        delete db.data.order[sender];
+        break;
+      }
+
+      try {
+        // Cek ke payment-gateway backend listener kamu
+        const paid = await checkPaymentViaPG({
+          totalAmount: totalAmount,
+          createdAtISO: db.data.order[sender].createdAtISO,
+          // deviceId: "opsional-jika-ada",
+        });
+
+        if (paid) {
+          await ronzz.sendMessage(from, { delete: message.key });
+          reply("Pembayaran berhasil, data akun akan segera diproses.");
+
+          // Update stok & transaksi
+          product.terjual = (product.terjual || 0) + quantityNum;
+          const soldItems = stock.splice(0, quantityNum);
+          await db.save();
+
+          // Rangkai detail akun
+          let detailAkun = `*📦 Produk:* ${product.name}\n` +
+                           `*📅 Tanggal:* ${tanggal}\n` +
+                           `*⏰ Jam:* ${jamwib} WIB\n\n`;
+
+          soldItems.forEach((i) => {
+            const dataAkun = i.split("|");
+            detailAkun += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`;
+            detailAkun += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`;
+            detailAkun += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`;
+            detailAkun += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`;
+            detailAkun += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`;
+          });
+
+          await ronzz.sendMessage(sender, { text: detailAkun }, { quoted: m });
+          await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkun }, { quoted: m });
+
+          // SNK produk
+          let snkProduk = `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`;
+          snkProduk += `*📋 SNK PRODUK: ${product.name}*\n\n`;
+          snkProduk += `${product.snk}\n\n`;
+          snkProduk += `*⚠️ PENTING:*\n`;
+          snkProduk += `• Baca dan pahami SNK sebelum menggunakan akun\n`;
+          snkProduk += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`;
+          snkProduk += `• Hubungi admin jika ada masalah dengan akun\n\n`;
+          snkProduk += `*╰────「 END SNK 」────╯*`;
+          await ronzz.sendMessage(sender, { text: snkProduk }, { quoted: m });
+
+          if (isGroup) reply("Pembelian berhasil! Detail akun telah dikirim ke chat.");
+
+          // Notif Owner
+          await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text:
+`Hai Owner,
+Ada transaksi QRIS-DANA yang telah selesai!
+
+*╭────「 TRANSAKSI DETAIL 」───*
+*┊・ 🧾| Reff Id:* ${reffId}
+*┊・ 📮| Nomor:* @${sender.split("@")[0]}
+*┊・ 📦| Nama Barang:* ${product.name}
+*┊・ 🏷️| Harga Barang:* Rp${toRupiahLocal(unitPrice)}
+*┊・ 🛍️| Jumlah Order:* ${quantityNum}
+*┊・ 💰| Total Bayar:* Rp${toRupiahLocal(totalAmount)}
+*┊・ 💳| Metode Bayar:* QRIS-DANA
+*┊・ 📅| Tanggal:* ${tanggal}
+*┊・ ⏰| Jam:* ${jamwib} WIB
+*╰┈┈┈┈┈┈┈┈*`, mentions: [sender] });
+
+          // Simpan transaksi
+          db.data.transaksi.push({
+            id: productId,
+            name: product.name,
+            price: unitPrice,
+            date: nowJakarta().format("YYYY-MM-DD HH:mm:ss"),
+            profit: product.profit,
+            jumlah: quantityNum,
+            user: sender.split("@")[0],
+            userRole: db.data.users[sender]?.role,
+            reffId,
+            metodeBayar: "QRIS-DANA",
+            totalBayar: totalAmount
+          });
+          await db.save();
+
+          // Alert stok habis
+          if (stock.length === 0) {
+            const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
+              `*📦 Produk:* ${product.name}\n` +
+              `*🆔 ID Produk:* ${productId}\n` +
+              `*📊 Stok Sebelumnya:* ${quantityNum}\n` +
+              `*📉 Stok Sekarang:* 0 (HABIS)\n` +
+              `*🛒 Terjual Terakhir:* ${quantityNum} akun\n` +
+              `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
+              `*💰 Total Transaksi:* Rp${toRupiahLocal(totalAmount)}\n` +
+              `*📅 Tanggal:* ${tanggal}\n` +
+              `*⏰ Jam:* ${jamwib} WIB\n\n` +
+              `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
+              `• Segera restok produk ini\n` +
+              `• Update harga jika diperlukan\n` +
+              `• Cek profit margin\n\n` +
+              `*💡 Tips:* Gunakan command *${prefix}addstok ${productId} jumlah* untuk menambah stok`;
+            await Promise.all([
+              ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] }),
+              ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+            ]);
+          }
+
+          // Cleanup
+          delete db.data.order[sender];
+          await db.save();
+
+          console.log(`✅ Transaction completed: ${orderId} - ${reffId}`);
+          break;
+        }
+      } catch (err) {
+        console.error(`Error checking payment via PG for ${orderId}:`, err.message);
+        if (err.message?.includes("timeout")) continue;
+
+        await ronzz.sendMessage(from, { delete: message.key });
+        reply("Pesanan dibatalkan karena error sistem.");
+        delete db.data.order[sender];
+        break;
+      }
+    }
+  } catch (error) {
+    console.error(`Error creating QRIS DANA for ${sender}:`, error);
+    reply("Gagal membuat QR Code pembayaran. Silakan coba lagi.");
+  }
+}
+break;
+
+
                 case 'midtrans': {
           if (db.data.order[sender]) {
               return reply(`Kamu sedang melakukan order. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`);
@@ -1919,7 +2261,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
                   }
 
                   try {
-                      const url = `${listener.baseUrl}/notifications?limit=10`;
+                      const url = `${listener.baseUrl}/notifications`;
                       const headers = listener.apiKey ? { 'X-API-Key': listener.apiKey } : {};
                       const resp = await axios.get(url, { headers });
                       const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : []);
