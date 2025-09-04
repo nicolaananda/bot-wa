@@ -2371,7 +2371,7 @@ Ada transaksi dengan QRIS yang telah selesai!
         }
         break;
      
-      case 'buy': {
+      case 'buynow': {
         if (db.data.order[sender] !== undefined) return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
         let data = q.split(" ")
         if (!data[1]) return reply(`Contoh: ${prefix + command} idproduk jumlah`)
