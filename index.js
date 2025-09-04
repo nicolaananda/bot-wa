@@ -1981,7 +1981,7 @@ case 'qris': {
     if (!unitPrice || unitPrice <= 0) throw new Error('Harga produk tidak valid');
 
     const amount = unitPrice * quantityNum;
-    const uniqueCode = Math.floor(100 + Math.random() * 900);
+    const uniqueCode = Math.floor(1 + Math.random() * 99);
     const totalAmount = amount + uniqueCode;
     if (totalAmount <= 0) throw new Error('Total amount tidak valid');
 
@@ -2199,7 +2199,7 @@ break;
               if (!unitPrice || unitPrice <= 0) throw new Error('Harga produk tidak valid');
 
               const amount = unitPrice * quantityNum;
-              const uniqueCode = Math.floor(100 + Math.random() * 900);
+              const uniqueCode = Math.floor(1 + Math.random() * 99);
               const totalAmount = amount + uniqueCode;
               if (totalAmount <= 0) throw new Error('Total amount tidak valid');
 
