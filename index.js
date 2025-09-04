@@ -25,6 +25,7 @@ const { expiredCheck, getAllSewa } = require("./function/sewa");
 const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
 const { qrisDinamis } = require("./function/dinamis");
+const BASE_QRIS_DANA = "00020101021126570011ID.DANA.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
 
 // Performance optimization: Cache for user saldo
 const saldoCache = new Map();
@@ -1843,7 +1844,6 @@ const PG_ENDPOINT = process.env.PG_ENDPOINT || "https://api-pg.nicola.id";
 const PG_API_KEY  = process.env.PG_API_KEY  || "kodeku";
 
 // QRIS statis DANA dari kamu (JANGAN DIUBAH)
-const BASE_QRIS_DANA = "00020101021126570011ID.DANA.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
 
 // ====== UTIL: Rupiah (fallback kalau belum ada) ======
 function toRupiahLocal(num) {
