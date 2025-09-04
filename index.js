@@ -1836,8 +1836,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         break
 
         // ====== CONFIG & IMPORT ======
-const fs = require("fs");
-const axios = require("axios");
+        // using top-level fs and axios imports
 
 // Ganti sesuai punyamu / .env
 const PG_ENDPOINT = process.env.PG_ENDPOINT || "https://api-pg.nicola.id";
