@@ -2173,7 +2173,7 @@ Ada transaksi QRIS-DANA yang telah selesai!
 break;
 
 
-                case 'midtrans': {
+                case 'buyynow': {
           if (db.data.order[sender]) {
               return reply(`Kamu sedang melakukan order. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`);
           }
