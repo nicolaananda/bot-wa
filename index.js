@@ -1837,8 +1837,6 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         // ====== CONFIG & IMPORT ======
 const fs = require("fs");
 const axios = require("axios");
-const crypto = require("crypto");
-const moment = require("moment-timezone");
 
 // Ganti sesuai punyamu / .env
 const PG_ENDPOINT = process.env.PG_ENDPOINT || "https://api-pg.nicola.id";
