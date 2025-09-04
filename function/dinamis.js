@@ -28,17 +28,26 @@ function toCRC16(str) {
   return hex;
 }
 
-async function qrisDinamis(nominal, path) {
+async function qrisDinamis(nominalOrQris, path) {
+  // If first arg looks like a full EMV QR string, write it directly
+  const isFullQrisString = typeof nominalOrQris === 'string' && /^(00\d{2}\d{2})/.test(nominalOrQris) && nominalOrQris.includes('6304');
+  if (isFullQrisString) {
+    await QRCode.toFile(path, nominalOrQris, { margin: 2, scale: 10 });
+    return path;
+  }
+
+  // Backward-compatible: treat as amount and build from global.codeqr
   let qris = codeqr
 
   let qris2 = qris.slice(0, -4);
   let replaceQris = qris2.replace("010211", "010212");
   let pecahQris = replaceQris.split("5802ID");
+  const nominal = String(nominalOrQris)
   let uang = "54" + ("0" + nominal.length).slice(-2) + nominal + "5802ID";
 
   let output = pecahQris[0] + uang + pecahQris[1] + toCRC16(pecahQris[0] + uang + pecahQris[1])
 
-  QRCode.toFile(path, output, { margin: 2, scale: 10 })
+  await QRCode.toFile(path, output, { margin: 2, scale: 10 })
   return path
 }
 
