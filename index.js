@@ -1981,56 +1981,48 @@ case 'qris': {
     if (!unitPrice || unitPrice <= 0) throw new Error('Harga produk tidak valid');
 
     const amount = unitPrice * quantityNum;
-
-    // (Opsional) Subsidi biaya admin — kalau mau hapus, set fee=0
-    const feeOriginal = (amount * 0.007) + 0.20;
-    const fee = Math.ceil(feeOriginal * 0.5);
-    const totalAmount = amount + fee;
+    const uniqueCode = Math.floor(100 + Math.random() * 900);
+    const totalAmount = amount + uniqueCode;
     if (totalAmount <= 0) throw new Error('Total amount tidak valid');
 
-    // Reff & Order ID
-    const reffId = crypto.randomBytes(5).toString("hex").toUpperCase(); // singkat untuk dicantumkan di Tag 62
+    const reffId = crypto.randomBytes(5).toString("hex").toUpperCase();
     const orderId = `TRX-${reffId}-${Date.now()}`;
 
-    // Buat QRIS dinamis dari QR statis DANA
-    const qrisString = generateDynamicQrisFromStatic(BASE_QRIS_DANA, totalAmount, reffId);
+    const qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
 
-    // Generate image QR (pakai fungsi kamu)
-    const qrImagePath = await qrisDinamis(qrisString, "./options/sticker/qris.jpg");
+    const expirationTime = Date.now() + toMs("10m");
+    const expireDate = new Date(expirationTime);
+    const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
+    const currentTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+    const expireTimeJakarta = new Date(new Date(currentTime).getTime() + timeLeft * 60000);
+    const formattedTime = `${expireTimeJakarta.getHours().toString().padStart(2, '0')}:${expireTimeJakarta.getMinutes().toString().padStart(2, '0')}`;
 
-    // Expired lokal 10 menit
-    const expirationTime = Date.now() + (10 * 60 * 1000);
-    const timeLeftMin = Math.max(0, Math.floor((expirationTime - Date.now()) / 60000));
-    const formattedExpire = formatClockJakarta(expirationTime);
-
-    // Kirim pesan QR
-    const caption = `*🧾 MENUNGGU PEMBAYARAN (QRIS DANA) 🧾*\n\n` +
-      `*Produk ID:* ${productId}\n` +
-      `*Nama Produk:* ${product.name}\n` +
-      `*Harga:* Rp${toRupiahLocal(unitPrice)}\n` +
-      `*Jumlah:* ${quantityNum}\n` +
-      `*Biaya Admin:* Rp${toRupiahLocal(fee)}\n` +
-      `*Total:* Rp${toRupiahLocal(totalAmount)}\n` +
-      `*Waktu:* ${timeLeftMin} menit\n\n` +
-      `Silakan scan QRIS di atas sebelum ${formattedExpire} WIB untuk melakukan pembayaran.\n\n` +
-      `*ℹ️ Catatan:* Jangan ubah nominal. Reff: ${reffId}\n\n` +
-      `Jika ingin membatalkan, ketik *${prefix}batal*`;
+    const caption = `*🧾 MENUNGGU PEMBAYARAN 🧾*\n\n` +
+        `*Produk ID:* ${productId}\n` +
+        `*Nama Produk:* ${product.name}\n` +
+        `*Harga:* Rp${toRupiah(unitPrice)}\n` +
+        `*Jumlah:* ${quantityNum}\n` +
+        `*Subtotal:* Rp${toRupiah(amount)}\n` +
+        `*Kode Unik:* ${uniqueCode}\n` +
+        `*Total:* Rp${toRupiah(totalAmount)}\n` +
+        `*Waktu:* ${timeLeft} menit\n\n` +
+        `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n\n` +
+        `Jika ingin membatalkan, ketik *${prefix}batal*`;
 
     const message = await ronzz.sendMessage(from, {
-      image: fs.readFileSync(qrImagePath),
-      caption
+        image: fs.readFileSync(qrImagePath),
+        caption: caption
     }, { quoted: m });
 
-    // Simpan data order
     db.data.order[sender] = {
-      id: productId,
-      jumlah: quantityNum,
-      from,
-      key: message.key,
-      orderId,
-      reffId,
-      totalAmount,
-      createdAtISO: new Date().toISOString()
+        id: productId,
+        jumlah: quantityNum,
+        from,
+        key: message.key,
+        orderId,
+        reffId,
+        totalAmount,
+        uniqueCode
     };
 
     // Polling status pembayaran (tiap 15 detik)
@@ -2207,7 +2199,8 @@ break;
               if (!unitPrice || unitPrice <= 0) throw new Error('Harga produk tidak valid');
 
               const amount = unitPrice * quantityNum;
-              const totalAmount = amount;
+              const uniqueCode = Math.floor(100 + Math.random() * 900);
+              const totalAmount = amount + uniqueCode;
               if (totalAmount <= 0) throw new Error('Total amount tidak valid');
 
               const reffId = crypto.randomBytes(5).toString("hex").toUpperCase();
@@ -2227,6 +2220,8 @@ break;
                   `*Nama Produk:* ${product.name}\n` +
                   `*Harga:* Rp${toRupiah(unitPrice)}\n` +
                   `*Jumlah:* ${quantityNum}\n` +
+                  `*Subtotal:* Rp${toRupiah(amount)}\n` +
+                  `*Kode Unik:* ${uniqueCode}\n` +
                   `*Total:* Rp${toRupiah(totalAmount)}\n` +
                   `*Waktu:* ${timeLeft} menit\n\n` +
                   `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n\n` +
@@ -2244,7 +2239,8 @@ break;
                   key: message.key,
                   orderId,
                   reffId,
-                  totalAmount
+                  totalAmount,
+                  uniqueCode
               };
 
               while (db.data.order[sender]) {
@@ -2258,7 +2254,7 @@ break;
                   }
 
                   try {
-                      const url = `${listener.baseUrl}/notifications`;
+                      const url = `${listener.baseUrl}/notifications?limit=50`;
                       const headers = listener.apiKey ? { 'X-API-Key': listener.apiKey } : {};
                       const resp = await axios.get(url, { headers });
                       const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : []);
@@ -4168,67 +4164,6 @@ OVO | GOPAY | SHOPEEPAY | DANA
       }
         break
 
-      case 'cod': {
-        axios.get("https://okeconnect.com/harga/json?id=905ccd028329b0a").then(res => {
-          var regeXcomp = (a, b) => {
-            var aPrice = Number(a.harga);
-            var bPrice = Number(b.harga);
-            return aPrice - bPrice
-          };
-          let listproduk = res.data.filter(i => i.kategori == "DIGITAL" && i.produk == "TPG Call Of Duty")
-          listproduk.sort(regeXcomp)
-          let teks = `Hai *@${sender.split('@')[0]}*\nSilahkan klik button di bawah ini untuk melihat list harga topup Call of Duty Mobile`
-          let rows = []
-          listproduk.map(i => {
-            rows.push({
-              title: i.keterangan,
-              description: `Harga: Rp${toRupiah(hargaSetelahProfit(i.harga, db.data.users[sender].role, i.kategori))} | Status: ${i.status == 1 ? "✅" : "❌"}`,
-              id: `tp ${i.kode}`
-            })
-          })
-          ronzz.sendMessage(from, {
-            footer: `${botName} © ${ownerName}`,
-            buttons: [
-              {
-                buttonId: 'action',
-                buttonText: { displayText: 'ini pesan interactiveMeta' },
-                type: 4,
-                nativeFlowInfo: {
-                  name: 'single_select',
-                  paramsJson: JSON.stringify({
-                    title: 'Click To List',
-                    sections: [
-                      {
-                        title: 'LIST HARGA',
-                        rows
-                      }
-                    ]
-                  })
-                }
-              }
-            ],
-            headerType: 1,
-            viewOnce: true,
-            image: fs.readFileSync(thumbnail),
-            caption: teks,
-            contextInfo: {
-              forwardingScore: 999,
-              isForwarded: true,
-              mentionedJid: parseMention(teks),
-              externalAdReply: {
-                title: botName,
-                body: `By ${ownerName}`,
-                thumbnailUrl: ppuser,
-                sourceUrl: '',
-                mediaType: 1,
-                renderLargerThumbnail: false
-              }
-            }
-          }, { quoted: m });
-        })
-      }
-        break
-
       case 'lordsmobile': {
         axios.get("https://okeconnect.com/harga/json?id=905ccd028329b0a").then(res => {
           var regeXcomp = (a, b) => {
@@ -4727,67 +4662,6 @@ OVO | GOPAY | SHOPEEPAY | DANA
           let listproduk = res.data.filter(i => i.kategori == "DIGITAL" && i.produk == "TPG Blood Strike")
           listproduk.sort(regeXcomp)
           let teks = `Hai *@${sender.split('@')[0]}*\nSilahkan klik button di bawah ini untuk melihat list harga topup Blood Strike`
-          let rows = []
-          listproduk.map(i => {
-            rows.push({
-              title: i.keterangan,
-              description: `Harga: Rp${toRupiah(hargaSetelahProfit(i.harga, db.data.users[sender].role, i.kategori))} | Status: ${i.status == 1 ? "✅" : "❌"}`,
-              id: `tp ${i.kode}`
-            })
-          })
-          ronzz.sendMessage(from, {
-            footer: `${botName} © ${ownerName}`,
-            buttons: [
-              {
-                buttonId: 'action',
-                buttonText: { displayText: 'ini pesan interactiveMeta' },
-                type: 4,
-                nativeFlowInfo: {
-                  name: 'single_select',
-                  paramsJson: JSON.stringify({
-                    title: 'Click To List',
-                    sections: [
-                      {
-                        title: 'LIST HARGA',
-                        rows
-                      }
-                    ]
-                  })
-                }
-              }
-            ],
-            headerType: 1,
-            viewOnce: true,
-            image: fs.readFileSync(thumbnail),
-            caption: teks,
-            contextInfo: {
-              forwardingScore: 999,
-              isForwarded: true,
-              mentionedJid: parseMention(teks),
-              externalAdReply: {
-                title: botName,
-                body: `By ${ownerName}`,
-                thumbnailUrl: ppuser,
-                sourceUrl: '',
-                mediaType: 1,
-                renderLargerThumbnail: false
-              }
-            }
-          }, { quoted: m });
-        })
-      }
-        break
-
-      case 'pln': {
-        axios.get("https://okeconnect.com/harga/json?id=905ccd028329b0a").then(res => {
-          var regeXcomp = (a, b) => {
-            var aPrice = Number(a.harga);
-            var bPrice = Number(b.harga);
-            return aPrice - bPrice
-          };
-          let listproduk = res.data.filter(i => i.kategori == "TOKEN PLN" && i.produk == "Token PLN Prabayar")
-          listproduk.sort(regeXcomp)
-          let teks = `Hai *@${sender.split('@')[0]}*\nSilahkan klik button di bawah ini untuk melihat list harga token PLN`
           let rows = []
           listproduk.map(i => {
             rows.push({
@@ -5388,67 +5262,6 @@ OVO | GOPAY | SHOPEEPAY | DANA
       }
         break
 
-      case 'maxim': {
-        axios.get("https://okeconnect.com/harga/json?id=905ccd028329b0a").then(res => {
-          var regeXcomp = (a, b) => {
-            var aPrice = Number(a.harga);
-            var bPrice = Number(b.harga);
-            return aPrice - bPrice
-          };
-          let listproduk = res.data.filter(i => i.kategori == "DIGITAL" && i.produk == "Top Up Maxim Customer")
-          listproduk.sort(regeXcomp)
-          let teks = `Hai *@${sender.split('@')[0]}*\nSilahkan klik button di bawah ini untuk melihat list harga topup saldo Maxim`
-          let rows = []
-          listproduk.map(i => {
-            rows.push({
-              title: i.keterangan,
-              description: `Harga: Rp${toRupiah(hargaSetelahProfit(i.harga, db.data.users[sender].role, i.kategori))} | Status: ${i.status == 1 ? "✅" : "❌"}`,
-              id: `tp ${i.kode}`
-            })
-          })
-          ronzz.sendMessage(from, {
-            footer: `${botName} © ${ownerName}`,
-            buttons: [
-              {
-                buttonId: 'action',
-                buttonText: { displayText: 'ini pesan interactiveMeta' },
-                type: 4,
-                nativeFlowInfo: {
-                  name: 'single_select',
-                  paramsJson: JSON.stringify({
-                    title: 'Click To List',
-                    sections: [
-                      {
-                        title: 'LIST HARGA',
-                        rows
-                      }
-                    ]
-                  })
-                }
-              }
-            ],
-            headerType: 1,
-            viewOnce: true,
-            image: fs.readFileSync(thumbnail),
-            caption: teks,
-            contextInfo: {
-              forwardingScore: 999,
-              isForwarded: true,
-              mentionedJid: parseMention(teks),
-              externalAdReply: {
-                title: botName,
-                body: `By ${ownerName}`,
-                thumbnailUrl: ppuser,
-                sourceUrl: '',
-                mediaType: 1,
-                renderLargerThumbnail: false
-              }
-            }
-          }, { quoted: m });
-        })
-      }
-        break
-
       case 'astrapay': {
         axios.get("https://okeconnect.com/harga/json?id=905ccd028329b0a").then(res => {
           var regeXcomp = (a, b) => {
@@ -5947,67 +5760,6 @@ OVO | GOPAY | SHOPEEPAY | DANA
           let listproduk = res.data.filter(i => i.kategori == "PULSA" && i.produk == "XL")
           listproduk.sort(regeXcomp)
           let teks = `Hai *@${sender.split('@')[0]}*\nSilahkan klik button di bawah ini untuk melihat list harga pulsa XL`
-          let rows = []
-          listproduk.map(i => {
-            rows.push({
-              title: i.keterangan,
-              description: `Harga: Rp${toRupiah(hargaSetelahProfit(i.harga, db.data.users[sender].role, i.kategori))} | Status: ${i.status == 1 ? "✅" : "❌"}`,
-              id: `tp ${i.kode}`
-            })
-          })
-          ronzz.sendMessage(from, {
-            footer: `${botName} © ${ownerName}`,
-            buttons: [
-              {
-                buttonId: 'action',
-                buttonText: { displayText: 'ini pesan interactiveMeta' },
-                type: 4,
-                nativeFlowInfo: {
-                  name: 'single_select',
-                  paramsJson: JSON.stringify({
-                    title: 'Click To List',
-                    sections: [
-                      {
-                        title: 'LIST HARGA',
-                        rows
-                      }
-                    ]
-                  })
-                }
-              }
-            ],
-            headerType: 1,
-            viewOnce: true,
-            image: fs.readFileSync(thumbnail),
-            caption: teks,
-            contextInfo: {
-              forwardingScore: 999,
-              isForwarded: true,
-              mentionedJid: parseMention(teks),
-              externalAdReply: {
-                title: botName,
-                body: `By ${ownerName}`,
-                thumbnailUrl: ppuser,
-                sourceUrl: '',
-                mediaType: 1,
-                renderLargerThumbnail: false
-              }
-            }
-          }, { quoted: m });
-        })
-      }
-        break
-
-      case 'pbyu': {
-        axios.get("https://okeconnect.com/harga/json?id=905ccd028329b0a").then(res => {
-          var regeXcomp = (a, b) => {
-            var aPrice = Number(a.harga);
-            var bPrice = Number(b.harga);
-            return aPrice - bPrice
-          };
-          let listproduk = res.data.filter(i => i.kategori == "PULSA" && i.produk == "By U")
-          listproduk.sort(regeXcomp)
-          let teks = `Hai *@${sender.split('@')[0]}*\nSilahkan klik button di bawah ini untuk melihat list harga pulsa ByU`
           let rows = []
           listproduk.map(i => {
             rows.push({
@@ -6645,7 +6397,7 @@ Ada yang upgrade role!
 *┊・ 📮| Nomer:* @${sender.split("@")[0]}
 *┊・ 📌| Role Sebelum:* Silver
 *┊・ 📦| Nama Barang:* Upgrade Role Gold
-*┊・ 🏷️| Harga Barang:* Rp${toRupiah(Number(uGold) - Number(uSilver))}
+*┊・ 🏷️| Harga Barang:* Rp${toRupiah(uGold)}
 *┊・ 🛍️| Fee:* Rp${toRupiah(Number(fee))}
 *┊・ 💰| Total Bayar:* Rp${toRupiah(amount)}
 *┊・ 📅| Tanggal:* ${tanggal}
@@ -7286,19 +7038,6 @@ Ada yang upgrade role!
       }
         break
 
-      case 'del': case 'delete': {
-        if (!isGroup) return reply(mess.group)
-        if (!isGroupAdmins && !isOwner) return reply(mess.admin)
-        if (!quotedMsg) return reply(`Reply chat yang ingin dihapus dengan caption *${prefix + command}*`)
-        if (m.quoted.fromMe) {
-          await ronzz.sendMessage(from, { delete: { fromMe: true, id: m.quoted.id, remoteJid: from } })
-        } else if (!m.quoted.fromMe) {
-          if (!isBotGroupAdmins) return reply(mess.botAdmin)
-          await ronzz.sendMessage(from, { delete: { remoteJid: from, fromMe: false, id: m.quoted.id, participant: m.quoted.sender } })
-        }
-      }
-        break
-
       case 'blok': case 'block':
         if (!isOwner && !fromMe) return reply(mess.owner)
         if (!q) return reply(`Contoh: ${prefix + command} 628xxx`)
@@ -7791,4 +7530,5 @@ Ada yang upgrade role!
     console.log(color('[ERROR]', 'red'), err)
   }
 }
+
 
