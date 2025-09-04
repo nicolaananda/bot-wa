@@ -8,7 +8,7 @@ global.jamBackup = 12 //Contoh: 12, berarti setiap 12 jam otomatis backup script
 global.memberId = "OK2596040" //Untuk cara mendapatkannya cek di file panduan.txt
 global.pin = "" //Pin order kuota
 global.pw = "" //Password order kuota
-global.codeqr = "" //Code QR lu
+global.codeqr = "00020101021126570011ID.DANA.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2" //Code QR lu
 
 //Persentase fee deposit
 global.feeDepo = 2
@@ -76,6 +76,12 @@ global.payment = {
     nope: "085235540944",
     an: "BRI****"
   }
+}
+
+// Listener backend for notification-based payment detection
+global.listener = {
+  baseUrl: "https://api-pg.nicola.id",
+  apiKey: "kodeku"
 }
 
 //Function buat menu
