@@ -1990,7 +1990,7 @@ case 'qris': {
 
     const qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
 
-    const expirationTime = Date.now() + toMs("10m");
+    const expirationTime = Date.now() + toMs("30m");
     const expireDate = new Date(expirationTime);
     const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
     const currentTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
@@ -2032,7 +2032,7 @@ case 'qris': {
       // Cek expired
       if (Date.now() >= expirationTime) {
         await ronzz.sendMessage(from, { delete: message.key });
-        reply("Pembayaran dibatalkan karena melewati batas waktu 10 menit.");
+        reply("Pembayaran dibatalkan karena melewati batas waktu 30 menit.");
         delete db.data.order[sender];
         break;
       }
@@ -2208,7 +2208,7 @@ break;
 
               const qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
 
-              const expirationTime = Date.now() + toMs("10m");
+              const expirationTime = Date.now() + toMs("30m");
               const expireDate = new Date(expirationTime);
               const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
               const currentTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
@@ -2248,7 +2248,7 @@ break;
 
                   if (Date.now() >= expirationTime) {
                       await ronzz.sendMessage(from, { delete: message.key });
-                      reply("Pembayaran dibatalkan karena melewati batas waktu 10 menit.");
+                      reply("Pembayaran dibatalkan karena melewati batas waktu 30 menit.");
                       delete db.data.order[sender];
                       break;
                   }
