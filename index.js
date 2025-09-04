@@ -2254,7 +2254,7 @@ break;
                   }
 
                   try {
-                      const url = `${listener.baseUrl}/notifications`;
+                      const url = `${listener.baseUrl}/notifications?limit=50`;
                       const headers = listener.apiKey ? { 'X-API-Key': listener.apiKey } : {};
                       const resp = await axios.get(url, { headers });
                       const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : []);
