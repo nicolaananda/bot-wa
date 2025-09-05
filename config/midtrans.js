@@ -318,7 +318,7 @@ async function createQRISCore(amount, orderId, customerDetails = {}) {
       }
     }
     
-    // Tidak perlu SNAP payment, hanya gunakan Core API QRIS saja
+    // Tidak perlu SNAP payment, QRIS image URL sudah cukup sebagai alternatif
     snapUrl = null;
     
     const paymentData = {
