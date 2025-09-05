@@ -1,48 +1,15 @@
 {
-  "TEST-DUAL-1757055444289-SNAP": {
-    "token": "0d72877e-46df-47e3-b01e-bc5376f8639b",
-    "order_id": "TEST-DUAL-1757055444289-SNAP",
-    "amount": 1091,
+  "TEST-QRIS-ONLY-1757056337041": {
+    "transaction_id": "e13e8688-b373-4326-bd79-f8a899bd8604",
+    "order_id": "TEST-QRIS-ONLY-1757056337041",
+    "amount": 15045,
     "status": "pending",
-    "qr_string": "0d72877e-46df-47e3-b01e-bc5376f8639b",
-    "created": "2025-09-05T06:57:24.750Z",
-    "snap_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/0d72877e-46df-47e3-b01e-bc5376f8639b",
-    "cachedAt": "2025-09-05T06:57:24.751Z"
-  },
-  "TEST-DUAL-1757055444289": {
-    "transaction_id": "f4eeb92f-9b1b-483c-a1a8-91bd619ffdc1",
-    "order_id": "TEST-DUAL-1757055444289",
-    "amount": 1091,
-    "status": "pending",
-    "qr_string": "https://api.sandbox.midtrans.com/v2/qris/f4eeb92f-9b1b-483c-a1a8-91bd619ffdc1/qr-code",
-    "qr_image_url": "https://api.sandbox.midtrans.com/v2/qris/f4eeb92f-9b1b-483c-a1a8-91bd619ffdc1/qr-code",
-    "snap_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/0d72877e-46df-47e3-b01e-bc5376f8639b",
-    "created": "2025-09-05T06:57:24.756Z",
+    "qr_string": "https://api.sandbox.midtrans.com/v2/qris/e13e8688-b373-4326-bd79-f8a899bd8604/qr-code",
+    "qr_image_url": "https://api.sandbox.midtrans.com/v2/qris/e13e8688-b373-4326-bd79-f8a899bd8604/qr-code",
+    "snap_url": null,
+    "created": "2025-09-05T07:12:17.338Z",
     "payment_type": "qris",
     "acquirer": "gopay",
-    "cachedAt": "2025-09-05T06:57:24.756Z"
-  },
-  "TRX-BCCF0D816F-1757055204159": {
-    "order_id": "TRX-BCCF0D816F-1757055204159",
-    "transaction_status": "pending",
-    "payment_type": "qris",
-    "gross_amount": "1091.00",
-    "transaction_time": "2025-09-05 13:53:24",
-    "fraud_status": "accept",
-    "status_code": "201",
-    "status_message": "Success, transaction is found",
-    "cachedAt": "2025-09-05T06:58:04.975Z"
-  },
-  "TRX-BCCF0D816F-1757055204159-SNAP": {
-    "order_id": "TRX-BCCF0D816F-1757055204159-SNAP",
-    "transaction_status": "settlement",
-    "payment_type": "qris",
-    "gross_amount": "1091.00",
-    "transaction_time": "2025-09-05 13:53:49",
-    "settlement_time": "2025-09-05 13:54:00",
-    "fraud_status": "accept",
-    "status_code": "200",
-    "status_message": "Success, transaction is found",
-    "cachedAt": "2025-09-05T06:58:05.057Z"
+    "cachedAt": "2025-09-05T07:12:17.340Z"
   }
 }
