@@ -46,27 +46,30 @@ Environment: Sandbox (for testing)
    - Validate product ID and stock availability
    - Verify quantity is positive integer
 
-2. **Payment Creation**
+2. **Dual Payment Creation**
    - Calculate total amount (price × quantity + unique code)
    - Generate unique order ID and reference ID
-   - Create Midtrans Snap payment link
+   - Create Midtrans Core API QRIS payment (for QR code)
+   - Create Midtrans Snap payment (for alternative payment methods)
 
 3. **Payment Notification**
-   - Send payment link with multiple payment options
+   - Download and display QRIS image from Midtrans
+   - Include Snap payment link for other payment methods
    - Set 30-minute expiration timer
-   - Store order data in database
+   - Store order data with both payment IDs in database
 
-4. **Payment Monitoring**
-   - Check payment status every 10 seconds
+4. **Dual Payment Monitoring**
+   - Check both Core API and Snap payment status every 10 seconds
+   - Monitor for payment completion from either method
+   - Identify which payment method was used
    - Handle payment completion or expiration
-   - Process product delivery upon successful payment
 
 5. **Order Completion**
    - Deduct stock and update sold count
    - Send account details to buyer's private chat
    - Send terms & conditions
-   - Notify admins of successful transaction
-   - Add transaction to database
+   - Notify admins with payment method details
+   - Add transaction to database with payment type
 
 ## 📱 User Experience
 

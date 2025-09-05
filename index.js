@@ -2628,7 +2628,8 @@ Ada transaksi dengan saldo yang telah selesai!
             reffId,
             totalAmount,
             uniqueCode,
-            paymentToken: paymentData.token,
+            paymentToken: paymentData.transaction_id,
+            snapOrderId: orderId + '-SNAP', // Order ID untuk SNAP payment
             metode: 'Midtrans'
           };
 
@@ -2644,9 +2645,18 @@ Ada transaksi dengan saldo yang telah selesai!
             }
 
             try {
-              const paymentStatus = await isPaymentCompleted(orderId);
+              // Cek status pembayaran untuk Core API dan SNAP
+              const corePaymentStatus = await isPaymentCompleted(orderId);
+              const snapPaymentStatus = db.data.order[sender].snapOrderId ? 
+                await isPaymentCompleted(db.data.order[sender].snapOrderId) : 
+                { status: 'PENDING' };
               
-              if (paymentStatus.status === 'PAID') {
+              console.log(`Core API Status: ${corePaymentStatus.status}, SNAP Status: ${snapPaymentStatus.status}`);
+              
+              // Jika salah satu pembayaran berhasil
+              if (corePaymentStatus.status === 'PAID' || snapPaymentStatus.status === 'PAID') {
+                const successfulPayment = corePaymentStatus.status === 'PAID' ? corePaymentStatus : snapPaymentStatus;
+                const paymentMethod = corePaymentStatus.status === 'PAID' ? 'Core API' : 'SNAP';
                 await ronzz.sendMessage(from, { delete: message.key });
                 reply("Pembayaran berhasil! Data akun akan segera diproses.");
 
@@ -2685,8 +2695,8 @@ Ada transaksi dengan saldo yang telah selesai!
 
                 if (isGroup) reply("Pembelian berhasil! Detail akun telah dikirim ke chat.");
 
-                // Notif Owner
-                await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text:
+                                 // Notif Owner
+                 await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text:
 `Hai Owner,
 Ada transaksi MIDTRANS yang telah selesai!
 
@@ -2697,27 +2707,27 @@ Ada transaksi MIDTRANS yang telah selesai!
 *┊・ 🏷️| Harga Barang:* Rp${toRupiahLocal(unitPrice)}
 *┊・ 🛍️| Jumlah Order:* ${quantityNum}
 *┊・ 💰| Total Bayar:* Rp${toRupiahLocal(totalAmount)}
-*┊・ 💳| Metode Bayar:* MIDTRANS
-*┊・ 🎯| Payment Type:* ${paymentStatus.payment_type || 'N/A'}
+*┊・ 💳| Metode Bayar:* MIDTRANS (${paymentMethod})
+*┊・ 🎯| Payment Type:* ${successfulPayment.payment_type || 'QRIS'}
 *┊・ 📅| Tanggal:* ${tanggal}
 *┊・ ⏰| Jam:* ${jamwib} WIB
 *╰┈┈┈┈┈┈┈┈*`, mentions: [sender] });
 
-                // Add to transaction database
-                db.data.transaksi.push({
-                  id: productId,
-                  name: product.name,
-                  price: unitPrice,
-                  date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
-                  profit: product.profit,
-                  jumlah: quantityNum,
-                  user: sender.split("@")[0],
-                  userRole: db.data.users[sender].role,
-                  reffId,
-                  metodeBayar: "Midtrans",
-                  totalBayar: totalAmount,
-                  paymentType: paymentStatus.payment_type
-                });
+                                 // Add to transaction database
+                 db.data.transaksi.push({
+                   id: productId,
+                   name: product.name,
+                   price: unitPrice,
+                   date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+                   profit: product.profit,
+                   jumlah: quantityNum,
+                   user: sender.split("@")[0],
+                   userRole: db.data.users[sender].role,
+                   reffId,
+                   metodeBayar: `Midtrans (${paymentMethod})`,
+                   totalBayar: totalAmount,
+                   paymentType: successfulPayment.payment_type || 'QRIS'
+                 });
                 await db.save();
 
                 // Check if stock is empty
@@ -2747,12 +2757,12 @@ Ada transaksi MIDTRANS yang telah selesai!
 
                 delete db.data.order[sender];
                 await db.save();
-                console.log(`✅ Midtrans Transaction completed: ${orderId} - ${reffId}`);
-                break;
-              }
-            } catch (error) {
-              console.error(`Error checking Midtrans payment for ${orderId}:`, error);
-            }
+                                 console.log(`✅ Midtrans Transaction completed via ${paymentMethod}: ${orderId} - ${reffId}`);
+                 break;
+               }
+                         } catch (error) {
+               console.error(`Error checking Midtrans payment for ${orderId} and ${db.data.order[sender].snapOrderId}:`, error);
+             }
           }
         } catch (error) {
           console.error(`Error processing Midtrans payment for ${productId}:`, error);
