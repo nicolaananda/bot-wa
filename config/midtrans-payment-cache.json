@@ -1,35 +1,48 @@
 {
-  "TEST-QRIS-1757054879166": {
-    "token": "d04e378a-0944-4638-aaf1-611badb6e0c3",
-    "order_id": "TEST-QRIS-1757054879166",
-    "amount": 15045,
+  "TEST-DUAL-1757055444289-SNAP": {
+    "token": "0d72877e-46df-47e3-b01e-bc5376f8639b",
+    "order_id": "TEST-DUAL-1757055444289-SNAP",
+    "amount": 1091,
     "status": "pending",
-    "qr_string": "d04e378a-0944-4638-aaf1-611badb6e0c3",
-    "created": "2025-09-05T06:47:59.411Z",
-    "snap_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/d04e378a-0944-4638-aaf1-611badb6e0c3",
-    "cachedAt": "2025-09-05T06:47:59.411Z"
+    "qr_string": "0d72877e-46df-47e3-b01e-bc5376f8639b",
+    "created": "2025-09-05T06:57:24.750Z",
+    "snap_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/0d72877e-46df-47e3-b01e-bc5376f8639b",
+    "cachedAt": "2025-09-05T06:57:24.751Z"
   },
-  "TEST-QRIS-1757055085470-SNAP": {
-    "token": "00c71685-3a0f-4069-a738-0dee7e963c01",
-    "order_id": "TEST-QRIS-1757055085470-SNAP",
-    "amount": 15045,
+  "TEST-DUAL-1757055444289": {
+    "transaction_id": "f4eeb92f-9b1b-483c-a1a8-91bd619ffdc1",
+    "order_id": "TEST-DUAL-1757055444289",
+    "amount": 1091,
     "status": "pending",
-    "qr_string": "00c71685-3a0f-4069-a738-0dee7e963c01",
-    "created": "2025-09-05T06:51:25.896Z",
-    "snap_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/00c71685-3a0f-4069-a738-0dee7e963c01",
-    "cachedAt": "2025-09-05T06:51:25.896Z"
-  },
-  "TEST-QRIS-1757055085470": {
-    "transaction_id": "3f68e33d-a735-46a9-81b5-4b1bc55ee694",
-    "order_id": "TEST-QRIS-1757055085470",
-    "amount": 15045,
-    "status": "pending",
-    "qr_string": "https://api.sandbox.midtrans.com/v2/qris/3f68e33d-a735-46a9-81b5-4b1bc55ee694/qr-code",
-    "qr_image_url": "https://api.sandbox.midtrans.com/v2/qris/3f68e33d-a735-46a9-81b5-4b1bc55ee694/qr-code",
-    "snap_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/00c71685-3a0f-4069-a738-0dee7e963c01",
-    "created": "2025-09-05T06:51:25.897Z",
+    "qr_string": "https://api.sandbox.midtrans.com/v2/qris/f4eeb92f-9b1b-483c-a1a8-91bd619ffdc1/qr-code",
+    "qr_image_url": "https://api.sandbox.midtrans.com/v2/qris/f4eeb92f-9b1b-483c-a1a8-91bd619ffdc1/qr-code",
+    "snap_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/0d72877e-46df-47e3-b01e-bc5376f8639b",
+    "created": "2025-09-05T06:57:24.756Z",
     "payment_type": "qris",
     "acquirer": "gopay",
-    "cachedAt": "2025-09-05T06:51:25.897Z"
+    "cachedAt": "2025-09-05T06:57:24.756Z"
+  },
+  "TRX-BCCF0D816F-1757055204159": {
+    "order_id": "TRX-BCCF0D816F-1757055204159",
+    "transaction_status": "pending",
+    "payment_type": "qris",
+    "gross_amount": "1091.00",
+    "transaction_time": "2025-09-05 13:53:24",
+    "fraud_status": "accept",
+    "status_code": "201",
+    "status_message": "Success, transaction is found",
+    "cachedAt": "2025-09-05T06:58:04.975Z"
+  },
+  "TRX-BCCF0D816F-1757055204159-SNAP": {
+    "order_id": "TRX-BCCF0D816F-1757055204159-SNAP",
+    "transaction_status": "settlement",
+    "payment_type": "qris",
+    "gross_amount": "1091.00",
+    "transaction_time": "2025-09-05 13:53:49",
+    "settlement_time": "2025-09-05 13:54:00",
+    "fraud_status": "accept",
+    "status_code": "200",
+    "status_message": "Success, transaction is found",
+    "cachedAt": "2025-09-05T06:58:05.057Z"
   }
 }
