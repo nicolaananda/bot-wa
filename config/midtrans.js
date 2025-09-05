@@ -275,10 +275,10 @@ async function createQRISCore(amount, orderId, customerDetails = {}) {
     };
 
     const itemDetails = [{
-      id: 'PRODUCT',
-      price: amount,
-      quantity: 1,
-      name: 'Pembelian Produk Digital'
+      id: customerDetails.product_id || 'PRODUCT',
+      price: amount, // Total amount (termasuk kode unik) 
+      quantity: 1,   // Quantity selalu 1 karena price sudah total
+      name: customerDetails.product_name || 'Pembelian Produk Digital'
     }];
 
     const customerDetailsObj = {
