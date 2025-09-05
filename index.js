@@ -2604,14 +2604,15 @@ Ada transaksi dengan saldo yang telah selesai!
             `*Total:* Rp${toRupiah(totalAmount)}\n` +
             `*Waktu:* ${timeLeft} menit\n\n` +
             `📱 *Scan QRIS Midtrans di atas untuk pembayaran cepat*\n\n` +
-            `🔗 *Atau gunakan link ini untuk metode pembayaran lain:*\n${paymentData.snap_url || 'Link tidak tersedia'}\n\n` +
-            `*💳 Metode Pembayaran Tersedia:*\n` +
-            `• 💳 QRIS (Semua E-Wallet)\n` +
-            `• 🏦 Virtual Account (BCA, BNI, BRI, dll)\n` +
-            `• 🌐 Internet Banking\n` +
-            `• 💰 E-Wallet (DANA, GoPay, ShopeePay, dll)\n` +
-            `• 💳 Credit Card\n\n` +
-            `Scan QRIS atau klik link sebelum ${formattedTime} untuk pembayaran.\n\n` +
+            `💳 *Pembayaran melalui QRIS Midtrans*\n\n` +
+            `*💳 E-Wallet yang Didukung:*\n` +
+            `• 🟢 GoPay\n` +
+            `• 🟣 OVO\n` +
+            `• 🔵 DANA\n` +
+            `• 🟠 ShopeePay\n` +
+            `• 🔴 LinkAja\n` +
+            `• 🏦 Mobile Banking dengan QRIS\n\n` +
+            `Scan QRIS sebelum ${formattedTime} untuk pembayaran.\n\n` +
             `Jika ingin membatalkan, ketik *${prefix}batal*`;
 
           const message = await ronzz.sendMessage(from, {
@@ -2629,13 +2630,16 @@ Ada transaksi dengan saldo yang telah selesai!
             totalAmount,
             uniqueCode,
             paymentToken: paymentData.transaction_id,
-            snapOrderId: orderId + '-SNAP', // Order ID untuk SNAP payment
             metode: 'Midtrans'
           };
 
-          // Check payment status periodically
+          // Check payment status periodically (lebih sering untuk responsivitas)
+          let checkCount = 0;
           while (db.data.order[sender]) {
-            await sleep(10000);
+            checkCount++;
+            // Check lebih sering di awal (setiap 5 detik), kemudian setiap 10 detik
+            const sleepTime = checkCount <= 6 ? 5000 : 10000;
+            await sleep(sleepTime);
 
             if (Date.now() >= expirationTime) {
               await ronzz.sendMessage(from, { delete: message.key });
@@ -2645,18 +2649,13 @@ Ada transaksi dengan saldo yang telah selesai!
             }
 
             try {
-              // Cek status pembayaran untuk Core API dan SNAP
-              const corePaymentStatus = await isPaymentCompleted(orderId);
-              const snapPaymentStatus = db.data.order[sender].snapOrderId ? 
-                await isPaymentCompleted(db.data.order[sender].snapOrderId) : 
-                { status: 'PENDING' };
+              // Cek status pembayaran QRIS Core API saja
+              const paymentStatus = await isPaymentCompleted(orderId);
               
-              console.log(`Core API Status: ${corePaymentStatus.status}, SNAP Status: ${snapPaymentStatus.status}`);
+              console.log(`QRIS Payment Status: ${paymentStatus.status}`);
               
-              // Jika salah satu pembayaran berhasil
-              if (corePaymentStatus.status === 'PAID' || snapPaymentStatus.status === 'PAID') {
-                const successfulPayment = corePaymentStatus.status === 'PAID' ? corePaymentStatus : snapPaymentStatus;
-                const paymentMethod = corePaymentStatus.status === 'PAID' ? 'Core API' : 'SNAP';
+              // Jika pembayaran berhasil
+              if (paymentStatus.status === 'PAID') {
                 await ronzz.sendMessage(from, { delete: message.key });
                 reply("Pembayaran berhasil! Data akun akan segera diproses.");
 
@@ -2698,7 +2697,7 @@ Ada transaksi dengan saldo yang telah selesai!
                                  // Notif Owner
                  await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text:
 `Hai Owner,
-Ada transaksi MIDTRANS yang telah selesai!
+Ada transaksi MIDTRANS QRIS yang telah selesai!
 
 *╭────「 TRANSAKSI DETAIL 」───*
 *┊・ 🧾| Reff Id:* ${reffId}
@@ -2707,8 +2706,8 @@ Ada transaksi MIDTRANS yang telah selesai!
 *┊・ 🏷️| Harga Barang:* Rp${toRupiahLocal(unitPrice)}
 *┊・ 🛍️| Jumlah Order:* ${quantityNum}
 *┊・ 💰| Total Bayar:* Rp${toRupiahLocal(totalAmount)}
-*┊・ 💳| Metode Bayar:* MIDTRANS (${paymentMethod})
-*┊・ 🎯| Payment Type:* ${successfulPayment.payment_type || 'QRIS'}
+*┊・ 💳| Metode Bayar:* MIDTRANS QRIS
+*┊・ 🎯| Payment Type:* ${paymentStatus.payment_type || 'QRIS'}
 *┊・ 📅| Tanggal:* ${tanggal}
 *┊・ ⏰| Jam:* ${jamwib} WIB
 *╰┈┈┈┈┈┈┈┈*`, mentions: [sender] });
@@ -2724,9 +2723,9 @@ Ada transaksi MIDTRANS yang telah selesai!
                    user: sender.split("@")[0],
                    userRole: db.data.users[sender].role,
                    reffId,
-                   metodeBayar: `Midtrans (${paymentMethod})`,
+                   metodeBayar: "Midtrans QRIS",
                    totalBayar: totalAmount,
-                   paymentType: successfulPayment.payment_type || 'QRIS'
+                   paymentType: paymentStatus.payment_type || 'QRIS'
                  });
                 await db.save();
 
@@ -2740,7 +2739,7 @@ Ada transaksi MIDTRANS yang telah selesai!
                     `*🛒 Terjual Terakhir:* ${quantityNum} akun\n` +
                     `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
                     `*💰 Total Transaksi:* Rp${toRupiahLocal(totalAmount)}\n` +
-                    `*💳 Metode Bayar:* Midtrans\n` +
+                                         `*💳 Metode Bayar:* Midtrans QRIS\n` +
                     `*📅 Tanggal:* ${tanggal}\n` +
                     `*⏰ Jam:* ${jamwib} WIB\n\n` +
                     `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
@@ -2757,11 +2756,11 @@ Ada transaksi MIDTRANS yang telah selesai!
 
                 delete db.data.order[sender];
                 await db.save();
-                                 console.log(`✅ Midtrans Transaction completed via ${paymentMethod}: ${orderId} - ${reffId}`);
+                                 console.log(`✅ Midtrans QRIS Transaction completed: ${orderId} - ${reffId}`);
                  break;
                }
                          } catch (error) {
-               console.error(`Error checking Midtrans payment for ${orderId} and ${db.data.order[sender].snapOrderId}:`, error);
+               console.error(`Error checking Midtrans QRIS payment for ${orderId}:`, error);
              }
           }
         } catch (error) {

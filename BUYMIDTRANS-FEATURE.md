@@ -46,30 +46,28 @@ Environment: Sandbox (for testing)
    - Validate product ID and stock availability
    - Verify quantity is positive integer
 
-2. **Dual Payment Creation**
+2. **QRIS Payment Creation**
    - Calculate total amount (price × quantity + unique code)
    - Generate unique order ID and reference ID
-   - Create Midtrans Core API QRIS payment (for QR code)
-   - Create Midtrans Snap payment (for alternative payment methods)
+   - Create Midtrans Core API QRIS payment only
 
 3. **Payment Notification**
    - Download and display QRIS image from Midtrans
-   - Include Snap payment link for other payment methods
+   - Show supported e-wallets (GoPay, OVO, DANA, ShopeePay, LinkAja)
    - Set 30-minute expiration timer
-   - Store order data with both payment IDs in database
+   - Store order data in database
 
-4. **Dual Payment Monitoring**
-   - Check both Core API and Snap payment status every 10 seconds
-   - Monitor for payment completion from either method
-   - Identify which payment method was used
+4. **Payment Monitoring**
+   - Check QRIS payment status every 5-10 seconds (optimized)
+   - Cache TTL reduced to 30 seconds for faster updates
    - Handle payment completion or expiration
 
 5. **Order Completion**
    - Deduct stock and update sold count
    - Send account details to buyer's private chat
    - Send terms & conditions
-   - Notify admins with payment method details
-   - Add transaction to database with payment type
+   - Notify admins of QRIS payment completion
+   - Add transaction to database as "Midtrans QRIS"
 
 ## 📱 User Experience
 

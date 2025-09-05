@@ -29,7 +29,7 @@ const MIDTRANS_IS_PRODUCTION = envConfig.MIDTRANS_IS_PRODUCTION === 'true' || fa
 // Local payment storage to avoid repeated API calls
 const paymentCache = new Map();
 const PAYMENT_CACHE_FILE = path.join(__dirname, 'midtrans-payment-cache.json');
-const CACHE_TTL = 5 * 60 * 1000; // Cache TTL: 5 minutes
+const CACHE_TTL = 30 * 1000; // Cache TTL: 30 seconds (lebih responsif untuk payment monitoring)
 
 // Load payment cache from file
 function loadPaymentCache() {
@@ -318,13 +318,8 @@ async function createQRISCore(amount, orderId, customerDetails = {}) {
       }
     }
     
-    // Juga buat Snap payment untuk link alternatif
-    try {
-      const snapPayment = await createQRISPayment(amount, orderId + '-SNAP', customerDetails);
-      snapUrl = snapPayment.snap_url;
-    } catch (snapError) {
-      console.warn('Failed to create Snap payment for alternative link:', snapError.message);
-    }
+    // Tidak perlu SNAP payment, hanya gunakan Core API QRIS saja
+    snapUrl = null;
     
     const paymentData = {
       transaction_id: result.transaction_id,
@@ -391,6 +386,12 @@ async function isPaymentCompleted(orderId) {
     
     const isCompleted = status.transaction_status === 'settlement' || 
                        status.transaction_status === 'capture';
+    
+    // Jika status berubah menjadi completed, clear cache untuk memastikan data terbaru
+    if (isCompleted) {
+      clearCachedPaymentData(orderId);
+      console.log(`✅ Payment completed for ${orderId}, cache cleared`);
+    }
     
     return {
       status: isCompleted ? 'PAID' : 'PENDING',
