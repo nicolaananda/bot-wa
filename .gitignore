@@ -1,6 +1,48 @@
-node_modules
-backup/
-session_backup
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Session data
+session/
 sessionsession/
-session/
-session/
+session_backup/
+backup/
+
+# Environment variables (CRITICAL - Never commit these!)
+.env
+.env.local
+.env.production
+.env.staging
+
+# Cache files
+midtrans-payment-cache.json
+*.cache
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Database backups (may contain sensitive data)
+database_backup_*.json

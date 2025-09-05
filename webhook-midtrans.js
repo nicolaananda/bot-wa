@@ -6,7 +6,12 @@ const app = express();
 app.use(express.json());
 
 // Midtrans Server Key untuk verifikasi signature
-const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY || 'Mid-server-gKkldwQbOCiluq1JardRR_bk';
+// Load and validate environment variables securely
+const envValidator = require('./config/env-validator');
+const validatedConfig = envValidator.validateOrExit();
+
+// Secure Midtrans Server Key from validated environment
+const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
 
 /**
  * Verify Midtrans notification signature
