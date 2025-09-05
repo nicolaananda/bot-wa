@@ -19,12 +19,20 @@ try {
   console.log('No .env file found, using default config');
 }
 
-// Midtrans configuration
-const MIDTRANS_SERVER_KEY = envConfig.MIDTRANS_SERVER_KEY || 'Mid-server-gKkldwQbOCiluq1JardRR_bk';
-const MIDTRANS_CLIENT_KEY = envConfig.MIDTRANS_CLIENT_KEY || 'Mid-client-nAhxrcVaalVHQMkv';
-const MIDTRANS_MERCHANT_ID = envConfig.MIDTRANS_MERCHANT_ID || 'G636278165';
-const MIDTRANS_BASE_URL = envConfig.MIDTRANS_BASE_URL || 'https://api.sandbox.midtrans.com';
-const MIDTRANS_IS_PRODUCTION = envConfig.MIDTRANS_IS_PRODUCTION === 'true' || false;
+// Load and validate environment variables securely
+const envValidator = require('./env-validator');
+const validatedConfig = envValidator.validateOrExit();
+
+// Secure Midtrans configuration from validated environment
+const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
+const MIDTRANS_CLIENT_KEY = process.env.MIDTRANS_CLIENT_KEY;
+const MIDTRANS_MERCHANT_ID = process.env.MIDTRANS_MERCHANT_ID;
+const MIDTRANS_IS_PRODUCTION = process.env.MIDTRANS_IS_PRODUCTION === 'true';
+
+// Determine API base URL based on environment
+const MIDTRANS_BASE_URL = MIDTRANS_IS_PRODUCTION 
+  ? 'https://api.midtrans.com'
+  : 'https://api.sandbox.midtrans.com';
 
 // Local payment storage to avoid repeated API calls
 const paymentCache = new Map();
