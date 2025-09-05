@@ -2556,7 +2556,11 @@ Ada transaksi dengan saldo yang telah selesai!
           // Create Midtrans payment menggunakan Core API untuk mendapatkan QRIS
           const customerDetails = {
             first_name: pushname || 'Customer',
-            phone: sender.split('@')[0]
+            phone: sender.split('@')[0],
+            product_id: productId,
+            product_name: product.name,
+            unit_price: unitPrice,
+            quantity: quantityNum
           };
 
           const paymentData = await createQRISCore(totalAmount, orderId, customerDetails);
@@ -2707,7 +2711,7 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
 *┊・ 🏷️| Harga Barang:* Rp${toRupiahLocal(unitPrice)}
 *┊・ 🛍️| Jumlah Order:* ${quantityNum}
 *┊・ 💰| Total Bayar:* Rp${toRupiahLocal(totalAmount)}
-*┊・ 💳| Metode Bayar:* MIDTRANS QRIS
+*┊・ 💳| Metode Bayar:* QRIS
 *┊・ 🎯| Payment Type:* ${paymentStatus.payment_type || 'QRIS'}
 *┊・ 📅| Tanggal:* ${tanggal}
 *┊・ ⏰| Jam:* ${jamwib} WIB
