@@ -12,13 +12,11 @@ Server Key: Mid-server-gKkldwQbOCiluq1JardRR_bk
 Environment: Sandbox (for testing)
 ```
 
-## 💳 Available Payment Methods
-- **QRIS** - Universal QR Code for all e-wallets
-- **E-Wallets**: DANA, GoPay, ShopeePay, OVO, LinkAja
-- **Virtual Account**: BCA, BNI, BRI, Permata, Mandiri
-- **Internet Banking**: BCA KlikBCA, BRI E-Pay, Mandiri ClickPay, CIMB Clicks, Danamon Online
-- **Credit Card**: Visa, MasterCard, JCB
-- **Other**: Telkomsel Cash, Akulaku
+## 💳 Available Payment Methods (QRIS Only)
+- **QRIS** - Universal QR Code supporting all major e-wallets
+- **E-Wallets via QRIS**: GoPay, OVO, DANA, ShopeePay, LinkAja
+- **Mobile Banking via QRIS**: BCA Mobile, BNI Mobile, BRI Mobile, Mandiri Online, dll
+- **Other QRIS-compatible apps**: Semua aplikasi yang mendukung standar QRIS Indonesia
 
 ## 📋 Usage
 

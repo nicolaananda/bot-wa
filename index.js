@@ -2604,6 +2604,7 @@ Ada transaksi dengan saldo yang telah selesai!
             `*Total:* Rp${toRupiah(totalAmount)}\n` +
             `*Waktu:* ${timeLeft} menit\n\n` +
             `📱 *Scan QRIS Midtrans di atas untuk pembayaran cepat*\n\n` +
+            `🔗 *Link QRIS (jika gambar tidak muncul):*\n${paymentData.qr_image_url}\n\n` +
             `💳 *Pembayaran melalui QRIS Midtrans*\n\n` +
             `*💳 E-Wallet yang Didukung:*\n` +
             `• 🟢 GoPay\n` +
