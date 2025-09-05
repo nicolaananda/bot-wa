@@ -243,6 +243,111 @@ async function createQRISPayment(amount, orderId, customerDetails = {}) {
 }
 
 /**
+ * Get QRIS string from Midtrans QR code URL
+ */
+async function getQRISString(qrCodeUrl) {
+  try {
+    // Fetch the QR code data from Midtrans URL
+    const response = await fetch(qrCodeUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch QR code: ${response.status}`);
+    }
+    
+    // For now, we'll return the URL as the QRIS string
+    // In a real implementation, you might need to extract the actual QRIS data
+    return qrCodeUrl;
+  } catch (error) {
+    console.error('Error getting QRIS string:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create QRIS payment using Midtrans Core API to get QRIS string
+ */
+async function createQRISCore(amount, orderId, customerDetails = {}) {
+  try {
+    console.log(`Creating Midtrans Core API QRIS for amount: ${amount}, orderId: ${orderId}`);
+    
+    const transactionDetails = {
+      order_id: orderId,
+      gross_amount: amount
+    };
+
+    const itemDetails = [{
+      id: 'PRODUCT',
+      price: amount,
+      quantity: 1,
+      name: 'Pembelian Produk Digital'
+    }];
+
+    const customerDetailsObj = {
+      first_name: customerDetails.first_name || 'Customer',
+      last_name: customerDetails.last_name || '',
+      email: customerDetails.email || 'customer@example.com',
+      phone: customerDetails.phone || '08123456789'
+    };
+
+    // Gunakan Core API untuk mendapatkan QRIS string
+    const coreRequest = {
+      payment_type: 'qris',
+      transaction_details: transactionDetails,
+      item_details: itemDetails,
+      customer_details: customerDetailsObj,
+      qris: {
+        acquirer: 'gopay'
+      }
+    };
+
+    console.log('Midtrans Core API QRIS request:', JSON.stringify(coreRequest, null, 2));
+    
+    // Gunakan Core API charge endpoint
+    const result = await makeMidtransRequest('/v2/charge', 'POST', coreRequest);
+    console.log('Midtrans Core API QRIS created successfully:', result);
+    
+    // Dapatkan QRIS string dari actions
+    let qrisString = null;
+    let qrImageUrl = null;
+    let snapUrl = null;
+    
+    if (result.actions && result.actions.length > 0) {
+      const qrAction = result.actions.find(action => action.name === 'generate-qr-code');
+      if (qrAction && qrAction.url) {
+        qrImageUrl = qrAction.url;
+        qrisString = qrAction.url; // URL to get QR image
+      }
+    }
+    
+    // Juga buat Snap payment untuk link alternatif
+    try {
+      const snapPayment = await createQRISPayment(amount, orderId + '-SNAP', customerDetails);
+      snapUrl = snapPayment.snap_url;
+    } catch (snapError) {
+      console.warn('Failed to create Snap payment for alternative link:', snapError.message);
+    }
+    
+    const paymentData = {
+      transaction_id: result.transaction_id,
+      order_id: orderId,
+      amount: amount,
+      status: 'pending',
+      qr_string: qrisString,
+      qr_image_url: qrImageUrl,
+      snap_url: snapUrl,
+      created: new Date().toISOString(),
+      payment_type: 'qris',
+      acquirer: 'gopay'
+    };
+    
+    storePaymentData(orderId, paymentData);
+    return paymentData;
+  } catch (error) {
+    console.error('Error creating Midtrans Core API QRIS:', error);
+    throw new Error(`Failed to create Midtrans QRIS: ${error.message}`);
+  }
+}
+
+/**
  * Get payment status by order ID
  */
 async function getPaymentStatus(orderId) {
@@ -340,6 +445,8 @@ async function getServiceStatus() {
 
 module.exports = {
   createQRISPayment,
+  createQRISCore,
+  getQRISString,
   getPaymentStatus,
   isPaymentCompleted,
   getPaymentDetails,
