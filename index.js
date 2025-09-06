@@ -1643,6 +1643,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           teks += `*┊・* Cara membeli: ${prefix}buy kodeproduk jumlah\n`
           teks += `*┊・* Contoh: ${prefix}buy netflix 2\n`
           teks += `*┊・* Kontak Admin: @${ownerNomer}\n`
+          teks += `*┊・* _⏰ Pesan ini akan terhapus otomatis dalam 5 menit_\n`
           teks += `*╰┈┈┈┈┈┈┈┈*\n\n`
 
           // Process each product safely
@@ -1688,10 +1689,22 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           }
 
           // Send the message
-          ronzz.sendMessage(from, { 
+          const sentMessage = await ronzz.sendMessage(from, { 
             text: teks, 
             mentions: [ownerNomer + "@s.whatsapp.net"] 
           }, { quoted: m })
+
+          // Auto delete setelah 5 menit (300000 ms)
+          setTimeout(async () => {
+            try {
+              await ronzz.sendMessage(from, {
+                delete: sentMessage.key
+              })
+              console.log(`🗑️ Auto-deleted stok list message after 5 minutes`)
+            } catch (deleteError) {
+              console.error(`❌ Failed to auto-delete stok message:`, deleteError.message)
+            }
+          }, 300000) // 5 menit = 300000 ms
           
         } catch (error) {
           console.error('❌ Error in stok command:', error)
@@ -2852,14 +2865,27 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
         teks += `   ✍️ Beli: ${prefix}buy ${productId} 1\n\n`
       })
   
-      teks += `*╰────「 END LIST 」────╯*\n\n`
+            teks += `*╰────「 END LIST 」────╯*\n\n`
       teks += `*💡 Cara membeli:* ${prefix}buy kodeproduk jumlah\n`
-      teks += `*📞 Kontak Admin:* @${ownerNomer}`
-  
-      ronzz.sendMessage(from, {
+      teks += `*📞 Kontak Admin:* @${ownerNomer}\n\n`
+      teks += `_⏰ Pesan ini akan terhapus otomatis dalam 5 menit_`
+
+      const sentMessage = await ronzz.sendMessage(from, {
         text: teks,
         mentions: [ownerNomer + "@s.whatsapp.net"]
       }, { quoted: m })
+
+      // Auto delete setelah 5 menit (300000 ms)
+      setTimeout(async () => {
+        try {
+          await ronzz.sendMessage(from, {
+            delete: sentMessage.key
+          })
+          console.log(`🗑️ Auto-deleted ${command} product list message after 5 minutes`)
+        } catch (deleteError) {
+          console.error(`❌ Failed to auto-delete ${command} message:`, deleteError.message)
+        }
+      }, 300000) // 5 menit = 300000 ms
   
     } catch (e) {
       console.error(`❌ Error in ${command} command:`, e)
