@@ -2270,30 +2270,47 @@ break;
                           const soldItems = stock.splice(0, quantityNum);
                           await db.save();
 
-                          let detailAkun = `*📦 Produk:* ${product.name}\n`
-                          detailAkun += `*📅 Tanggal:* ${tanggal}\n`
-                          detailAkun += `*⏰ Jam:* ${jamwib} WIB\n\n`
+                          // Buat detail akun untuk customer (gabungan akun + SNK)
+                          let detailAkunCustomer = `*📦 Produk:* ${product.name}\n`
+                          detailAkunCustomer += `*📅 Tanggal:* ${tanggal}\n`
+                          detailAkunCustomer += `*⏰ Jam:* ${jamwib} WIB\n\n`
                           soldItems.forEach((i, index) => {
                             let dataAkun = i.split("|")
-                            detailAkun += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
-                            detailAkun += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
-                            detailAkun += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`
-                            detailAkun += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`
-                            detailAkun += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`
+                            detailAkunCustomer += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
+                            detailAkunCustomer += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
+                            detailAkunCustomer += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`
+                            detailAkunCustomer += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`
+                            detailAkunCustomer += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`
+                          })
+                          
+                          // Tambahkan SNK ke pesan customer
+                          detailAkunCustomer += `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`
+                          detailAkunCustomer += `*📋 SNK PRODUK: ${product.name}*\n\n`
+                          detailAkunCustomer += `${product.snk}\n\n`
+                          detailAkunCustomer += `*⚠️ PENTING:*\n`
+                          detailAkunCustomer += `• Baca dan pahami SNK sebelum menggunakan akun\n`
+                          detailAkunCustomer += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`
+                          detailAkunCustomer += `• Hubungi admin jika ada masalah dengan akun\n\n`
+                          detailAkunCustomer += `*╰────「 END SNK 」────╯*`
+
+                          // Buat detail akun untuk owner (hanya informasi akun)
+                          let detailAkunOwner = `*📦 Produk:* ${product.name}\n`
+                          detailAkunOwner += `*📅 Tanggal:* ${tanggal}\n`
+                          detailAkunOwner += `*⏰ Jam:* ${jamwib} WIB\n\n`
+                          soldItems.forEach((i, index) => {
+                            let dataAkun = i.split("|")
+                            detailAkunOwner += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
+                            detailAkunOwner += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
+                            detailAkunOwner += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`
+                            detailAkunOwner += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`
+                            detailAkunOwner += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`
                           })
 
-                          await ronzz.sendMessage(sender, { text: detailAkun }, { quoted: m })
-                          await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkun }, { quoted: m })
-
-                          let snkProduk = `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`
-                          snkProduk += `*📋 SNK PRODUK: ${product.name}*\n\n`
-                          snkProduk += `${product.snk}\n\n`
-                          snkProduk += `*⚠️ PENTING:*\n`
-                          snkProduk += `• Baca dan pahami SNK sebelum menggunakan akun\n`
-                          snkProduk += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`
-                          snkProduk += `• Hubungi admin jika ada masalah dengan akun\n\n`
-                          snkProduk += `*╰────「 END SNK 」────╯*`
-                          await ronzz.sendMessage(sender, { text: snkProduk }, { quoted: m })
+                          // Kirim ke customer (1 pesan lengkap dengan akun + SNK)
+                          await ronzz.sendMessage(sender, { text: detailAkunCustomer }, { quoted: m })
+                          
+                          // Kirim ke owner (hanya detail akun)
+                          await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkunOwner }, { quoted: m })
 
                           if (isGroup) {
                             reply("Pembelian berhasil! Detail akun telah dikirim ke chat.")
