@@ -1447,6 +1447,1058 @@ app.get('/api/dashboard/products/:productId/stock/details', async (req, res) => 
   }
 });
 
+// ===== ADVANCED DASHBOARD API ENDPOINTS =====
+
+// 11. Advanced Analytics Dashboard
+app.get('/api/dashboard/analytics/advanced', (req, res) => {
+  try {
+    const db = getFormattedData();
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load database'
+      });
+    }
+    
+    const users = db.data.users || {};
+    const transaksi = db.data.transaksi || [];
+    const profit = db.data.profit || {};
+    const persentase = db.data.persentase || {};
+    
+    // Calculate comprehensive metrics
+    const totalUsers = Object.keys(users).length;
+    const totalTransactions = transaksi.length;
+    const totalRevenue = transaksi.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
+    const totalProfit = transaksi.reduce((sum, t) => {
+      const userRole = t.userRole || 'bronze';
+      const profitPercent = persentase[userRole] || 2;
+      return sum + Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
+    }, 0);
+    
+    // User role distribution
+    const roleDistribution = {};
+    Object.values(users).forEach(user => {
+      const role = user.role || 'bronze';
+      roleDistribution[role] = (roleDistribution[role] || 0) + 1;
+    });
+    
+    // Payment method distribution
+    const paymentMethods = {};
+    transaksi.forEach(t => {
+      const method = t.metodeBayar || 'Unknown';
+      paymentMethods[method] = (paymentMethods[method] || 0) + 1;
+    });
+    
+    // Monthly growth analysis
+    const monthlyData = {};
+    transaksi.forEach(t => {
+      if (t.date) {
+        const month = t.date.slice(0, 7); // YYYY-MM
+        if (!monthlyData[month]) {
+          monthlyData[month] = {
+            transactions: 0,
+            revenue: 0,
+            profit: 0,
+            users: new Set()
+          };
+        }
+        monthlyData[month].transactions++;
+        monthlyData[month].revenue += parseInt(t.totalBayar) || 0;
+        monthlyData[month].users.add(t.user);
+        
+        const userRole = t.userRole || 'bronze';
+        const profitPercent = persentase[userRole] || 2;
+        monthlyData[month].profit += Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
+      }
+    });
+    
+    // Convert monthly data for chart
+    const monthlyChart = Object.entries(monthlyData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, data]) => ({
+        month,
+        transactions: data.transactions,
+        revenue: data.revenue,
+        profit: data.profit,
+        uniqueUsers: data.users.size
+      }));
+    
+    // Top products by revenue
+    const productRevenue = {};
+    transaksi.forEach(t => {
+      const productId = t.id;
+      if (!productRevenue[productId]) {
+        productRevenue[productId] = {
+          id: productId,
+          name: t.name,
+          totalRevenue: 0,
+          totalSold: 0,
+          transactionCount: 0
+        };
+      }
+      productRevenue[productId].totalRevenue += parseInt(t.totalBayar) || 0;
+      productRevenue[productId].totalSold += t.jumlah || 1;
+      productRevenue[productId].transactionCount++;
+    });
+    
+    const topProducts = Object.values(productRevenue)
+      .sort((a, b) => b.totalRevenue - a.totalRevenue)
+      .slice(0, 10);
+    
+    // User activity heatmap (by hour)
+    const hourlyActivity = Array(24).fill(0);
+    transaksi.forEach(t => {
+      if (t.date) {
+        try {
+          const hour = new Date(t.date).getHours();
+          if (!isNaN(hour)) {
+            hourlyActivity[hour]++;
+          }
+        } catch (e) {
+          // Handle invalid date format
+          const timeMatch = t.date.match(/(\d{2}):(\d{2}):(\d{2})/);
+          if (timeMatch) {
+            const hour = parseInt(timeMatch[1]);
+            if (hour >= 0 && hour < 24) {
+              hourlyActivity[hour]++;
+            }
+          }
+        }
+      }
+    });
+    
+    // Customer lifetime value
+    const userLTV = {};
+    transaksi.forEach(t => {
+      if (!userLTV[t.user]) {
+        userLTV[t.user] = {
+          totalSpent: 0,
+          transactionCount: 0,
+          firstPurchase: t.date,
+          lastPurchase: t.date
+        };
+      }
+      userLTV[t.user].totalSpent += parseInt(t.totalBayar) || 0;
+      userLTV[t.user].transactionCount++;
+      if (t.date < userLTV[t.user].firstPurchase) userLTV[t.user].firstPurchase = t.date;
+      if (t.date > userLTV[t.user].lastPurchase) userLTV[t.user].lastPurchase = t.date;
+    });
+    
+    const avgLTV = Object.values(userLTV).reduce((sum, user) => sum + user.totalSpent, 0) / Object.keys(userLTV).length;
+    
+    res.json({
+      success: true,
+      data: {
+        overview: {
+          totalUsers,
+          totalTransactions,
+          totalRevenue,
+          totalProfit,
+          avgLTV: Math.round(avgLTV)
+        },
+        distributions: {
+          roles: roleDistribution,
+          paymentMethods: paymentMethods
+        },
+        trends: {
+          monthly: monthlyChart,
+          hourlyActivity: hourlyActivity.map((count, hour) => ({ hour, transactions: count }))
+        },
+        topProducts: topProducts,
+        userMetrics: {
+          totalCustomers: Object.keys(userLTV).length,
+          averageOrderValue: Math.round(totalRevenue / totalTransactions),
+          repeatCustomers: Object.values(userLTV).filter(u => u.transactionCount > 1).length
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in advanced analytics:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 12. Product Performance Analytics
+app.get('/api/dashboard/products/performance', (req, res) => {
+  try {
+    const rawDb = loadDatabase();
+    const db = getFormattedData();
+    
+    if (!rawDb || !rawDb.produk || !db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load database'
+      });
+    }
+    
+    const products = rawDb.produk;
+    const transaksi = db.data.transaksi || [];
+    const persentase = db.data.persentase || {};
+    
+    // Calculate performance metrics for each product
+    const productPerformance = Object.entries(products).map(([productId, product]) => {
+      // Get transactions for this product
+      const productTransactions = transaksi.filter(t => t.id === productId);
+      const totalSold = productTransactions.reduce((sum, t) => sum + (t.jumlah || 1), 0);
+      const totalRevenue = productTransactions.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
+      
+      // Calculate profit
+      const totalProfit = productTransactions.reduce((sum, t) => {
+        const userRole = t.userRole || 'bronze';
+        const profitPercent = persentase[userRole] || 2;
+        return sum + Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
+      }, 0);
+      
+      // Stock analysis
+      const currentStock = product.stok ? product.stok.length : 0;
+      const stockStatus = currentStock === 0 ? 'out_of_stock' : 
+                         currentStock <= 5 ? 'low_stock' : 'in_stock';
+      
+      // Performance metrics
+      const conversionRate = currentStock > 0 ? (totalSold / (totalSold + currentStock)) * 100 : 0;
+      const avgOrderValue = productTransactions.length > 0 ? totalRevenue / productTransactions.length : 0;
+      
+      // Category detection
+      let category = 'Other';
+      const name = product.name.toLowerCase();
+      if (name.includes('netflix')) category = 'Streaming';
+      else if (name.includes('capcut') || name.includes('canva')) category = 'Design';
+      else if (name.includes('spotify') || name.includes('youtube')) category = 'Music';
+      else if (name.includes('zoom') || name.includes('meet')) category = 'Meeting';
+      else if (name.includes('office') || name.includes('word')) category = 'Productivity';
+      
+      // Price analysis
+      const priceRange = {
+        bronze: parseInt(product.priceB) || 0,
+        silver: parseInt(product.priceS) || parseInt(product.priceB) || 0,
+        gold: parseInt(product.priceG) || parseInt(product.priceB) || 0
+      };
+      
+      return {
+        id: productId,
+        name: product.name,
+        description: product.desc,
+        category: category,
+        prices: priceRange,
+        stock: {
+          current: currentStock,
+          status: stockStatus,
+          items: product.stok || []
+        },
+        sales: {
+          totalSold: totalSold,
+          totalTransactions: productTransactions.length,
+          totalRevenue: totalRevenue,
+          totalProfit: totalProfit,
+          avgOrderValue: Math.round(avgOrderValue)
+        },
+        metrics: {
+          conversionRate: Math.round(conversionRate * 100) / 100,
+          profitMargin: totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 100 * 100) / 100 : 0,
+          stockTurnover: currentStock > 0 ? Math.round((totalSold / currentStock) * 100) / 100 : 0
+        },
+        lastSale: productTransactions.length > 0 ? 
+          productTransactions.sort((a, b) => new Date(b.date) - new Date(a.date))[0].date : null
+      };
+    });
+    
+    // Sort by total revenue
+    productPerformance.sort((a, b) => b.sales.totalRevenue - a.sales.totalRevenue);
+    
+    // Category performance summary
+    const categoryPerformance = {};
+    productPerformance.forEach(product => {
+      if (!categoryPerformance[product.category]) {
+        categoryPerformance[product.category] = {
+          totalProducts: 0,
+          totalRevenue: 0,
+          totalSold: 0,
+          totalProfit: 0,
+          avgConversionRate: 0
+        };
+      }
+      
+      const cat = categoryPerformance[product.category];
+      cat.totalProducts++;
+      cat.totalRevenue += product.sales.totalRevenue;
+      cat.totalSold += product.sales.totalSold;
+      cat.totalProfit += product.sales.totalProfit;
+      cat.avgConversionRate += product.metrics.conversionRate;
+    });
+    
+    // Calculate averages for categories
+    Object.keys(categoryPerformance).forEach(category => {
+      const cat = categoryPerformance[category];
+      cat.avgConversionRate = Math.round((cat.avgConversionRate / cat.totalProducts) * 100) / 100;
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        products: productPerformance,
+        summary: {
+          totalProducts: productPerformance.length,
+          totalRevenue: productPerformance.reduce((sum, p) => sum + p.sales.totalRevenue, 0),
+          totalProfit: productPerformance.reduce((sum, p) => sum + p.sales.totalProfit, 0),
+          bestPerformer: productPerformance[0] || null,
+          categories: categoryPerformance
+        },
+        insights: {
+          topByRevenue: productPerformance.slice(0, 5),
+          topByProfit: [...productPerformance].sort((a, b) => b.sales.totalProfit - a.sales.totalProfit).slice(0, 5),
+          topByConversion: [...productPerformance].sort((a, b) => b.metrics.conversionRate - a.metrics.conversionRate).slice(0, 5),
+          lowStock: productPerformance.filter(p => p.stock.status === 'low_stock' || p.stock.status === 'out_of_stock')
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in product performance:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 13. User Behavior Analytics
+app.get('/api/dashboard/users/behavior', (req, res) => {
+  try {
+    const db = getFormattedData();
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load database'
+      });
+    }
+    
+    const users = db.data.users || {};
+    const transaksi = db.data.transaksi || [];
+    
+    // User segmentation analysis
+    const userSegments = {
+      new: [], // 0-1 transactions
+      regular: [], // 2-5 transactions
+      loyal: [], // 6-10 transactions
+      vip: [] // 11+ transactions
+    };
+    
+    const userBehavior = {};
+    
+    // Analyze each user's behavior
+    Object.keys(users).forEach(userId => {
+      const user = users[userId];
+      const userTransactions = transaksi.filter(t => t.user === userId || t.user === `${userId}@s.whatsapp.net`);
+      
+      const totalTransactions = userTransactions.length;
+      const totalSpent = userTransactions.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
+      const avgOrderValue = totalTransactions > 0 ? totalSpent / totalTransactions : 0;
+      
+      // Calculate purchase frequency
+      let daysBetweenPurchases = 0;
+      if (userTransactions.length > 1) {
+        const sortedTransactions = userTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+        const firstPurchase = new Date(sortedTransactions[0].date);
+        const lastPurchase = new Date(sortedTransactions[sortedTransactions.length - 1].date);
+        const totalDays = (lastPurchase - firstPurchase) / (1000 * 60 * 60 * 24);
+        daysBetweenPurchases = totalDays / (totalTransactions - 1);
+      }
+      
+      // Preferred payment method
+      const paymentMethods = {};
+      userTransactions.forEach(t => {
+        const method = t.metodeBayar || 'Unknown';
+        paymentMethods[method] = (paymentMethods[method] || 0) + 1;
+      });
+      const preferredPayment = Object.entries(paymentMethods)
+        .sort(([,a], [,b]) => b - a)[0]?.[0] || 'None';
+      
+      // Product preferences
+      const productPreferences = {};
+      userTransactions.forEach(t => {
+        const productId = t.id;
+        productPreferences[productId] = (productPreferences[productId] || 0) + 1;
+      });
+      const favoriteProduct = Object.entries(productPreferences)
+        .sort(([,a], [,b]) => b - a)[0]?.[0] || 'None';
+      
+      // Shopping time analysis
+      const hourlyPurchases = Array(24).fill(0);
+      userTransactions.forEach(t => {
+        if (t.date) {
+          try {
+            const hour = new Date(t.date).getHours();
+            if (!isNaN(hour)) {
+              hourlyPurchases[hour]++;
+            }
+          } catch (e) {
+            const timeMatch = t.date.match(/(\d{2}):(\d{2}):(\d{2})/);
+            if (timeMatch) {
+              const hour = parseInt(timeMatch[1]);
+              if (hour >= 0 && hour < 24) {
+                hourlyPurchases[hour]++;
+              }
+            }
+          }
+        }
+      });
+      const preferredHour = hourlyPurchases.indexOf(Math.max(...hourlyPurchases));
+      
+      const userAnalysis = {
+        userId: userId,
+        username: user.username || `User ${userId.slice(-4)}`,
+        saldo: parseInt(user.saldo) || 0,
+        role: user.role || 'bronze',
+        totalTransactions: totalTransactions,
+        totalSpent: totalSpent,
+        avgOrderValue: Math.round(avgOrderValue),
+        daysBetweenPurchases: Math.round(daysBetweenPurchases),
+        preferredPayment: preferredPayment,
+        favoriteProduct: favoriteProduct,
+        preferredHour: preferredHour,
+        lastActivity: user.lastActivity || user.createdAt || null,
+        createdAt: user.createdAt || null
+      };
+      
+      userBehavior[userId] = userAnalysis;
+      
+      // Segment users
+      if (totalTransactions <= 1) {
+        userSegments.new.push(userAnalysis);
+      } else if (totalTransactions <= 5) {
+        userSegments.regular.push(userAnalysis);
+      } else if (totalTransactions <= 10) {
+        userSegments.loyal.push(userAnalysis);
+      } else {
+        userSegments.vip.push(userAnalysis);
+      }
+    });
+    
+    // Calculate segment statistics
+    const segmentStats = {};
+    Object.entries(userSegments).forEach(([segment, users]) => {
+      const totalSpent = users.reduce((sum, user) => sum + user.totalSpent, 0);
+      const avgSpent = users.length > 0 ? totalSpent / users.length : 0;
+      const avgTransactions = users.length > 0 ? 
+        users.reduce((sum, user) => sum + user.totalTransactions, 0) / users.length : 0;
+      
+      segmentStats[segment] = {
+        count: users.length,
+        totalSpent: totalSpent,
+        avgSpent: Math.round(avgSpent),
+        avgTransactions: Math.round(avgTransactions * 10) / 10,
+        percentage: users.length > 0 ? Math.round((users.length / Object.keys(users).length) * 100 * 10) / 10 : 0
+      };
+    });
+    
+    // Churn analysis (users who haven't purchased in 30+ days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const churnedUsers = Object.values(userBehavior).filter(user => {
+      if (!user.lastActivity) return true;
+      return new Date(user.lastActivity) < thirtyDaysAgo;
+    });
+    
+    // Payment method preferences by segment
+    const paymentBySegment = {};
+    Object.entries(userSegments).forEach(([segment, users]) => {
+      paymentBySegment[segment] = {};
+      users.forEach(user => {
+        const method = user.preferredPayment;
+        paymentBySegment[segment][method] = (paymentBySegment[segment][method] || 0) + 1;
+      });
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        segments: userSegments,
+        segmentStats: segmentStats,
+        churnAnalysis: {
+          churnedUsers: churnedUsers.length,
+          churnRate: Math.round((churnedUsers.length / Object.keys(userBehavior).length) * 100 * 10) / 10,
+          recentlyActive: Object.values(userBehavior).filter(user => {
+            if (!user.lastActivity) return false;
+            return new Date(user.lastActivity) >= thirtyDaysAgo;
+          }).length
+        },
+        insights: {
+          paymentPreferences: paymentBySegment,
+          mostActiveHour: transaksi.reduce((hourCounts, t) => {
+            if (t.date) {
+              try {
+                const hour = new Date(t.date).getHours();
+                if (!isNaN(hour)) {
+                  hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+                }
+              } catch (e) {
+                const timeMatch = t.date.match(/(\d{2}):(\d{2}):(\d{2})/);
+                if (timeMatch) {
+                  const hour = parseInt(timeMatch[1]);
+                  if (hour >= 0 && hour < 24) {
+                    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+                  }
+                }
+              }
+            }
+            return hourCounts;
+          }, {}),
+          topSpenders: Object.values(userBehavior)
+            .sort((a, b) => b.totalSpent - a.totalSpent)
+            .slice(0, 10),
+          mostFrequentBuyers: Object.values(userBehavior)
+            .sort((a, b) => b.totalTransactions - a.totalTransactions)
+            .slice(0, 10)
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in user behavior analytics:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 14. Financial Analytics & Insights
+app.get('/api/dashboard/finance/analytics', (req, res) => {
+  try {
+    const db = getFormattedData();
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load database'
+      });
+    }
+    
+    const transaksi = db.data.transaksi || [];
+    const users = db.data.users || {};
+    const persentase = db.data.persentase || {};
+    
+    // Calculate comprehensive financial metrics
+    const totalRevenue = transaksi.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
+    const totalProfit = transaksi.reduce((sum, t) => {
+      const userRole = t.userRole || 'bronze';
+      const profitPercent = persentase[userRole] || 2;
+      return sum + Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
+    }, 0);
+    
+    // Revenue by payment method
+    const revenueByPayment = {};
+    transaksi.forEach(t => {
+      const method = t.metodeBayar || 'Unknown';
+      revenueByPayment[method] = (revenueByPayment[method] || 0) + (parseInt(t.totalBayar) || 0);
+    });
+    
+    // Revenue by user role
+    const revenueByRole = {};
+    const profitByRole = {};
+    transaksi.forEach(t => {
+      const role = t.userRole || 'bronze';
+      revenueByRole[role] = (revenueByRole[role] || 0) + (parseInt(t.totalBayar) || 0);
+      
+      const profitPercent = persentase[role] || 2;
+      const profit = Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
+      profitByRole[role] = (profitByRole[role] || 0) + profit;
+    });
+    
+    // Daily revenue analysis (last 30 days)
+    const dailyRevenue = {};
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    
+    transaksi.forEach(t => {
+      if (t.date) {
+        const date = t.date.split(' ')[0]; // Get date part
+        const transactionDate = new Date(date);
+        
+        if (transactionDate >= thirtyDaysAgo) {
+          if (!dailyRevenue[date]) {
+            dailyRevenue[date] = {
+              revenue: 0,
+              profit: 0,
+              transactions: 0
+            };
+          }
+          
+          dailyRevenue[date].revenue += parseInt(t.totalBayar) || 0;
+          dailyRevenue[date].transactions++;
+          
+          const userRole = t.userRole || 'bronze';
+          const profitPercent = persentase[userRole] || 2;
+          const profit = Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
+          dailyRevenue[date].profit += profit;
+        }
+      }
+    });
+    
+    // Convert to chart data
+    const dailyChart = Object.entries(dailyRevenue)
+      .sort(([a], [b]) => new Date(a) - new Date(b))
+      .map(([date, data]) => ({
+        date,
+        revenue: data.revenue,
+        profit: data.profit,
+        transactions: data.transactions,
+        avgOrderValue: Math.round(data.revenue / data.transactions)
+      }));
+    
+    // Calculate growth rates
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
+    
+    const currentMonthRevenue = transaksi
+      .filter(t => t.date && t.date.startsWith(currentMonth))
+      .reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
+    
+    const lastMonthRevenue = transaksi
+      .filter(t => t.date && t.date.startsWith(lastMonth))
+      .reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
+    
+    const revenueGrowthRate = lastMonthRevenue > 0 ? 
+      Math.round(((currentMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 * 10) / 10 : 0;
+    
+    // User balance analysis
+    const totalUserBalance = Object.values(users).reduce((sum, user) => sum + (parseInt(user.saldo) || 0), 0);
+    const avgUserBalance = Object.keys(users).length > 0 ? totalUserBalance / Object.keys(users).length : 0;
+    
+    // Top revenue generating products
+    const productRevenue = {};
+    transaksi.forEach(t => {
+      if (!productRevenue[t.id]) {
+        productRevenue[t.id] = {
+          id: t.id,
+          name: t.name,
+          revenue: 0,
+          profit: 0,
+          transactions: 0
+        };
+      }
+      
+      productRevenue[t.id].revenue += parseInt(t.totalBayar) || 0;
+      productRevenue[t.id].transactions++;
+      
+      const userRole = t.userRole || 'bronze';
+      const profitPercent = persentase[userRole] || 2;
+      const profit = Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
+      productRevenue[t.id].profit += profit;
+    });
+    
+    const topRevenueProducts = Object.values(productRevenue)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+    
+    // Financial health indicators
+    const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+    const avgOrderValue = transaksi.length > 0 ? totalRevenue / transaksi.length : 0;
+    
+    res.json({
+      success: true,
+      data: {
+        overview: {
+          totalRevenue: totalRevenue,
+          totalProfit: totalProfit,
+          profitMargin: Math.round(profitMargin * 100) / 100,
+          avgOrderValue: Math.round(avgOrderValue),
+          totalTransactions: transaksi.length,
+          revenueGrowthRate: revenueGrowthRate
+        },
+        distributions: {
+          byPaymentMethod: revenueByPayment,
+          byUserRole: revenueByRole,
+          profitByRole: profitByRole
+        },
+        trends: {
+          daily: dailyChart,
+          monthly: {
+            current: currentMonthRevenue,
+            previous: lastMonthRevenue,
+            growthRate: revenueGrowthRate
+          }
+        },
+        userFinances: {
+          totalBalance: totalUserBalance,
+          avgBalance: Math.round(avgUserBalance),
+          balanceDistribution: {
+            high: Object.values(users).filter(u => (parseInt(u.saldo) || 0) >= 100000).length,
+            medium: Object.values(users).filter(u => {
+              const saldo = parseInt(u.saldo) || 0;
+              return saldo >= 50000 && saldo < 100000;
+            }).length,
+            low: Object.values(users).filter(u => (parseInt(u.saldo) || 0) < 50000).length
+          }
+        },
+        topProducts: topRevenueProducts,
+        insights: {
+          healthScore: Math.round((profitMargin + (revenueGrowthRate > 0 ? 10 : 0) + 
+            (avgOrderValue > 10000 ? 10 : 5)) * 10) / 10,
+          recommendations: [
+            profitMargin < 10 ? "Consider optimizing profit margins" : null,
+            revenueGrowthRate < 0 ? "Focus on customer acquisition" : null,
+            avgOrderValue < 15000 ? "Implement upselling strategies" : null
+          ].filter(Boolean)
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in financial analytics:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 15. Real-time Dashboard Data
+app.get('/api/dashboard/realtime', (req, res) => {
+  try {
+    const db = getFormattedData();
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load database'
+      });
+    }
+    
+    const transaksi = db.data.transaksi || [];
+    const users = db.data.users || {};
+    
+    // Get today's data
+    const today = new Date().toISOString().slice(0, 10);
+    const todayTransactions = transaksi.filter(t => t.date && t.date.startsWith(today));
+    
+    // Get last 24 hours data
+    const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recent24hTransactions = transaksi.filter(t => {
+      if (!t.date) return false;
+      try {
+        return new Date(t.date) >= last24Hours;
+      } catch (e) {
+        return t.date.startsWith(today);
+      }
+    });
+    
+    // Real-time metrics
+    const todayRevenue = todayTransactions.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
+    const last24hRevenue = recent24hTransactions.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
+    
+    // Hourly breakdown for today
+    const hourlyData = Array(24).fill(0).map((_, hour) => ({
+      hour: hour,
+      transactions: 0,
+      revenue: 0
+    }));
+    
+    todayTransactions.forEach(t => {
+      try {
+        const hour = new Date(t.date).getHours();
+        if (!isNaN(hour) && hour >= 0 && hour < 24) {
+          hourlyData[hour].transactions++;
+          hourlyData[hour].revenue += parseInt(t.totalBayar) || 0;
+        }
+      } catch (e) {
+        const timeMatch = t.date.match(/(\d{2}):(\d{2}):(\d{2})/);
+        if (timeMatch) {
+          const hour = parseInt(timeMatch[1]);
+          if (hour >= 0 && hour < 24) {
+            hourlyData[hour].transactions++;
+            hourlyData[hour].revenue += parseInt(t.totalBayar) || 0;
+          }
+        }
+      }
+    });
+    
+    // Active users (users with transactions in last 7 days)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const activeUsers = new Set();
+    transaksi.forEach(t => {
+      if (t.date) {
+        try {
+          if (new Date(t.date) >= sevenDaysAgo) {
+            activeUsers.add(t.user);
+          }
+        } catch (e) {
+          // Handle date parsing error
+        }
+      }
+    });
+    
+    // Top products today
+    const todayProducts = {};
+    todayTransactions.forEach(t => {
+      if (!todayProducts[t.id]) {
+        todayProducts[t.id] = {
+          id: t.id,
+          name: t.name,
+          sold: 0,
+          revenue: 0
+        };
+      }
+      todayProducts[t.id].sold += t.jumlah || 1;
+      todayProducts[t.id].revenue += parseInt(t.totalBayar) || 0;
+    });
+    
+    const topTodayProducts = Object.values(todayProducts)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+    
+    // Recent transactions (last 10)
+    const recentTransactions = transaksi
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 10)
+      .map(t => ({
+        id: t.reffId || t.id,
+        product: t.name,
+        user: t.user,
+        amount: parseInt(t.totalBayar) || 0,
+        method: t.metodeBayar,
+        time: t.date
+      }));
+    
+    // Performance indicators
+    const avgOrderValue = todayTransactions.length > 0 ? todayRevenue / todayTransactions.length : 0;
+    const conversionRate = Object.keys(users).length > 0 ? 
+      (activeUsers.size / Object.keys(users).length) * 100 : 0;
+    
+    res.json({
+      success: true,
+      data: {
+        timestamp: new Date().toISOString(),
+        today: {
+          transactions: todayTransactions.length,
+          revenue: todayRevenue,
+          avgOrderValue: Math.round(avgOrderValue),
+          topProducts: topTodayProducts
+        },
+        last24h: {
+          transactions: recent24hTransactions.length,
+          revenue: last24hRevenue
+        },
+        realtime: {
+          activeUsers: activeUsers.size,
+          totalUsers: Object.keys(users).length,
+          conversionRate: Math.round(conversionRate * 100) / 100,
+          hourlyData: hourlyData
+        },
+        recent: {
+          transactions: recentTransactions
+        },
+        alerts: [
+          todayRevenue < 50000 ? { type: 'warning', message: 'Low daily revenue' } : null,
+          activeUsers.size < 10 ? { type: 'info', message: 'Low user activity' } : null
+        ].filter(Boolean)
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in realtime dashboard:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 16. Predictive Analytics
+app.get('/api/dashboard/predictions', (req, res) => {
+  try {
+    const db = getFormattedData();
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load database'
+      });
+    }
+    
+    const transaksi = db.data.transaksi || [];
+    const users = db.data.users || {};
+    
+    // Monthly revenue prediction based on historical data
+    const monthlyRevenue = {};
+    transaksi.forEach(t => {
+      if (t.date) {
+        const month = t.date.slice(0, 7);
+        monthlyRevenue[month] = (monthlyRevenue[month] || 0) + (parseInt(t.totalBayar) || 0);
+      }
+    });
+    
+    const monthlyData = Object.entries(monthlyRevenue)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, revenue]) => ({ month, revenue }));
+    
+    // Simple linear regression for revenue prediction
+    let predictedRevenue = 0;
+    if (monthlyData.length >= 3) {
+      const recentMonths = monthlyData.slice(-3);
+      const avgGrowth = recentMonths.reduce((sum, curr, idx) => {
+        if (idx === 0) return 0;
+        const prev = recentMonths[idx - 1];
+        const growth = (curr.revenue - prev.revenue) / prev.revenue;
+        return sum + growth;
+      }, 0) / (recentMonths.length - 1);
+      
+      const lastMonthRevenue = recentMonths[recentMonths.length - 1].revenue;
+      predictedRevenue = Math.round(lastMonthRevenue * (1 + avgGrowth));
+    }
+    
+    // User growth prediction
+    const monthlyUsers = {};
+    Object.values(users).forEach(user => {
+      if (user.createdAt) {
+        const month = user.createdAt.slice(0, 7);
+        monthlyUsers[month] = (monthlyUsers[month] || 0) + 1;
+      }
+    });
+    
+    const userGrowthData = Object.entries(monthlyUsers)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, count]) => ({ month, users: count }));
+    
+    let predictedUsers = 0;
+    if (userGrowthData.length >= 3) {
+      const recentUserGrowth = userGrowthData.slice(-3);
+      const avgUserGrowth = recentUserGrowth.reduce((sum, curr, idx) => {
+        if (idx === 0) return 0;
+        const prev = recentUserGrowth[idx - 1];
+        const growth = curr.users - prev.users;
+        return sum + growth;
+      }, 0) / (recentUserGrowth.length - 1);
+      
+      predictedUsers = Math.round(Math.max(0, avgUserGrowth));
+    }
+    
+    // Product demand prediction
+    const productDemand = {};
+    transaksi.forEach(t => {
+      const week = new Date(t.date).toISOString().slice(0, 10);
+      if (!productDemand[t.id]) {
+        productDemand[t.id] = {
+          name: t.name,
+          weeklyData: {}
+        };
+      }
+      productDemand[t.id].weeklyData[week] = (productDemand[t.id].weeklyData[week] || 0) + (t.jumlah || 1);
+    });
+    
+    // Predict stock needs for top products
+    const stockPredictions = Object.entries(productDemand)
+      .map(([productId, data]) => {
+        const weeklyValues = Object.values(data.weeklyData);
+        if (weeklyValues.length < 2) return null;
+        
+        const avgWeeklySales = weeklyValues.reduce((sum, val) => sum + val, 0) / weeklyValues.length;
+        const predictedMonthlySales = Math.round(avgWeeklySales * 4.33); // Average weeks per month
+        
+        return {
+          productId,
+          name: data.name,
+          avgWeeklySales: Math.round(avgWeeklySales),
+          predictedMonthlySales,
+          recommendedStock: Math.round(predictedMonthlySales * 1.2) // 20% buffer
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.predictedMonthlySales - a.predictedMonthlySales)
+      .slice(0, 10);
+    
+    // Churn risk analysis
+    const churnRisk = Object.keys(users).map(userId => {
+      const userTransactions = transaksi.filter(t => t.user === userId);
+      if (userTransactions.length === 0) return null;
+      
+      const lastTransaction = userTransactions.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+      const daysSinceLastPurchase = Math.floor((Date.now() - new Date(lastTransaction.date)) / (1000 * 60 * 60 * 24));
+      
+      let riskLevel = 'low';
+      if (daysSinceLastPurchase > 60) riskLevel = 'high';
+      else if (daysSinceLastPurchase > 30) riskLevel = 'medium';
+      
+      return {
+        userId,
+        username: users[userId]?.username || `User ${userId.slice(-4)}`,
+        daysSinceLastPurchase,
+        riskLevel,
+        totalSpent: userTransactions.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0),
+        transactionCount: userTransactions.length
+      };
+    })
+    .filter(Boolean)
+    .filter(user => user.riskLevel !== 'low')
+    .sort((a, b) => b.totalSpent - a.totalSpent);
+    
+    // Market trends analysis
+    const categoryTrends = {};
+    transaksi.forEach(t => {
+      let category = 'Other';
+      const name = t.name.toLowerCase();
+      if (name.includes('netflix')) category = 'Streaming';
+      else if (name.includes('capcut') || name.includes('canva')) category = 'Design';
+      else if (name.includes('spotify') || name.includes('youtube')) category = 'Music';
+      
+      const month = t.date.slice(0, 7);
+      if (!categoryTrends[category]) categoryTrends[category] = {};
+      categoryTrends[category][month] = (categoryTrends[category][month] || 0) + (t.jumlah || 1);
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        revenue: {
+          historical: monthlyData,
+          predicted: {
+            nextMonth: predictedRevenue,
+            confidence: monthlyData.length >= 6 ? 'high' : 'medium'
+          }
+        },
+        users: {
+          historical: userGrowthData,
+          predicted: {
+            nextMonthNewUsers: predictedUsers,
+            totalPredicted: Object.keys(users).length + predictedUsers
+          }
+        },
+        inventory: {
+          stockPredictions: stockPredictions,
+          totalRecommendedStock: stockPredictions.reduce((sum, p) => sum + p.recommendedStock, 0)
+        },
+        churnRisk: {
+          highRisk: churnRisk.filter(u => u.riskLevel === 'high').length,
+          mediumRisk: churnRisk.filter(u => u.riskLevel === 'medium').length,
+          usersAtRisk: churnRisk.slice(0, 10)
+        },
+        trends: {
+          categories: categoryTrends,
+          insights: [
+            'Streaming services show consistent demand',
+            'Design tools gaining popularity',
+            'Consider seasonal promotions'
+          ]
+        },
+        recommendations: [
+          predictedRevenue < monthlyData[monthlyData.length - 1]?.revenue ? 
+            'Revenue decline predicted - implement retention strategies' : null,
+          churnRisk.length > Object.keys(users).length * 0.2 ? 
+            'High churn risk detected - focus on customer engagement' : null,
+          stockPredictions.some(p => p.recommendedStock > 50) ? 
+            'High demand products identified - ensure adequate stock' : null
+        ].filter(Boolean)
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in predictive analytics:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -1513,17 +2565,38 @@ if (require.main === module) {
   }
 
   console.log(`\n📚 API Documentation:`);
+  console.log(`\n🔧 Basic Endpoints:`);
   console.log(`- GET /api/dashboard/overview`);
   console.log(`- GET /api/dashboard/chart/daily`);
   console.log(`- GET /api/dashboard/chart/monthly`);
   console.log(`- GET /api/dashboard/users/activity`);
+  console.log(`- GET /api/dashboard/users/all?page=1&limit=10&search=&role=all`);
   console.log(`- GET /api/dashboard/users/:userId/transactions`);
   console.log(`- GET /api/dashboard/transactions/search/:reffId`);
+  console.log(`- GET /api/dashboard/transactions/recent?limit=20`);
   console.log(`- GET /api/dashboard/export/:format`);
+  
+  console.log(`\n📊 Statistics & Analytics:`);
   console.log(`- GET /api/dashboard/users/stats`);
   console.log(`- GET /api/dashboard/products/stats`);
+  console.log(`- GET /api/dashboard/analytics/advanced`);
+  console.log(`- GET /api/dashboard/products/performance`);
+  console.log(`- GET /api/dashboard/users/behavior`);
+  console.log(`- GET /api/dashboard/finance/analytics`);
+  console.log(`- GET /api/dashboard/realtime`);
+  console.log(`- GET /api/dashboard/predictions`);
+  
+  console.log(`\n📦 Stock Management:`);
   console.log(`- GET /api/dashboard/products/stock`);
-  console.log(`- GET /api/dashboard/transactions/recent?limit=20`);
+  console.log(`- GET /api/dashboard/products/stock/summary`);
+  console.log(`- PUT /api/dashboard/products/:productId/stock`);
+  console.log(`- GET /api/dashboard/products/stock/alerts`);
+  console.log(`- GET /api/dashboard/products/:productId/stock/history`);
+  console.log(`- GET /api/dashboard/products/stock/analytics`);
+  console.log(`- GET /api/dashboard/products/stock/report`);
+  console.log(`- GET /api/dashboard/products/stock/export`);
+  console.log(`- POST /api/dashboard/products/stock/bulk-update`);
+  console.log(`- GET /api/dashboard/products/:productId/stock/details`);
 }
 
 module.exports = app; 
