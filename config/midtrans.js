@@ -35,7 +35,7 @@ const MIDTRANS_IS_PRODUCTION = process.env.MIDTRANS_IS_PRODUCTION === 'true';
 //   : 'https://api.sandbox.midtrans.com';
 const MIDTRANS_BASE_URL = MIDTRANS_IS_PRODUCTION 
   ? 'https://api.midtrans.com'
-  : 'https://api.midtrans.com';
+  : 'https://api.sandbox.midtrans.com';
 // Local payment storage to avoid repeated API calls
 const paymentCache = new Map();
 const PAYMENT_CACHE_FILE = path.join(__dirname, 'midtrans-payment-cache.json');
