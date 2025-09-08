@@ -43,7 +43,7 @@ class EnvValidator {
       },
       MIDTRANS_BASE_URL: {
         description: 'Midtrans API base URL',
-        default: 'https://api.sandbox.midtrans.com'
+        default: 'https://api.midtrans.com'
       }
     };
   }
