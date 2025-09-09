@@ -1,0 +1,12 @@
+{
+  "TEST-1757419464385": {
+    "token": "9f984f6e-0378-4a29-b003-05c3346968c0",
+    "order_id": "TEST-1757419464385",
+    "amount": 10000,
+    "status": "pending",
+    "qr_string": "9f984f6e-0378-4a29-b003-05c3346968c0",
+    "created": "2025-09-09T12:04:24.686Z",
+    "snap_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/9f984f6e-0378-4a29-b003-05c3346968c0",
+    "cachedAt": "2025-09-09T12:04:24.688Z"
+  }
+}
