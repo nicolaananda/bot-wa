@@ -1,12 +1,14 @@
 {
-  "TEST-1757419464385": {
-    "token": "9f984f6e-0378-4a29-b003-05c3346968c0",
-    "order_id": "TEST-1757419464385",
-    "amount": 10000,
+  "TRX-CORE-1757420129393": {
+    "transaction_id": "ea51b168-9601-4b60-8e2b-a2e4a106a6ce",
+    "order_id": "TRX-CORE-1757420129393",
+    "amount": 15010,
     "status": "pending",
-    "qr_string": "9f984f6e-0378-4a29-b003-05c3346968c0",
-    "created": "2025-09-09T12:04:24.686Z",
-    "snap_url": "https://app.sandbox.midtrans.com/snap/v4/redirection/9f984f6e-0378-4a29-b003-05c3346968c0",
-    "cachedAt": "2025-09-09T12:04:24.688Z"
+    "qr_string": "https://api.sandbox.midtrans.com/v2/qris/ea51b168-9601-4b60-8e2b-a2e4a106a6ce/qr-code",
+    "qr_image_url": "https://api.sandbox.midtrans.com/v2/qris/ea51b168-9601-4b60-8e2b-a2e4a106a6ce/qr-code",
+    "created": "2025-09-09T12:15:31.713Z",
+    "payment_type": "qris",
+    "acquirer": "gopay",
+    "cachedAt": "2025-09-09T12:15:31.713Z"
   }
 }
