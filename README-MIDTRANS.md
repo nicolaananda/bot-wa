@@ -1,12 +1,12 @@
 # Implementasi Midtrans Payment Gateway
 
 ## Overview
-Bot telah berhasil diubah dari menggunakan Xendit menjadi Midtrans sebagai payment gateway untuk pembayaran QRIS.
+Bot telah berhasil diubah dari menggunakan Xendit menjadi Midtrans sebagai payment gateway untuk pembayaran QRIS menggunakan Core API.
 
 ## Perubahan yang Dilakukan
 
 ### 1. File Konfigurasi Baru
-- **config/midtrans.js** - Service Midtrans dengan API yang sudah disesuaikan
+- **config/midtrans.js** - Service Midtrans dengan Core API yang sudah disesuaikan
 - **config/.env** - Environment variables untuk konfigurasi Midtrans
 
 ### 2. Kredensial Midtrans
@@ -19,12 +19,12 @@ Bot telah berhasil diubah dari menggunakan Xendit menjadi Midtrans sebagai payme
 - Case command berubah dari `xendit` menjadi `midtrans`
 - Import service berubah dari `./config/xendit` menjadi `./config/midtrans`
 - Variable `externalId` berubah menjadi `orderId`
-- Response field `invoice_url` berubah menjadi `snap_url`
+- Menggunakan `createQRISCore` untuk Core API implementation
 - Notifikasi berubah dari "QRIS-XENDIT" menjadi "QRIS-MIDTRANS"
 
 ### 4. API Endpoint
 - Base URL: https://api.sandbox.midtrans.com
-- Create Transaction: POST /snap/v1/transactions
+- Create Transaction: POST /v2/charge (Core API)
 - Check Status: GET /v2/{order_id}/status
 
 ## Cara Penggunaan
@@ -43,8 +43,8 @@ midtrans PROD001 2
 
 1. **User Request**: User mengetik command `midtrans` dengan ID produk dan jumlah
 2. **Validasi**: Bot memvalidasi stok, produk, dan input
-3. **Create Payment**: Bot memanggil Midtrans Snap API untuk membuat transaksi
-4. **Generate QR**: QR code dibuat dari Snap URL yang diterima
+3. **Create Payment**: Bot memanggil Midtrans Core API untuk membuat transaksi QRIS
+4. **Generate QR**: QR code dibuat dari QRIS image URL yang diterima
 5. **Send QR**: Bot mengirim QR code dan detail pembayaran
 6. **Monitor**: Bot melakukan polling status pembayaran setiap 15 detik
 7. **Complete**: Jika pembayaran berhasil, produk dikirim ke user

@@ -25,7 +25,7 @@ const { expiredCheck, getAllSewa } = require("./function/sewa");
 const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
 const { qrisDinamis } = require("./function/dinamis");
-const { createQRISPayment, createQRISCore, isPaymentCompleted } = require('./config/midtrans');
+const { createQRISCore, isPaymentCompleted } = require('./config/midtrans');
 const BASE_QRIS_DANA = "00020101021126570011ID.DANA.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
 
 // Performance optimization: Cache for user saldo
@@ -2592,7 +2592,7 @@ Ada transaksi dengan saldo yang telah selesai!
           const reffId = crypto.randomBytes(5).toString("hex").toUpperCase();
           const orderId = `TRX-${reffId}-${Date.now()}`;
 
-          // Create Midtrans payment menggunakan Snap API (tidak perlu approval)
+          // Create Midtrans payment menggunakan Core API untuk mendapatkan QRIS
           const customerDetails = {
             first_name: pushname || 'Customer',
             phone: sender.split('@')[0],
@@ -2602,7 +2602,7 @@ Ada transaksi dengan saldo yang telah selesai!
             quantity: quantityNum
           };
 
-          const paymentData = await createQRISPayment(totalAmount, orderId, customerDetails);
+          const paymentData = await createQRISCore(totalAmount, orderId, customerDetails);
 
           const expirationTime = Date.now() + toMs("30m");
           const expireDate = new Date(expirationTime);
@@ -2611,18 +2611,28 @@ Ada transaksi dengan saldo yang telah selesai!
           const expireTimeJakarta = new Date(new Date(currentTime).getTime() + timeLeft * 60000);
           const formattedTime = `${expireTimeJakarta.getHours().toString().padStart(2, '0')}:${expireTimeJakarta.getMinutes().toString().padStart(2, '0')}`;
 
-          // Generate QR Code dari Snap URL
+          // Download QRIS image dari Midtrans
           let qrImagePath;
           try {
-            if (paymentData.snap_url) {
-              // Generate QR code dari Snap URL
-              qrImagePath = await qrisDinamis(paymentData.snap_url, "./options/sticker/qris_midtrans.jpg");
+            if (paymentData.qr_image_url) {
+              // Download gambar QRIS dari Midtrans
+              const axios = require('axios');
+              const response = await axios.get(paymentData.qr_image_url, { responseType: 'stream' });
+              qrImagePath = "./options/sticker/qris_midtrans.jpg";
+              
+              const writer = fs.createWriteStream(qrImagePath);
+              response.data.pipe(writer);
+              
+              await new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+              });
             } else {
               // Fallback ke QRIS lokal jika gagal
               qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
             }
           } catch (qrError) {
-            console.error('Error generating Snap QR code:', qrError);
+            console.error('Error downloading Midtrans QRIS image:', qrError);
             // Fallback ke QRIS lokal
             qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
           }
@@ -2636,14 +2646,17 @@ Ada transaksi dengan saldo yang telah selesai!
             `*Kode Unik:* ${uniqueCode}\n` +
             `*Total:* Rp${toRupiah(totalAmount)}\n` +
             `*Waktu:* ${timeLeft} menit\n\n` +
-            `📱 *Scan QR Code di atas atau klik link pembayaran*\n\n` +
-            `🔗 *Link Pembayaran Midtrans:*\n${paymentData.snap_url}\n\n` +
-            `💳 *Metode Pembayaran yang Tersedia:*\n` +
-            `• 🟢 QRIS (GoPay, OVO, DANA, ShopeePay, LinkAja)\n` +
-            `• 🏦 Virtual Account (BCA, BNI, BRI, Mandiri)\n` +
-            `• 💳 Kartu Kredit/Debit\n` +
-            `• 🏪 Convenience Store (Alfamart, Indomaret)\n\n` +
-            `Bayar sebelum ${formattedTime} untuk menyelesaikan transaksi.\n\n` +
+            `📱 *Scan QRIS Midtrans di atas untuk pembayaran cepat*\n\n` +
+            `🔗 *Link QRIS (jika gambar tidak muncul):*\n${paymentData.qr_image_url}\n\n` +
+            `💳 *Pembayaran melalui QRIS Midtrans*\n\n` +
+            `*💳 E-Wallet yang Didukung:*\n` +
+            `• 🟢 GoPay\n` +
+            `• 🟣 OVO\n` +
+            `• 🔵 DANA\n` +
+            `• 🟠 ShopeePay\n` +
+            `• 🔴 LinkAja\n` +
+            `• 🏦 Mobile Banking dengan QRIS\n\n` +
+            `Scan QRIS sebelum ${formattedTime} untuk pembayaran.\n\n` +
             `Jika ingin membatalkan, ketik *${prefix}batal*`;
 
           const message = await ronzz.sendMessage(from, {
@@ -2660,9 +2673,8 @@ Ada transaksi dengan saldo yang telah selesai!
             reffId,
             totalAmount,
             uniqueCode,
-            paymentToken: paymentData.token,
-            snapUrl: paymentData.snap_url,
-            metode: 'Midtrans-Snap'
+            paymentToken: paymentData.transaction_id,
+            metode: 'Midtrans'
           };
 
           // Check payment status periodically (lebih sering untuk responsivitas)
