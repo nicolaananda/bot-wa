@@ -2281,6 +2281,8 @@ break;
 
                           product.terjual += quantityNum;
                           const soldItems = stock.splice(0, quantityNum);
+                          console.log('Sold items extracted:', soldItems.length, 'items');
+                          console.log('First item preview:', soldItems[0] ? soldItems[0].substring(0, 50) + '...' : 'No items');
                           await db.save();
 
                           // Buat detail akun untuk customer (gabungan akun + SNK)
@@ -2319,14 +2321,56 @@ break;
                             detailAkunOwner += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`
                           })
 
-                          // Kirim ke customer (1 pesan lengkap dengan akun + SNK)
-                          await ronzz.sendMessage(sender, { text: detailAkunCustomer }, { quoted: m })
+                          // Kirim ke customer (1 pesan gabungan akun + SNK)
+                          try {
+                            console.log('Sending account details to customer:', sender);
+                            console.log('Message length:', detailAkunCustomer.length);
+                            
+                            await ronzz.sendMessage(sender, { text: detailAkunCustomer }, { quoted: m })
+                            console.log('✅ Complete account details (with SNK) sent to customer successfully');
+                            
+                          } catch (error) {
+                            console.error('❌ Error sending account details to customer:', error);
+                            console.error('Error details:', error.message);
+                            
+                            // Fallback: coba kirim tanpa quoted message
+                            try {
+                              await ronzz.sendMessage(sender, { text: detailAkunCustomer })
+                              console.log('✅ Account details sent without quoted message');
+                            } catch (fallbackError1) {
+                              console.error('❌ Fallback 1 failed:', fallbackError1.message);
+                              
+                              // Fallback 2: send simple account info
+                              let simpleAccount = `*📦 AKUN PEMBELIAN*\n\n`
+                              simpleAccount += `*Produk:* ${product.name}\n`
+                              simpleAccount += `*Tanggal:* ${tanggal}\n\n`
+                              soldItems.forEach((i, index) => {
+                                let dataAkun = i.split("|")
+                                simpleAccount += `*Akun ${index + 1}:*\n`
+                                simpleAccount += `Email: ${dataAkun[0] || 'Tidak ada'}\n`
+                                simpleAccount += `Password: ${dataAkun[1] || 'Tidak ada'}\n\n`
+                              })
+                              try {
+                                await ronzz.sendMessage(sender, { text: simpleAccount })
+                                console.log('✅ Simple account details sent successfully');
+                              } catch (fallbackError2) {
+                                console.error('❌ All fallback attempts failed:', fallbackError2.message);
+                              }
+                            }
+                          }
                           
                           // Kirim ke owner (hanya detail akun)
-                          await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkunOwner }, { quoted: m })
+                          try {
+                            await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkunOwner }, { quoted: m })
+                            console.log('✅ Account details sent to owner successfully');
+                          } catch (error) {
+                            console.error('❌ Error sending account details to owner:', error);
+                          }
 
                           if (isGroup) {
-                            reply("Pembelian berhasil! Detail akun telah dikirim ke chat.")
+                            reply("Pembelian berhasil! Detail akun telah dikirim ke chat pribadi Anda.")
+                          } else {
+                            reply("Pembelian berhasil! Detail akun telah dikirim.")
                           }
 
                           await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
@@ -2475,11 +2519,51 @@ Ada transaksi dengan QRIS yang telah selesai!
             detailAkunOwner += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`
           })
 
-          // Kirim ke customer (1 pesan lengkap dengan akun + SNK)
-          await ronzz.sendMessage(sender, { text: detailAkunCustomer }, { quoted: m })
+          // Kirim ke customer (1 pesan gabungan akun + SNK) - PRIORITAS UTAMA
+          try {
+            console.log('Sending complete account details to customer (buy case):', sender);
+            console.log('Message length:', detailAkunCustomer.length);
+            
+            await ronzz.sendMessage(sender, { text: detailAkunCustomer }, { quoted: m })
+            console.log('✅ Complete account details sent to customer successfully');
+            
+          } catch (error) {
+            console.error('❌ Error sending account details to customer:', error);
+            console.error('Error details:', error.message);
+            
+            // Fallback: coba kirim tanpa quoted message
+            try {
+              await ronzz.sendMessage(sender, { text: detailAkunCustomer })
+              console.log('✅ Account details sent without quoted message');
+            } catch (fallbackError1) {
+              console.error('❌ Fallback 1 failed:', fallbackError1.message);
+              
+              // Fallback 2: send simple account info
+              let simpleAccount = `*📦 AKUN PEMBELIAN*\n\n`
+              simpleAccount += `*Produk:* ${db.data.produk[data[0]].name}\n`
+              simpleAccount += `*Tanggal:* ${tanggal}\n\n`
+              dataStok.forEach((i, index) => {
+                let dataAkun = i.split("|")
+                simpleAccount += `*Akun ${index + 1}:*\n`
+                simpleAccount += `Email: ${dataAkun[0] || 'Tidak ada'}\n`
+                simpleAccount += `Password: ${dataAkun[1] || 'Tidak ada'}\n\n`
+              })
+              try {
+                await ronzz.sendMessage(sender, { text: simpleAccount })
+                console.log('✅ Simple account details sent successfully');
+              } catch (fallbackError2) {
+                console.error('❌ All fallback attempts failed:', fallbackError2.message);
+              }
+            }
+          }
           
-          // Kirim ke owner (hanya detail akun)
-          await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkunOwner }, { quoted: m })
+          // Kirim ke owner (hanya detail akun) - TIDAK PRIORITAS
+          try {
+            await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkunOwner }, { quoted: m })
+            console.log('✅ Account details sent to owner successfully');
+          } catch (error) {
+            console.error('❌ Error sending account details to owner (not critical):', error);
+          }
       
           // Kirim notifikasi ke owner
                           await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
@@ -2537,10 +2621,12 @@ Ada transaksi dengan saldo yang telah selesai!
             await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
           }
           
-          // Beri notifikasi pembelian berhasil hanya jika di grup
+          // Beri notifikasi pembelian berhasil
           if (isGroup) {
-            reply("Pembelian berhasil! Detail akun telah dikirim ke chat.")
-                      }
+            reply("Pembelian berhasil! Detail akun telah dikirim ke chat pribadi Anda.")
+          } else {
+            reply("Pembelian berhasil! Detail akun telah dikirim.")
+          }
                   } catch (error) {
           console.log("Error processing buy:", error)
           reply("Terjadi kesalahan saat memproses pembelian. Silakan coba lagi atau hubungi admin.")

@@ -17,19 +17,19 @@ module.exports = {
         
         // Check if user has pending order
         if (global.db.data.order[sender] !== undefined) {
-            return reply(\Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *\batal* untuk membatalkan pembayaran.\);
+            return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *batal* untuk membatalkan pembayaran.`);
         }
         
         // Validate input
         if (!args[1]) {
-            return reply(\Contoh: \buy idproduk jumlah\);
+            return reply(`Contoh: buy idproduk jumlah`);
         }
         
         const productId = args[0];
         const quantity = Number(args[1]);
         
         if (!global.db.data.produk[productId]) {
-            return reply(\Produk dengan ID *\* tidak ada\);
+            return reply(`Produk dengan ID *${productId}* tidak ada`);
         }
         
         if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -44,7 +44,7 @@ module.exports = {
         }
         
         if (stock.length < quantity) {
-            return reply(\Stok tersedia \, jadi harap jumlah tidak melebihi stok\);
+            return reply(`Stok tersedia ${stock.length}, jadi harap jumlah tidak melebihi stok`);
         }
         
         const reffId = crypto.randomBytes(5).toString('hex').toUpperCase();
@@ -64,7 +64,7 @@ module.exports = {
             
             if (userData.saldo < totalPrice) {
                 delete global.db.data.order[sender];
-                return reply(\Saldo tidak cukup! Saldo kamu: Rp\\\nTotal harga: Rp\\\n\\nSilahkan topup saldo terlebih dahulu dengan ketik *\payment*\);
+                return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(userData.saldo)}\nTotal harga: Rp${toRupiah(totalPrice)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *payment*`);
             }
             
             await reply('Sedang memproses pembelian dengan saldo...');
@@ -87,35 +87,60 @@ module.exports = {
             const tanggal = moment.tz('Asia/Jakarta').format('DD MMMM YYYY');
             const jamwib = moment.tz('Asia/Jakarta').format('HH:mm:ss');
             
-            // Create account details text
-            let accountDetails = \*📦 Produk:* \\\n\;
-            accountDetails += \*📅 Tanggal:* \\\n\;
-            accountDetails += \*⏰ Jam:* \ WIB\\n\\n\;
+            // Create complete account details with SNK (1 message)
+            let completeDetails = `*📦 Produk:* ${product.name}\n`;
+            completeDetails += `*📅 Tanggal:* ${tanggal}\n`;
+            completeDetails += `*⏰ Jam:* ${jamwib} WIB\n\n`;
             
             soldItems.forEach((item, index) => {
                 let accountData = item.split('|');
-                accountDetails += \│ 📧 Email: \\\n\;
-                accountDetails += \│ 🔐 Password: \\\n\;
-                accountDetails += \│ 👤 Profil: \\\n\;
-                accountDetails += \│ 🔢 Pin: \\\n\;
-                accountDetails += \│ 🔒 2FA: \\\n\\n\;
+                completeDetails += `│ 📧 Email: ${accountData[0] || 'Tidak ada'}\n`;
+                completeDetails += `│ 🔐 Password: ${accountData[1] || 'Tidak ada'}\n`;
+                completeDetails += `│ 👤 Profil: ${accountData[2] || 'Tidak ada'}\n`;
+                completeDetails += `│ 🔢 Pin: ${accountData[3] || 'Tidak ada'}\n`;
+                completeDetails += `│ 🔒 2FA: ${accountData[4] || 'Tidak ada'}\n\n`;
             });
             
-            // Send account details to user's private chat
-            await ctx.ronzz.sendMessage(sender, { text: accountDetails }, { quoted: ctx.m });
-            await ctx.ronzz.sendMessage('6281389592985@s.whatsapp.net', { text: accountDetails }, { quoted: ctx.m });
+            // Add SNK to the same message
+            completeDetails += `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`;
+            completeDetails += `*📋 SNK PRODUK: ${product.name}*\n\n`;
+            completeDetails += `${product.snk}\n\n`;
+            completeDetails += `*⚠️ PENTING:*\n`;
+            completeDetails += `• Baca dan pahami SNK sebelum menggunakan akun\n`;
+            completeDetails += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`;
+            completeDetails += `• Hubungi admin jika ada masalah dengan akun\n\n`;
+            completeDetails += `*╰────「 END SNK 」────╯*`;
             
-            // Create product terms and conditions text
-            let termsText = \*╭────「 SYARAT & KETENTUAN 」────╮*\\n\\n\;
-            termsText += \*📋 SNK PRODUK: \*\\n\\n\;
-            termsText += \\\\n\\n\;
-            termsText += \*⚠️ PENTING:*\\n\;
-            termsText += \• Baca dan pahami SNK sebelum menggunakan akun\\n\;
-            termsText += \• Akun yang sudah dibeli tidak dapat dikembalikan\\n\;
-            termsText += \• Hubungi admin jika ada masalah dengan akun\\n\\n\;
-            termsText += \*╰────「 END SNK 」────╯*\;
-            
-            await ctx.ronzz.sendMessage(sender, { text: termsText }, { quoted: ctx.m });
+            // Send complete details (account + SNK) to user and owner
+            try {
+                console.log('Sending complete account details to customer:', sender);
+                console.log('Message length:', completeDetails.length);
+                
+                await ctx.ronzz.sendMessage(sender, { text: completeDetails }, { quoted: ctx.m });
+                await ctx.ronzz.sendMessage('6281389592985@s.whatsapp.net', { text: completeDetails }, { quoted: ctx.m });
+                console.log('✅ Complete account details sent successfully');
+                
+            } catch (error) {
+                console.error('❌ Error sending account details:', error);
+                
+                // Fallback: send simple account info
+                let simpleAccount = `*📦 AKUN PEMBELIAN*\n\n`;
+                simpleAccount += `*Produk:* ${product.name}\n`;
+                simpleAccount += `*Tanggal:* ${tanggal}\n\n`;
+                soldItems.forEach((item, index) => {
+                    let accountData = item.split('|');
+                    simpleAccount += `*Akun ${index + 1}:*\n`;
+                    simpleAccount += `Email: ${accountData[0] || 'Tidak ada'}\n`;
+                    simpleAccount += `Password: ${accountData[1] || 'Tidak ada'}\n\n`;
+                });
+                
+                try {
+                    await ctx.ronzz.sendMessage(sender, { text: simpleAccount });
+                    console.log('✅ Fallback account details sent successfully');
+                } catch (fallbackError) {
+                    console.error('❌ Fallback also failed:', fallbackError);
+                }
+            }
             
             // Send notification to owner
             const ownerNotification = \Hai Owner,
