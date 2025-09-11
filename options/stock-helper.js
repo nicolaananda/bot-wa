@@ -98,7 +98,7 @@ function getProductCategory(productId, productName) {
     return 'VPN';
   }
   
-  return 'Uncategorized';
+  return 'Software';
 }
 
 /**
