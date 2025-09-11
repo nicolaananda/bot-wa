@@ -2179,83 +2179,67 @@ Ada transaksi QRIS-DANA yang telah selesai!
 break;
 
 
-                case 'buynow': {
-          if (db.data.order[sender]) {
-              return reply(`Kamu sedang melakukan order. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`);
-          }
+      case 'buynow': {
+        if (db.data.order[sender] !== undefined) return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
+        let data = q.split(" ")
+        if (!data[1]) return reply(`Contoh: ${prefix + command} idproduk jumlah`)
+        if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
 
-          const [productId, quantity] = q.split(" ");
-          if (!productId || !quantity) {
-              return reply(`Contoh: ${prefix + command} idproduk jumlah`);
-          }
+        const jumlah = Number(data[1])
+        if (!Number.isFinite(jumlah) || jumlah <= 0) return reply("Jumlah harus berupa angka lebih dari 0")
 
-          const product = db.data.produk[productId];
-          if (!product) {
-              return reply(`Produk dengan ID *${productId}* tidak ditemukan.`);
-          }
+        let stok = db.data.produk[data[0]].stok
+        if (stok.length <= 0) return reply("Stok habis, silahkan hubungi Owner untuk restok")
+        if (stok.length < jumlah) return reply(`Stok tersedia ${stok.length}, jadi harap jumlah tidak melebihi stok`)
 
-          const stock = product.stok;
-          const quantityNum = Number(quantity);
-          if (!Number.isInteger(quantityNum) || quantityNum <= 0) {
-              return reply(`Jumlah harus berupa angka positif.`);
-          }
-          if (stock.length === 0) {
-              return reply("Stok habis, silakan hubungi Owner untuk restok.");
-          }
-          if (stock.length < quantityNum) {
-              return reply(`Stok tersedia ${stock.length}, jumlah pesanan tidak boleh melebihi stok.`);
-          }
+        const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
+        db.data.order[sender] = { status: 'processing', reffId, idProduk: data[0], jumlah, metode: 'QRIS', startedAt: Date.now() }
+
+        try {
+          // Hitung harga (sama seperti case 'buy')
+          let totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * jumlah
+          const uniqueCode = Math.floor(1 + Math.random() * 99);
+          const totalAmount = totalHarga + uniqueCode;
 
           reply("Sedang membuat QR Code...");
+          
+          const orderId = `TRX-${reffId}-${Date.now()}`;
+          const qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
 
-          try {
-              const unitPrice = Number(hargaProduk(productId, db.data.users[sender].role));
-              if (!unitPrice || unitPrice <= 0) throw new Error('Harga produk tidak valid');
+          const expirationTime = Date.now() + toMs("30m");
+          const expireDate = new Date(expirationTime);
+          const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
+          const currentTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+          const expireTimeJakarta = new Date(new Date(currentTime).getTime() + timeLeft * 60000);
+          const formattedTime = `${expireTimeJakarta.getHours().toString().padStart(2, '0')}:${expireTimeJakarta.getMinutes().toString().padStart(2, '0')}`;
 
-              const amount = unitPrice * quantityNum;
-              const uniqueCode = Math.floor(1 + Math.random() * 99);
-              const totalAmount = amount + uniqueCode;
-              if (totalAmount <= 0) throw new Error('Total amount tidak valid');
+          const caption = `*🧾 MENUNGGU PEMBAYARAN 🧾*\n\n` +
+              `*Produk ID:* ${data[0]}\n` +
+              `*Nama Produk:* ${db.data.produk[data[0]].name}\n` +
+              `*Harga:* Rp${toRupiah(totalHarga / jumlah)}\n` +
+              `*Jumlah:* ${jumlah}\n` +
+              `*Subtotal:* Rp${toRupiah(totalHarga)}\n` +
+              `*Kode Unik:* ${uniqueCode}\n` +
+              `*Total:* Rp${toRupiah(totalAmount)}\n` +
+              `*Waktu:* ${timeLeft} menit\n\n` +
+              `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n\n` +
+              `Jika ingin membatalkan, ketik *${prefix}batal*`;
 
-              const reffId = crypto.randomBytes(5).toString("hex").toUpperCase();
-              const orderId = `TRX-${reffId}-${Date.now()}`;
+          const message = await ronzz.sendMessage(from, {
+              image: fs.readFileSync(qrImagePath),
+              caption: caption
+          }, { quoted: m });
 
-              const qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
-
-              const expirationTime = Date.now() + toMs("30m");
-              const expireDate = new Date(expirationTime);
-              const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
-              const currentTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
-              const expireTimeJakarta = new Date(new Date(currentTime).getTime() + timeLeft * 60000);
-              const formattedTime = `${expireTimeJakarta.getHours().toString().padStart(2, '0')}:${expireTimeJakarta.getMinutes().toString().padStart(2, '0')}`;
-
-              const caption = `*🧾 MENUNGGU PEMBAYARAN 🧾*\n\n` +
-                  `*Produk ID:* ${productId}\n` +
-                  `*Nama Produk:* ${product.name}\n` +
-                  `*Harga:* Rp${toRupiah(unitPrice)}\n` +
-                  `*Jumlah:* ${quantityNum}\n` +
-                  `*Subtotal:* Rp${toRupiah(amount)}\n` +
-                  `*Kode Unik:* ${uniqueCode}\n` +
-                  `*Total:* Rp${toRupiah(totalAmount)}\n` +
-                  `*Waktu:* ${timeLeft} menit\n\n` +
-                  `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n\n` +
-                  `Jika ingin membatalkan, ketik *${prefix}batal*`;
-
-              const message = await ronzz.sendMessage(from, {
-                  image: fs.readFileSync(qrImagePath),
-                  caption: caption
-              }, { quoted: m });
-
-              db.data.order[sender] = {
-                  id: productId,
-                  jumlah: quantityNum,
-                  from,
-                  key: message.key,
-                  orderId,
-                  reffId,
-                  totalAmount,
-                  uniqueCode
-              };
+          db.data.order[sender] = {
+              id: data[0],
+              jumlah: jumlah,
+              from,
+              key: message.key,
+              orderId,
+              reffId,
+              totalAmount,
+              uniqueCode
+          };
 
               while (db.data.order[sender]) {
                   await sleep(10000);
@@ -2279,17 +2263,20 @@ break;
                           await ronzz.sendMessage(from, { delete: message.key });
                           reply("Pembayaran berhasil, data akun akan segera diproses.");
 
-                          product.terjual += quantityNum;
-                          const soldItems = stock.splice(0, quantityNum);
-                          console.log('Sold items extracted:', soldItems.length, 'items');
-                          console.log('First item preview:', soldItems[0] ? soldItems[0].substring(0, 50) + '...' : 'No items');
+                          // Proses pembelian langsung (sama seperti case 'buy')
+                          db.data.produk[data[0]].terjual += jumlah
+                          let dataStok = []
+                          for (let i = 0; i < jumlah; i++) {
+                            dataStok.push(db.data.produk[data[0]].stok.shift())
+                          }
+                          
                           await db.save();
 
                           // Buat detail akun untuk customer (gabungan akun + SNK)
-                          let detailAkunCustomer = `*📦 Produk:* ${product.name}\n`
+                          let detailAkunCustomer = `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
                           detailAkunCustomer += `*📅 Tanggal:* ${tanggal}\n`
                           detailAkunCustomer += `*⏰ Jam:* ${jamwib} WIB\n\n`
-                          soldItems.forEach((i, index) => {
+                          dataStok.forEach((i, index) => {
                             let dataAkun = i.split("|")
                             detailAkunCustomer += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
                             detailAkunCustomer += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
@@ -2300,8 +2287,8 @@ break;
                           
                           // Tambahkan SNK ke pesan customer
                           detailAkunCustomer += `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`
-                          detailAkunCustomer += `*📋 SNK PRODUK: ${product.name}*\n\n`
-                          detailAkunCustomer += `${product.snk}\n\n`
+                          detailAkunCustomer += `*📋 SNK PRODUK: ${db.data.produk[data[0]].name}*\n\n`
+                          detailAkunCustomer += `${db.data.produk[data[0]].snk}\n\n`
                           detailAkunCustomer += `*⚠️ PENTING:*\n`
                           detailAkunCustomer += `• Baca dan pahami SNK sebelum menggunakan akun\n`
                           detailAkunCustomer += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`
@@ -2309,10 +2296,10 @@ break;
                           detailAkunCustomer += `*╰────「 END SNK 」────╯*`
 
                           // Buat detail akun untuk owner (hanya informasi akun)
-                          let detailAkunOwner = `*📦 Produk:* ${product.name}\n`
+                          let detailAkunOwner = `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
                           detailAkunOwner += `*📅 Tanggal:* ${tanggal}\n`
                           detailAkunOwner += `*⏰ Jam:* ${jamwib} WIB\n\n`
-                          soldItems.forEach((i, index) => {
+                          dataStok.forEach((i, index) => {
                             let dataAkun = i.split("|")
                             detailAkunOwner += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
                             detailAkunOwner += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
@@ -2321,50 +2308,73 @@ break;
                             detailAkunOwner += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`
                           })
 
-                          // Kirim ke customer (1 pesan gabungan akun + SNK)
+                          // Kirim ke customer (1 pesan gabungan akun + SNK) - PRIORITAS UTAMA
+                          console.log('🚀 STARTING CUSTOMER MESSAGE SEND PROCESS');
+                          console.log('Customer ID:', sender);
+                          console.log('Message length:', detailAkunCustomer.length);
+                          console.log('First 100 chars of message:', detailAkunCustomer.substring(0, 100));
+                          
+                          let customerMessageSent = false;
+                          
+                          // Attempt 1: Send with basic format
                           try {
-                            console.log('Sending account details to customer:', sender);
-                            console.log('Message length:', detailAkunCustomer.length);
-                            
-                            await ronzz.sendMessage(sender, { text: detailAkunCustomer }, { quoted: m })
-                            console.log('✅ Complete account details (with SNK) sent to customer successfully');
+                            console.log('📤 Attempt 1: Sending account details to customer...');
+                            await ronzz.sendMessage(sender, { text: detailAkunCustomer })
+                            console.log('✅ SUCCESS: Account details sent to customer!');
+                            customerMessageSent = true;
                             
                           } catch (error) {
-                            console.error('❌ Error sending account details to customer:', error);
-                            console.error('Error details:', error.message);
+                            console.error('❌ ATTEMPT 1 FAILED:', error.message);
                             
-                            // Fallback: coba kirim tanpa quoted message
+                            // Attempt 2: Send simple account info only
                             try {
-                              await ronzz.sendMessage(sender, { text: detailAkunCustomer })
-                              console.log('✅ Account details sent without quoted message');
-                            } catch (fallbackError1) {
-                              console.error('❌ Fallback 1 failed:', fallbackError1.message);
+                              console.log('📤 Attempt 2: Sending simple account info...');
+                              let simpleAccount = `*📦 DETAIL AKUN PEMBELIAN*\n\n`
+                              simpleAccount += `*Produk:* ${db.data.produk[data[0]].name}\n`
+                              simpleAccount += `*Tanggal:* ${tanggal}\n`
+                              simpleAccount += `*Jam:* ${jamwib} WIB\n\n`
                               
-                              // Fallback 2: send simple account info
-                              let simpleAccount = `*📦 AKUN PEMBELIAN*\n\n`
-                              simpleAccount += `*Produk:* ${product.name}\n`
-                              simpleAccount += `*Tanggal:* ${tanggal}\n\n`
-                              soldItems.forEach((i, index) => {
+                              dataStok.forEach((i, index) => {
                                 let dataAkun = i.split("|")
-                                simpleAccount += `*Akun ${index + 1}:*\n`
-                                simpleAccount += `Email: ${dataAkun[0] || 'Tidak ada'}\n`
-                                simpleAccount += `Password: ${dataAkun[1] || 'Tidak ada'}\n\n`
+                                simpleAccount += `*═══ AKUN ${index + 1} ═══*\n`
+                                simpleAccount += `📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
+                                simpleAccount += `🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
+                                if (dataAkun[2]) simpleAccount += `👤 Profil: ${dataAkun[2]}\n`
+                                if (dataAkun[3]) simpleAccount += `🔢 Pin: ${dataAkun[3]}\n`
+                                if (dataAkun[4]) simpleAccount += `🔒 2FA: ${dataAkun[4]}\n`
+                                simpleAccount += `\n`
                               })
+                              
+                              await ronzz.sendMessage(sender, { text: simpleAccount })
+                              console.log('✅ SUCCESS: Simple account details sent to customer!');
+                              customerMessageSent = true;
+                              
+                            } catch (fallbackError) {
+                              console.error('❌ ATTEMPT 2 ALSO FAILED:', fallbackError.message);
+                              
+                              // Attempt 3: Send basic text only
                               try {
-                                await ronzz.sendMessage(sender, { text: simpleAccount })
-                                console.log('✅ Simple account details sent successfully');
-                              } catch (fallbackError2) {
-                                console.error('❌ All fallback attempts failed:', fallbackError2.message);
+                                console.log('📤 Attempt 3: Sending basic notification...');
+                                const basicMessage = `Akun berhasil dibeli!\n\nProduk: ${db.data.produk[data[0]].name}\nJumlah: ${jumlah} akun\n\nSilahkan hubungi admin untuk mendapatkan detail akun.`;
+                                await ronzz.sendMessage(sender, { text: basicMessage })
+                                console.log('✅ SUCCESS: Basic notification sent to customer!');
+                                customerMessageSent = true;
+                                
+                              } catch (finalError) {
+                                console.error('❌ ALL ATTEMPTS FAILED:', finalError.message);
+                                console.error('❌ CUSTOMER WILL NOT RECEIVE ACCOUNT DETAILS!');
                               }
                             }
                           }
                           
-                          // Kirim ke owner (hanya detail akun)
+                          console.log('🏁 CUSTOMER MESSAGE SEND RESULT:', customerMessageSent ? 'SUCCESS' : 'FAILED');
+                          
+                          // Kirim ke owner (hanya detail akun) - TIDAK PRIORITAS
                           try {
-                            await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkunOwner }, { quoted: m })
+                            await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkunOwner })
                             console.log('✅ Account details sent to owner successfully');
                           } catch (error) {
-                            console.error('❌ Error sending account details to owner:', error);
+                            console.error('❌ Error sending account details to owner (not critical):', error);
                           }
 
                           if (isGroup) {
@@ -2373,57 +2383,59 @@ break;
                             reply("Pembelian berhasil! Detail akun telah dikirim.")
                           }
 
+                          // Kirim notifikasi ke owner (sama seperti case 'buy')
                           await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
 Ada transaksi dengan QRIS yang telah selesai!
 
 *╭────「 TRANSAKSI DETAIL 」───*
 *┊・ 🧾| Reff Id:* ${reffId}
 *┊・ 📮| Nomor:* @${sender.split("@")[0]}
-*┊・ 📦| Nama Barang:* ${product.name}
-*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(unitPrice)}
-*┊・ 🛍️| Jumlah Order:* ${quantityNum}
+*┊・ 📦| Nama Barang:* ${db.data.produk[data[0]].name}
+*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}
+*┊・ 🛍️| Jumlah Order:* ${jumlah}
 *┊・ 💰| Total Bayar:* Rp${toRupiah(totalAmount)}
 *┊・ 💳| Metode Bayar:* QRIS-Listener
 *┊・ 📅| Tanggal:* ${tanggal}
 *┊・ ⏰| Jam:* ${jamwib} WIB
 *╰┈┈┈┈┈┈┈┈*`, mentions: [sender] })
 
+                          // Tambah ke database transaksi (sama seperti case 'buy')
                           db.data.transaksi.push({
-                              id: productId,
-                              name: product.name,
-                              price: unitPrice,
-                              date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
-                              profit: product.profit,
-                              jumlah: quantityNum,
-                              user: sender.split("@")[0],
-                              userRole: db.data.users[sender].role,
-                              reffId,
-                              metodeBayar: "QRIS",
-                              totalBayar: totalAmount
+                            id: data[0],
+                            name: db.data.produk[data[0]].name,
+                            price: hargaProduk(data[0], db.data.users[sender].role),
+                            date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+                            profit: db.data.produk[data[0]].profit,
+                            jumlah: jumlah,
+                            user: sender.split("@")[0],
+                            userRole: db.data.users[sender].role,
+                            reffId: reffId,
+                            metodeBayar: "QRIS",
+                            totalBayar: totalAmount
                           });
                           await db.save();
 
-                          if (stock.length === 0) {
-                              const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
-                                  `*📦 Produk:* ${product.name}\n` +
-                                  `*🆔 ID Produk:* ${productId}\n` +
-                                  `*📊 Stok Sebelumnya:* ${quantityNum}\n` +
-                                  `*📉 Stok Sekarang:* 0 (HABIS)\n` +
-                                  `*🛒 Terjual Terakhir:* ${quantityNum} akun\n` +
-                                  `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
-                                  `*💰 Total Transaksi:* Rp${toRupiah(totalAmount)}\n` +
-                                  `*📅 Tanggal:* ${tanggal}\n` +
-                                  `*⏰ Jam:* ${jamwib} WIB\n\n` +
-                                  `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
-                                  `• Segera restok produk ini\n` +
-                                  `• Update harga jika diperlukan\n` +
-                                  `• Cek profit margin\n\n` +
-                                  `*💡 Tips:* Gunakan command *${prefix}addstok ${productId} jumlah* untuk menambah stok`;
-
-                              await Promise.all([
-                                  ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] }),
-                                  ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
-                              ]);
+                          // Cek apakah stok habis dan kirim notifikasi ke admin (sama seperti case 'buy')
+                          if (db.data.produk[data[0]].stok.length === 0) {
+                            const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
+                              `*📦 Produk:* ${db.data.produk[data[0]].name}\n` +
+                              `*🆔 ID Produk:* ${data[0]}\n` +
+                              `*📊 Stok Sebelumnya:* ${jumlah}\n` +
+                              `*📉 Stok Sekarang:* 0 (HABIS)\n` +
+                              `*🛒 Terjual Terakhir:* ${jumlah} akun\n` +
+                              `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
+                              `*💰 Total Transaksi:* Rp${toRupiah(totalAmount)}\n` +
+                              `*📅 Tanggal:* ${tanggal}\n` +
+                              `*⏰ Jam:* ${jamwib} WIB\n\n` +
+                              `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
+                              `• Segera restok produk ini\n` +
+                              `• Update harga jika diperlukan\n` +
+                              `• Cek profit margin\n\n` +
+                              `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`
+                            
+                            // Kirim notifikasi ke admin yang ditentukan
+                            await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+                            await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
                           }
 
                           delete db.data.order[sender];
