@@ -301,7 +301,15 @@ async function getPaymentStatus(orderId) {
  */
 async function isPaymentCompleted(orderId) {
   try {
+    console.log(`🔍 Checking payment completion for order: ${orderId}`);
     const status = await getPaymentStatus(orderId);
+    
+    console.log(`📊 Payment status details:`, {
+      transaction_status: status.transaction_status,
+      payment_type: status.payment_type,
+      gross_amount: status.gross_amount,
+      settlement_time: status.settlement_time
+    });
     
     const isCompleted = status.transaction_status === 'settlement' || 
                        status.transaction_status === 'capture';
@@ -310,6 +318,8 @@ async function isPaymentCompleted(orderId) {
     if (isCompleted) {
       clearCachedPaymentData(orderId);
       console.log(`✅ Payment completed for ${orderId}, cache cleared`);
+    } else {
+      console.log(`⏳ Payment still pending for ${orderId}, status: ${status.transaction_status}`);
     }
     
     return {
@@ -387,15 +397,16 @@ async function createGopayPayment(amount, orderId, customerDetails = {}) {
     
     // Extract payment URL and info
     let paymentUrl = result.payment_url;
-    let snapToken = result.order_id; // Snap token for reference
+    let midtransOrderId = result.order_id; // This is the actual order ID from Midtrans
     
     const paymentData = {
-      transaction_id: result.order_id,
-      order_id: orderId,
+      transaction_id: midtransOrderId, // Use Midtrans order ID for status checking
+      order_id: orderId, // Our original order ID
+      midtrans_order_id: midtransOrderId, // Store both for reference
       amount: amount,
       status: 'pending',
       payment_url: paymentUrl,
-      snap_token: snapToken,
+      snap_token: midtransOrderId,
       deeplink: paymentUrl, // Use payment URL as deeplink
       qr_string: paymentUrl,
       created: new Date().toISOString(),
@@ -404,7 +415,9 @@ async function createGopayPayment(amount, orderId, customerDetails = {}) {
       status_message: 'Payment link created successfully'
     };
     
+    // Store with both order IDs for easier lookup
     storePaymentData(orderId, paymentData);
+    storePaymentData(midtransOrderId, paymentData);
     return paymentData;
   } catch (error) {
     console.error('Error creating Midtrans Gopay payment:', error);

@@ -3208,6 +3208,7 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
             totalAmount,
             uniqueCode,
             paymentToken: paymentData.transaction_id,
+            midtrans_order_id: paymentData.midtrans_order_id,
             metode: 'Gopay',
             payment_url: paymentData.payment_url
           };
@@ -3227,7 +3228,11 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
             }
 
             try {
-              const paymentStatus = await isPaymentCompleted(orderId);
+              // Use Midtrans order ID for status checking
+              const midtransOrderId = db.data.order[sender].midtrans_order_id || orderId;
+              console.log(`Checking payment status for Midtrans Order ID: ${midtransOrderId}`);
+              
+              const paymentStatus = await isPaymentCompleted(midtransOrderId);
               console.log(`Gopay Payment Status: ${paymentStatus.status}`);
 
               if (paymentStatus.status === 'PAID') {
