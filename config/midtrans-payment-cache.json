@@ -1,14 +1,36 @@
 {
-  "TRX-CORE-1757420129393": {
-    "transaction_id": "ea51b168-9601-4b60-8e2b-a2e4a106a6ce",
-    "order_id": "TRX-CORE-1757420129393",
-    "amount": 15010,
+  "GOPAY-8CF005CDB2-1757679587327": {
+    "transaction_id": "GOPAY-8CF005CDB2-1757679587327",
+    "order_id": "GOPAY-8CF005CDB2-1757679587327",
+    "midtrans_order_id": "GOPAY-8CF005CDB2-1757679587327-1757679599045",
+    "amount": 2072,
     "status": "pending",
-    "qr_string": "https://api.sandbox.midtrans.com/v2/qris/ea51b168-9601-4b60-8e2b-a2e4a106a6ce/qr-code",
-    "qr_image_url": "https://api.sandbox.midtrans.com/v2/qris/ea51b168-9601-4b60-8e2b-a2e4a106a6ce/qr-code",
-    "created": "2025-09-09T12:15:31.713Z",
-    "payment_type": "qris",
-    "acquirer": "gopay",
-    "cachedAt": "2025-09-09T12:15:31.713Z"
+    "payment_url": "https://app.midtrans.com/payment-links/...",
+    "payment_type": "gopay",
+    "created": "2025-09-12T12:48:10.835Z",
+    "cachedAt": "2025-09-12T12:48:10.838Z",
+    "webhook_updated": "2025-09-12T12:48:10.838Z",
+    "transaction_status": "settlement",
+    "gross_amount": "2072.00",
+    "settlement_time": "2025-09-12 19:20:03",
+    "status_code": "200",
+    "status_message": "Success, transaction is found"
+  },
+  "GOPAY-8CF005CDB2-1757679587327-1757679599045": {
+    "transaction_id": "GOPAY-8CF005CDB2-1757679587327",
+    "order_id": "GOPAY-8CF005CDB2-1757679587327",
+    "midtrans_order_id": "GOPAY-8CF005CDB2-1757679587327-1757679599045",
+    "amount": 2072,
+    "status": "pending",
+    "payment_url": "https://app.midtrans.com/payment-links/...",
+    "payment_type": "gopay",
+    "created": "2025-09-12T12:48:10.835Z",
+    "cachedAt": "2025-09-12T12:48:10.838Z",
+    "webhook_updated": "2025-09-12T12:48:10.838Z",
+    "transaction_status": "settlement",
+    "gross_amount": "2072.00",
+    "settlement_time": "2025-09-12 19:20:03",
+    "status_code": "200",
+    "status_message": "Success, transaction is found"
   }
 }

@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { clearCachedPaymentData } = require('./config/midtrans');
+const { clearCachedPaymentData, storePaymentData, updateOrderIdFromWebhook } = require('./config/midtrans');
 
 const app = express();
 app.use(express.json());
@@ -51,24 +51,48 @@ app.post('/webhook/midtrans', (req, res) => {
     
     console.log(`📋 Order: ${order_id}, Status: ${transaction_status}, Payment: ${payment_type}`);
     
-    // Clear cache untuk order ini agar status terbaru langsung terdeteksi
-    clearCachedPaymentData(order_id);
-    console.log(`🗑️ Cache cleared for ${order_id}`);
+    // Store updated payment data to cache
+    const paymentData = {
+      order_id,
+      transaction_status,
+      payment_type,
+      gross_amount: notification.gross_amount,
+      transaction_time: notification.transaction_time,
+      settlement_time,
+      fraud_status,
+      status_code: notification.status_code,
+      status_message: notification.status_message,
+      webhook_updated: new Date().toISOString()
+    };
     
-    // Jika payment berhasil, bisa tambahkan logic untuk trigger immediate check
+    storePaymentData(order_id, paymentData);
+    console.log(`💾 Payment data stored for ${order_id} with status: ${transaction_status}`);
+    
+    // Try to update order ID mapping if this looks like a full Midtrans order ID
+    if (order_id.includes('-') && order_id.split('-').length >= 4) {
+      // Extract potential original order ID (first 3 parts)
+      const parts = order_id.split('-');
+      const originalOrderId = parts.slice(0, 3).join('-');
+      console.log(`🔍 Attempting to update order ID mapping: ${originalOrderId} -> ${order_id}`);
+      updateOrderIdFromWebhook(originalOrderId, order_id);
+    }
+    
+    // Jika payment berhasil, emit event untuk trigger immediate processing
     if (transaction_status === 'settlement' || transaction_status === 'capture') {
       console.log(`✅ Payment successful for ${order_id} via ${payment_type}`);
-      
-      // Bisa tambahkan logic untuk langsung memproses order tanpa menunggu polling
-      // Misalnya dengan emit event atau update database langsung
       
       // Emit event untuk memberitahu sistem bahwa payment sudah berhasil
       process.emit('payment-completed', {
         orderId: order_id,
         transactionStatus: transaction_status,
         paymentType: payment_type,
-        settlementTime: settlement_time
+        settlementTime: settlement_time,
+        grossAmount: notification.gross_amount
       });
+      
+      console.log(`🚀 Payment completion event emitted for ${order_id}`);
+    } else {
+      console.log(`⏳ Payment status updated for ${order_id}: ${transaction_status}`);
     }
     
     // Respond OK ke Midtrans

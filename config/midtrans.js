@@ -297,126 +297,90 @@ async function getPaymentStatus(orderId) {
 }
 
 /**
- * Check if payment is completed with fallback order ID formats
+ * Check if payment is completed - Simplified webhook-based approach
  */
 async function isPaymentCompleted(orderId) {
   try {
     console.log(`🔍 Checking payment completion for order: ${orderId}`);
     
-    // Try multiple order ID formats
-    const orderIdFormats = [
-      orderId, // Original format
-      orderId + '-' + Date.now().toString().slice(-10), // Try with timestamp suffix
-    ];
-    
-         // If orderId looks like bot format (GOPAY-XXXXX-timestamp), try Midtrans format
-     if (orderId.match(/^GOPAY-[A-F0-9]+-\d+$/)) {
-       // Generate possible Midtrans format with additional timestamp
-       const baseId = orderId;
-       const currentTime = Date.now();
-       
-       // Extract base parts for timestamp generation
-       const parts = orderId.split('-');
-       if (parts.length >= 3) {
-         const basePrefix = parts[0] + '-' + parts[1]; // GOPAY-XXXXX
-         const originalTimestamp = parseInt(parts[2]);
-         
-         if (originalTimestamp) {
-           console.log(`🔍 Generating timestamp variations for: ${basePrefix}-${originalTimestamp}`);
-           
-           // Try timestamps around the original creation time (payment processing time)
-           // Based on your case: difference was ~12 seconds (1757679599045 - 1757679587327 = 11718ms)
-           const timestampRanges = [
-             // Close range (0-30 seconds after creation)
-             { start: 0, end: 30000, step: 1000 },
-             // Medium range (30 seconds - 2 minutes)
-             { start: 30000, end: 120000, step: 5000 },
-             // Wide range (2-10 minutes)
-             { start: 120000, end: 600000, step: 15000 }
-           ];
-           
-           timestampRanges.forEach(range => {
-             for (let offset = range.start; offset <= range.end; offset += range.step) {
-               const testTimestamp = originalTimestamp + offset;
-               const testOrderId = `${basePrefix}-${originalTimestamp}-${testTimestamp}`;
-               orderIdFormats.push(testOrderId);
-             }
-           });
-           
-           // Also try with current time variations (for recent payments)
-           const currentTime = Date.now();
-           for (let offset = 0; offset <= 300000; offset += 15000) { // 0 to 5 minutes
-             const testTimestamp = currentTime - offset;
-             const testOrderId = `${basePrefix}-${originalTimestamp}-${testTimestamp}`;
-             orderIdFormats.push(testOrderId);
-           }
-         }
-       }
-     }
-    
-         let lastError = null;
-     
-     // Limit the number of attempts to avoid too many API calls
-     const maxAttempts = 20;
-     const limitedFormats = orderIdFormats.slice(0, maxAttempts);
-     
-     console.log(`📊 Will try ${limitedFormats.length} order ID formats (limited from ${orderIdFormats.length})`);
-     
-     // Try each format until one works
-     for (const testOrderId of limitedFormats) {
-      try {
-        console.log(`🧪 Trying order ID format: ${testOrderId}`);
-        const status = await getPaymentStatus(testOrderId);
-        
-        console.log(`📊 Payment status details:`, {
-          order_id: testOrderId,
-          transaction_status: status.transaction_status,
-          payment_type: status.payment_type,
-          gross_amount: status.gross_amount,
-          settlement_time: status.settlement_time
-        });
-        
-        const isCompleted = status.transaction_status === 'settlement' || 
-                           status.transaction_status === 'capture';
-        
-        // Jika status berubah menjadi completed, clear cache untuk memastikan data terbaru
-        if (isCompleted) {
-          clearCachedPaymentData(testOrderId);
-          console.log(`✅ Payment completed for ${testOrderId}, cache cleared`);
-        } else {
-          console.log(`⏳ Payment still pending for ${testOrderId}, status: ${status.transaction_status}`);
-        }
-        
-        return {
-          status: isCompleted ? 'PAID' : 'PENDING',
-          paid_amount: isCompleted ? status.gross_amount : 0,
-          transaction_status: status.transaction_status,
-          payment_type: status.payment_type,
-          settlement_time: status.settlement_time,
-          working_order_id: testOrderId // Return which format worked
-        };
-        
-      } catch (error) {
-        console.log(`❌ Failed with ${testOrderId}: ${error.message}`);
-        lastError = error;
-        continue; // Try next format
-      }
+    // First check cache for webhook updates
+    const cached = getCachedPaymentData(orderId);
+    if (cached && (cached.transaction_status === 'settlement' || cached.transaction_status === 'capture')) {
+      console.log(`✅ Found completed payment in cache for ${orderId}`);
+      return {
+        status: 'PAID',
+        paid_amount: cached.gross_amount || 0,
+        transaction_status: cached.transaction_status,
+        payment_type: cached.payment_type,
+        settlement_time: cached.settlement_time,
+        working_order_id: orderId
+      };
     }
     
-    // If all formats failed
-    console.error('❌ All order ID formats failed for:', orderId);
-    return {
-      status: 'ERROR',
-      paid_amount: 0,
-      error: lastError?.message || 'All order ID formats failed'
-    };
+    // Try direct status check with original order ID
+    try {
+      const status = await getPaymentStatus(orderId);
+      
+      console.log(`📊 Payment status for ${orderId}:`, {
+        transaction_status: status.transaction_status,
+        payment_type: status.payment_type,
+        gross_amount: status.gross_amount,
+        status_code: status.status_code
+      });
+      
+      const isCompleted = status.transaction_status === 'settlement' || 
+                         status.transaction_status === 'capture';
+      
+      if (isCompleted) {
+        console.log(`✅ Payment completed for ${orderId}`);
+        // Update cache with completed status
+        storePaymentData(orderId, status);
+      } else {
+        console.log(`⏳ Payment still pending for ${orderId}, status: ${status.transaction_status || 'undefined'}`);
+      }
+      
+      return {
+        status: isCompleted ? 'PAID' : 'PENDING',
+        paid_amount: isCompleted ? (status.gross_amount || 0) : 0,
+        transaction_status: status.transaction_status,
+        payment_type: status.payment_type,
+        settlement_time: status.settlement_time,
+        working_order_id: orderId
+      };
+      
+    } catch (apiError) {
+      console.log(`❌ Direct status check failed for ${orderId}: ${apiError.message}`);
+      
+      // If API call fails, check if it's a 404 (transaction not found)
+      if (apiError.message.includes('404') || apiError.message.includes("doesn't exist")) {
+        console.log('💡 Transaction not found - may need webhook update or different order ID format');
+        
+        // Return pending status and suggest webhook
+        return {
+          status: 'PENDING',
+          paid_amount: 0,
+          error: 'Transaction not found via API',
+          suggestion: 'webhook_required',
+          working_order_id: null
+        };
+      }
+      
+      // For other errors, return error status
+      return {
+        status: 'ERROR',
+        paid_amount: 0,
+        error: apiError.message,
+        working_order_id: null
+      };
+    }
     
   } catch (error) {
-    console.error('Error checking Midtrans payment completion:', error);
+    console.error('Error checking payment completion:', error);
     return {
       status: 'ERROR',
       paid_amount: 0,
-      error: error.message
+      error: error.message,
+      working_order_id: null
     };
   }
 }
@@ -480,8 +444,8 @@ async function createGopayPayment(amount, orderId, customerDetails = {}) {
     // Extract payment URL and info
     let paymentUrl = result.payment_url;
     
-    // Try to get the correct order ID from different fields
-    let midtransOrderId = result.order_id || result.id || result.payment_id;
+    // Extract order ID from response - this might be incomplete
+    let midtransOrderId = result.order_id || result.id || result.payment_id || orderId;
     
     // If still not found, extract from payment URL
     if (!midtransOrderId && paymentUrl) {
@@ -491,8 +455,9 @@ async function createGopayPayment(amount, orderId, customerDetails = {}) {
     
     console.log('🔍 Payment creation details:');
     console.log(`- Original Order ID: ${orderId}`);
-    console.log(`- Midtrans Order ID: ${midtransOrderId}`);
+    console.log(`- Midtrans Order ID (from response): ${midtransOrderId}`);
     console.log(`- Payment URL: ${paymentUrl}`);
+    console.log(`- ⚠️  Note: Real Midtrans Order ID will be updated via webhook`);
     console.log(`- Full Midtrans Response:`, JSON.stringify(result, null, 2));
     
     const paymentData = {
@@ -543,6 +508,49 @@ async function getServiceStatus() {
   }
 }
 
+/**
+ * Update order ID mapping from webhook data
+ */
+function updateOrderIdFromWebhook(originalOrderId, webhookOrderId, webhookData = null) {
+  try {
+    console.log(`🔄 Updating order ID mapping: ${originalOrderId} -> ${webhookOrderId}`);
+    
+    // Get existing payment data
+    const existingData = getCachedPaymentData(originalOrderId);
+    const webhookPaymentData = getCachedPaymentData(webhookOrderId);
+    
+    if (existingData) {
+      // Update with correct Midtrans order ID and webhook data
+      existingData.midtrans_order_id = webhookOrderId;
+      existingData.webhook_updated = new Date().toISOString();
+      
+      // If webhook data is available, merge it
+      if (webhookPaymentData) {
+        existingData.transaction_status = webhookPaymentData.transaction_status;
+        existingData.payment_type = webhookPaymentData.payment_type;
+        existingData.gross_amount = webhookPaymentData.gross_amount;
+        existingData.settlement_time = webhookPaymentData.settlement_time;
+        existingData.status_code = webhookPaymentData.status_code;
+        existingData.status_message = webhookPaymentData.status_message;
+        console.log(`📊 Merged webhook data: status=${webhookPaymentData.transaction_status}`);
+      }
+      
+      // Store with both IDs
+      storePaymentData(originalOrderId, existingData);
+      storePaymentData(webhookOrderId, existingData);
+      
+      console.log(`✅ Order ID mapping updated successfully`);
+      return true;
+    } else {
+      console.log(`⚠️ No existing data found for ${originalOrderId}`);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error updating order ID mapping:', error);
+    return false;
+  }
+}
+
 module.exports = {
   createQRISCore,
   createGopayPayment,
@@ -552,6 +560,9 @@ module.exports = {
   getPaymentDetails,
   getServiceStatus,
   clearCachedPaymentData,
+  storePaymentData,
+  getCachedPaymentData,
+  updateOrderIdFromWebhook,
   MIDTRANS_SERVER_KEY,
   MIDTRANS_CLIENT_KEY,
   MIDTRANS_MERCHANT_ID,
