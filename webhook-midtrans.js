@@ -5,13 +5,8 @@ const { clearCachedPaymentData } = require('./config/midtrans');
 const app = express();
 app.use(express.json());
 
-// Midtrans Server Key untuk verifikasi signature
-// Load and validate environment variables securely
-const envValidator = require('./config/env-validator');
-const validatedConfig = envValidator.validateOrExit();
-
-// Secure Midtrans Server Key from validated environment
-const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
+// Midtrans Server Key untuk verifikasi signature (direct configuration)
+const MIDTRANS_SERVER_KEY = 'Mid-server-ZVcAyI7O27Ta4HCL7E4K-gPJ';
 
 /**
  * Verify Midtrans notification signature

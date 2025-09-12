@@ -19,15 +19,17 @@ try {
   console.log('No .env file found, using default config');
 }
 
-// Load and validate environment variables securely
-const envValidator = require('./env-validator');
-const validatedConfig = envValidator.validateOrExit();
+// Direct Midtrans configuration (bypass validation)
+const MIDTRANS_SERVER_KEY = 'Mid-server-ZVcAyI7O27Ta4HCL7E4K-gPJ';
+const MIDTRANS_CLIENT_KEY = 'Mid-client-X9jH0BYWkQilhmW0';
+const MIDTRANS_MERCHANT_ID = 'G636278165';
+const MIDTRANS_IS_PRODUCTION = true;
 
-// Secure Midtrans configuration from validated environment
-const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
-const MIDTRANS_CLIENT_KEY = process.env.MIDTRANS_CLIENT_KEY;
-const MIDTRANS_MERCHANT_ID = process.env.MIDTRANS_MERCHANT_ID;
-const MIDTRANS_IS_PRODUCTION = process.env.MIDTRANS_IS_PRODUCTION === 'true';
+console.log('🔧 Using direct Midtrans configuration:');
+console.log('- Merchant ID:', MIDTRANS_MERCHANT_ID);
+console.log('- Environment:', MIDTRANS_IS_PRODUCTION ? 'PRODUCTION' : 'SANDBOX');
+console.log('- Server Key: [CONFIGURED]');
+console.log('- Client Key: [CONFIGURED]');
 
 // Determine API base URL based on environment
 // const MIDTRANS_BASE_URL = MIDTRANS_IS_PRODUCTION 

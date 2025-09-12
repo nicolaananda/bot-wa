@@ -1,5 +1,7 @@
 const { createGopayPayment, isPaymentCompleted } = require('./config/midtrans');
 
+console.log('🚀 Testing Gopay Payment with Production Credentials...');
+
 async function testGopayPayment() {
   console.log('🧪 Testing Gopay Payment Integration...\n');
   
