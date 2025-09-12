@@ -309,21 +309,61 @@ async function isPaymentCompleted(orderId) {
       orderId + '-' + Date.now().toString().slice(-10), // Try with timestamp suffix
     ];
     
-    // If orderId looks like bot format (GOPAY-XXXXX-timestamp), try Midtrans format
-    if (orderId.match(/^GOPAY-[A-F0-9]+-\d+$/)) {
-      // Generate possible Midtrans format with additional timestamp
-      const baseId = orderId;
-      const currentTime = Date.now();
-      orderIdFormats.push(baseId + '-' + currentTime);
-      orderIdFormats.push(baseId + '-' + (currentTime - 10000)); // 10 seconds ago
-      orderIdFormats.push(baseId + '-' + (currentTime - 30000)); // 30 seconds ago
-      orderIdFormats.push(baseId + '-' + (currentTime - 60000)); // 1 minute ago
-    }
+         // If orderId looks like bot format (GOPAY-XXXXX-timestamp), try Midtrans format
+     if (orderId.match(/^GOPAY-[A-F0-9]+-\d+$/)) {
+       // Generate possible Midtrans format with additional timestamp
+       const baseId = orderId;
+       const currentTime = Date.now();
+       
+       // Extract base parts for timestamp generation
+       const parts = orderId.split('-');
+       if (parts.length >= 3) {
+         const basePrefix = parts[0] + '-' + parts[1]; // GOPAY-XXXXX
+         const originalTimestamp = parseInt(parts[2]);
+         
+         if (originalTimestamp) {
+           console.log(`🔍 Generating timestamp variations for: ${basePrefix}-${originalTimestamp}`);
+           
+           // Try timestamps around the original creation time (payment processing time)
+           // Based on your case: difference was ~12 seconds (1757679599045 - 1757679587327 = 11718ms)
+           const timestampRanges = [
+             // Close range (0-30 seconds after creation)
+             { start: 0, end: 30000, step: 1000 },
+             // Medium range (30 seconds - 2 minutes)
+             { start: 30000, end: 120000, step: 5000 },
+             // Wide range (2-10 minutes)
+             { start: 120000, end: 600000, step: 15000 }
+           ];
+           
+           timestampRanges.forEach(range => {
+             for (let offset = range.start; offset <= range.end; offset += range.step) {
+               const testTimestamp = originalTimestamp + offset;
+               const testOrderId = `${basePrefix}-${originalTimestamp}-${testTimestamp}`;
+               orderIdFormats.push(testOrderId);
+             }
+           });
+           
+           // Also try with current time variations (for recent payments)
+           const currentTime = Date.now();
+           for (let offset = 0; offset <= 300000; offset += 15000) { // 0 to 5 minutes
+             const testTimestamp = currentTime - offset;
+             const testOrderId = `${basePrefix}-${originalTimestamp}-${testTimestamp}`;
+             orderIdFormats.push(testOrderId);
+           }
+         }
+       }
+     }
     
-    let lastError = null;
-    
-    // Try each format until one works
-    for (const testOrderId of orderIdFormats) {
+         let lastError = null;
+     
+     // Limit the number of attempts to avoid too many API calls
+     const maxAttempts = 20;
+     const limitedFormats = orderIdFormats.slice(0, maxAttempts);
+     
+     console.log(`📊 Will try ${limitedFormats.length} order ID formats (limited from ${orderIdFormats.length})`);
+     
+     // Try each format until one works
+     for (const testOrderId of limitedFormats) {
       try {
         console.log(`🧪 Trying order ID format: ${testOrderId}`);
         const status = await getPaymentStatus(testOrderId);
