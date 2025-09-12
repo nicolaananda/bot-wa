@@ -187,7 +187,7 @@ async function createQRISCore(amount, orderId, customerDetails = {}) {
 
     const customerDetailsObj = {
       first_name: customerDetails.first_name || 'Customer',
-      last_name: customerDetails.last_name || '',
+      last_name: customerDetails.last_name || 'User', // Midtrans requires non-empty last_name
       email: customerDetails.email || 'customer@example.com',
       phone: customerDetails.phone || '08123456789'
     };
@@ -362,7 +362,7 @@ async function createGopayPayment(amount, orderId, customerDetails = {}) {
 
     const customerDetailsObj = {
       first_name: customerDetails.first_name || 'Customer',
-      last_name: customerDetails.last_name || '',
+      last_name: customerDetails.last_name || 'User', // Midtrans requires non-empty last_name
       email: customerDetails.email || 'customer@example.com',
       phone: customerDetails.phone || '08123456789'
     };
