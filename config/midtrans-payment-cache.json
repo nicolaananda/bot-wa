@@ -1,36 +1,20 @@
 {
-  "GOPAY-8CF005CDB2-1757679587327": {
-    "transaction_id": "GOPAY-8CF005CDB2-1757679587327",
-    "order_id": "GOPAY-8CF005CDB2-1757679587327",
-    "midtrans_order_id": "GOPAY-8CF005CDB2-1757679587327-1757679599045",
-    "amount": 2072,
+  "GOPAY-FINAL-1757683188133": {
+    "transaction_id": "dadf84b5-6232-4c97-b74a-e8a0b6dacfbb",
+    "order_id": "GOPAY-FINAL-1757683188133",
+    "midtrans_order_id": "GOPAY-FINAL-1757683188133",
+    "snap_token": "dadf84b5-6232-4c97-b74a-e8a0b6dacfbb",
+    "amount": 5000,
     "status": "pending",
-    "payment_url": "https://app.midtrans.com/payment-links/...",
+    "transaction_status": "pending",
+    "payment_url": "https://app.midtrans.com/snap/v4/redirection/dadf84b5-6232-4c97-b74a-e8a0b6dacfbb",
+    "redirect_url": "https://app.midtrans.com/snap/v4/redirection/dadf84b5-6232-4c97-b74a-e8a0b6dacfbb",
+    "deeplink": "https://app.midtrans.com/snap/v4/redirection/dadf84b5-6232-4c97-b74a-e8a0b6dacfbb",
+    "qr_string": null,
     "payment_type": "gopay",
-    "created": "2025-09-12T12:48:10.835Z",
-    "cachedAt": "2025-09-12T12:48:10.838Z",
-    "webhook_updated": "2025-09-12T12:48:10.838Z",
-    "transaction_status": "settlement",
-    "gross_amount": "2072.00",
-    "settlement_time": "2025-09-12 19:20:03",
-    "status_code": "200",
-    "status_message": "Success, transaction is found"
-  },
-  "GOPAY-8CF005CDB2-1757679587327-1757679599045": {
-    "transaction_id": "GOPAY-8CF005CDB2-1757679587327",
-    "order_id": "GOPAY-8CF005CDB2-1757679587327",
-    "midtrans_order_id": "GOPAY-8CF005CDB2-1757679587327-1757679599045",
-    "amount": 2072,
-    "status": "pending",
-    "payment_url": "https://app.midtrans.com/payment-links/...",
-    "payment_type": "gopay",
-    "created": "2025-09-12T12:48:10.835Z",
-    "cachedAt": "2025-09-12T12:48:10.838Z",
-    "webhook_updated": "2025-09-12T12:48:10.838Z",
-    "transaction_status": "settlement",
-    "gross_amount": "2072.00",
-    "settlement_time": "2025-09-12 19:20:03",
-    "status_code": "200",
-    "status_message": "Success, transaction is found"
+    "status_code": "201",
+    "status_message": "Snap payment created successfully",
+    "created": "2025-09-12T13:19:48.386Z",
+    "cachedAt": "2025-09-12T13:19:48.386Z"
   }
 }

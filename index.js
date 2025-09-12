@@ -3170,19 +3170,22 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
           paymentMessage += `*💯 Total:* Rp${toRupiah(totalAmount)}\n`;
           paymentMessage += `*⏰ Waktu:* ${timeLeft} menit\n\n`;
 
-          // Add payment instructions for Midtrans payment link
-          if (paymentData.payment_url) {
+          // Add payment instructions for Gopay (sama seperti buymidtrans)
+          if (paymentData.deeplink) {
             paymentMessage += `*🔗 KLIK LINK UNTUK BAYAR GOPAY:*\n`;
-            paymentMessage += `${paymentData.payment_url}\n\n`;
+            paymentMessage += `${paymentData.deeplink}\n\n`;
             paymentMessage += `*📱 Cara Pembayaran:*\n`;
-            paymentMessage += `1. Klik link di atas\n`;
-            paymentMessage += `2. Pilih "GoPay/GoPay Later"\n`;
-            paymentMessage += `3. Klik "Pay now"\n`;
-            paymentMessage += `4. Akan otomatis buka app Gopay\n`;
-            paymentMessage += `5. Konfirmasi pembayaran\n`;
-            paymentMessage += `6. Tunggu konfirmasi otomatis\n\n`;
+            paymentMessage += `1. Klik link di atas untuk buka Gopay\n`;
+            paymentMessage += `2. Atau scan QR code jika tersedia\n`;
+            paymentMessage += `3. Konfirmasi pembayaran di app Gopay\n`;
+            paymentMessage += `4. Tunggu konfirmasi otomatis\n\n`;
+            
+            // Add QR info if available
+            if (paymentData.qr_string) {
+              paymentMessage += `*📱 QR Code Gopay:*\n${paymentData.qr_string}\n\n`;
+            }
           } else {
-            paymentMessage += `*⚠️ Sedang memproses link pembayaran...*\n`;
+            paymentMessage += `*⚠️ Sedang memproses pembayaran Gopay...*\n`;
             paymentMessage += `Link pembayaran akan segera tersedia.\n\n`;
           }
 
@@ -3207,10 +3210,11 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
             reffId,
             totalAmount,
             uniqueCode,
-            paymentToken: paymentData.transaction_id,
-            midtrans_order_id: paymentData.midtrans_order_id,
+            paymentToken: paymentData.snap_token,
+            midtrans_order_id: orderId, // For Snap API, monitor with order_id
             metode: 'Gopay',
-            payment_url: paymentData.payment_url
+            payment_url: paymentData.payment_url,
+            snap_token: paymentData.snap_token
           };
 
           // Check payment status periodically
@@ -3228,18 +3232,16 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
             }
 
             try {
-              // Use Midtrans order ID for status checking
+              // Use transaction_id for status checking (sama seperti buymidtrans)
               const orderData = db.data.order[sender];
               console.log('📋 Order data stored:', {
                 orderId: orderData.orderId,
-                midtrans_order_id: orderData.midtrans_order_id,
-                paymentToken: orderData.paymentToken
+                paymentToken: orderData.paymentToken,
+                midtrans_order_id: orderData.midtrans_order_id
               });
               
-              const midtransOrderId = orderData.midtrans_order_id || orderId;
-              console.log(`🎯 Using Order ID for status check: ${midtransOrderId}`);
-              
-              const paymentStatus = await isPaymentCompleted(midtransOrderId);
+              // For Snap API, use order_id for monitoring (not snap token)
+              const paymentStatus = await isPaymentCompleted(orderData.orderId);
               console.log(`Gopay Payment Status: ${paymentStatus.status}`);
 
               if (paymentStatus.status === 'PAID') {

@@ -25,6 +25,8 @@ const MIDTRANS_CLIENT_KEY = 'Mid-client-X9jH0BYWkQilhmW0';
 const MIDTRANS_MERCHANT_ID = 'G636278165';
 const MIDTRANS_IS_PRODUCTION = true;
 
+// Gopay is activated in production, using production credentials
+
 console.log('🔧 Using direct Midtrans configuration:');
 console.log('- Merchant ID:', MIDTRANS_MERCHANT_ID);
 console.log('- Environment:', MIDTRANS_IS_PRODUCTION ? 'PRODUCTION' : 'SANDBOX');
@@ -398,11 +400,11 @@ async function getPaymentDetails(orderId) {
 }
 
 /**
- * Create Gopay payment using Midtrans Snap API (more reliable)
+ * Create Gopay payment using Midtrans Core API (same as buymidtrans - proven working)
  */
 async function createGopayPayment(amount, orderId, customerDetails = {}) {
   try {
-    console.log(`Creating Midtrans Gopay payment via Snap API for amount: ${amount}, orderId: ${orderId}`);
+    console.log(`Creating Midtrans Gopay payment via Core API for amount: ${amount}, orderId: ${orderId}`);
     
     const transactionDetails = {
       order_id: orderId,
@@ -418,67 +420,61 @@ async function createGopayPayment(amount, orderId, customerDetails = {}) {
 
     const customerDetailsObj = {
       first_name: customerDetails.first_name || 'Customer',
-      last_name: customerDetails.last_name || 'User', // Midtrans requires non-empty last_name
+      last_name: customerDetails.last_name || 'User',
       email: customerDetails.email || 'customer@example.com',
       phone: customerDetails.phone || '08123456789'
     };
 
-    // Gunakan Snap API untuk Gopay - lebih reliable
+    // Gunakan Snap API untuk Gopay (lebih reliable untuk production)
     const snapRequest = {
       transaction_details: transactionDetails,
       item_details: itemDetails,
       customer_details: customerDetailsObj,
-      enabled_payments: ["gopay"], // Hanya aktifkan Gopay
+      enabled_payments: ["gopay"],
       gopay: {
         enable_callback: true,
-        callback_url: "https://midtrans.com"
+        callback_url: "https://example.com/callback"
       }
     };
 
-    console.log('Midtrans Snap Gopay request:', JSON.stringify(snapRequest, null, 2));
+    console.log('Midtrans Snap API Gopay request:', JSON.stringify(snapRequest, null, 2));
     
-    // Gunakan Snap API endpoint untuk create payment link
-    const result = await makeMidtransRequest('/v1/payment-links', 'POST', snapRequest);
-    console.log('Midtrans Snap Gopay payment created successfully:', result);
+    // Gunakan Snap API endpoint yang benar
+    const result = await makeMidtransRequest('/snap/v1/transactions', 'POST', snapRequest);
+    console.log('Midtrans Snap API Gopay payment created successfully:', result);
+    console.log('Full Snap API response:', JSON.stringify(result, null, 2));
     
-    // Extract payment URL and info
-    let paymentUrl = result.payment_url;
+    // Extract data dari Snap API response
+    const snapToken = result.token;
+    const redirectUrl = result.redirect_url;
     
-    // Extract order ID from response - this might be incomplete
-    let midtransOrderId = result.order_id || result.id || result.payment_id || orderId;
-    
-    // If still not found, extract from payment URL
-    if (!midtransOrderId && paymentUrl) {
-      const urlParts = paymentUrl.split('/');
-      midtransOrderId = urlParts[urlParts.length - 1] || orderId;
-    }
-    
-    console.log('🔍 Payment creation details:');
-    console.log(`- Original Order ID: ${orderId}`);
-    console.log(`- Midtrans Order ID (from response): ${midtransOrderId}`);
-    console.log(`- Payment URL: ${paymentUrl}`);
-    console.log(`- ⚠️  Note: Real Midtrans Order ID will be updated via webhook`);
-    console.log(`- Full Midtrans Response:`, JSON.stringify(result, null, 2));
+    console.log('🔍 Gopay payment creation details:');
+    console.log(`- Snap Token: ${snapToken}`);
+    console.log(`- Order ID: ${orderId}`);
+    console.log(`- Redirect URL: ${redirectUrl}`);
+    console.log(`- Payment URL: ${redirectUrl}`);
     
     const paymentData = {
-      transaction_id: midtransOrderId, // Use Midtrans order ID for status checking
-      order_id: orderId, // Our original order ID
-      midtrans_order_id: midtransOrderId, // Store both for reference
+      transaction_id: snapToken, // Use snap token as transaction_id
+      order_id: orderId,
+      midtrans_order_id: orderId, // For Snap API, use original order_id for monitoring
+      snap_token: snapToken,
       amount: amount,
       status: 'pending',
-      payment_url: paymentUrl,
-      snap_token: midtransOrderId,
-      deeplink: paymentUrl, // Use payment URL as deeplink
-      qr_string: paymentUrl,
-      created: new Date().toISOString(),
+      transaction_status: 'pending',
+      payment_url: redirectUrl,
+      redirect_url: redirectUrl,
+      deeplink: redirectUrl, // Use redirect URL as deeplink
+      qr_string: null, // Snap API doesn't provide QR directly
       payment_type: 'gopay',
-      status_code: '200',
-      status_message: 'Payment link created successfully'
+      status_code: '201',
+      status_message: 'Snap payment created successfully',
+      created: new Date().toISOString()
     };
     
-    // Store with both order IDs for easier lookup
+    // Store payment data with order ID for monitoring
     storePaymentData(orderId, paymentData);
-    storePaymentData(midtransOrderId, paymentData);
+    
     return paymentData;
   } catch (error) {
     console.error('Error creating Midtrans Gopay payment:', error);
