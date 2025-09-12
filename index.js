@@ -2515,27 +2515,23 @@ break;
                             console.error('❌ Error sending account details to owner (not critical):', error);
                           }
 
-                          // Reply berdasarkan apakah customer benar-benar menerima detail akun
+                          // Send single comprehensive success message
                           if (customerMessageSent) {
                             if (isGroup) {
-                              reply("✅ Pembelian berhasil! Detail akun telah dikirim ke chat pribadi Anda.")
+                              reply("🎉 Pembayaran QRIS berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!");
                             } else {
-                              reply("✅ Pembelian berhasil! Detail akun telah dikirim.")
+                              reply("🎉 Pembayaran QRIS berhasil! Detail akun telah dikirim di atas. Terima kasih!");
                             }
                           } else {
-                            if (isGroup) {
-                              reply("⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun. Silahkan hubungi admin untuk mendapatkan detail akun Anda.")
-                            } else {
-                              reply("⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun. Silahkan hubungi admin untuk mendapatkan detail akun Anda.")
-                            }
+                            reply("⚠️ Pembayaran QRIS berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
                             
                             // Send alert to admin about failed delivery
                             try {
                               await ronzz.sendMessage("6281389592985@s.whatsapp.net", { 
-                                text: `🚨 ALERT: Customer message delivery FAILED!\n\nCustomer: @${sender.split("@")[0]}\nProduct: ${db.data.produk[data[0]].name}\nAmount: ${jumlah}\nRef ID: ${reffId}\n\nCustomer tidak menerima detail akun. Harap kirim manual!`,
+                                text: `🚨 ALERT: Customer message delivery FAILED (BUYNOW CASE)!\n\nCustomer: @${sender.split("@")[0]}\nProduct: ${db.data.produk[data[0]].name}\nAmount: ${jumlah}\nRef ID: ${reffId}\nMethod: QRIS\n\nCustomer tidak menerima detail akun. Harap kirim manual!`,
                                 mentions: [sender]
                               });
-                              console.log('🚨 Alert sent to admin about failed customer delivery');
+                              console.log('🚨 Alert sent to admin about failed customer delivery (BUYNOW CASE)');
                             } catch (alertError) {
                               console.error('❌ Failed to send alert to admin:', alertError.message);
                             }
@@ -2803,19 +2799,15 @@ Ada transaksi dengan saldo yang telah selesai!
             await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
           }
           
-          // Beri notifikasi pembelian berhasil berdasarkan apakah customer menerima detail akun
+          // Send single comprehensive success message
           if (customerMessageSent) {
             if (isGroup) {
-              reply("✅ Pembelian berhasil! Detail akun telah dikirim ke chat pribadi Anda.")
+              reply("🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!");
             } else {
-              reply("✅ Pembelian berhasil! Detail akun telah dikirim.")
+              reply("🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim di atas. Terima kasih!");
             }
           } else {
-            if (isGroup) {
-              reply("⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun. Silahkan hubungi admin untuk mendapatkan detail akun Anda.")
-            } else {
-              reply("⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun. Silahkan hubungi admin untuk mendapatkan detail akun Anda.")
-            }
+            reply("⚠️ Pembelian dengan saldo berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
             
             // Send alert to admin about failed delivery
             try {
@@ -3023,7 +3015,12 @@ Ada transaksi dengan saldo yang telah selesai!
                 snkProduk += `*╰────「 END SNK 」────╯*`;
                 await ronzz.sendMessage(sender, { text: snkProduk }, { quoted: m });
 
-                if (isGroup) reply("Pembelian berhasil! Detail akun telah dikirim ke chat.");
+                // Send single comprehensive success message
+                if (isGroup) {
+                  reply("🎉 Pembayaran Midtrans QRIS berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!");
+                } else {
+                  reply("🎉 Pembayaran Midtrans QRIS berhasil! Detail akun telah dikirim di atas. Terima kasih!");
+                }
 
                                  // Notif Owner
                  await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text:
@@ -3136,8 +3133,12 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
           if (!unitPrice || unitPrice <= 0) throw new Error('Harga produk tidak valid');
 
           const amount = unitPrice * quantityNum;
-          const uniqueCode = Math.floor(1 + Math.random() * 99);
-          const totalAmount = amount + uniqueCode;
+          
+          // Admin fee Gopay 4% (subsidi 50% = customer bayar 2%)
+          const gopayAdminFee = Math.ceil(amount * 0.04); // 4% admin fee
+          const subsidizedFee = Math.ceil(gopayAdminFee * 0.5); // Customer bayar 50% = 2%
+          
+          const totalAmount = amount + subsidizedFee;
           if (totalAmount <= 0) throw new Error('Total amount tidak valid');
 
           const reffId = crypto.randomBytes(5).toString("hex").toUpperCase();
@@ -3165,9 +3166,7 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
           paymentMessage += `*🆔 ID Produk:* ${productId}\n`;
           paymentMessage += `*💰 Harga:* Rp${toRupiah(unitPrice)}\n`;
           paymentMessage += `*🔢 Jumlah:* ${quantityNum}\n`;
-          paymentMessage += `*💸 Subtotal:* Rp${toRupiah(amount)}\n`;
-          paymentMessage += `*🎲 Kode Unik:* ${uniqueCode}\n`;
-          paymentMessage += `*💯 Total:* Rp${toRupiah(totalAmount)}\n`;
+          paymentMessage += `*💯 Total Bayar:* Rp${toRupiah(totalAmount)}\n`;
           paymentMessage += `*⏰ Waktu:* ${timeLeft} menit\n\n`;
 
           // Add payment instructions for Gopay (sama seperti buymidtrans)
@@ -3209,7 +3208,9 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
             orderId,
             reffId,
             totalAmount,
-            uniqueCode,
+            amount, // Subtotal sebelum admin fee
+            gopayAdminFee, // Admin fee penuh (4%)
+            subsidizedFee, // Admin fee setelah subsidi (2%)
             paymentToken: paymentData.snap_token,
             midtrans_order_id: orderId, // For Snap API, monitor with order_id
             metode: 'Gopay',
@@ -3246,7 +3247,7 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
 
               if (paymentStatus.status === 'PAID') {
                 await ronzz.sendMessage(from, { delete: message.key });
-                reply("✅ Pembayaran Gopay berhasil! Data akun akan segera diproses.");
+                // Will send single comprehensive message after account delivery
 
                 // Process the purchase - same as other payment methods
                 product.terjual += quantityNum;
@@ -3303,14 +3304,7 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
                   console.log('✅ SUCCESS: Account details sent to customer!');
                   customerMessageSent = true;
                   
-                  // Send confirmation
-                  await sleep(2000);
-                  try {
-                    await ronzz.sendMessage(sender, { text: "✅ Detail akun telah dikirim di pesan sebelumnya. Jika tidak terlihat, silahkan hubungi admin." });
-                    console.log('✅ Confirmation message sent');
-                  } catch (confirmError) {
-                    console.error('❌ Confirmation message failed:', confirmError.message);
-                  }
+                  // No separate confirmation message needed
                   
                 } catch (error) {
                   console.error('❌ ATTEMPT 1 FAILED:', error.message);
@@ -3374,19 +3368,15 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
                   console.error('❌ Error sending account details to owner (not critical):', error);
                 }
 
-                // Send success message based on delivery status
+                // Send single comprehensive success message
                 if (customerMessageSent) {
                   if (isGroup) {
-                    reply("✅ Pembelian berhasil! Detail akun telah dikirim ke chat pribadi Anda.");
+                    reply("🎉 Pembayaran Gopay berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!");
                   } else {
-                    reply("✅ Pembelian berhasil! Detail akun telah dikirim.");
+                    reply("🎉 Pembayaran Gopay berhasil! Detail akun telah dikirim di atas. Terima kasih!");
                   }
                 } else {
-                  if (isGroup) {
-                    reply("⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun. Silahkan hubungi admin untuk mendapatkan detail akun Anda.");
-                  } else {
-                    reply("⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun. Silahkan hubungi admin untuk mendapatkan detail akun Anda.");
-                  }
+                  reply("⚠️ Pembayaran Gopay berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
                   
                   // Send alert to admin
                   try {
