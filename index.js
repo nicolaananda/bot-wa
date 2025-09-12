@@ -3170,24 +3170,17 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
           paymentMessage += `*💯 Total:* Rp${toRupiah(totalAmount)}\n`;
           paymentMessage += `*⏰ Waktu:* ${timeLeft} menit\n\n`;
 
-          // Add payment instructions based on what's available
-          if (paymentData.deeplink) {
-            paymentMessage += `*🔗 KLIK LINK UNTUK BAYAR:*\n`;
-            paymentMessage += `${paymentData.deeplink}\n\n`;
+          // Add payment instructions for Midtrans payment link
+          if (paymentData.payment_url) {
+            paymentMessage += `*🔗 KLIK LINK UNTUK BAYAR GOPAY:*\n`;
+            paymentMessage += `${paymentData.payment_url}\n\n`;
             paymentMessage += `*📱 Cara Pembayaran:*\n`;
             paymentMessage += `1. Klik link di atas\n`;
-            paymentMessage += `2. Akan otomatis membuka Gopay\n`;
-            paymentMessage += `3. Konfirmasi pembayaran di app Gopay\n`;
-            paymentMessage += `4. Tunggu konfirmasi otomatis\n\n`;
-          } else if (paymentData.qr_string) {
-            paymentMessage += `*📱 SCAN QR CODE GOPAY:*\n`;
-            paymentMessage += `${paymentData.qr_string}\n\n`;
-            paymentMessage += `*📱 Cara Pembayaran:*\n`;
-            paymentMessage += `1. Buka aplikasi Gopay\n`;
-            paymentMessage += `2. Pilih "Bayar" atau "Scan"\n`;
-            paymentMessage += `3. Scan QR code di atas\n`;
-            paymentMessage += `4. Konfirmasi pembayaran\n`;
-            paymentMessage += `5. Tunggu konfirmasi otomatis\n\n`;
+            paymentMessage += `2. Pilih "GoPay/GoPay Later"\n`;
+            paymentMessage += `3. Klik "Pay now"\n`;
+            paymentMessage += `4. Akan otomatis buka app Gopay\n`;
+            paymentMessage += `5. Konfirmasi pembayaran\n`;
+            paymentMessage += `6. Tunggu konfirmasi otomatis\n\n`;
           } else {
             paymentMessage += `*⚠️ Sedang memproses link pembayaran...*\n`;
             paymentMessage += `Link pembayaran akan segera tersedia.\n\n`;
@@ -3216,7 +3209,7 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
             uniqueCode,
             paymentToken: paymentData.transaction_id,
             metode: 'Gopay',
-            deeplink: paymentData.deeplink
+            payment_url: paymentData.payment_url
           };
 
           // Check payment status periodically

@@ -342,11 +342,11 @@ async function getPaymentDetails(orderId) {
 }
 
 /**
- * Create Gopay payment using Midtrans Core API
+ * Create Gopay payment using Midtrans Snap API (more reliable)
  */
 async function createGopayPayment(amount, orderId, customerDetails = {}) {
   try {
-    console.log(`Creating Midtrans Gopay payment for amount: ${amount}, orderId: ${orderId}`);
+    console.log(`Creating Midtrans Gopay payment via Snap API for amount: ${amount}, orderId: ${orderId}`);
     
     const transactionDetails = {
       order_id: orderId,
@@ -367,53 +367,41 @@ async function createGopayPayment(amount, orderId, customerDetails = {}) {
       phone: customerDetails.phone || '08123456789'
     };
 
-    // Gunakan Core API untuk Gopay
-    const coreRequest = {
-      payment_type: 'gopay',
+    // Gunakan Snap API untuk Gopay - lebih reliable
+    const snapRequest = {
       transaction_details: transactionDetails,
       item_details: itemDetails,
       customer_details: customerDetailsObj,
+      enabled_payments: ["gopay"], // Hanya aktifkan Gopay
       gopay: {
         enable_callback: true,
-        callback_url: "https://midtrans.com" // Bisa disesuaikan dengan webhook URL
+        callback_url: "https://midtrans.com"
       }
     };
 
-    console.log('Midtrans Gopay request:', JSON.stringify(coreRequest, null, 2));
+    console.log('Midtrans Snap Gopay request:', JSON.stringify(snapRequest, null, 2));
     
-    const result = await makeMidtransRequest('/v2/charge', 'POST', coreRequest);
-    console.log('Midtrans Gopay payment created successfully:', result);
+    // Gunakan Snap API endpoint
+    const result = await makeMidtransRequest('/v1/payment-links', 'POST', snapRequest);
+    console.log('Midtrans Snap Gopay payment created successfully:', result);
     
-    // Dapatkan deeplink untuk Gopay
-    let deeplink = null;
-    let qrString = null;
-    
-    if (result.actions && result.actions.length > 0) {
-      // Cari deeplink action
-      const deeplinkAction = result.actions.find(action => action.name === 'deeplink-redirect');
-      if (deeplinkAction && deeplinkAction.url) {
-        deeplink = deeplinkAction.url;
-      }
-      
-      // Cari QR code action sebagai fallback
-      const qrAction = result.actions.find(action => action.name === 'generate-qr-code');
-      if (qrAction && qrAction.url) {
-        qrString = qrAction.url;
-      }
-    }
+    // Extract payment URL and info
+    let paymentUrl = result.payment_url;
+    let snapToken = result.order_id; // Snap token for reference
     
     const paymentData = {
-      transaction_id: result.transaction_id,
+      transaction_id: result.order_id,
       order_id: orderId,
       amount: amount,
-      status: result.transaction_status || 'pending',
-      deeplink: deeplink,
-      qr_string: qrString,
+      status: 'pending',
+      payment_url: paymentUrl,
+      snap_token: snapToken,
+      deeplink: paymentUrl, // Use payment URL as deeplink
+      qr_string: paymentUrl,
       created: new Date().toISOString(),
       payment_type: 'gopay',
-      va_number: result.va_numbers ? result.va_numbers[0].va_number : null,
-      status_code: result.status_code,
-      status_message: result.status_message
+      status_code: '200',
+      status_message: 'Payment link created successfully'
     };
     
     storePaymentData(orderId, paymentData);
