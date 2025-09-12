@@ -18,29 +18,29 @@ class EnvValidator {
   constructor() {
     this.requiredVars = {
       // Midtrans configuration
-      MIDTRANS_SERVER_KEY: {
-        description: 'Midtrans Server Key for API authentication',
-        pattern: /^Mid-server-[a-zA-Z0-9_-]+$/,
-        sensitive: true
-      },
-      MIDTRANS_CLIENT_KEY: {
-        description: 'Midtrans Client Key for frontend integration',
-        pattern: /^Mid-client-[a-zA-Z0-9_-]+$/,
-        sensitive: true
-      },
       MIDTRANS_MERCHANT_ID: {
         description: 'Midtrans Merchant ID',
         pattern: /^G[0-9]+$/,
         sensitive: false
-      }
-    };
-    
-    this.optionalVars = {
+      },
+      MIDTRANS_SERVER_KEY: {
+        description: 'Midtrans Server Key for API authentication',
+        pattern: /^Mid-server-.+$/,
+        sensitive: true
+      },
+      MIDTRANS_CLIENT_KEY: {
+        description: 'Midtrans Client Key for frontend integration', 
+        pattern: /^Mid-client-.+$/,
+        sensitive: true
+      },
       MIDTRANS_IS_PRODUCTION: {
         description: 'Production mode flag (true/false)',
         default: 'false',
         pattern: /^(true|false)$/
-      },
+      }
+    };
+    
+    this.optionalVars = {
       MIDTRANS_BASE_URL: {
         description: 'Midtrans API base URL',
         default: 'https://api.midtrans.com'
@@ -75,6 +75,15 @@ class EnvValidator {
         result.valid = false;
         result.errors.push(`❌ Invalid format for ${varName}`);
         result.errors.push(`   Expected pattern: ${config.pattern}`);
+        
+        // Provide specific guidance for Midtrans keys
+        if (varName === 'MIDTRANS_SERVER_KEY') {
+          result.errors.push(`   Your key should start with "Mid-server-"`);
+          result.errors.push(`   Example: Mid-server-abc123xyz`);
+        } else if (varName === 'MIDTRANS_CLIENT_KEY') {
+          result.errors.push(`   Your key should start with "Mid-client-"`);
+          result.errors.push(`   Example: Mid-client-abc123xyz`);
+        }
         continue;
       }
 
@@ -159,11 +168,19 @@ class EnvValidator {
     this.printReport(result);
 
     if (!result.valid) {
+      // Check if we should skip validation (for development/testing)
+      if (process.env.SKIP_ENV_VALIDATION === 'true') {
+        console.log('⚠️  Environment validation skipped (SKIP_ENV_VALIDATION=true)');
+        console.log('🚨 WARNING: Running with potentially invalid configuration!\n');
+        return result.config;
+      }
+
       console.log('💡 Solutions:');
       console.log('1. Create a .env file in your project root');
       console.log('2. Copy values from env.example');
       console.log('3. Update with your actual Midtrans credentials');
-      console.log('4. Restart the application\n');
+      console.log('4. Restart the application');
+      console.log('5. Or set SKIP_ENV_VALIDATION=true to bypass (not recommended)\n');
       
       process.exit(1);
     }
