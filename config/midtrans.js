@@ -297,38 +297,80 @@ async function getPaymentStatus(orderId) {
 }
 
 /**
- * Check if payment is completed
+ * Check if payment is completed with fallback order ID formats
  */
 async function isPaymentCompleted(orderId) {
   try {
     console.log(`🔍 Checking payment completion for order: ${orderId}`);
-    const status = await getPaymentStatus(orderId);
     
-    console.log(`📊 Payment status details:`, {
-      transaction_status: status.transaction_status,
-      payment_type: status.payment_type,
-      gross_amount: status.gross_amount,
-      settlement_time: status.settlement_time
-    });
+    // Try multiple order ID formats
+    const orderIdFormats = [
+      orderId, // Original format
+      orderId + '-' + Date.now().toString().slice(-10), // Try with timestamp suffix
+    ];
     
-    const isCompleted = status.transaction_status === 'settlement' || 
-                       status.transaction_status === 'capture';
-    
-    // Jika status berubah menjadi completed, clear cache untuk memastikan data terbaru
-    if (isCompleted) {
-      clearCachedPaymentData(orderId);
-      console.log(`✅ Payment completed for ${orderId}, cache cleared`);
-    } else {
-      console.log(`⏳ Payment still pending for ${orderId}, status: ${status.transaction_status}`);
+    // If orderId looks like bot format (GOPAY-XXXXX-timestamp), try Midtrans format
+    if (orderId.match(/^GOPAY-[A-F0-9]+-\d+$/)) {
+      // Generate possible Midtrans format with additional timestamp
+      const baseId = orderId;
+      const currentTime = Date.now();
+      orderIdFormats.push(baseId + '-' + currentTime);
+      orderIdFormats.push(baseId + '-' + (currentTime - 10000)); // 10 seconds ago
+      orderIdFormats.push(baseId + '-' + (currentTime - 30000)); // 30 seconds ago
+      orderIdFormats.push(baseId + '-' + (currentTime - 60000)); // 1 minute ago
     }
     
+    let lastError = null;
+    
+    // Try each format until one works
+    for (const testOrderId of orderIdFormats) {
+      try {
+        console.log(`🧪 Trying order ID format: ${testOrderId}`);
+        const status = await getPaymentStatus(testOrderId);
+        
+        console.log(`📊 Payment status details:`, {
+          order_id: testOrderId,
+          transaction_status: status.transaction_status,
+          payment_type: status.payment_type,
+          gross_amount: status.gross_amount,
+          settlement_time: status.settlement_time
+        });
+        
+        const isCompleted = status.transaction_status === 'settlement' || 
+                           status.transaction_status === 'capture';
+        
+        // Jika status berubah menjadi completed, clear cache untuk memastikan data terbaru
+        if (isCompleted) {
+          clearCachedPaymentData(testOrderId);
+          console.log(`✅ Payment completed for ${testOrderId}, cache cleared`);
+        } else {
+          console.log(`⏳ Payment still pending for ${testOrderId}, status: ${status.transaction_status}`);
+        }
+        
+        return {
+          status: isCompleted ? 'PAID' : 'PENDING',
+          paid_amount: isCompleted ? status.gross_amount : 0,
+          transaction_status: status.transaction_status,
+          payment_type: status.payment_type,
+          settlement_time: status.settlement_time,
+          working_order_id: testOrderId // Return which format worked
+        };
+        
+      } catch (error) {
+        console.log(`❌ Failed with ${testOrderId}: ${error.message}`);
+        lastError = error;
+        continue; // Try next format
+      }
+    }
+    
+    // If all formats failed
+    console.error('❌ All order ID formats failed for:', orderId);
     return {
-      status: isCompleted ? 'PAID' : 'PENDING',
-      paid_amount: isCompleted ? status.gross_amount : 0,
-      transaction_status: status.transaction_status,
-      payment_type: status.payment_type,
-      settlement_time: status.settlement_time
+      status: 'ERROR',
+      paid_amount: 0,
+      error: lastError?.message || 'All order ID formats failed'
     };
+    
   } catch (error) {
     console.error('Error checking Midtrans payment completion:', error);
     return {
@@ -391,13 +433,27 @@ async function createGopayPayment(amount, orderId, customerDetails = {}) {
 
     console.log('Midtrans Snap Gopay request:', JSON.stringify(snapRequest, null, 2));
     
-    // Gunakan Snap API endpoint
+    // Gunakan Snap API endpoint untuk create payment link
     const result = await makeMidtransRequest('/v1/payment-links', 'POST', snapRequest);
     console.log('Midtrans Snap Gopay payment created successfully:', result);
     
     // Extract payment URL and info
     let paymentUrl = result.payment_url;
-    let midtransOrderId = result.order_id; // This is the actual order ID from Midtrans
+    
+    // Try to get the correct order ID from different fields
+    let midtransOrderId = result.order_id || result.id || result.payment_id;
+    
+    // If still not found, extract from payment URL
+    if (!midtransOrderId && paymentUrl) {
+      const urlParts = paymentUrl.split('/');
+      midtransOrderId = urlParts[urlParts.length - 1] || orderId;
+    }
+    
+    console.log('🔍 Payment creation details:');
+    console.log(`- Original Order ID: ${orderId}`);
+    console.log(`- Midtrans Order ID: ${midtransOrderId}`);
+    console.log(`- Payment URL: ${paymentUrl}`);
+    console.log(`- Full Midtrans Response:`, JSON.stringify(result, null, 2));
     
     const paymentData = {
       transaction_id: midtransOrderId, // Use Midtrans order ID for status checking

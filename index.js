@@ -3229,8 +3229,15 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
 
             try {
               // Use Midtrans order ID for status checking
-              const midtransOrderId = db.data.order[sender].midtrans_order_id || orderId;
-              console.log(`Checking payment status for Midtrans Order ID: ${midtransOrderId}`);
+              const orderData = db.data.order[sender];
+              console.log('📋 Order data stored:', {
+                orderId: orderData.orderId,
+                midtrans_order_id: orderData.midtrans_order_id,
+                paymentToken: orderData.paymentToken
+              });
+              
+              const midtransOrderId = orderData.midtrans_order_id || orderId;
+              console.log(`🎯 Using Order ID for status check: ${midtransOrderId}`);
               
               const paymentStatus = await isPaymentCompleted(midtransOrderId);
               console.log(`Gopay Payment Status: ${paymentStatus.status}`);
