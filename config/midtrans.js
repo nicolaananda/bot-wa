@@ -340,6 +340,89 @@ async function getPaymentDetails(orderId) {
 }
 
 /**
+ * Create Gopay payment using Midtrans Core API
+ */
+async function createGopayPayment(amount, orderId, customerDetails = {}) {
+  try {
+    console.log(`Creating Midtrans Gopay payment for amount: ${amount}, orderId: ${orderId}`);
+    
+    const transactionDetails = {
+      order_id: orderId,
+      gross_amount: amount
+    };
+
+    const itemDetails = [{
+      id: customerDetails.product_id || 'PRODUCT',
+      price: amount,
+      quantity: 1,
+      name: customerDetails.product_name || 'Pembelian Produk Digital'
+    }];
+
+    const customerDetailsObj = {
+      first_name: customerDetails.first_name || 'Customer',
+      last_name: customerDetails.last_name || '',
+      email: customerDetails.email || 'customer@example.com',
+      phone: customerDetails.phone || '08123456789'
+    };
+
+    // Gunakan Core API untuk Gopay
+    const coreRequest = {
+      payment_type: 'gopay',
+      transaction_details: transactionDetails,
+      item_details: itemDetails,
+      customer_details: customerDetailsObj,
+      gopay: {
+        enable_callback: true,
+        callback_url: "https://midtrans.com" // Bisa disesuaikan dengan webhook URL
+      }
+    };
+
+    console.log('Midtrans Gopay request:', JSON.stringify(coreRequest, null, 2));
+    
+    const result = await makeMidtransRequest('/v2/charge', 'POST', coreRequest);
+    console.log('Midtrans Gopay payment created successfully:', result);
+    
+    // Dapatkan deeplink untuk Gopay
+    let deeplink = null;
+    let qrString = null;
+    
+    if (result.actions && result.actions.length > 0) {
+      // Cari deeplink action
+      const deeplinkAction = result.actions.find(action => action.name === 'deeplink-redirect');
+      if (deeplinkAction && deeplinkAction.url) {
+        deeplink = deeplinkAction.url;
+      }
+      
+      // Cari QR code action sebagai fallback
+      const qrAction = result.actions.find(action => action.name === 'generate-qr-code');
+      if (qrAction && qrAction.url) {
+        qrString = qrAction.url;
+      }
+    }
+    
+    const paymentData = {
+      transaction_id: result.transaction_id,
+      order_id: orderId,
+      amount: amount,
+      status: result.transaction_status || 'pending',
+      deeplink: deeplink,
+      qr_string: qrString,
+      created: new Date().toISOString(),
+      payment_type: 'gopay',
+      va_number: result.va_numbers ? result.va_numbers[0].va_number : null,
+      status_code: result.status_code,
+      status_message: result.status_message
+    };
+    
+    storePaymentData(orderId, paymentData);
+    return paymentData;
+  } catch (error) {
+    console.error('Error creating Midtrans Gopay payment:', error);
+    throw new Error(`Failed to create Midtrans Gopay payment: ${error.message}`);
+  }
+}
+
+/**
  * Get Midtrans service status
  */
 async function getServiceStatus() {
@@ -363,6 +446,7 @@ async function getServiceStatus() {
 
 module.exports = {
   createQRISCore,
+  createGopayPayment,
   getQRISString,
   getPaymentStatus,
   isPaymentCompleted,

@@ -25,7 +25,7 @@ const { expiredCheck, getAllSewa } = require("./function/sewa");
 const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
 const { qrisDinamis } = require("./function/dinamis");
-const { createQRISCore, isPaymentCompleted } = require('./config/midtrans');
+const { createQRISCore, createGopayPayment, isPaymentCompleted } = require('./config/midtrans');
 const BASE_QRIS_DANA = "00020101021126570011ID.DANA.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
 
 // Performance optimization: Cache for user saldo
@@ -3097,6 +3097,343 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
         } catch (error) {
           console.error(`Error processing Midtrans payment for ${productId}:`, error);
           reply("Gagal membuat link pembayaran Midtrans. Silakan coba lagi.");
+          delete db.data.order[sender];
+        }
+      }
+        break
+
+      case 'gopay': {
+        if (db.data.order[sender]) {
+          return reply(`Kamu sedang melakukan order. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`);
+        }
+
+        const [productId, quantity] = q.split(" ");
+        if (!productId || !quantity) {
+          return reply(`❌ Format salah!\n\n*Contoh:* ${prefix + command} idproduk jumlah\n*Misal:* ${prefix + command} vid3u 1`);
+        }
+
+        const product = db.data.produk[productId];
+        if (!product) {
+          return reply(`❌ Produk dengan ID *${productId}* tidak ditemukan.\n\nGunakan *${prefix}list* untuk melihat daftar produk.`);
+        }
+
+        const stock = product.stok;
+        const quantityNum = Number(quantity);
+        if (!Number.isInteger(quantityNum) || quantityNum <= 0) {
+          return reply(`❌ Jumlah harus berupa angka positif.\n\n*Contoh:* ${prefix + command} ${productId} 1`);
+        }
+        if (stock.length === 0) {
+          return reply("❌ Stok habis, silakan hubungi Owner untuk restok.");
+        }
+        if (stock.length < quantityNum) {
+          return reply(`❌ Stok tidak cukup!\n\n*Stok tersedia:* ${stock.length}\n*Jumlah diminta:* ${quantityNum}`);
+        }
+
+        reply("🔄 Sedang membuat link pembayaran Gopay...");
+
+        try {
+          const unitPrice = Number(hargaProduk(productId, db.data.users[sender].role));
+          if (!unitPrice || unitPrice <= 0) throw new Error('Harga produk tidak valid');
+
+          const amount = unitPrice * quantityNum;
+          const uniqueCode = Math.floor(1 + Math.random() * 99);
+          const totalAmount = amount + uniqueCode;
+          if (totalAmount <= 0) throw new Error('Total amount tidak valid');
+
+          const reffId = crypto.randomBytes(5).toString("hex").toUpperCase();
+          const orderId = `GOPAY-${reffId}-${Date.now()}`;
+
+          // Create Gopay payment menggunakan Midtrans
+          const customerDetails = {
+            first_name: pushname || 'Customer',
+            phone: sender.split('@')[0],
+            product_id: productId,
+            product_name: product.name,
+            unit_price: unitPrice,
+            quantity: quantityNum
+          };
+
+          console.log(`Creating Gopay payment: ${orderId} - Amount: ${totalAmount}`);
+          const paymentData = await createGopayPayment(totalAmount, orderId, customerDetails);
+
+          const expirationTime = Date.now() + toMs("30m");
+          const expireDate = new Date(expirationTime);
+          const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
+
+          let paymentMessage = `*💳 PEMBAYARAN GOPAY 💳*\n\n`;
+          paymentMessage += `*📦 Produk:* ${product.name}\n`;
+          paymentMessage += `*🆔 ID Produk:* ${productId}\n`;
+          paymentMessage += `*💰 Harga:* Rp${toRupiah(unitPrice)}\n`;
+          paymentMessage += `*🔢 Jumlah:* ${quantityNum}\n`;
+          paymentMessage += `*💸 Subtotal:* Rp${toRupiah(amount)}\n`;
+          paymentMessage += `*🎲 Kode Unik:* ${uniqueCode}\n`;
+          paymentMessage += `*💯 Total:* Rp${toRupiah(totalAmount)}\n`;
+          paymentMessage += `*⏰ Waktu:* ${timeLeft} menit\n\n`;
+
+          // Add payment instructions based on what's available
+          if (paymentData.deeplink) {
+            paymentMessage += `*🔗 KLIK LINK UNTUK BAYAR:*\n`;
+            paymentMessage += `${paymentData.deeplink}\n\n`;
+            paymentMessage += `*📱 Cara Pembayaran:*\n`;
+            paymentMessage += `1. Klik link di atas\n`;
+            paymentMessage += `2. Akan otomatis membuka Gopay\n`;
+            paymentMessage += `3. Konfirmasi pembayaran di app Gopay\n`;
+            paymentMessage += `4. Tunggu konfirmasi otomatis\n\n`;
+          } else if (paymentData.qr_string) {
+            paymentMessage += `*📱 SCAN QR CODE GOPAY:*\n`;
+            paymentMessage += `${paymentData.qr_string}\n\n`;
+            paymentMessage += `*📱 Cara Pembayaran:*\n`;
+            paymentMessage += `1. Buka aplikasi Gopay\n`;
+            paymentMessage += `2. Pilih "Bayar" atau "Scan"\n`;
+            paymentMessage += `3. Scan QR code di atas\n`;
+            paymentMessage += `4. Konfirmasi pembayaran\n`;
+            paymentMessage += `5. Tunggu konfirmasi otomatis\n\n`;
+          } else {
+            paymentMessage += `*⚠️ Sedang memproses link pembayaran...*\n`;
+            paymentMessage += `Link pembayaran akan segera tersedia.\n\n`;
+          }
+
+          paymentMessage += `*🚨 PENTING:*\n`;
+          paymentMessage += `• Bayar sesuai nominal: *Rp${toRupiah(totalAmount)}*\n`;
+          paymentMessage += `• Jangan bayar kurang atau lebih\n`;
+          paymentMessage += `• Pembayaran otomatis terdeteksi\n`;
+          paymentMessage += `• Akun akan dikirim otomatis setelah bayar\n\n`;
+          paymentMessage += `*💡 Butuh bantuan?* Hubungi admin\n`;
+          paymentMessage += `*❌ Batal:* Ketik *${prefix}batal*`;
+
+          const message = await ronzz.sendMessage(from, {
+            text: paymentMessage
+          }, { quoted: m });
+
+          db.data.order[sender] = {
+            id: productId,
+            jumlah: quantityNum,
+            from,
+            key: message.key,
+            orderId,
+            reffId,
+            totalAmount,
+            uniqueCode,
+            paymentToken: paymentData.transaction_id,
+            metode: 'Gopay',
+            deeplink: paymentData.deeplink
+          };
+
+          // Check payment status periodically
+          let checkCount = 0;
+          while (db.data.order[sender]) {
+            checkCount++;
+            const sleepTime = checkCount <= 6 ? 5000 : 10000;
+            await sleep(sleepTime);
+
+            if (Date.now() >= expirationTime) {
+              await ronzz.sendMessage(from, { delete: message.key });
+              reply("⏰ Pembayaran dibatalkan karena melewati batas waktu 30 menit.");
+              delete db.data.order[sender];
+              break;
+            }
+
+            try {
+              const paymentStatus = await isPaymentCompleted(orderId);
+              console.log(`Gopay Payment Status: ${paymentStatus.status}`);
+
+              if (paymentStatus.status === 'PAID') {
+                await ronzz.sendMessage(from, { delete: message.key });
+                reply("✅ Pembayaran Gopay berhasil! Data akun akan segera diproses.");
+
+                // Process the purchase - same as other payment methods
+                product.terjual += quantityNum;
+                const soldItems = stock.splice(0, quantityNum);
+                await db.save();
+
+                // Create account details for customer
+                let detailAkunCustomer = `*📦 Produk:* ${product.name}\n`;
+                detailAkunCustomer += `*📅 Tanggal:* ${tanggal}\n`;
+                detailAkunCustomer += `*⏰ Jam:* ${jamwib} WIB\n\n`;
+                
+                soldItems.forEach((item, index) => {
+                  let dataAkun = item.split("|");
+                  detailAkunCustomer += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`;
+                  detailAkunCustomer += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`;
+                  detailAkunCustomer += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`;
+                  detailAkunCustomer += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`;
+                  detailAkunCustomer += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`;
+                });
+
+                // Add SNK
+                detailAkunCustomer += `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`;
+                detailAkunCustomer += `*📋 SNK PRODUK: ${product.name}*\n\n`;
+                detailAkunCustomer += `${product.snk}\n\n`;
+                detailAkunCustomer += `*⚠️ PENTING:*\n`;
+                detailAkunCustomer += `• Baca dan pahami SNK sebelum menggunakan akun\n`;
+                detailAkunCustomer += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`;
+                detailAkunCustomer += `• Hubungi admin jika ada masalah dengan akun\n\n`;
+                detailAkunCustomer += `*╰────「 END SNK 」────╯*`;
+
+                // Create account details for owner
+                let detailAkunOwner = `*📦 Produk:* ${product.name}\n`;
+                detailAkunOwner += `*📅 Tanggal:* ${tanggal}\n`;
+                detailAkunOwner += `*⏰ Jam:* ${jamwib} WIB\n\n`;
+                soldItems.forEach((item, index) => {
+                  let dataAkun = item.split("|");
+                  detailAkunOwner += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`;
+                  detailAkunOwner += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`;
+                  detailAkunOwner += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`;
+                  detailAkunOwner += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`;
+                  detailAkunOwner += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`;
+                });
+
+                // Send account details to customer with enhanced delivery system
+                console.log('🚀 STARTING CUSTOMER MESSAGE SEND PROCESS (GOPAY CASE)');
+                console.log('Customer ID:', sender);
+                console.log('Message length:', detailAkunCustomer.length);
+                
+                let customerMessageSent = false;
+                
+                try {
+                  console.log('📤 Attempt 1: Sending account details to customer...');
+                  await ronzz.sendMessage(sender, { text: detailAkunCustomer });
+                  console.log('✅ SUCCESS: Account details sent to customer!');
+                  customerMessageSent = true;
+                  
+                  // Send confirmation
+                  await sleep(2000);
+                  try {
+                    await ronzz.sendMessage(sender, { text: "✅ Detail akun telah dikirim di pesan sebelumnya. Jika tidak terlihat, silahkan hubungi admin." });
+                    console.log('✅ Confirmation message sent');
+                  } catch (confirmError) {
+                    console.error('❌ Confirmation message failed:', confirmError.message);
+                  }
+                  
+                } catch (error) {
+                  console.error('❌ ATTEMPT 1 FAILED:', error.message);
+                  
+                  // Attempt 2: Send in multiple messages
+                  try {
+                    console.log('📤 Attempt 2: Sending in multiple messages...');
+                    
+                    let headerMessage = `*📦 DETAIL AKUN PEMBELIAN*\n\n`;
+                    headerMessage += `*Produk:* ${product.name}\n`;
+                    headerMessage += `*Tanggal:* ${tanggal}\n`;
+                    headerMessage += `*Jam:* ${jamwib} WIB\n`;
+                    headerMessage += `*Jumlah Akun:* ${soldItems.length}\n\n`;
+                    headerMessage += `📋 Detail akun akan dikirim dalam pesan terpisah...`;
+                    
+                    await sleep(1000);
+                    await ronzz.sendMessage(sender, { text: headerMessage });
+                    console.log('✅ Header message sent');
+                    
+                    // Send each account separately
+                    for (let index = 0; index < soldItems.length; index++) {
+                      await sleep(2000);
+                      let dataAkun = soldItems[index].split("|");
+                      let accountMessage = `*═══ AKUN ${index + 1} ═══*\n`;
+                      accountMessage += `📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`;
+                      accountMessage += `🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`;
+                      if (dataAkun[2]) accountMessage += `👤 Profil: ${dataAkun[2]}\n`;
+                      if (dataAkun[3]) accountMessage += `🔢 Pin: ${dataAkun[3]}\n`;
+                      if (dataAkun[4]) accountMessage += `🔒 2FA: ${dataAkun[4]}\n`;
+                      
+                      await ronzz.sendMessage(sender, { text: accountMessage });
+                      console.log(`✅ Account ${index + 1} details sent`);
+                    }
+                    
+                    console.log('✅ SUCCESS: All account details sent in separate messages!');
+                    customerMessageSent = true;
+                    
+                  } catch (fallbackError) {
+                    console.error('❌ ATTEMPT 2 ALSO FAILED:', fallbackError.message);
+                    
+                    // Attempt 3: Basic notification
+                    try {
+                      console.log('📤 Attempt 3: Sending basic notification...');
+                      const basicMessage = `Akun berhasil dibeli!\n\nProduk: ${product.name}\nJumlah: ${quantityNum} akun\n\nSilahkan hubungi admin untuk mendapatkan detail akun.`;
+                      await ronzz.sendMessage(sender, { text: basicMessage });
+                      console.log('✅ SUCCESS: Basic notification sent to customer!');
+                      customerMessageSent = true;
+                    } catch (finalError) {
+                      console.error('❌ ALL ATTEMPTS FAILED:', finalError.message);
+                    }
+                  }
+                }
+                
+                console.log('🏁 CUSTOMER MESSAGE SEND RESULT (GOPAY CASE):', customerMessageSent ? 'SUCCESS' : 'FAILED');
+
+                // Send to owner
+                try {
+                  await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkunOwner });
+                  console.log('✅ Account details sent to owner successfully');
+                } catch (error) {
+                  console.error('❌ Error sending account details to owner (not critical):', error);
+                }
+
+                // Send success message based on delivery status
+                if (customerMessageSent) {
+                  if (isGroup) {
+                    reply("✅ Pembelian berhasil! Detail akun telah dikirim ke chat pribadi Anda.");
+                  } else {
+                    reply("✅ Pembelian berhasil! Detail akun telah dikirim.");
+                  }
+                } else {
+                  if (isGroup) {
+                    reply("⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun. Silahkan hubungi admin untuk mendapatkan detail akun Anda.");
+                  } else {
+                    reply("⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun. Silahkan hubungi admin untuk mendapatkan detail akun Anda.");
+                  }
+                  
+                  // Send alert to admin
+                  try {
+                    await ronzz.sendMessage("6281389592985@s.whatsapp.net", { 
+                      text: `🚨 ALERT: Customer message delivery FAILED (GOPAY CASE)!\n\nCustomer: @${sender.split("@")[0]}\nProduct: ${product.name}\nAmount: ${quantityNum}\nRef ID: ${reffId}\nMethod: Gopay\n\nCustomer tidak menerima detail akun. Harap kirim manual!`,
+                      mentions: [sender]
+                    });
+                    console.log('🚨 Alert sent to admin about failed customer delivery (GOPAY CASE)');
+                  } catch (alertError) {
+                    console.error('❌ Failed to send alert to admin:', alertError.message);
+                  }
+                }
+
+                // Send notification to owner
+                await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { 
+                  text: `Hai Owner,\nAda transaksi dengan Gopay yang telah selesai!\n\n*╭────「 TRANSAKSI DETAIL 」───*\n*┊・ 🧾| Reff Id:* ${reffId}\n*┊・ 📮| Nomor:* @${sender.split("@")[0]}\n*┊・ 📦| Nama Barang:* ${product.name}\n*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(unitPrice)}\n*┊・ 🛍️| Jumlah Order:* ${quantityNum}\n*┊・ 💰| Total Bayar:* Rp${toRupiah(totalAmount)}\n*┊・ 💳| Metode Bayar:* Gopay\n*┊・ 📅| Tanggal:* ${tanggal}\n*┊・ ⏰| Jam:* ${jamwib} WIB\n*╰┈┈┈┈┈┈┈┈*`, 
+                  mentions: [sender] 
+                });
+
+                // Add to transaction database
+                db.data.transaksi.push({
+                  id: productId,
+                  name: product.name,
+                  price: unitPrice,
+                  date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+                  profit: product.profit,
+                  jumlah: quantityNum,
+                  user: sender.split("@")[0],
+                  userRole: db.data.users[sender].role,
+                  reffId: reffId,
+                  metodeBayar: "Gopay",
+                  totalBayar: totalAmount
+                });
+
+                await db.save();
+
+                // Check if stock is empty
+                if (stock.length === 0) {
+                  const stockEmptyMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n*📦 Produk:* ${product.name}\n*🆔 ID Produk:* ${productId}\n*📊 Stok Sebelumnya:* ${quantityNum}\n*📉 Stok Sekarang:* 0 (HABIS)\n*🛒 Terjual Terakhir:* ${quantityNum} akun\n*👤 Pembeli:* @${sender.split("@")[0]}\n*💰 Total Transaksi:* Rp${toRupiah(totalAmount)}\n*📅 Tanggal:* ${tanggal}\n*⏰ Jam:* ${jamwib} WIB\n\n*⚠️ TINDAKAN YANG DIPERLUKAN:*\n• Segera restok produk ini\n• Update harga jika diperlukan\n• Cek profit margin\n\n*💡 Tips:* Gunakan command *${prefix}addstok ${productId} jumlah* untuk menambah stok`;
+                  
+                  await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stockEmptyMessage, mentions: [sender] });
+                  await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stockEmptyMessage, mentions: [sender] });
+                }
+
+                delete db.data.order[sender];
+                break;
+              }
+            } catch (error) {
+              console.error('Error checking Gopay payment status:', error);
+            }
+          }
+        } catch (error) {
+          console.error('Error creating Gopay payment:', error);
+          reply(`❌ Gagal membuat pembayaran Gopay: ${error.message}\n\nSilahkan coba lagi atau hubungi admin.`);
           delete db.data.order[sender];
         }
       }
