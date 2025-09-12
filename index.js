@@ -986,6 +986,100 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
     if (chats) console.log('->[\x1b[1;32mCMD\x1b[1;37m]', color(moment(m.messageTimestamp * 1000).format('DD/MM/YYYY HH:mm:ss'), 'yellow'), color(`${prefix + command} [${args.length}]`), 'from', color(pushname), isGroup ? 'in ' + color(groupName) : '')
 
     switch (command) {
+      case 'testmsg':
+        if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
+        
+        if (!q) return reply('❌ Format: .testmsg <nomor_whatsapp>\nContoh: .testmsg 6281234567890')
+        
+        const testNumber = q.trim() + '@s.whatsapp.net'
+        console.log('🧪 Testing message delivery to:', testNumber)
+        
+        try {
+          // Test 1: Simple message
+          await ronzz.sendMessage(testNumber, { text: '🧪 Test 1: Pesan sederhana - apakah sampai?' })
+          console.log('✅ Test 1 sent')
+          
+          await sleep(2000)
+          
+          // Test 2: Formatted message
+          const testMsg = `*🧪 TEST MESSAGE 2*
+
+*Format:* Test dengan format
+*Tanggal:* ${tanggal}
+*Jam:* ${jamwib} WIB
+
+📧 Test: example@test.com
+🔐 Test: password123
+
+Jika pesan ini sampai, sistem berfungsi normal.`
+          
+          await ronzz.sendMessage(testNumber, { text: testMsg })
+          console.log('✅ Test 2 sent')
+          
+          reply(`✅ Test messages sent to ${q}. Check if received.`)
+          
+        } catch (error) {
+          console.error('❌ Test message failed:', error)
+          reply(`❌ Failed to send test message: ${error.message}`)
+        }
+      break
+      
+      case 'resendakun':
+        if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
+        
+        if (!q) return reply('❌ Format: .resendakun <nomor_customer> <product_id> <jumlah>\nContoh: .resendakun 6281234567890 vid3u 1')
+        
+        const [customerNum, productId, amount] = q.split(' ')
+        if (!customerNum || !productId || !amount) {
+          return reply('❌ Format: .resendakun <nomor_customer> <product_id> <jumlah>\nContoh: .resendakun 6281234567890 vid3u 1')
+        }
+        
+        if (!db.data.produk[productId]) {
+          return reply(`❌ Product ID ${productId} tidak ditemukan`)
+        }
+        
+        const customerNumber = customerNum + '@s.whatsapp.net'
+        const qty = parseInt(amount)
+        
+        if (db.data.produk[productId].stok.length < qty) {
+          return reply(`❌ Stok tidak cukup. Stok tersedia: ${db.data.produk[productId].stok.length}`)
+        }
+        
+        try {
+          // Ambil stok untuk dikirim (simulasi pembelian)
+          let accountData = []
+          for (let i = 0; i < qty; i++) {
+            accountData.push(db.data.produk[productId].stok[i])
+          }
+          
+          // Buat pesan detail akun
+          let accountDetails = `*📦 RESEND AKUN MANUAL*\n\n`
+          accountDetails += `*Produk:* ${db.data.produk[productId].name}\n`
+          accountDetails += `*Tanggal:* ${tanggal}\n`
+          accountDetails += `*Jam:* ${jamwib} WIB\n\n`
+          
+          accountData.forEach((item, index) => {
+            let dataAkun = item.split("|")
+            accountDetails += `*═══ AKUN ${index + 1} ═══*\n`
+            accountDetails += `📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
+            accountDetails += `🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
+            if (dataAkun[2]) accountDetails += `👤 Profil: ${dataAkun[2]}\n`
+            if (dataAkun[3]) accountDetails += `🔢 Pin: ${dataAkun[3]}\n`
+            if (dataAkun[4]) accountDetails += `🔒 2FA: ${dataAkun[4]}\n\n`
+          })
+          
+          // Kirim ke customer
+          await ronzz.sendMessage(customerNumber, { text: accountDetails })
+          console.log('✅ Manual account resend successful')
+          
+          reply(`✅ Detail akun berhasil dikirim ulang ke ${customerNum}\n\nProduk: ${db.data.produk[productId].name}\nJumlah: ${qty} akun`)
+          
+        } catch (error) {
+          console.error('❌ Manual resend failed:', error)
+          reply(`❌ Gagal mengirim ulang akun: ${error.message}`)
+        }
+      break
+      
       case 'menu': {
         let teks = global.menu(prefix, sender, pushname)
         ronzz.sendMessage(from, {
@@ -2319,34 +2413,78 @@ break;
                           // Attempt 1: Send with basic format
                           try {
                             console.log('📤 Attempt 1: Sending account details to customer...');
-                            await ronzz.sendMessage(sender, { text: detailAkunCustomer })
+                            console.log('📞 Customer WhatsApp ID:', sender);
+                            console.log('📏 Message length:', detailAkunCustomer.length);
+                            
+                            // Add delay before sending to avoid rate limits
+                            await sleep(1000);
+                            
+                            const messageResult = await ronzz.sendMessage(sender, { text: detailAkunCustomer });
+                            console.log('📨 Message result:', messageResult ? 'Message object returned' : 'No result returned');
                             console.log('✅ SUCCESS: Account details sent to customer!');
+                            
+                            // Wait a bit and try to send a confirmation
+                            await sleep(2000);
+                            try {
+                              await ronzz.sendMessage(sender, { text: "✅ Detail akun telah dikirim di pesan sebelumnya. Jika tidak terlihat, silahkan hubungi admin." });
+                              console.log('✅ Confirmation message sent');
+                            } catch (confirmError) {
+                              console.error('❌ Confirmation message failed:', confirmError.message);
+                            }
+                            
                             customerMessageSent = true;
                             
                           } catch (error) {
                             console.error('❌ ATTEMPT 1 FAILED:', error.message);
+                            console.error('❌ Full error:', error);
                             
-                            // Attempt 2: Send simple account info only
+                            // Attempt 2: Send in multiple smaller messages
                             try {
-                              console.log('📤 Attempt 2: Sending simple account info...');
-                              let simpleAccount = `*📦 DETAIL AKUN PEMBELIAN*\n\n`
-                              simpleAccount += `*Produk:* ${db.data.produk[data[0]].name}\n`
-                              simpleAccount += `*Tanggal:* ${tanggal}\n`
-                              simpleAccount += `*Jam:* ${jamwib} WIB\n\n`
+                              console.log('📤 Attempt 2: Sending account details in multiple messages...');
                               
-                              dataStok.forEach((i, index) => {
-                                let dataAkun = i.split("|")
-                                simpleAccount += `*═══ AKUN ${index + 1} ═══*\n`
-                                simpleAccount += `📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
-                                simpleAccount += `🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
-                                if (dataAkun[2]) simpleAccount += `👤 Profil: ${dataAkun[2]}\n`
-                                if (dataAkun[3]) simpleAccount += `🔢 Pin: ${dataAkun[3]}\n`
-                                if (dataAkun[4]) simpleAccount += `🔒 2FA: ${dataAkun[4]}\n`
-                                simpleAccount += `\n`
-                              })
+                              // Send header first
+                              let headerMessage = `*📦 DETAIL AKUN PEMBELIAN*\n\n`;
+                              headerMessage += `*Produk:* ${db.data.produk[data[0]].name}\n`;
+                              headerMessage += `*Tanggal:* ${tanggal}\n`;
+                              headerMessage += `*Jam:* ${jamwib} WIB\n`;
+                              headerMessage += `*Jumlah Akun:* ${dataStok.length}\n\n`;
+                              headerMessage += `📋 Detail akun akan dikirim dalam pesan terpisah...`;
                               
-                              await ronzz.sendMessage(sender, { text: simpleAccount })
-                              console.log('✅ SUCCESS: Simple account details sent to customer!');
+                              await sleep(1000);
+                              await ronzz.sendMessage(sender, { text: headerMessage });
+                              console.log('✅ Header message sent');
+                              
+                              // Send each account separately
+                              for (let index = 0; index < dataStok.length; index++) {
+                                await sleep(2000); // Delay between messages
+                                let dataAkun = dataStok[index].split("|");
+                                let accountMessage = `*═══ AKUN ${index + 1} ═══*\n`;
+                                accountMessage += `📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`;
+                                accountMessage += `🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`;
+                                if (dataAkun[2]) accountMessage += `👤 Profil: ${dataAkun[2]}\n`;
+                                if (dataAkun[3]) accountMessage += `🔢 Pin: ${dataAkun[3]}\n`;
+                                if (dataAkun[4]) accountMessage += `🔒 2FA: ${dataAkun[4]}\n`;
+                                
+                                await ronzz.sendMessage(sender, { text: accountMessage });
+                                console.log(`✅ Account ${index + 1} details sent`);
+                              }
+                              
+                              // Send SNK separately if it exists
+                              if (db.data.produk[data[0]].snk) {
+                                await sleep(2000);
+                                let snkMessage = `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`;
+                                snkMessage += `${db.data.produk[data[0]].snk}\n\n`;
+                                snkMessage += `*⚠️ PENTING:*\n`;
+                                snkMessage += `• Baca dan pahami SNK sebelum menggunakan akun\n`;
+                                snkMessage += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`;
+                                snkMessage += `• Hubungi admin jika ada masalah dengan akun\n\n`;
+                                snkMessage += `*╰────「 END SNK 」────╯*`;
+                                
+                                await ronzz.sendMessage(sender, { text: snkMessage });
+                                console.log('✅ SNK message sent');
+                              }
+                              
+                              console.log('✅ SUCCESS: All account details sent in separate messages!');
                               customerMessageSent = true;
                               
                             } catch (fallbackError) {
@@ -2377,10 +2515,30 @@ break;
                             console.error('❌ Error sending account details to owner (not critical):', error);
                           }
 
-                          if (isGroup) {
-                            reply("Pembelian berhasil! Detail akun telah dikirim ke chat pribadi Anda.")
+                          // Reply berdasarkan apakah customer benar-benar menerima detail akun
+                          if (customerMessageSent) {
+                            if (isGroup) {
+                              reply("✅ Pembelian berhasil! Detail akun telah dikirim ke chat pribadi Anda.")
+                            } else {
+                              reply("✅ Pembelian berhasil! Detail akun telah dikirim.")
+                            }
                           } else {
-                            reply("Pembelian berhasil! Detail akun telah dikirim.")
+                            if (isGroup) {
+                              reply("⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun. Silahkan hubungi admin untuk mendapatkan detail akun Anda.")
+                            } else {
+                              reply("⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun. Silahkan hubungi admin untuk mendapatkan detail akun Anda.")
+                            }
+                            
+                            // Send alert to admin about failed delivery
+                            try {
+                              await ronzz.sendMessage("6281389592985@s.whatsapp.net", { 
+                                text: `🚨 ALERT: Customer message delivery FAILED!\n\nCustomer: @${sender.split("@")[0]}\nProduct: ${db.data.produk[data[0]].name}\nAmount: ${jumlah}\nRef ID: ${reffId}\n\nCustomer tidak menerima detail akun. Harap kirim manual!`,
+                                mentions: [sender]
+                              });
+                              console.log('🚨 Alert sent to admin about failed customer delivery');
+                            } catch (alertError) {
+                              console.error('❌ Failed to send alert to admin:', alertError.message);
+                            }
                           }
 
                           // Kirim notifikasi ke owner (sama seperti case 'buy')
@@ -2532,42 +2690,54 @@ Ada transaksi dengan QRIS yang telah selesai!
           })
 
           // Kirim ke customer (1 pesan gabungan akun + SNK) - PRIORITAS UTAMA
+          console.log('🚀 STARTING CUSTOMER MESSAGE SEND PROCESS (BUY CASE)');
+          console.log('Customer ID:', sender);
+          console.log('Message length:', detailAkunCustomer.length);
+          
+          let customerMessageSent = false;
+          
           try {
-            console.log('Sending complete account details to customer (buy case):', sender);
-            console.log('Message length:', detailAkunCustomer.length);
+            console.log('📤 Attempt 1: Sending complete account details to customer...');
             
             await ronzz.sendMessage(sender, { text: detailAkunCustomer }, { quoted: m })
             console.log('✅ Complete account details sent to customer successfully');
+            customerMessageSent = true;
             
           } catch (error) {
-            console.error('❌ Error sending account details to customer:', error);
-            console.error('Error details:', error.message);
+            console.error('❌ ATTEMPT 1 FAILED:', error.message);
+            console.error('Error details:', error);
             
             // Fallback: coba kirim tanpa quoted message
             try {
+              console.log('📤 Attempt 2: Sending without quoted message...');
               await ronzz.sendMessage(sender, { text: detailAkunCustomer })
               console.log('✅ Account details sent without quoted message');
+              customerMessageSent = true;
             } catch (fallbackError1) {
-              console.error('❌ Fallback 1 failed:', fallbackError1.message);
+              console.error('❌ Attempt 2 failed:', fallbackError1.message);
               
               // Fallback 2: send simple account info
-              let simpleAccount = `*📦 AKUN PEMBELIAN*\n\n`
-              simpleAccount += `*Produk:* ${db.data.produk[data[0]].name}\n`
-              simpleAccount += `*Tanggal:* ${tanggal}\n\n`
-              dataStok.forEach((i, index) => {
-                let dataAkun = i.split("|")
-                simpleAccount += `*Akun ${index + 1}:*\n`
-                simpleAccount += `Email: ${dataAkun[0] || 'Tidak ada'}\n`
-                simpleAccount += `Password: ${dataAkun[1] || 'Tidak ada'}\n\n`
-              })
               try {
+                console.log('📤 Attempt 3: Sending simple account info...');
+                let simpleAccount = `*📦 AKUN PEMBELIAN*\n\n`
+                simpleAccount += `*Produk:* ${db.data.produk[data[0]].name}\n`
+                simpleAccount += `*Tanggal:* ${tanggal}\n\n`
+                dataStok.forEach((i, index) => {
+                  let dataAkun = i.split("|")
+                  simpleAccount += `*Akun ${index + 1}:*\n`
+                  simpleAccount += `Email: ${dataAkun[0] || 'Tidak ada'}\n`
+                  simpleAccount += `Password: ${dataAkun[1] || 'Tidak ada'}\n\n`
+                })
                 await ronzz.sendMessage(sender, { text: simpleAccount })
                 console.log('✅ Simple account details sent successfully');
+                customerMessageSent = true;
               } catch (fallbackError2) {
                 console.error('❌ All fallback attempts failed:', fallbackError2.message);
               }
             }
           }
+          
+          console.log('🏁 CUSTOMER MESSAGE SEND RESULT (BUY CASE):', customerMessageSent ? 'SUCCESS' : 'FAILED');
           
           // Kirim ke owner (hanya detail akun) - TIDAK PRIORITAS
           try {
@@ -2633,11 +2803,30 @@ Ada transaksi dengan saldo yang telah selesai!
             await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
           }
           
-          // Beri notifikasi pembelian berhasil
-          if (isGroup) {
-            reply("Pembelian berhasil! Detail akun telah dikirim ke chat pribadi Anda.")
+          // Beri notifikasi pembelian berhasil berdasarkan apakah customer menerima detail akun
+          if (customerMessageSent) {
+            if (isGroup) {
+              reply("✅ Pembelian berhasil! Detail akun telah dikirim ke chat pribadi Anda.")
+            } else {
+              reply("✅ Pembelian berhasil! Detail akun telah dikirim.")
+            }
           } else {
-            reply("Pembelian berhasil! Detail akun telah dikirim.")
+            if (isGroup) {
+              reply("⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun. Silahkan hubungi admin untuk mendapatkan detail akun Anda.")
+            } else {
+              reply("⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun. Silahkan hubungi admin untuk mendapatkan detail akun Anda.")
+            }
+            
+            // Send alert to admin about failed delivery
+            try {
+              await ronzz.sendMessage("6281389592985@s.whatsapp.net", { 
+                text: `🚨 ALERT: Customer message delivery FAILED (BUY CASE)!\n\nCustomer: @${sender.split("@")[0]}\nProduct: ${db.data.produk[data[0]].name}\nAmount: ${jumlah}\nRef ID: ${reffId}\nMethod: Saldo\n\nCustomer tidak menerima detail akun. Harap kirim manual!`,
+                mentions: [sender]
+              });
+              console.log('🚨 Alert sent to admin about failed customer delivery (BUY CASE)');
+            } catch (alertError) {
+              console.error('❌ Failed to send alert to admin:', alertError.message);
+            }
           }
                   } catch (error) {
           console.log("Error processing buy:", error)
