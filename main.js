@@ -100,7 +100,7 @@ async function startronzz() {
 
   if (pairingCode && !ronzz.authState.creds.registered) {
     const phoneNumber = await question(color('\n\nSilahkan masukkan nomor Whatsapp bot anda, awali dengan 62:\n', 'magenta'));
-    const code = await ronzz.requestPairingCode(phoneNumber.trim(), "RONZZYT1")
+    const code = await ronzz.requestPairingCode(phoneNumber.trim(), "NICONADA")
     console.log(color(`⚠︎ Phone number:`, "gold"), color(`${phoneNumber}`, "white"))
     console.log(color(`⚠︎ Pairing code:`, "gold"), color(`${code}`, "white"))
   }
