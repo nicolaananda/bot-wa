@@ -3508,7 +3508,176 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
         }
       }
         break
-
+        case 'tambah': {
+          // Top-up saldo via Gopay Snap (exact nominal, no admin fee). Bonus: +2k per 50k
+          if (!isGroup) return reply('❌ Perintah ini hanya bisa dipakai di grup.');
+          if (db.data.order[sender]) {
+            return reply(`Kamu sedang melakukan order. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`);
+          }
+  
+          const nominalStr = (q || '').trim();
+          if (!nominalStr || !/^[0-9]+$/.test(nominalStr)) {
+            return reply(`❌ Format salah!\n\nKetik: *${prefix + command} nominal*\nContoh: *${prefix + command} 50000*`);
+          }
+  
+          const nominal = Number(nominalStr);
+          if (!Number.isFinite(nominal) || nominal <= 0) {
+            return reply('❌ Nominal tidak valid.');
+          }
+  
+          try {
+            // Hitung bonus topup: setiap kelipatan 50.000 dapat +2.000
+            const bonus = Math.floor(nominal / 50000) * 2000;
+  
+            const reffId = crypto.randomBytes(5).toString('hex').toUpperCase();
+            const orderId = `TOPUP-${reffId}-${Date.now()}`;
+  
+            const customerDetails = {
+              first_name: pushname || 'Customer',
+              phone: sender.split('@')[0],
+              product_id: 'TOPUP',
+              product_name: 'Topup Saldo',
+              unit_price: nominal,
+              quantity: 1
+            };
+  
+            console.log(`Creating Gopay TOPUP payment: ${orderId} - Amount: ${nominal}`);
+            const paymentData = await createGopayPayment(nominal, orderId, customerDetails);
+  
+            const expirationTime = Date.now() + toMs('30m');
+            const timeLeft = Math.max(0, Math.floor((expirationTime - Date.now()) / 60000));
+  
+            let paymentMessage = `*💳 TOPUP SALDO (GOPAY) 💳*\n\n`;
+            paymentMessage += `*👤 User:* @${sender.split('@')[0]}\n`;
+            paymentMessage += `*🧾 Ref:* ${reffId}\n`;
+            paymentMessage += `*💰 Nominal:* Rp${toRupiah(nominal)}\n`;
+            paymentMessage += `*💯 Total Bayar:* Rp${toRupiah(nominal)}\n`;
+            paymentMessage += `*⏰ Batas Waktu:* ${timeLeft} menit\n\n`;
+  
+            if (paymentData.payment_url) {
+              paymentMessage += `*🔗 KLIK LINK UNTUK BAYAR GOPAY:*\n${paymentData.payment_url}\n\n`;
+              paymentMessage += `*📱 Cara Pembayaran:*\n`;
+              paymentMessage += `1. Klik link di atas untuk buka Gopay\n`;
+              paymentMessage += `2. Konfirmasi pembayaran di app Gopay\n`;
+              paymentMessage += `3. Tunggu konfirmasi otomatis\n\n`;
+            } else {
+              paymentMessage += `*⚠️ Sedang memproses pembayaran Gopay...*\nLink pembayaran akan segera tersedia.\n\n`;
+            }
+  
+            paymentMessage += `*🚨 PENTING:*\n`;
+            paymentMessage += `• Bayar sesuai nominal: *Rp${toRupiah(nominal)}*\n`;
+            paymentMessage += `• Jangan bayar kurang atau lebih\n`;
+            paymentMessage += `• Saldo akan otomatis masuk setelah bayar\n\n`;
+  
+            const msg = await ronzz.sendMessage(from, { text: paymentMessage, mentions: [sender] }, { quoted: m });
+  
+            // Simpan order untuk monitoring
+            db.data.order[sender] = {
+              tipe: 'Topup',
+              id: 'TOPUP',
+              jumlah: 1,
+              from,
+              key: msg.key,
+              orderId,
+              reffId,
+              totalAmount: nominal,
+              topupAmount: nominal,
+              bonus,
+              paymentToken: paymentData.snap_token,
+              midtrans_order_id: orderId,
+              metode: 'Gopay-Topup',
+              payment_url: paymentData.payment_url,
+              snap_token: paymentData.snap_token,
+              expiresAt: expirationTime
+            };
+  
+            // Monitoring pembayaran (pakai order_id seperti case gopay)
+            let checkCount = 0;
+            while (db.data.order[sender]) {
+              checkCount++;
+              const sleepTime = checkCount <= 6 ? 5000 : 10000;
+              await sleep(sleepTime);
+  
+              if (Date.now() >= expirationTime) {
+                await ronzz.sendMessage(from, { delete: msg.key });
+                reply('⏰ Pembayaran dibatalkan karena melewati batas waktu 30 menit.');
+                delete db.data.order[sender];
+                break;
+              }
+  
+              try {
+                const orderData = db.data.order[sender];
+                const paymentStatus = await isPaymentCompleted(orderData.orderId);
+                console.log(`Topup Payment Status: ${paymentStatus.status}`);
+  
+                if (paymentStatus.status === 'PAID') {
+                  await ronzz.sendMessage(from, { delete: msg.key });
+  
+                  // Tambah saldo + bonus
+                  const credit = orderData.topupAmount + orderData.bonus;
+                  db.data.users[sender].saldo = (db.data.users[sender].saldo || 0) + credit;
+                  await db.save();
+  
+                  // Pesan sukses ke user (single message)
+                  const successMsg = `🎉 Topup Gopay berhasil!\n\n` +
+                    `*🧾 Ref:* ${orderData.reffId}\n` +
+                    `*💰 Nominal:* Rp${toRupiah(orderData.topupAmount)}\n` +
+                    `*🎁 Bonus:* Rp${toRupiah(orderData.bonus)}\n` +
+                    `*💳 Saldo Bertambah:* Rp${toRupiah(credit)}\n` +
+                    `*💼 Saldo Sekarang:* Rp${toRupiah(db.data.users[sender].saldo)}\n\n` +
+                    `Terima kasih!`;
+  
+                  reply(successMsg);
+  
+                  // Notif Owner
+                  try {
+                    await ronzz.sendMessage(ownerNomer + '@s.whatsapp.net', { text:
+  `Hai Owner,
+  Ada TOPUP saldo via Gopay yang telah selesai!
+  
+  *╭────「 TRANSAKSI DETAIL 」───*
+  *┊・ 🧾| Reff Id:* ${orderData.reffId}
+  *┊・ 📮| Nomor:* @${sender.split('@')[0]}
+  *┊・ 💰| Nominal:* Rp${toRupiah(orderData.topupAmount)}
+  *┊・ 🎁| Bonus:* Rp${toRupiah(orderData.bonus)}
+  *┊・ 💳| Metode Bayar:* Gopay (Topup)
+  *┊・ 📅| Tanggal:* ${tanggal}
+  *┊・ ⏰| Jam:* ${jamwib} WIB
+  *╰┈┈┈┈┈┈┈┈*`, mentions: [sender] });
+                  } catch (e) { console.error('Owner notif failed:', e?.message || e); }
+  
+                  // Simpan ke transaksi
+                  db.data.transaksi.push({
+                    id: 'TOPUP',
+                    name: 'Topup Saldo',
+                    price: orderData.topupAmount,
+                    date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
+                    profit: 0,
+                    jumlah: 1,
+                    user: sender.split('@')[0],
+                    userRole: db.data.users[sender].role,
+                    reffId: orderData.reffId,
+                    metodeBayar: 'Gopay-Topup',
+                    totalBayar: orderData.topupAmount,
+                    paymentType: 'gopay'
+                  });
+                  await db.save();
+  
+                  delete db.data.order[sender];
+                  break;
+                }
+  
+              } catch (err) {
+                console.error('Topup status check error:', err?.message || err);
+                // Continue polling
+              }
+            }
+          } catch (error) {
+            console.error('Error creating topup payment:', error);
+            reply('❌ Gagal membuat pembayaran topup. Coba lagi nanti.');
+          }
+        }
+        break
       // Handler umum: user bisa ketik "netflix", "canva", "viu", dll
   case 'netflix':
   case 'canva':
