@@ -32,6 +32,9 @@ const BASE_QRIS_DANA = "00020101021126570011ID.DANA.WWW0118936009153177776115020
 const saldoCache = new Map();
 const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
+// Anti-spam configuration
+const COMMAND_COOLDOWN_MS = 2500
+
 // Cache management functions
 function getCachedSaldo(userId) {
   const cached = saldoCache.get(userId);
@@ -67,6 +70,63 @@ const tanggal = moment.tz('Asia/Jakarta').format('DD MMMM YYYY')
 
 module.exports = async (ronzz, m, mek) => {
   try {
+    // Install safe rate-limiter for sendMessage once per socket instance
+    if (!ronzz.__safeSendInstalled) {
+      ronzz.__safeSendInstalled = true
+      const originalSend = ronzz.sendMessage.bind(ronzz)
+      const sendQueue = []
+      let queueProcessing = false
+      const lastSendPerJid = new Map()
+      let lastSendGlobal = 0
+      const MIN_GLOBAL_INTERVAL_MS = 900
+      const MIN_PER_JID_INTERVAL_MS = 3000
+      const MAX_RETRY = 3
+
+      const nowMs = () => Date.now()
+      const jitter = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a
+
+      async function processQueue() {
+        if (queueProcessing) return
+        queueProcessing = true
+        try {
+          while (sendQueue.length) {
+            const item = sendQueue.shift()
+            const { args, resolve, reject, attempt } = item
+            const jid = args[0]
+            const elapsedGlobal = nowMs() - lastSendGlobal
+            const elapsedJid = nowMs() - (lastSendPerJid.get(jid) || 0)
+            const waitGlobal = Math.max(0, MIN_GLOBAL_INTERVAL_MS - elapsedGlobal)
+            const waitJid = Math.max(0, MIN_PER_JID_INTERVAL_MS - elapsedJid)
+            const waitMs = Math.max(waitGlobal, waitJid) + jitter(100, 300)
+            if (waitMs > 0) await new Promise(r => setTimeout(r, waitMs))
+            try {
+              const result = await originalSend(...args)
+              lastSendGlobal = nowMs()
+              lastSendPerJid.set(jid, lastSendGlobal)
+              resolve(result)
+            } catch (err) {
+              const code = (err && (err.status || err.code)) || 0
+              if (attempt < MAX_RETRY && (code === 429 || code === 503 || code === 'ETIMEDOUT')) {
+                const backoff = Math.min(8000, (attempt + 1) * 1500 + jitter(250, 750))
+                setTimeout(() => {
+                  sendQueue.unshift({ args, resolve, reject, attempt: attempt + 1 })
+                  processQueue()
+                }, backoff)
+              } else {
+                reject(err)
+              }
+            }
+          }
+        } finally {
+          queueProcessing = false
+        }
+      }
+
+      ronzz.sendMessage = (...args) => new Promise((resolve, reject) => {
+        sendQueue.push({ args, resolve, reject, attempt: 0 })
+        processQueue()
+      })
+    }
     const { isQuotedMsg, fromMe } = m
     if (fromMe) return
     const jamwib = moment.tz('Asia/Jakarta').format('HH:mm:ss')
@@ -100,6 +160,19 @@ module.exports = async (ronzz, m, mek) => {
     const isVideo = (m.mtype == 'videoMessage')
     const isQuotedVideo = isQuotedMsg ? content.includes('videoMessage') ? true : false : false
     const isSewa = db.data.sewa[from] ? true : false
+
+    // Per-user cooldown for commands (skip owners)
+    if (command && !isOwner) {
+      ronzz.__cooldowns = ronzz.__cooldowns || new Map()
+      const last = ronzz.__cooldowns.get(sender) || 0
+      const diff = Date.now() - last
+      if (diff < COMMAND_COOLDOWN_MS) {
+        const remaining = Math.ceil((COMMAND_COOLDOWN_MS - diff) / 1000)
+        ronzz.sendMessage(from, { text: `⏳ Mohon tunggu ${remaining}s sebelum menggunakan perintah lagi.`, mentions: [sender] }, { quoted: m })
+        return
+      }
+      ronzz.__cooldowns.set(sender, Date.now())
+    }
 
     function parseMention(text = '') {
       return [...text.matchAll(/@([0-9]{5,16}|0)/g)].map(v => v[1] + '@s.whatsapp.net')
