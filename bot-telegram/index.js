@@ -759,8 +759,15 @@ Stok berhasil ditambahkan!`)
         if (db.data.waitingPhoneInput && db.data.waitingPhoneInput[sender]) {
           const phoneNumber = text.replace(/[^0-9]/g, '')
           
-          // Validasi format nomor
-          if (!phoneNumber.startsWith('62') || phoneNumber.length < 10) {
+          // Debug logging
+          console.log('🔍 Debug phone input:')
+          console.log('  Original text:', JSON.stringify(text))
+          console.log('  Cleaned phone:', JSON.stringify(phoneNumber))
+          console.log('  Phone length:', phoneNumber.length)
+          console.log('  Starts with 62:', phoneNumber.startsWith('62'))
+          
+          // Validasi format nomor - perbaiki validasi panjang untuk nomor Indonesia
+          if (!phoneNumber.startsWith('62') || phoneNumber.length < 10 || phoneNumber.length > 15) {
             return reply('❌ Format nomor salah!\n\nGunakan format: 62xxxxxxxxxx\nContoh: 6281234567890\n\nSilakan masukkan ulang atau ketik /cancel untuk membatalkan')
           }
           
