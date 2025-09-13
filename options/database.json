@@ -81,16 +81,31 @@
       "username": "User 62",
       "createdAt": "2025-08-31T13:41:35.850Z"
     },
+    "1152626784": {
+      "saldo": 0,
+      "role": "bronze",
+      "linkedPhone": "6282143003950@s.whatsapp.net"
+    },
+    "1222156616": {
+      "saldo": 2132400,
+      "role": "bronze",
+      "linkedPhone": "6285235540944@s.whatsapp.net"
+    },
+    "2131595063": {
+      "saldo": 0,
+      "role": "bronze",
+      "linkedPhone": "6281389592985@s.whatsapp.net"
+    },
     "6287777657944@s.whatsapp.net": {
-      "saldo": 314609,
+      "saldo": 2314609,
       "role": "bronze"
     },
     "6281389592985@s.whatsapp.net": {
-      "saldo": 1070900,
+      "saldo": 1055600,
       "role": "bronze"
     },
     "6285235540944@s.whatsapp.net": {
-      "saldo": 132400,
+      "saldo": 2132400,
       "role": "bronze"
     },
     "6287883940775@s.whatsapp.net": {
@@ -98,7 +113,7 @@
       "role": "bronze"
     },
     "6281359417389@s.whatsapp.net": {
-      "saldo": 0,
+      "saldo": 2000000,
       "role": "bronze"
     },
     "218189220855971@lid": {
@@ -1739,9 +1754,8 @@
       "priceB": 13000,
       "priceS": "13700",
       "priceG": "13700",
-      "terjual": 433,
+      "terjual": 434,
       "stok": [
-        "huyeijin@gmail.com|bacasnkto|jinah|8888",
         "huyeijin@gmail.com|bacasnkto|jinah|8888",
         "huyeijin@gmail.com|bacasnkto|pika|8888",
         "fahtity@apeollo.my.id|bacasnk676|1|8888",
@@ -1753,7 +1767,8 @@
         "fahtity@apeollo.my.id|bacasnk676|2|8888",
         "fahtity@apeollo.my.id|bacasnk676|3|8888",
         "fahtity@apeollo.my.id|bacasnk676|4|8888",
-        "fahtity@apeollo.my.id|bacasnk676|5|8888"
+        "fahtity@apeollo.my.id|bacasnk676|5|8888",
+        "huyeijin@gmail.com|bacasnkto|jinah|8888"
       ]
     },
     "net1u": {
@@ -1788,9 +1803,8 @@
       "priceG": "8000",
       "terjual": 139,
       "stok": [
-        "emiliecoureaud.fr@peachito.com|bacasnk|1|8888",
-        "emiliecoureaud.fr@peachito.com|bacasnk|2|8888",
-        "emiliecoureaud.fr@peachito.com|bacasnk|3|8888",
+        "frontend@test.com|frontend123|10|1111|from frontend",
+        "||||",
         "emiliecoureaud.fr@peachito.com|bacasnk|4|8888",
         "emiliecoureaud.fr@peachito.com|bacasnk|5|8888",
         "hv.luyton.fr@apeollo.my.id|bacasnk9|a|8888",
@@ -1802,8 +1816,11 @@
         "netcruo827@mepo.uk|bacasnk8|ayu|1111",
         "netcruo827@mepo.uk|bacasnk8|c|1111",
         "netcruo827@mepo.uk|bacasnk8|kucit|1111",
-        "netcruo827@mepo.uk|bacasnk8|e|1111"
-      ]
+        "netcruo827@mepo.uk|bacasnk8|e|1111",
+        "test@example.com|pass|profile|pin",
+        "test@example.com|pass|profile|pin"
+      ],
+      "lastRestock": "2025-09-13T14:11:19.526Z"
     },
     "capcutshr": {
       "id": "capcutshr",
@@ -2515,9 +2532,8 @@
       "priceS": "2300",
       "priceG": "2300",
       "profit": "0",
-      "terjual": 6,
+      "terjual": 7,
       "stok": [
-        "frieda425@ghzm.us|viuku123",
         "hassie480@ghzm.us|viuku123",
         "titus209@ghzm.us|viuku123",
         "michel160@ghzm.us|viuku123",
@@ -16442,6 +16458,30 @@
       "reffId": "3666E98555",
       "metodeBayar": "Saldo",
       "totalBayar": 11000
+    },
+    {
+      "id": "net2u",
+      "name": "NETFLIX 1 BULAN 1P2U BEST SELLER🔥",
+      "price": 13000,
+      "date": "2025-09-13 15:56:06",
+      "jumlah": 1,
+      "user": "6281389592985",
+      "userRole": "bronze",
+      "reffId": "2LERGC00ZOR",
+      "metodeBayar": "Saldo",
+      "totalBayar": 13000
+    },
+    {
+      "id": "viu3b",
+      "name": "VIU 3 BULAN",
+      "price": "2300",
+      "date": "2025-09-13 20:56:37",
+      "jumlah": 1,
+      "user": "6281389592985",
+      "userRole": "bronze",
+      "reffId": "GOLQTOE3IH4",
+      "metodeBayar": "Saldo",
+      "totalBayar": 2300
     }
   ],
   "persentase": {
@@ -16482,5 +16522,12 @@
     "171",
     "81",
     "172"
-  ]
+  ],
+  "phoneMapping": {
+    "6281389592985": "2131595063",
+    "6285235540944": "1222156616",
+    "6282143003950": "1152626784"
+  },
+  "waitingPhoneInput": {},
+  "pendingVerification": {}
 }
