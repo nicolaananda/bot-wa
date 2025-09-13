@@ -81,6 +81,11 @@
       "username": "User 62",
       "createdAt": "2025-08-31T13:41:35.850Z"
     },
+    "2131595063": {
+      "saldo": 0,
+      "role": "bronze",
+      "linkedPhone": null
+    },
     "6287777657944@s.whatsapp.net": {
       "saldo": 314609,
       "role": "bronze"
@@ -16482,5 +16487,7 @@
     "171",
     "81",
     "172"
-  ]
+  ],
+  "phoneMapping": {},
+  "waitingPhoneInput": {}
 }
