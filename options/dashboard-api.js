@@ -221,7 +221,61 @@ app.post('/api/pos/update-pin', (req, res) => {
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
+// ===== POS WEB RECEIPT ENDPOINTS (BEGIN) =====
 
+/**
+ * POST /api/pos/save-receipt
+ * Body: { reffId: string, receipt: string }
+ * Simpan struk transaksi ke file TRX-{reffId}.txt
+ */
+app.post('/api/pos/save-receipt', (req, res) => {
+  if (!posAuth(req, res)) return;
+  try {
+    const { reffId, receipt } = req.body || {};
+    if (!reffId || typeof reffId !== 'string' || !receipt || typeof receipt !== 'string') {
+      return res.status(400).json({ success: false, error: 'reffId and receipt are required' });
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(reffId)) {
+      return res.status(400).json({ success: false, error: 'Invalid reffId format' });
+    }
+
+    const filePath = path.join(__dirname, `TRX-${reffId}.txt`);
+    fs.writeFileSync(filePath, receipt, 'utf8');
+
+    return res.json({ success: true, reffId, savedAt: new Date().toISOString() });
+  } catch (e) {
+    console.error('[POS save-receipt] Error:', e);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/pos/receipt/:reffId
+ * Return struk transaksi (text/plain) dari file TRX-{reffId}.txt
+ */
+app.get('/api/pos/receipt/:reffId', (req, res) => {
+  posNoStore(res);
+  try {
+    const { reffId } = req.params || {};
+    if (!reffId || !/^[a-zA-Z0-9_-]+$/.test(reffId)) {
+      return res.status(400).json({ success: false, error: 'Invalid reffId' });
+    }
+
+    const filePath = path.join(__dirname, `TRX-${reffId}.txt`);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'Receipt not found' });
+    }
+
+    const text = fs.readFileSync(filePath, 'utf8');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.send(text);
+  } catch (e) {
+    console.error('[POS get-receipt] Error:', e);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ===== POS WEB RECEIPT ENDPOINTS (END) =====
 // ===== POS WEB INTEGRATION ENDPOINTS (END) =====
 function validateRole(role) {
   const validRoles = ['user', 'admin', 'moderator', 'superadmin'];
