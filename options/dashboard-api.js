@@ -29,8 +29,7 @@ app.use(cors({
   ],
   credentials: true
 }));
-app.use(express.json());
-
+app.use(express.json({ limit: '2mb' })); // ganti yang sebelumnya app.use(express.json())
 // Function untuk membaca database.json
 function loadDatabase() {
   try {
