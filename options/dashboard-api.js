@@ -189,6 +189,11 @@ app.post('/api/pos/save-database', (req, res) => {
  * Body: { phone: '628xxx@s.whatsapp.net', pin: '1234' }
  * Update PIN user tanpa kirim seluruh database.
  */
+app.get('/api/pos/debug', (req, res) => {
+  const filePath = path.join(__dirname, 'database.json');
+  res.json({ __dirname, filePath, exists: fs.existsSync(filePath) });
+});
+
 app.post('/api/pos/update-pin', (req, res) => {
   if (!posAuth(req, res)) return;
   try {
