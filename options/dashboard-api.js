@@ -119,7 +119,105 @@ function saveDatabase(db) {
     return false;
   }
 }
+    // ===== POS WEB INTEGRATION ENDPOINTS (BEGIN) =====
 
+// Token opsional untuk write-protect endpoint POS
+const POS_TOKEN = process.env.DB_TOKEN || process.env.VITE_DB_TOKEN;
+
+// Helper auth sederhana
+function posAuth(req, res) {
+  if (!POS_TOKEN) return true; // tanpa token = allow
+  const auth = req.headers.authorization || '';
+  if (auth !== `Bearer ${POS_TOKEN}`) {
+    res.status(401).json({ success: false, error: 'Unauthorized' });
+    return false;
+  }
+  return true;
+}
+
+// Cache-control helper
+function posNoStore(res) {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+}
+
+/**
+ * GET /api/pos/database
+ * Bacakan langsung options/database.json agar POS Web bisa read tanpa Nginx alias.
+ * Menggunakan loadDatabase() yang sudah ada di file ini.
+ */
+app.get('/api/pos/database', (req, res) => {
+  posNoStore(res);
+  const db = loadDatabase();
+  if (!db) {
+    return res.status(500).json({ success: false, error: 'Failed to load database' });
+  }
+  return res.json(db);
+});
+
+/**
+ * POST /api/pos/save-database
+ * Body: { database: <obj db penuh> }
+ * Simpan perubahan dari POS Web (saldo, stok, terjual, dll) ke options/database.json
+ * Menggunakan saveDatabase() yang sudah ada di file ini.
+ */
+app.post('/api/pos/save-database', (req, res) => {
+  if (!posAuth(req, res)) return;
+  try {
+    const { database } = req.body || {};
+    if (!database || typeof database !== 'object') {
+      return res.status(400).json({ success: false, error: 'Invalid payload: { database } required' });
+    }
+    if (!database.users || !database.produk) {
+      return res.status(400).json({ success: false, error: 'Database must include users and produk' });
+    }
+
+    if (saveDatabase(database)) {
+      return res.json({ success: true, updatedAt: new Date().toISOString() });
+    }
+    return res.status(500).json({ success: false, error: 'Failed to save database' });
+  } catch (e) {
+    console.error('[POS save-database] Error:', e);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/pos/update-pin
+ * Body: { phone: '628xxx@s.whatsapp.net', pin: '1234' }
+ * Update PIN user tanpa kirim seluruh database.
+ */
+app.post('/api/pos/update-pin', (req, res) => {
+  if (!posAuth(req, res)) return;
+  try {
+    const { phone, pin } = req.body || {};
+    if (!phone || !pin) {
+      return res.status(400).json({ success: false, error: 'phone and pin required' });
+    }
+
+    const db = loadDatabase();
+    if (!db || !db.users) {
+      return res.status(500).json({ success: false, error: 'Database not available' });
+    }
+    if (!db.users[phone]) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    db.users[phone].pin = pin;
+
+    if (saveDatabase(db)) {
+      return res.json({ success: true, phone, updatedAt: new Date().toISOString() });
+    }
+    return res.status(500).json({ success: false, error: 'Failed to save database' });
+  } catch (e) {
+    console.error('[POS update-pin] Error:', e);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ===== POS WEB INTEGRATION ENDPOINTS (END) =====
 function validateRole(role) {
   const validRoles = ['user', 'admin', 'moderator', 'superadmin'];
   return validRoles.includes(role);
@@ -374,105 +472,7 @@ app.get('/api/dashboard/users/all', (req, res) => {
       
       return true;
     });
-    // ===== POS WEB INTEGRATION ENDPOINTS (BEGIN) =====
 
-// Token opsional untuk write-protect endpoint POS
-const POS_TOKEN = process.env.DB_TOKEN || process.env.VITE_DB_TOKEN;
-
-// Helper auth sederhana
-function posAuth(req, res) {
-  if (!POS_TOKEN) return true; // tanpa token = allow
-  const auth = req.headers.authorization || '';
-  if (auth !== `Bearer ${POS_TOKEN}`) {
-    res.status(401).json({ success: false, error: 'Unauthorized' });
-    return false;
-  }
-  return true;
-}
-
-// Cache-control helper
-function posNoStore(res) {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.setHeader('Surrogate-Control', 'no-store');
-}
-
-/**
- * GET /api/pos/database
- * Bacakan langsung options/database.json agar POS Web bisa read tanpa Nginx alias.
- * Menggunakan loadDatabase() yang sudah ada di file ini.
- */
-app.get('/api/pos/database', (req, res) => {
-  posNoStore(res);
-  const db = loadDatabase();
-  if (!db) {
-    return res.status(500).json({ success: false, error: 'Failed to load database' });
-  }
-  return res.json(db);
-});
-
-/**
- * POST /api/pos/save-database
- * Body: { database: <obj db penuh> }
- * Simpan perubahan dari POS Web (saldo, stok, terjual, dll) ke options/database.json
- * Menggunakan saveDatabase() yang sudah ada di file ini.
- */
-app.post('/api/pos/save-database', (req, res) => {
-  if (!posAuth(req, res)) return;
-  try {
-    const { database } = req.body || {};
-    if (!database || typeof database !== 'object') {
-      return res.status(400).json({ success: false, error: 'Invalid payload: { database } required' });
-    }
-    if (!database.users || !database.produk) {
-      return res.status(400).json({ success: false, error: 'Database must include users and produk' });
-    }
-
-    if (saveDatabase(database)) {
-      return res.json({ success: true, updatedAt: new Date().toISOString() });
-    }
-    return res.status(500).json({ success: false, error: 'Failed to save database' });
-  } catch (e) {
-    console.error('[POS save-database] Error:', e);
-    return res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
-
-/**
- * POST /api/pos/update-pin
- * Body: { phone: '628xxx@s.whatsapp.net', pin: '1234' }
- * Update PIN user tanpa kirim seluruh database.
- */
-app.post('/api/pos/update-pin', (req, res) => {
-  if (!posAuth(req, res)) return;
-  try {
-    const { phone, pin } = req.body || {};
-    if (!phone || !pin) {
-      return res.status(400).json({ success: false, error: 'phone and pin required' });
-    }
-
-    const db = loadDatabase();
-    if (!db || !db.users) {
-      return res.status(500).json({ success: false, error: 'Database not available' });
-    }
-    if (!db.users[phone]) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-
-    db.users[phone].pin = pin;
-
-    if (saveDatabase(db)) {
-      return res.json({ success: true, phone, updatedAt: new Date().toISOString() });
-    }
-    return res.status(500).json({ success: false, error: 'Failed to save database' });
-  } catch (e) {
-    console.error('[POS update-pin] Error:', e);
-    return res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
-
-// ===== POS WEB INTEGRATION ENDPOINTS (END) =====
     // Get total count for pagination
     const totalUsers = filteredUsers.length;
     const totalPages = Math.ceil(totalUsers / usersPerPage);
