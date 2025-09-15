@@ -32,6 +32,13 @@ const BASE_QRIS_DANA = "00020101021126570011ID.DANA.WWW0118936009153177776115020
 const saldoCache = new Map();
 const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
+// Invalidate saldo cache when database file is reloaded externally
+try {
+  process.on('database:reloaded', () => {
+    saldoCache.clear();
+  });
+} catch {}
+
 // Cache management functions
 function getCachedSaldo(userId) {
   const cached = saldoCache.get(userId);

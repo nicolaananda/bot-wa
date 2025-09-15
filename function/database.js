@@ -39,6 +39,7 @@ class Database {
 						const fresh = _fs.existsSync(this.file) ? JSON.parse(_fs.readFileSync(this.file)) : {}
 						this._data = fresh
 						if (this.logger && this.logger.info) this.logger.info('[Database] Reloaded after external change:', this.file)
+						try { process.emit && process.emit('database:reloaded'); } catch {}
 					} catch (e) {
 						this.logger.error('[Database] Failed to reload after external change:', e)
 					}
