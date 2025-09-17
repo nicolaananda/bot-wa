@@ -85,11 +85,11 @@ function parseDeliveredAccountFromFile(reffId) {
     const lines = content.split(/\r?\n/).map(l => l.trim());
     const acc = {};
     for (const line of lines) {
-      if (line.toLowerCase().startsWith('• email:')) acc.email = line.split(':').slice(1).join(':').trim();
-      else if (line.toLowerCase().startsWith('• password:')) acc.password = line.split(':').slice(1).join(':').trim();
-      else if (line.toLowerCase().startsWith('• profil:')) acc.profile = line.split(':').slice(1).join(':').trim();
-      else if (line.toLowerCase().startsWith('• pin:')) acc.pin = line.split(':').slice(1).join(':').trim();
-      else if (line.toLowerCase().startsWith('• 2fa:')) acc.twofa = line.split(':').slice(1).join(':').trim();
+      if (line.toLowerCase().startsWith('â€¢ email:')) acc.email = line.split(':').slice(1).join(':').trim();
+      else if (line.toLowerCase().startsWith('â€¢ password:')) acc.password = line.split(':').slice(1).join(':').trim();
+      else if (line.toLowerCase().startsWith('â€¢ profil:')) acc.profile = line.split(':').slice(1).join(':').trim();
+      else if (line.toLowerCase().startsWith('â€¢ pin:')) acc.pin = line.split(':').slice(1).join(':').trim();
+      else if (line.toLowerCase().startsWith('â€¢ 2fa:')) acc.twofa = line.split(':').slice(1).join(':').trim();
     }
 
     if (Object.keys(acc).length === 0) return null;
@@ -277,6 +277,310 @@ app.get('/api/pos/receipt/:reffId', (req, res) => {
 
 // ===== POS WEB RECEIPT ENDPOINTS (END) =====
 // ===== POS WEB INTEGRATION ENDPOINTS (END) =====
+
+// ===== ADMIN USER MANAGEMENT (BEGIN) =====
+const ADMIN_OWNERS = new Set(['6281389592985', '6285235540944']);
+const IDEMP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const idempotencyCache = new Map(); // key -> { at: number }
+
+function cleanUpIdempotencyCache() {
+  const now = Date.now();
+  for (const [key, info] of idempotencyCache.entries()) {
+    if (now - info.at > IDEMP_TTL_MS) idempotencyCache.delete(key);
+  }
+}
+setInterval(cleanUpIdempotencyCache, 60 * 1000);
+
+function posAdminAuth(req, res) {
+  // Reuse Bearer auth
+  if (!posAuth(req, res)) return false;
+  const adminUser = (req.headers['x-admin-user'] || '').toString().replace(/[^0-9]/g, '');
+  if (!ADMIN_OWNERS.has(adminUser)) {
+    res.status(403).json({ success: false, error: 'Forbidden: admin not allowed' });
+    return false;
+  }
+  req.adminUser = adminUser;
+  return true;
+}
+
+function findUserRecord(db, userId) {
+  // Accept both formats
+  const idNoSuffix = userId.replace(/[^0-9]/g, '');
+  const idWithSuffix = idNoSuffix + '@s.whatsapp.net';
+  const users = db.users || {};
+  if (users[idNoSuffix]) return { key: idNoSuffix, record: users[idNoSuffix] };
+  if (users[idWithSuffix]) return { key: idWithSuffix, record: users[idWithSuffix] };
+  return null;
+}
+
+function writeAudit(entry) {
+  try {
+    const filePath = path.join(__dirname, 'audit-admin.log');
+    const line = JSON.stringify(entry) + '\n';
+    fs.appendFileSync(filePath, line, 'utf8');
+  } catch {}
+}
+
+function generateAuditId() {
+  const ts = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const rnd = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `AUD-${ts}-${rnd}`;
+}
+
+function paginate(array, page, limit) {
+  const total = array.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const start = (currentPage - 1) * limit;
+  const items = array.slice(start, start + limit);
+  return { items, currentPage, totalPages, total };
+}
+
+// 1) List users for admin
+app.get('/api/admin/users', (req, res) => {
+  if (!posAdminAuth(req, res)) return;
+  try {
+    const { search = '', role = 'all', minSaldo, maxSaldo, page = 1, limit = 20 } = req.query;
+    const lim = Math.min(parseInt(limit) || 20, 100);
+    const pg = parseInt(page) || 1;
+
+    const formatted = getFormattedData();
+    if (!formatted) return res.status(500).json({ success: false, error: 'Failed to load database' });
+    const users = formatted.data.users || {};
+    const transaksi = formatted.data.transaksi || [];
+
+    let list = Object.keys(users).map(userId => {
+      const u = users[userId] || {};
+      const idNoSuffix = userId.replace('@s.whatsapp.net', '');
+      const txs = transaksi.filter(t => t.user === idNoSuffix || t.user === `${idNoSuffix}@s.whatsapp.net`);      return {
+        userId,
+        username: u.username || `User ${userId.slice(-4)}`,
+        saldo: parseInt(u.saldo) || 0,
+        role: u.role || 'bronze',
+        isActive: u.isActive !== false,
+        lastActivity: u.lastActivity || u.createdAt || null,
+        createdAt: u.createdAt || null,
+        transactionCount: txs.length,
+        totalSpent: txs.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0)
+      };
+    });
+
+    const s = search.toString().toLowerCase().trim();
+    if (s) {
+      list = list.filter(u => u.userId.toLowerCase().includes(s) || (u.username || '').toLowerCase().includes(s));
+    }
+    if (role && role !== 'all') {
+      list = list.filter(u => (u.role || 'bronze') === role);
+    }
+    if (minSaldo !== undefined) {
+      const min = parseInt(minSaldo) || 0;
+      list = list.filter(u => (u.saldo || 0) >= min);
+    }
+    if (maxSaldo !== undefined) {
+      const max = parseInt(maxSaldo) || 0;
+      list = list.filter(u => (u.saldo || 0) <= max);
+    }
+
+    // Sort by createdAt desc as default
+    list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    const { items, currentPage, totalPages, total } = paginate(list, pg, lim);
+    return res.json({
+      success: true,
+      data: {
+        users: items,
+        pagination: {
+          currentPage,
+          totalPages,
+          totalUsers: total,
+          usersPerPage: lim,
+          hasNextPage: currentPage < totalPages,
+          hasPrevPage: currentPage > 1
+        }
+      }
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// 2) Adjust saldo
+app.patch('/api/admin/users/:userId/saldo', (req, res) => {
+  if (!posAdminAuth(req, res)) return;
+  try {
+    const { userId } = req.params;
+    const { amount, reason = '', idempotencyKey } = req.body || {};
+    if (typeof amount !== 'number' || Number.isNaN(amount)) {
+      return res.status(400).json({ success: false, error: 'Invalid payload: amount must be number' });
+    }
+
+    if (idempotencyKey) {
+      const key = `${req.adminUser}|${userId}|${idempotencyKey}`;
+      const hit = idempotencyCache.get(key);
+      if (hit && Date.now() - hit.at <= IDEMP_TTL_MS) {
+        return res.status(409).json({ success: false, error: 'Idempotency conflict' });
+      }
+      idempotencyCache.set(key, { at: Date.now() });
+    }
+
+    const db = loadDatabase();
+    if (!db || !db.users) return res.status(500).json({ success: false, error: 'Database not available' });
+    const found = findUserRecord(db, userId);
+    if (!found) return res.status(404).json({ success: false, error: 'User not found' });
+
+    const before = parseInt(found.record.saldo) || 0;
+    const after = before + amount;
+    if (after < 0) {
+      return res.status(400).json({ success: false, error: 'Invalid payload: resulting saldo would be negative' });
+    }
+
+    found.record.saldo = after;
+    const saved = saveDatabase(db);
+    if (!saved) return res.status(500).json({ success: false, error: 'Failed to save database' });
+
+    const auditId = generateAuditId();
+    writeAudit({
+      id: auditId,
+      admin: req.adminUser,
+      userId: found.key,
+      action: 'saldo.adjust',
+      delta: amount,
+      reason: reason || null,
+      before,
+      after,
+      timestamp: new Date().toISOString(),
+      ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null
+    });
+
+    return res.json({ success: true, data: { userId: found.key, before, after, delta: amount, auditId } });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// 3) Set PIN
+app.post('/api/admin/users/:userId/pin', (req, res) => {
+  if (!posAdminAuth(req, res)) return;
+  try {
+    const { userId } = req.params;
+    const { pin } = req.body || {};
+    if (typeof pin !== 'string' || !/^\d{4,6}$/.test(pin)) {
+      return res.status(400).json({ success: false, error: 'Invalid payload: pin must be 4-6 numeric digits' });
+    }
+
+    const db = loadDatabase();
+    if (!db || !db.users) return res.status(500).json({ success: false, error: 'Database not available' });
+    const found = findUserRecord(db, userId);
+    if (!found) return res.status(404).json({ success: false, error: 'User not found' });
+
+    found.record.pin = pin;
+    const saved = saveDatabase(db);
+    if (!saved) return res.status(500).json({ success: false, error: 'Failed to save database' });
+
+    const auditId = generateAuditId();
+    writeAudit({
+      id: auditId,
+      admin: req.adminUser,
+      userId: found.key,
+      action: 'pin.update',
+      masked: '******',
+      timestamp: new Date().toISOString(),
+      ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null
+    });
+
+    return res.json({ success: true, data: { userId: found.key, updatedAt: new Date().toISOString() } });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// 4) Update role
+app.patch('/api/admin/users/:userId/role', (req, res) => {
+  if (!posAdminAuth(req, res)) return;
+  try {
+    const { userId } = req.params;
+    const { role } = req.body || {};
+    const allowed = new Set(['bronze', 'silver', 'gold', 'admin']);
+    if (!allowed.has(role)) {
+      return res.status(400).json({ success: false, error: 'Invalid payload: role must be one of bronze|silver|gold|admin' });
+    }
+    // Only owners may set to admin (already enforced by posAdminAuth), keep explicit check
+    if (role === 'admin' && !ADMIN_OWNERS.has(req.adminUser)) {
+      return res.status(403).json({ success: false, error: 'Forbidden: admin not allowed' });
+    }
+
+    const db = loadDatabase();
+    if (!db || !db.users) return res.status(500).json({ success: false, error: 'Database not available' });
+    const found = findUserRecord(db, userId);
+    if (!found) return res.status(404).json({ success: false, error: 'User not found' });
+
+    const oldRole = found.record.role || 'bronze';
+    found.record.role = role;
+    const saved = saveDatabase(db);
+    if (!saved) return res.status(500).json({ success: false, error: 'Failed to save database' });
+
+    const auditId = generateAuditId();
+    writeAudit({
+      id: auditId,
+      admin: req.adminUser,
+      userId: found.key,
+      action: 'role.update',
+      oldRole,
+      newRole: role,
+      timestamp: new Date().toISOString(),
+      ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null
+    });
+
+    return res.json({ success: true, data: { userId: found.key, oldRole, newRole: role } });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// 5) Audit log query
+app.get('/api/admin/audit', (req, res) => {
+  if (!posAdminAuth(req, res)) return;
+  try {
+    const { admin, userId, action, dateFrom, dateTo, page = 1, limit = 50 } = req.query;
+    const lim = Math.min(parseInt(limit) || 50, 200);
+    const pg = parseInt(page) || 1;
+
+    const filePath = path.join(__dirname, 'audit-admin.log');
+    let logs = [];
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      logs = content.split(/\r?\n/).filter(Boolean).map(line => {
+        try { return JSON.parse(line); } catch { return null; }
+      }).filter(Boolean);
+    }
+
+    let filtered = logs;
+    if (admin) filtered = filtered.filter(l => (l.admin || '').includes(admin));
+    if (userId) filtered = filtered.filter(l => (l.userId || '').includes(userId));
+    if (action) filtered = filtered.filter(l => (l.action || '') === action);
+
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to = dateTo ? new Date(dateTo) : null;
+    if (from || to) {
+      filtered = filtered.filter(l => {
+        const t = new Date(l.timestamp);
+        if (from && t < from) return false;
+        if (to && t > to) return false;
+        return true;
+      });
+    }
+
+    // Newest first
+    filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    const { items, currentPage, totalPages, total } = paginate(filtered, pg, lim);
+    return res.json({ success: true, data: { logs: items, pagination: { currentPage, totalPages, total } } });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+// ===== ADMIN USER MANAGEMENT (END) =====
+
 function validateRole(role) {
   const validRoles = ['user', 'admin', 'moderator', 'superadmin'];
   return validRoles.includes(role);
@@ -2686,19 +2990,19 @@ if (require.main === module) {
   try {
     const httpServer = http.createServer(app);
     httpServer.listen(PORT, () => {
-      console.log(`🚀 Dashboard API HTTP server running on port ${PORT}`);
-      console.log(`📱 Access via: http://localhost:${PORT} or http://dash.nicola.id:${PORT}`);
+      console.log(`ðŸš€ Dashboard API HTTP server running on port ${PORT}`);
+      console.log(`ðŸ“± Access via: http://localhost:${PORT} or http://dash.nicola.id:${PORT}`);
     });
     
     httpServer.on('error', (error) => {
       if (error.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${PORT} is already in use. Please use a different port.`);
+        console.error(`âŒ Port ${PORT} is already in use. Please use a different port.`);
       } else {
-        console.error(`❌ HTTP server error:`, error);
+        console.error(`âŒ HTTP server error:`, error);
       }
     });
   } catch (error) {
-    console.error(`❌ Failed to start HTTP server:`, error);
+    console.error(`âŒ Failed to start HTTP server:`, error);
   }
 
   // HTTPS Server (if SSL certificates exist - Linux/Unix only)
@@ -2716,20 +3020,20 @@ if (require.main === module) {
 
       const httpsServer = https.createServer(credentials, app);
       httpsServer.listen(HTTPS_PORT, () => {
-        console.log(`🔒 Dashboard API HTTPS server running on port ${HTTPS_PORT}`);
-        console.log(`🌐 Access via: https://dash.nicola.id:${HTTPS_PORT}`);
+        console.log(`ðŸ”’ Dashboard API HTTPS server running on port ${HTTPS_PORT}`);
+        console.log(`ðŸŒ Access via: https://dash.nicola.id:${HTTPS_PORT}`);
       });
     } catch (error) {
-      console.log(`⚠️  HTTPS server not started: SSL certificates not found`);
-      console.log(`💡 To enable HTTPS, ensure SSL certificates are available at /etc/letsencrypt/live/dash.nicola.id/`);
+      console.log(`âš ï¸  HTTPS server not started: SSL certificates not found`);
+      console.log(`ðŸ’¡ To enable HTTPS, ensure SSL certificates are available at /etc/letsencrypt/live/dash.nicola.id/`);
     }
   } else {
-    console.log(`⚠️  HTTPS server not started: Windows platform detected`);
-    console.log(`💡 HTTPS is not supported on Windows in this configuration`);
+    console.log(`âš ï¸  HTTPS server not started: Windows platform detected`);
+    console.log(`ðŸ’¡ HTTPS is not supported on Windows in this configuration`);
   }
 
-  console.log(`\n📚 API Documentation:`);
-  console.log(`\n🔧 Basic Endpoints:`);
+  console.log(`\nðŸ“š API Documentation:`);
+  console.log(`\nðŸ”§ Basic Endpoints:`);
   console.log(`- GET /api/dashboard/overview`);
   console.log(`- GET /api/dashboard/chart/daily`);
   console.log(`- GET /api/dashboard/chart/monthly`);
@@ -2740,7 +3044,7 @@ if (require.main === module) {
   console.log(`- GET /api/dashboard/transactions/recent?limit=20`);
   console.log(`- GET /api/dashboard/export/:format`);
   
-  console.log(`\n📊 Statistics & Analytics:`);
+  console.log(`\nðŸ“Š Statistics & Analytics:`);
   console.log(`- GET /api/dashboard/users/stats`);
   console.log(`- GET /api/dashboard/products/stats`);
   console.log(`- GET /api/dashboard/analytics/advanced`);
@@ -2750,7 +3054,7 @@ if (require.main === module) {
   console.log(`- GET /api/dashboard/realtime`);
   console.log(`- GET /api/dashboard/predictions`);
   
-  console.log(`\n📦 Stock Management:`);
+  console.log(`\nðŸ“¦ Stock Management:`);
   console.log(`- GET /api/dashboard/products/stock`);
   console.log(`- GET /api/dashboard/products/stock/summary`);
   console.log(`- PUT /api/dashboard/products/:productId/stock`);

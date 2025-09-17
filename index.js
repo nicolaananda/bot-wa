@@ -8,6 +8,7 @@ const toMs = require('ms');
 const ms = require('parse-ms');
 const os = require('os');
 const { sizeFormatter } = require('human-readable');
+const path = require('path');
 const { exec, execSync } = require("child_process");
 const util = require('util');
 const crypto = require("crypto");
@@ -38,6 +39,33 @@ try {
     saldoCache.clear();
   });
 } catch {}
+
+// Watch for external changes to the database file (bot-tele/posweb updates)
+try {
+  const dbFilePath = path.join(__dirname, 'options', 'database.json');
+  if (fs.existsSync(dbFilePath)) {
+    fs.watchFile(dbFilePath, { interval: 1000 }, () => {
+      try {
+        const raw = fs.readFileSync(dbFilePath, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (global.db && global.db.data) {
+          global.db.data = parsed;
+        } else {
+          global.db = {
+            data: parsed,
+            save: async () => fs.writeFileSync(dbFilePath, JSON.stringify(global.db.data, null, 2))
+          };
+        }
+        process.emit('database:reloaded');
+        console.log('[DB] Reloaded from external change');
+      } catch (e) {
+        console.error('[DB] Failed to reload external change:', e.message);
+      }
+    });
+  }
+} catch (e) {
+  console.error('[DB] Watch setup failed:', e.message);
+}
 
 // Cache management functions
 function getCachedSaldo(userId) {
@@ -904,7 +932,7 @@ Total Bayar: Rp${toRupiah(db.data.deposit[sender].data.total_deposit)}`
                         }
                       }
                     }, { quoted: m });
-                    await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: text_sukses, mentions: [sender] })
+                    
 
                     db.data.users[sender].saldo += Number(db.data.deposit[sender].data.amount_deposit)
                     await db.save() // Force save database
@@ -2199,22 +2227,7 @@ case 'qris': {
 
           if (isGroup) reply("Pembelian berhasil! Detail akun telah dikirim ke chat.");
 
-          // Notif Owner
-          await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text:
-`Hai Owner,
-Ada transaksi QRIS-DANA yang telah selesai!
-
-*╭────「 TRANSAKSI DETAIL 」───*
-*┊・ 🧾| Reff Id:* ${reffId}
-*┊・ 📮| Nomor:* @${sender.split("@")[0]}
-*┊・ 📦| Nama Barang:* ${product.name}
-*┊・ 🏷️| Harga Barang:* Rp${toRupiahLocal(unitPrice)}
-*┊・ 🛍️| Jumlah Order:* ${quantityNum}
-*┊・ 💰| Total Bayar:* Rp${toRupiahLocal(totalAmount)}
-*┊・ 💳| Metode Bayar:* QRIS-DANA
-*┊・ 📅| Tanggal:* ${tanggal}
-*┊・ ⏰| Jam:* ${jamwib} WIB
-*╰┈┈┈┈┈┈┈┈*`, mentions: [sender] });
+          
 
           // Simpan transaksi
           db.data.transaksi.push({
@@ -2232,28 +2245,7 @@ Ada transaksi QRIS-DANA yang telah selesai!
           });
           await db.save();
 
-          // Alert stok habis
-          if (stock.length === 0) {
-            const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
-              `*📦 Produk:* ${product.name}\n` +
-              `*🆔 ID Produk:* ${productId}\n` +
-              `*📊 Stok Sebelumnya:* ${quantityNum}\n` +
-              `*📉 Stok Sekarang:* 0 (HABIS)\n` +
-              `*🛒 Terjual Terakhir:* ${quantityNum} akun\n` +
-              `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
-              `*💰 Total Transaksi:* Rp${toRupiahLocal(totalAmount)}\n` +
-              `*📅 Tanggal:* ${tanggal}\n` +
-              `*⏰ Jam:* ${jamwib} WIB\n\n` +
-              `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
-              `• Segera restok produk ini\n` +
-              `• Update harga jika diperlukan\n` +
-              `• Cek profit margin\n\n` +
-              `*💡 Tips:* Gunakan command *${prefix}addstok ${productId} jumlah* untuk menambah stok`;
-            await Promise.all([
-              ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] }),
-              ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
-            ]);
-          }
+          
 
           // Cleanup
           delete db.data.order[sender];
@@ -2533,33 +2525,10 @@ case 'buynow': {
                     } else {
                       reply("⚠️ Pembayaran QRIS berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
                       
-                      // Send alert to admin about failed delivery
-                      try {
-                        await ronzz.sendMessage("6281389592985@s.whatsapp.net", { 
-                          text: `🚨 ALERT: Customer message delivery FAILED (BUYNOW CASE)!\n\nCustomer: @${sender.split("@")[0]}\nProduct: ${db.data.produk[data[0]].name}\nAmount: ${jumlah}\nRef ID: ${reffId}\nMethod: QRIS\n\nCustomer tidak menerima detail akun. Harap kirim manual!`,
-                          mentions: [sender]
-                        });
-                        console.log('🚨 Alert sent to admin about failed customer delivery (BUYNOW CASE)');
-                      } catch (alertError) {
-                        console.error('❌ Failed to send alert to admin:', alertError.message);
-                      }
+                    // Skip sending alert to admin about failed delivery
                     }
 
-                    // Kirim notifikasi ke owner (sama seperti case 'buy')
-                    await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
-Ada transaksi dengan QRIS yang telah selesai!
-
-*╭────「 TRANSAKSI DETAIL 」───*
-*┊・ 🧾| Reff Id:* ${reffId}
-*┊・ 📮| Nomor:* @${sender.split("@")[0]}
-*┊・ 📦| Nama Barang:* ${db.data.produk[data[0]].name}
-*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}
-*┊・ 🛍️| Jumlah Order:* ${jumlah}
-*┊・ 💰| Total Bayar:* Rp${toRupiah(totalAmount)}
-*┊・ 💳| Metode Bayar:* QRIS-Listener
-*┊・ 📅| Tanggal:* ${tanggal}
-*┊・ ⏰| Jam:* ${jamwib} WIB
-*╰┈┈┈┈┈┈┈┈*`, mentions: [sender] })
+                    
 
                     // Tambah ke database transaksi (sama seperti case 'buy')
                     db.data.transaksi.push({
@@ -2577,28 +2546,7 @@ Ada transaksi dengan QRIS yang telah selesai!
                     });
                     await db.save();
 
-                    // Cek apakah stok habis dan kirim notifikasi ke admin (sama seperti case 'buy')
-                    if (db.data.produk[data[0]].stok.length === 0) {
-                      const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
-                        `*📦 Produk:* ${db.data.produk[data[0]].name}\n` +
-                        `*🆔 ID Produk:* ${data[0]}\n` +
-                        `*📊 Stok Sebelumnya:* ${jumlah}\n` +
-                        `*📉 Stok Sekarang:* 0 (HABIS)\n` +
-                        `*🛒 Terjual Terakhir:* ${jumlah} akun\n` +
-                        `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
-                        `*💰 Total Transaksi:* Rp${toRupiah(totalAmount)}\n` +
-                        `*📅 Tanggal:* ${tanggal}\n` +
-                        `*⏰ Jam:* ${jamwib} WIB\n\n` +
-                        `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
-                        `• Segera restok produk ini\n` +
-                        `• Update harga jika diperlukan\n` +
-                        `• Cek profit margin\n\n` +
-                        `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`
-                      
-                      // Kirim notifikasi ke admin yang ditentukan
-                      await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
-                      await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
-                    }
+                    // Skip stock-empty admin notifications
 
                     delete db.data.order[sender];
                     await db.save();
@@ -2751,21 +2699,7 @@ case 'buy': {
       console.error('❌ Error sending account details to owner (not critical):', error);
     }
 
-    // Kirim notifikasi ke owner
-                    await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,
-Ada transaksi dengan saldo yang telah selesai!
-
-*╭────「 TRANSAKSI DETAIL 」───*
-*┊・ 🧾| Reff Id:* ${reffId}
-*┊・ 📮| Nomor:* @${sender.split("@")[0]}
-*┊・ 📦| Nama Barang:* ${db.data.produk[data[0]].name}
-*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(hargaProduk(data[0], db.data.users[sender].role))}
-*┊・ 🛍️| Jumlah Order:* ${jumlah}
-*┊・ 💰| Total Bayar:* Rp${toRupiah(totalHarga)}
-*┊・ 💳| Metode Bayar:* Saldo
-*┊・ 📅| Tanggal:* ${tanggal}
-*┊・ ⏰| Jam:* ${jamwib} WIB
-*╰┈┈┈┈┈┈┈┈*`, mentions: [sender] })
+    
 
     // Tambah ke database transaksi
                     db.data.transaksi.push({
@@ -2802,9 +2736,7 @@ Ada transaksi dengan saldo yang telah selesai!
                             `• Cek profit margin\n\n` +
         `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`
       
-      // Kirim notifikasi ke admin yang ditentukan
-      await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
-      await ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+      // Skip admin stock-empty notifications
     }
     
     // Send single comprehensive success message
@@ -2817,16 +2749,7 @@ Ada transaksi dengan saldo yang telah selesai!
     } else {
       reply("⚠️ Pembelian dengan saldo berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
       
-      // Send alert to admin about failed delivery
-      try {
-        await ronzz.sendMessage("6281389592985@s.whatsapp.net", { 
-          text: `🚨 ALERT: Customer message delivery FAILED (BUY CASE)!\n\nCustomer: @${sender.split("@")[0]}\nProduct: ${db.data.produk[data[0]].name}\nAmount: ${jumlah}\nRef ID: ${reffId}\nMethod: Saldo\n\nCustomer tidak menerima detail akun. Harap kirim manual!`,
-          mentions: [sender]
-        });
-        console.log('🚨 Alert sent to admin about failed customer delivery (BUY CASE)');
-      } catch (alertError) {
-        console.error('❌ Failed to send alert to admin:', alertError.message);
-      }
+      // Skip failed-delivery alert to admin
     }
             } catch (error) {
     console.log("Error processing buy:", error)
@@ -3030,23 +2953,7 @@ case 'buymidtrans': {
             reply("🎉 Pembayaran Midtrans QRIS berhasil! Detail akun telah dikirim di atas. Terima kasih!");
           }
 
-                           // Notif Owner
-           await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text:
-`Hai Owner,
-Ada transaksi MIDTRANS QRIS yang telah selesai!
-
-*╭────「 TRANSAKSI DETAIL 」───*
-*┊・ 🧾| Reff Id:* ${reffId}
-*┊・ 📮| Nomor:* @${sender.split("@")[0]}
-*┊・ 📦| Nama Barang:* ${product.name}
-*┊・ 🏷️| Harga Barang:* Rp${toRupiahLocal(unitPrice)}
-*┊・ 🛍️| Jumlah Order:* ${quantityNum}
-*┊・ 💰| Total Bayar:* Rp${toRupiahLocal(totalAmount)}
-*┊・ 💳| Metode Bayar:* QRIS
-*┊・ 🎯| Payment Type:* ${paymentStatus.payment_type || 'QRIS'}
-*┊・ 📅| Tanggal:* ${tanggal}
-*┊・ ⏰| Jam:* ${jamwib} WIB
-*╰┈┈┈┈┈┈┈┈*`, mentions: [sender] });
+                           
 
                            // Add to transaction database
            db.data.transaksi.push({
@@ -3084,10 +2991,7 @@ Ada transaksi MIDTRANS QRIS yang telah selesai!
               `• Cek profit margin\n\n` +
               `*💡 Tips:* Gunakan command *${prefix}addstok ${productId} jumlah* untuk menambah stok`;
 
-            await Promise.all([
-              ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] }),
-              ronzz.sendMessage("6285235540944@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
-            ]);
+            // Skip admin stock-empty notifications
           }
 
           delete db.data.order[sender];
@@ -4010,16 +3914,6 @@ OVO | GOPAY | SHOPEEPAY | DANA
         
         // Notifikasi ke user yang ditambahkan saldonya
         ronzz.sendMessage(nomorNya, { text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
-
-
-        // Notifikasi ke WA 6281389592985 dan 6285235540944
-        const notifNumbers = ["6281389592985@s.whatsapp.net", "6285235540944@s.whatsapp.net"];
-        for (const adminJid of notifNumbers) {
-          ronzz.sendMessage(adminJid, { 
-            text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, 
-            mentions: [nomorNya, sender] 
-          });
-        }
       }
         break
 
@@ -8139,5 +8033,3 @@ Ada yang upgrade role!
     console.log(color('[ERROR]', 'red'), err)
   }
 }
-
-
