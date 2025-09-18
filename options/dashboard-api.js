@@ -224,9 +224,6 @@ app.get('/api/pos/database', async (req, res) => {
 app.post('/api/pos/save-database', async (req, res) => {
   if (!posAuth(req, res)) return;
   try {
-    if (usePg) {
-      return res.status(405).json({ success: false, error: 'Not allowed in Postgres mode' });
-    }
     const { database } = req.body || {};
     if (!database || typeof database !== 'object') {
       return res.status(400).json({ success: false, error: 'Invalid payload: { database } required' });
@@ -235,6 +232,48 @@ app.post('/api/pos/save-database', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Database must include users and produk' });
     }
 
+    // PG mode: apply incoming snapshot into relational tables
+    if (usePg) {
+      try {
+        // Upsert users (saldo, role, data)
+        const userEntries = Object.entries(database.users || {});
+        for (const [userId, u] of userEntries) {
+          const saldo = parseInt(u && u.saldo) || 0;
+          const role = (u && u.role) || 'bronze';
+          await pg.query(
+            "INSERT INTO users(user_id, saldo, role, data) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id) DO UPDATE SET saldo=EXCLUDED.saldo, role=EXCLUDED.role, data=EXCLUDED.data",
+            [userId, saldo, role, JSON.stringify(u || {})]
+          );
+        }
+
+        // Upsert produk (name, price, stock, data)
+        const produkEntries = Object.entries(database.produk || {});
+        for (const [id, p] of produkEntries) {
+          const stock = Array.isArray(p && p.stok) ? p.stok.length : (parseInt(p && p.stock) || 0);
+          const price = parseInt(p && (p.price || p.priceB || p.harga)) || 0;
+          const name = p && (p.name || p.nama) || null;
+          await pg.query(
+            'INSERT INTO produk(id, name, price, stock, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, price=EXCLUDED.price, stock=EXCLUDED.stock, data=EXCLUDED.data',
+            [id, name, price, stock, JSON.stringify(p || {})]
+          );
+        }
+
+        // Optionally persist settings (best-effort)
+        if (database.setting && typeof database.setting === 'object') {
+          const settingEntries = Object.entries(database.setting);
+          for (const [k, v] of settingEntries) {
+            await pg.query('INSERT INTO settings(key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value', [k, JSON.stringify(v)]);
+          }
+        }
+
+        return res.json({ success: true, mode: 'postgres', updatedAt: new Date().toISOString() });
+      } catch (e) {
+        console.error('[POS save-database PG] Error:', e);
+        return res.status(500).json({ success: false, error: 'Failed to apply to Postgres: ' + e.message });
+      }
+    }
+
+    // File mode
     if (saveDatabase(database)) {
       return res.json({ success: true, updatedAt: new Date().toISOString() });
     }
