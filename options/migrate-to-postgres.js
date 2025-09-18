@@ -52,13 +52,23 @@ async function migrate() {
 
     // transaksi
     if (Array.isArray(db.transaksi)) {
+      let inserted = 0, skipped = 0;
       for (const t of db.transaksi) {
-        await client.query(
-          'INSERT INTO transaksi(ref_id, user_id, amount, status, meta) VALUES ($1,$2,$3,$4,$5)',
-          [t.ref_id || t.reffId || null, t.user_id || t.userId || null, toNumber(t.amount ?? t.nominal, 0), t.status || null, JSON.stringify(t)]
-        );
+        const refId = t.ref_id || t.reffId || null;
+        try {
+          await client.query(
+            'INSERT INTO transaksi(ref_id, user_id, amount, status, meta) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (ref_id) DO NOTHING',
+            [refId, t.user_id || t.userId || null, toNumber(t.amount ?? t.nominal, 0), t.status || null, JSON.stringify(t)]
+          );
+          // Count whether inserted or skipped
+          const r = await client.query('SELECT 1 FROM transaksi WHERE ref_id = $1', [refId]);
+          if (r.rowCount) inserted++; else skipped++;
+        } catch (e) {
+          // If duplicate or other unique violation, skip
+          skipped++;
+        }
       }
-      console.log(`[migrate] transaksi: ${db.transaksi.length}`);
+      console.log(`[migrate] transaksi: attempted=${db.transaksi.length}, inserted=${inserted}, skipped=${skipped}`);
     }
 
     // produk
