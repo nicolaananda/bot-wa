@@ -386,7 +386,6 @@ module.exports = async (ronzz, m, mek) => {
       if (role == "silver") return db.data.produk[id].priceS
       if (role == "gold") return db.data.produk[id].priceG
     }
-
     expiredCheck(ronzz, m, groupId)
 
     if (db.data.topup[sender]) {
@@ -597,7 +596,7 @@ module.exports = async (ronzz, m, mek) => {
                               }
                             }
                           }, { quoted: m });
-                          db.data.users[sender].saldo += db.data.topup[sender].data.price
+                          await dbHelper.updateUserSaldo(sender, db.data.topup[sender].data.price, 'add')
                           delete db.data.topup[sender]
                         } else {
                           if (product.produk == "TPG Diamond Mobile Legends" || product.produk == "TPG Genshin Impact Crystals") {
@@ -641,7 +640,7 @@ module.exports = async (ronzz, m, mek) => {
                                 }
                               }
                             }, { quoted: m });
-                            db.data.users[sender].saldo += db.data.topup[sender].data.price
+                            await dbHelper.updateUserSaldo(sender, db.data.topup[sender].data.price, 'add')
                             delete db.data.topup[sender]
                             break
                           }
@@ -768,8 +767,7 @@ module.exports = async (ronzz, m, mek) => {
                         await ronzz.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» Tujuan:* ${db.data.topup[sender].data.id}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
                         fs.unlinkSync(invoice)
                       }
-                      db.data.users[sender].saldo -= db.data.topup[sender].data.price
-                      await db.save() // Force save database
+                      await dbHelper.updateUserSaldo(sender, db.data.topup[sender].data.price, 'subtract')
                       delete db.data.topup[sender]
                       break
                     }
@@ -934,8 +932,7 @@ Total Bayar: Rp${toRupiah(db.data.deposit[sender].data.total_deposit)}`
                     }, { quoted: m });
                     
 
-                    db.data.users[sender].saldo += Number(db.data.deposit[sender].data.amount_deposit)
-                    await db.save() // Force save database
+                    await dbHelper.updateUserSaldo(sender, Number(db.data.deposit[sender].data.amount_deposit), 'add')
                     delete db.data.deposit[sender]
                   }
                 } catch (error) {
@@ -1038,7 +1035,6 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           
           // Test 2: Formatted message
           const testMsg = `*🧪 TEST MESSAGE 2*
-
 *Format:* Test dengan format
 *Tanggal:* ${tanggal}
 *Jam:* ${jamwib} WIB
@@ -2506,14 +2502,6 @@ case 'buynow': {
                     }
                     
                     console.log('🏁 CUSTOMER MESSAGE SEND RESULT:', customerMessageSent ? 'SUCCESS' : 'FAILED');
-                    
-                    // Kirim ke owner (hanya detail akun) - TIDAK PRIORITAS
-                    try {
-                      await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkunOwner })
-                      console.log('✅ Account details sent to owner successfully');
-                    } catch (error) {
-                      console.error('❌ Error sending account details to owner (not critical):', error);
-                    }
 
                     // Send single comprehensive success message
                     if (customerMessageSent) {
@@ -2527,8 +2515,6 @@ case 'buynow': {
                       
                     // Skip sending alert to admin about failed delivery
                     }
-
-                    
 
                     // Tambah ke database transaksi (sama seperti case 'buy')
                     db.data.transaksi.push({
@@ -2581,20 +2567,18 @@ case 'buy': {
   db.data.order[sender] = { status: 'processing', reffId, idProduk: data[0], jumlah, metode: 'Saldo', startedAt: Date.now() }
 
   try {
-    // Cek saldo user
+    // Cek saldo user (PG-aware)
     let totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * jumlah
-    if (db.data.users[sender].saldo < totalHarga) {
+    const currentSaldo = dbHelper.getUserSaldo(sender)
+    if (currentSaldo < totalHarga) {
       delete db.data.order[sender]
-      return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(db.data.users[sender].saldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}payment*`)
+      return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(currentSaldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}payment*`)
     }
 
     reply("Sedang memproses pembelian dengan saldo...")
 
-    // Kurangi saldo user
-    db.data.users[sender].saldo -= totalHarga
-    
-    // Force save database setelah perubahan saldo
-    await db.save()
+    // Kurangi saldo user (PG)
+    await dbHelper.updateUserSaldo(sender, totalHarga, 'subtract')
 
     await sleep(1000)
     
@@ -2691,13 +2675,6 @@ case 'buy': {
     
     console.log('🏁 CUSTOMER MESSAGE SEND RESULT (BUY CASE):', customerMessageSent ? 'SUCCESS' : 'FAILED');
     
-    // Kirim ke owner (hanya detail akun) - TIDAK PRIORITAS
-    try {
-      await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkunOwner }, { quoted: m })
-      console.log('✅ Account details sent to owner successfully');
-    } catch (error) {
-      console.error('❌ Error sending account details to owner (not critical):', error);
-    }
 
     
 
@@ -3108,7 +3085,26 @@ case 'buymidtrans': {
         break
         
       case 'riwayat': {
-        if (!q) return reply(`Contoh: ${prefix + command} <nomor>\n\nContoh: ${prefix + command} 6281234567890`)
+        if (!q) {
+          // Tampilkan 10 transaksi terbaru (global)
+          const trx = (db.data.transaksi || [])
+            .filter(Boolean)
+            .slice(-10)
+            .reverse();
+          if (trx.length === 0) return reply('Belum ada transaksi.');
+          let teks = `*📊 10 Transaksi Terbaru*\n\n`;
+          trx.forEach((t, i) => {
+            teks += `*${i + 1}. ${t.name}*\n`;
+            teks += `• ID: ${t.id}\n`;
+            teks += `• Harga: Rp${toRupiah(parseInt(t.price) || 0)}\n`;
+            teks += `• Jumlah: ${t.jumlah || 1}\n`;
+            teks += `• Total: Rp${toRupiah(t.totalBayar || ((parseInt(t.price) || 0) * (t.jumlah || 1)))}\n`;
+            teks += `• Metode: ${t.metodeBayar || t.payment_method || 'Tidak diketahui'}\n`;
+            teks += `• Tanggal: ${t.date || '-'}\n`;
+            teks += `• Reff ID: ${t.reffId || t.order_id || '-'}\n\n`;
+          });
+          return reply(teks);
+        }
         
         let targetUser = q.replace(/[^0-9]/g, '') + "@s.whatsapp.net"
         let userTransaksi = db.data.transaksi.filter(t => t.user === q.replace(/[^0-9]/g, ''))
@@ -3590,10 +3586,8 @@ Ada yang deposit nih kak, coba dicek saldonya`
         if (!q) return reply(`Contoh: ${prefix + command} 628xxx`)
         let orang = q.split(",")[0].replace(/[^0-9]/g, '')
         let pajakny = (Number(db.data.persentase["feeDepo"] / 100)) * Number(db.data.deposit[orang + "@s.whatsapp.net"].data.amount_deposit)
-        db.data.users[orang + "@s.whatsapp.net"].saldo += Number(db.data.deposit[orang + "@s.whatsapp.net"].data.amount_deposit)
-        await db.save() // Force save database
+        await dbHelper.updateUserSaldo(orang + "@s.whatsapp.net", Number(db.data.deposit[orang + "@s.whatsapp.net"].data.amount_deposit), 'add')
         var text_sukses = `*✅「 DEPOSIT SUKSES 」✅*
-
 *ID:* ${db.data.deposit[orang + "@s.whatsapp.net"].ID}
 *Nomer:* @${db.data.deposit[orang + "@s.whatsapp.net"].number.split('@')[0]}
 *Payment:* ${db.data.deposit[orang + "@s.whatsapp.net"].payment}
@@ -3789,59 +3783,22 @@ Ada yang deposit nih kak, coba dicek saldonya`
           }
         } else {
           // If not reply and no parameter, check own saldo (all users can do this)
-          // Try to find user in database with both formats
-          let user = null;
-          let foundKey = null;
-          
-          if (db.data.users && db.data.users[sender]) {
-            user = db.data.users[sender];
-            foundKey = sender;
-          } else {
-            // Try without @s.whatsapp.net suffix
-            const senderWithoutSuffix = sender.split('@')[0];
-            if (db.data.users && db.data.users[senderWithoutSuffix]) {
-              user = db.data.users[senderWithoutSuffix];
+          // Self saldo check
+          const senderWithoutSuffix = sender.replace(/@s\.whatsapp\.net$/, '');
+          const saldo = dbHelper.getUserSaldo(sender);
+
+          // Try to find user record key for display
+          let foundKey = sender;
+          if (db.data && db.data.users) {
+            if (!db.data.users[sender] && db.data.users[senderWithoutSuffix]) {
               foundKey = senderWithoutSuffix;
             }
           }
-          
-          if (user) {
-            // Try to get saldo from cache first for better performance
-            let saldo = getCachedSaldo(foundKey);
-            if (saldo === null) {
-              // If not in cache, get from database and cache it
-              saldo = parseInt(user.saldo) || 0;
-              setCachedSaldo(foundKey, saldo);
-            }
-            
-            const username = user.username || `User ${foundKey.slice(-4)}`;
-            
-            reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* ${username}\n🆔 *ID:* ${foundKey}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n💡 *Saldo hanya untuk transaksi dibot ini.*`);
-          } else {
-            // User not found, create new user with 0 saldo
-            if (!db.data.users) db.data.users = {};
-            
-            // Create user with both formats
-            const senderWithoutSuffix = sender.split('@')[0];
-            db.data.users[senderWithoutSuffix] = {
-              saldo: 0,
-              role: 'bronze',
-              username: `User ${senderWithoutSuffix.slice(-4)}`,
-              createdAt: new Date().toISOString()
-            };
-            
-            // Also create with suffix format for consistency
-            db.data.users[sender] = {
-              saldo: 0,
-              role: 'bronze',
-              username: `User ${senderWithoutSuffix.slice(-4)}`,
-              createdAt: new Date().toISOString()
-            };
-            
-            await db.save();
-            
-            reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* User ${senderWithoutSuffix.slice(-4)}\n🆔 *ID:* ${senderWithoutSuffix}\n💳 *Saldo:* Rp0\n\n💡 *Info:* User baru dibuat dengan saldo 0`);
-          }
+
+          const user = (db.data && db.data.users && db.data.users[foundKey]) || {};
+          const username = user.username || `User ${senderWithoutSuffix.slice(-4)}`;
+
+          reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* ${username}\n🆔 *ID:* ${foundKey}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n💡 *Saldo hanya untuk transaksi dibot ini.*`);
         }
       }
         break
@@ -3905,8 +3862,7 @@ OVO | GOPAY | SHOPEEPAY | DANA
           }
         }
         
-        db.data.users[nomorNya].saldo += nominal
-        await db.save() // Force save database
+        await dbHelper.updateUserSaldo(nomorNya, nominal, 'add')
         await sleep(50)
         
         // Notifikasi ke admin
@@ -3938,8 +3894,7 @@ OVO | GOPAY | SHOPEEPAY | DANA
         if (db.data.users[nomorNya].saldo <= 0) return reply("User belum terdaftar di database saldo atau saldo 0.")
         if (db.data.users[nomorNya].saldo < nominal) return reply(`Saldo user tidak cukup! Saldo: Rp${toRupiah(db.data.users[nomorNya].saldo)}, yang ingin dikurangi: Rp${toRupiah(nominal)}`)
         
-        db.data.users[nomorNya].saldo -= nominal
-        await db.save() // Force save database
+        await dbHelper.updateUserSaldo(nomorNya, nominal, 'subtract')
         await sleep(50)
         
         // Notifikasi ke admin
@@ -3966,8 +3921,7 @@ OVO | GOPAY | SHOPEEPAY | DANA
           }
         }
         
-        db.data.users[targetUser].saldo += nominal
-        await db.save() // Force save database
+        await dbHelper.updateUserSaldo(targetUser, nominal, 'add')
         await sleep(50)
         
         reply(`✅ *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${targetUser.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[targetUser].saldo)}\n\n*By:* @${sender.split('@')[0]}`, { mentions: [targetUser, sender] })
@@ -6967,7 +6921,6 @@ Ada yang upgrade role!
                   await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", {
                     text: `Hai Owner,
 Ada yang upgrade role!
-
 *╭────「 TRANSAKSI DETAIL 」───*
 *┊・ 📮| Nomer:* @${sender.split("@")[0]}
 *┊・ 📦| Nama Barang:* Upgrade Role Gold
@@ -7610,7 +7563,6 @@ Ada yang upgrade role!
         db.data.chat[from].sProses = q
         reply(`Sukses set proses`)
         break
-
       case 'delproses':
         if (!isGroup) return reply(mess.group)
         if (!isGroupAdmins && !isOwner) return reply(mess.admin)
