@@ -5,7 +5,6 @@ yarn-debug.log*
 yarn-error.log*
 
 # Session data
-session/
 sessionsession/
 session_backup/
 backup/
