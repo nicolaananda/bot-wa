@@ -28,6 +28,7 @@ const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsername
 const { qrisDinamis } = require("./function/dinamis");
 const { createQRISCore, isPaymentCompleted } = require('./config/midtrans');
 const BASE_QRIS_DANA = "00020101021126570011ID.DANA.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
+const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 
 // Performance optimization: Cache for user saldo
 const saldoCache = new Map();
@@ -40,31 +41,53 @@ try {
   });
 } catch {}
 
-// Watch for external changes to the database file (bot-tele/posweb updates)
-try {
-  const dbFilePath = path.join(__dirname, 'options', 'database.json');
-  if (fs.existsSync(dbFilePath)) {
-    fs.watchFile(dbFilePath, { interval: 1000 }, () => {
-      try {
-        const raw = fs.readFileSync(dbFilePath, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (global.db && global.db.data) {
-          global.db.data = parsed;
-        } else {
-          global.db = {
-            data: parsed,
-            save: async () => fs.writeFileSync(dbFilePath, JSON.stringify(global.db.data, null, 2))
-          };
+// Watch for external changes to the database file (bot-tele/posweb updates) only in JSON mode
+if (!usePg) {
+  try {
+    const dbFilePath = path.join(__dirname, 'options', 'database.json');
+    if (fs.existsSync(dbFilePath)) {
+      fs.watchFile(dbFilePath, { interval: 1000 }, () => {
+        try {
+          const raw = fs.readFileSync(dbFilePath, 'utf8');
+          if (!raw || raw.trim().length < 2) return; // skip empty/partial writes
+          const parsed = JSON.parse(raw);
+          if (global.db && global.db.data) {
+            global.db.data = parsed;
+          } else {
+            global.db = {
+              data: parsed,
+              save: async () => fs.writeFileSync(dbFilePath, JSON.stringify(global.db.data, null, 2))
+            };
+          }
+          process.emit('database:reloaded');
+          console.log('[DB] Reloaded from external change');
+        } catch (e) {
+          // Retry once after a short delay to handle atomic writes
+          setTimeout(() => {
+            try {
+              const raw2 = fs.readFileSync(dbFilePath, 'utf8');
+              if (!raw2 || raw2.trim().length < 2) return;
+              const parsed2 = JSON.parse(raw2);
+              if (global.db && global.db.data) {
+                global.db.data = parsed2;
+              } else {
+                global.db = {
+                  data: parsed2,
+                  save: async () => fs.writeFileSync(dbFilePath, JSON.stringify(global.db.data, null, 2))
+                };
+              }
+              process.emit('database:reloaded');
+              console.log('[DB] Reloaded from external change');
+            } catch (ee) {
+              console.error('[DB] Failed to reload external change:', ee.message);
+            }
+          }, 300);
         }
-        process.emit('database:reloaded');
-        console.log('[DB] Reloaded from external change');
-      } catch (e) {
-        console.error('[DB] Failed to reload external change:', e.message);
-      }
-    });
+      });
+    }
+  } catch (e) {
+    console.error('[DB] Watch setup failed:', e.message);
   }
-} catch (e) {
-  console.error('[DB] Watch setup failed:', e.message);
 }
 
 // Cache management functions
