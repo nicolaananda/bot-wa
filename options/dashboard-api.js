@@ -266,6 +266,25 @@ app.post('/api/pos/save-database', async (req, res) => {
           }
         }
 
+        // Save transaksi (append-only)
+        if (database.transaksi && Array.isArray(database.transaksi)) {
+          for (const t of database.transaksi) {
+            try {
+              const refId = t && (t.ref_id || t.reffId || t.order_id) || null;
+              const uid = t && (t.user_id || t.userId || t.user) || null;
+              const amt = parseInt(t && (t.totalBayar || t.amount || (t.price * (t.jumlah || 1)))) || 0;
+              const status = t && t.status || null;
+              await pg.query(
+                'INSERT INTO transaksi(ref_id, user_id, amount, status, meta) VALUES ($1,$2,$3,$4,$5)',
+                [refId, uid, amt, status, JSON.stringify(t)]
+              );
+            } catch (e) {
+              // best-effort; continue with others
+              try { console.error('[POS save-database PG] insert transaksi failed:', e.message) } catch {}
+            }
+          }
+        }
+
         return res.json({ success: true, mode: 'postgres', updatedAt: new Date().toISOString() });
       } catch (e) {
         console.error('[POS save-database PG] Error:', e);
