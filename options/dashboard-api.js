@@ -216,6 +216,60 @@ app.get('/api/pos/database', async (req, res) => {
 });
 
 /**
+ * POST /api/pos/transactions
+ * Body: { transactions: array }
+ * Simpan riwayat transaksi dari POS Web ke database
+ */
+app.post('/api/pos/transactions', async (req, res) => {
+  if (!posAuth(req, res)) return;
+  try {
+    const { transactions } = req.body || {};
+    if (!Array.isArray(transactions)) {
+      return res.status(400).json({ success: false, error: 'transactions must be array' });
+    }
+
+    if (usePg) {
+      // Save to Postgres
+      let saved = 0;
+      for (const t of transactions) {
+        try {
+          const refId = t && (t.ref_id || t.reffId || t.order_id) || null;
+          const uid = t && (t.user_id || t.userId || t.user) || null;
+          const amt = parseInt(t && (t.totalBayar || t.amount || (t.price * t.jumlah)) || 0);
+          const status = t && (t.status || 'completed') || 'completed';
+          
+          await pg.query(
+            'INSERT INTO transaksi(ref_id, user_id, amount, status, meta) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
+            [refId, uid, amt, status, JSON.stringify(t)]
+          );
+          saved++;
+        } catch (e) {
+          console.error('[POS] Failed to save transaction:', e.message);
+        }
+      }
+      return res.json({ success: true, saved, mode: 'postgres' });
+    } else {
+      // Save to JSON
+      const db = await loadDatabaseAsync();
+      if (!db) {
+        return res.status(500).json({ success: false, error: 'Database not available' });
+      }
+      
+      if (!db.transaksi) db.transaksi = [];
+      db.transaksi.push(...transactions);
+      
+      if (saveDatabase(db)) {
+        return res.json({ success: true, saved: transactions.length, mode: 'json' });
+      }
+      return res.status(500).json({ success: false, error: 'Failed to save database' });
+    }
+  } catch (e) {
+    console.error('[POS] Transaction save error:', e);
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+/**
  * POST /api/pos/save-database
  * Body: { database: <obj db penuh> }
  * Simpan perubahan dari POS Web (saldo, stok, terjual, dll) ke options/database.json
