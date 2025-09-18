@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
@@ -30,8 +31,30 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json({ limit: '2mb' })); // ganti yang sebelumnya app.use(express.json())
-// Function untuk membaca database.json
-function loadDatabase() {
+const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
+let pg; if (usePg) { pg = require('../config/postgres'); }
+
+// Function untuk membaca database (JSON file atau Postgres)
+async function loadDatabaseAsync() {
+  if (usePg) {
+    const result = { users: {}, transaksi: [], produk: {}, setting: {}, profit: {}, persentase: {} };
+    // users
+    const users = await pg.query('SELECT user_id, data FROM users');
+    for (const row of users.rows) result.users[row.user_id] = row.data || {};
+    // transaksi
+    const trx = await pg.query('SELECT meta FROM transaksi ORDER BY id ASC');
+    result.transaksi = trx.rows.map(r => r.meta);
+    // produk
+    const pr = await pg.query('SELECT id, data FROM produk');
+    for (const row of pr.rows) result.produk[row.id] = row.data || {};
+    // settings
+    const st = await pg.query('SELECT key, value FROM settings');
+    for (const row of st.rows) result.setting[row.key] = row.value;
+    // optional keys if exist in kv tables created by migration
+    try { const prf = await pg.query('SELECT v FROM "profit"'); if (prf.rows.length) result.profit = Object.fromEntries(prf.rows.map((r,i)=>[String(i), r.v])); } catch {}
+    try { const per = await pg.query('SELECT v FROM "persentase"'); if (per.rows.length) result.persentase = Object.fromEntries(per.rows.map((r,i)=>[String(i), r.v])); } catch {}
+    return result;
+  }
   try {
     const dbPath = path.join(__dirname, 'database.json');
     console.log('Loading database from:', dbPath);
@@ -57,8 +80,8 @@ function loadDatabase() {
 }
 
 // Function untuk mendapatkan data dengan format yang sesuai
-function getFormattedData() {
-  const db = loadDatabase();
+async function getFormattedDataAsync() {
+  const db = await loadDatabaseAsync();
   if (!db) {
     return null;
   }
@@ -148,9 +171,9 @@ function posNoStore(res) {
  * Bacakan langsung options/database.json agar POS Web bisa read tanpa Nginx alias.
  * Menggunakan loadDatabase() yang sudah ada di file ini.
  */
-app.get('/api/pos/database', (req, res) => {
+app.get('/api/pos/database', async (req, res) => {
   posNoStore(res);
-  const db = loadDatabase();
+  const db = await loadDatabaseAsync();
   if (!db) {
     return res.status(500).json({ success: false, error: 'Failed to load database' });
   }
@@ -163,9 +186,12 @@ app.get('/api/pos/database', (req, res) => {
  * Simpan perubahan dari POS Web (saldo, stok, terjual, dll) ke options/database.json
  * Menggunakan saveDatabase() yang sudah ada di file ini.
  */
-app.post('/api/pos/save-database', (req, res) => {
+app.post('/api/pos/save-database', async (req, res) => {
   if (!posAuth(req, res)) return;
   try {
+    if (usePg) {
+      return res.status(405).json({ success: false, error: 'Not allowed in Postgres mode' });
+    }
     const { database } = req.body || {};
     if (!database || typeof database !== 'object') {
       return res.status(400).json({ success: false, error: 'Invalid payload: { database } required' });
@@ -189,12 +215,24 @@ app.post('/api/pos/save-database', (req, res) => {
  * Body: { phone: '628xxx@s.whatsapp.net', pin: '1234' }
  * Update PIN user tanpa kirim seluruh database.
  */
-app.get('/api/pos/debug', (req, res) => {
+app.get('/api/pos/debug', async (req, res) => {
+  if (usePg) {
+    try {
+      const counters = await Promise.all([
+        pg.query('SELECT COUNT(*)::int AS c FROM users'),
+        pg.query('SELECT COUNT(*)::int AS c FROM transaksi'),
+        pg.query('SELECT COUNT(*)::int AS c FROM produk')
+      ]);
+      return res.json({ mode: 'postgres', users: counters[0].rows[0].c, transaksi: counters[1].rows[0].c, produk: counters[2].rows[0].c });
+    } catch (e) {
+      return res.status(500).json({ success: false, error: e.message });
+    }
+  }
   const filePath = path.join(__dirname, 'database.json');
-  res.json({ __dirname, filePath, exists: fs.existsSync(filePath) });
+  res.json({ mode: 'file', __dirname, filePath, exists: fs.existsSync(filePath) });
 });
 
-app.post('/api/pos/update-pin', (req, res) => {
+app.post('/api/pos/update-pin', async (req, res) => {
   if (!posAuth(req, res)) return;
   try {
     const { phone, pin } = req.body || {};
@@ -202,7 +240,14 @@ app.post('/api/pos/update-pin', (req, res) => {
       return res.status(400).json({ success: false, error: 'phone and pin required' });
     }
 
-    const db = loadDatabase();
+    if (usePg) {
+      await pg.query(
+        'UPDATE users SET data = jsonb_set(COALESCE(data, \'{}\'::jsonb), $3::text[], to_jsonb($2::text), true) WHERE user_id=$1',
+        [phone, pin, '{pin}']
+      );
+      return res.json({ success: true, phone, updatedAt: new Date().toISOString() });
+    }
+    const db = await loadDatabaseAsync();
     if (!db || !db.users) {
       return res.status(500).json({ success: false, error: 'Database not available' });
     }
@@ -337,14 +382,14 @@ function paginate(array, page, limit) {
 }
 
 // 1) List users for admin
-app.get('/api/admin/users', (req, res) => {
+app.get('/api/admin/users', async (req, res) => {
   if (!posAdminAuth(req, res)) return;
   try {
     const { search = '', role = 'all', minSaldo, maxSaldo, page = 1, limit = 20 } = req.query;
     const lim = Math.min(parseInt(limit) || 20, 100);
     const pg = parseInt(page) || 1;
 
-    const formatted = getFormattedData();
+    const formatted = await getFormattedDataAsync();
     if (!formatted) return res.status(500).json({ success: false, error: 'Failed to load database' });
     const users = formatted.data.users || {};
     const transaksi = formatted.data.transaksi || [];
@@ -405,7 +450,7 @@ app.get('/api/admin/users', (req, res) => {
 });
 
 // 2) Adjust saldo
-app.patch('/api/admin/users/:userId/saldo', (req, res) => {
+app.patch('/api/admin/users/:userId/saldo', async (req, res) => {
   if (!posAdminAuth(req, res)) return;
   try {
     const { userId } = req.params;
@@ -423,7 +468,17 @@ app.patch('/api/admin/users/:userId/saldo', (req, res) => {
       idempotencyCache.set(key, { at: Date.now() });
     }
 
-    const db = loadDatabase();
+    if (usePg) {
+      const beforeRes = await pg.query('SELECT saldo FROM users WHERE user_id=$1', [userId]);
+      const before = beforeRes.rows[0] ? parseInt(beforeRes.rows[0].saldo) : 0;
+      const after = before + amount;
+      if (after < 0) return res.status(400).json({ success: false, error: 'Invalid payload: resulting saldo would be negative' });
+      await pg.query('INSERT INTO users(user_id, saldo, role, data) VALUES ($1,$2,' + "'bronze'" + ', ' + "'{}'" + '::jsonb) ON CONFLICT (user_id) DO UPDATE SET saldo=$2', [userId, after]);
+      const auditId = generateAuditId();
+      writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'saldo.adjust', delta: amount, reason: reason || null, before, after, timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
+      return res.json({ success: true, data: { userId, before, after, delta: amount, auditId } });
+    }
+    const db = await loadDatabaseAsync();
     if (!db || !db.users) return res.status(500).json({ success: false, error: 'Database not available' });
     const found = findUserRecord(db, userId);
     if (!found) return res.status(404).json({ success: false, error: 'User not found' });
@@ -459,7 +514,7 @@ app.patch('/api/admin/users/:userId/saldo', (req, res) => {
 });
 
 // 3) Set PIN
-app.post('/api/admin/users/:userId/pin', (req, res) => {
+app.post('/api/admin/users/:userId/pin', async (req, res) => {
   if (!posAdminAuth(req, res)) return;
   try {
     const { userId } = req.params;
@@ -468,7 +523,16 @@ app.post('/api/admin/users/:userId/pin', (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid payload: pin must be 4-6 numeric digits' });
     }
 
-    const db = loadDatabase();
+    if (usePg) {
+      await pg.query(
+        'UPDATE users SET data = jsonb_set(COALESCE(data, \'{}\'::jsonb), $3::text[], to_jsonb($2::text), true) WHERE user_id=$1',
+        [userId, pin, '{pin}']
+      );
+      const auditId = generateAuditId();
+      writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'pin.update', masked: '******', timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
+      return res.json({ success: true, data: { userId, updatedAt: new Date().toISOString() } });
+    }
+    const db = await loadDatabaseAsync();
     if (!db || !db.users) return res.status(500).json({ success: false, error: 'Database not available' });
     const found = findUserRecord(db, userId);
     if (!found) return res.status(404).json({ success: false, error: 'User not found' });
@@ -495,7 +559,7 @@ app.post('/api/admin/users/:userId/pin', (req, res) => {
 });
 
 // 4) Update role
-app.patch('/api/admin/users/:userId/role', (req, res) => {
+app.patch('/api/admin/users/:userId/role', async (req, res) => {
   if (!posAdminAuth(req, res)) return;
   try {
     const { userId } = req.params;
@@ -509,7 +573,18 @@ app.patch('/api/admin/users/:userId/role', (req, res) => {
       return res.status(403).json({ success: false, error: 'Forbidden: admin not allowed' });
     }
 
-    const db = loadDatabase();
+    if (usePg) {
+      const beforeRes = await pg.query('SELECT data FROM users WHERE user_id=$1', [userId]);
+      const oldRole = (beforeRes.rows[0] && beforeRes.rows[0].data && beforeRes.rows[0].data.role) || 'bronze';
+      await pg.query(
+        "UPDATE users SET data = jsonb_set(COALESCE(data, '{}'::jsonb), $3::text[], to_jsonb($2::text), true) WHERE user_id=$1".replace("'{}'", "''{}''"),
+        [userId, role, '{role}']
+      );
+      const auditId = generateAuditId();
+      writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'role.update', oldRole, newRole: role, timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
+      return res.json({ success: true, data: { userId, oldRole, newRole: role } });
+    }
+    const db = await loadDatabaseAsync();
     if (!db || !db.users) return res.status(500).json({ success: false, error: 'Database not available' });
     const found = findUserRecord(db, userId);
     if (!found) return res.status(404).json({ success: false, error: 'User not found' });
@@ -604,9 +679,9 @@ function generateUserId() {
 // API Endpoints
 
 // 1. Dashboard Overview
-app.get('/api/dashboard/overview', (req, res) => {
+app.get('/api/dashboard/overview', async (req, res) => {
   try {
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     if (!db) {
       return res.status(500).json({
         success: false,
@@ -635,9 +710,9 @@ app.get('/api/dashboard/overview', (req, res) => {
 });
 
 // 2. Chart Data Harian
-app.get('/api/dashboard/chart/daily', (req, res) => {
+app.get('/api/dashboard/chart/daily', async (req, res) => {
   try {
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     if (!db) {
       return res.status(500).json({
         success: false,
@@ -659,9 +734,9 @@ app.get('/api/dashboard/chart/daily', (req, res) => {
 });
 
 // 3. Chart Data Bulanan
-app.get('/api/dashboard/chart/monthly', (req, res) => {
+app.get('/api/dashboard/chart/monthly', async (req, res) => {
   try {
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     if (!db) {
       return res.status(500).json({
         success: false,
@@ -683,9 +758,9 @@ app.get('/api/dashboard/chart/monthly', (req, res) => {
 });
 
 // 4. User Activity
-app.get('/api/dashboard/users/activity', (req, res) => {
+app.get('/api/dashboard/users/activity', async (req, res) => {
   try {
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     if (!db) {
       return res.status(500).json({
         success: false,
@@ -795,10 +870,10 @@ app.get('/api/dashboard/users/activity', (req, res) => {
 });
 
 // 5. Get All Users with Pagination
-app.get('/api/dashboard/users/all', (req, res) => {
+app.get('/api/dashboard/users/all', async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '', role = 'all' } = req.query;
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     
     if (!db) {
       return res.status(500).json({
@@ -915,10 +990,10 @@ app.get('/api/dashboard/users/all', (req, res) => {
 });
 
 // 6. Transaksi by User
-app.get('/api/dashboard/users/:userId/transactions', (req, res) => {
+app.get('/api/dashboard/users/:userId/transactions', async (req, res) => {
   try {
     const { userId } = req.params;
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     
     if (!db) {
       return res.status(500).json({
@@ -987,10 +1062,10 @@ app.get('/api/dashboard/users/:userId/transactions', (req, res) => {
 });
 
 // 6. Search Transaksi by Reff ID
-app.get('/api/dashboard/transactions/search/:reffId', (req, res) => {
+app.get('/api/dashboard/transactions/search/:reffId', async (req, res) => {
   try {
     const { reffId } = req.params;
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     
     if (!db) {
       return res.status(500).json({
@@ -1052,10 +1127,10 @@ app.get('/api/dashboard/transactions/search/:reffId', (req, res) => {
 });
 
 // 7. Export Data
-app.get('/api/dashboard/export/:format', (req, res) => {
+app.get('/api/dashboard/export/:format', async (req, res) => {
   try {
     const { format } = req.params;
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     
     if (!db) {
       return res.status(500).json({
@@ -1081,9 +1156,9 @@ app.get('/api/dashboard/export/:format', (req, res) => {
 });
 
 // 8. User Statistics
-app.get('/api/dashboard/users/stats', (req, res) => {
+app.get('/api/dashboard/users/stats', async (req, res) => {
   try {
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     if (!db) {
       return res.status(500).json({
         success: false,
@@ -1196,9 +1271,9 @@ app.get('/api/dashboard/users/stats', (req, res) => {
 });
 
 // 9. Product Statistics
-app.get('/api/dashboard/products/stats', (req, res) => {
+app.get('/api/dashboard/products/stats', async (req, res) => {
   try {
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     if (!db) {
       return res.status(500).json({
         success: false,
@@ -1259,10 +1334,10 @@ app.get('/api/dashboard/products/stats', (req, res) => {
 });
 
 // 10. Recent Transactions
-app.get('/api/dashboard/transactions/recent', (req, res) => {
+app.get('/api/dashboard/transactions/recent', async (req, res) => {
   try {
     const { limit = 20 } = req.query;
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     
     if (!db) {
       return res.status(500).json({
@@ -1918,9 +1993,9 @@ app.get('/api/dashboard/products/:productId/stock/details', async (req, res) => 
 // ===== ADVANCED DASHBOARD API ENDPOINTS =====
 
 // 11. Advanced Analytics Dashboard
-app.get('/api/dashboard/analytics/advanced', (req, res) => {
+app.get('/api/dashboard/analytics/advanced', async (req, res) => {
   try {
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     if (!db) {
       return res.status(500).json({
         success: false,
@@ -2091,10 +2166,10 @@ app.get('/api/dashboard/analytics/advanced', (req, res) => {
 });
 
 // 12. Product Performance Analytics
-app.get('/api/dashboard/products/performance', (req, res) => {
+app.get('/api/dashboard/products/performance', async (req, res) => {
   try {
-    const rawDb = loadDatabase();
-    const db = getFormattedData();
+    const rawDb = await loadDatabaseAsync();
+    const db = await getFormattedDataAsync();
     
     if (!rawDb || !rawDb.produk || !db) {
       return res.status(500).json({
@@ -2234,9 +2309,9 @@ app.get('/api/dashboard/products/performance', (req, res) => {
 });
 
 // 13. User Behavior Analytics
-app.get('/api/dashboard/users/behavior', (req, res) => {
+app.get('/api/dashboard/users/behavior', async (req, res) => {
   try {
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     if (!db) {
       return res.status(500).json({
         success: false,
@@ -2434,9 +2509,9 @@ app.get('/api/dashboard/users/behavior', (req, res) => {
 });
 
 // 14. Financial Analytics & Insights
-app.get('/api/dashboard/finance/analytics', (req, res) => {
+app.get('/api/dashboard/finance/analytics', async (req, res) => {
   try {
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     if (!db) {
       return res.status(500).json({
         success: false,
@@ -2623,9 +2698,9 @@ app.get('/api/dashboard/finance/analytics', (req, res) => {
 });
 
 // 15. Real-time Dashboard Data
-app.get('/api/dashboard/realtime', (req, res) => {
+app.get('/api/dashboard/realtime', async (req, res) => {
   try {
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     if (!db) {
       return res.status(500).json({
         success: false,
@@ -2773,9 +2848,9 @@ app.get('/api/dashboard/realtime', (req, res) => {
 });
 
 // 16. Predictive Analytics
-app.get('/api/dashboard/predictions', (req, res) => {
+app.get('/api/dashboard/predictions', async (req, res) => {
   try {
-    const db = getFormattedData();
+    const db = await getFormattedDataAsync();
     if (!db) {
       return res.status(500).json({
         success: false,

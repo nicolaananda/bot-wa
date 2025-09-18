@@ -40,33 +40,45 @@ require('./options/graceful-shutdown')
 // Load database helper
 global.dbHelper = require('./options/db-helper')
 
-// Initialize database structure only if it doesn't exist
-// Don't overwrite existing data
-if (!db.data.list) db.data.list = []
-if (!db.data.testi) db.data.testi = []
-if (!db.data.chat) db.data.chat = {}
-if (!db.data.users) db.data.users = {}
-if (!db.data.sewa) db.data.sewa = {}
-if (!db.data.profit) db.data.profit = {}
-if (!db.data.topup) db.data.topup = {}
-if (!db.data.type) db.data.type = type
-if (!db.data.setting) db.data.setting = {}
-if (!db.data.deposit) db.data.deposit = {}
-if (!db.data.produk) db.data.produk = {}
-if (!db.data.order) db.data.order = {}
-if (!db.data.transaksi) db.data.transaksi = []
-if (!db.data.persentase) db.data.persentase = {}
-if (!db.data.customProfit) db.data.customProfit = {}
+// Load full snapshot from PG (if enabled), then init defaults and log counts
+;(async () => {
+  try {
+    const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
+    if (usePg && typeof db.load === 'function') {
+      await db.load()
+    }
+  } catch (e) {
+    console.error('[DB] Failed to load from Postgres:', e)
+  }
 
-// Log database status
-console.log(`📊 Database loaded: ${Object.keys(db.data.users).length} users, ${db.data.transaksi.length} transactions`)
+  // Initialize database structure only if it doesn't exist
+  // Don't overwrite existing data
+  if (!db.data.list) db.data.list = []
+  if (!db.data.testi) db.data.testi = []
+  if (!db.data.chat) db.data.chat = {}
+  if (!db.data.users) db.data.users = {}
+  if (!db.data.sewa) db.data.sewa = {}
+  if (!db.data.profit) db.data.profit = {}
+  if (!db.data.topup) db.data.topup = {}
+  if (!db.data.type) db.data.type = type
+  if (!db.data.setting) db.data.setting = {}
+  if (!db.data.deposit) db.data.deposit = {}
+  if (!db.data.produk) db.data.produk = {}
+  if (!db.data.order) db.data.order = {}
+  if (!db.data.transaksi) db.data.transaksi = []
+  if (!db.data.persentase) db.data.persentase = {}
+  if (!db.data.customProfit) db.data.customProfit = {}
 
-let lastJSON = JSON.stringify(db.data)
-if (!opts['test']) setInterval(async () => {
-  if (JSON.stringify(db.data) == lastJSON) return
-  await db.save()
-  lastJSON = JSON.stringify(db.data)
-}, 5 * 1000) // Ubah dari 10 detik ke 5 detik
+  // Log database status
+  console.log(`📊 Database loaded: ${Object.keys(db.data.users || {}).length} users, ${(db.data.transaksi || []).length} transactions`)
+
+  let lastJSON = JSON.stringify(db.data)
+  if (!global.opts['test']) setInterval(async () => {
+    if (JSON.stringify(db.data) == lastJSON) return
+    await db.save()
+    lastJSON = JSON.stringify(db.data)
+  }, 5 * 1000) // Ubah dari 10 detik ke 5 detik
+})()
 
 async function startronzz() {
 

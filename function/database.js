@@ -1,110 +1,99 @@
-const path = require('path')
-const _fs = require('fs')
-const { promises: fs } = _fs
+require('dotenv').config()
+const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 
-class Database {
-	/**
-	 * Create new Database
-	 * @param {String} filepath Path to specified json database
-	 * @param  {...any} args JSON.stringify arguments
-	 */
-	constructor(filepath, ...args) {
-		this.file = path.resolve(filepath)
-		this.logger = console
+if (!usePg) {
+    module.exports = require('./database-fs')
+} else {
+    const { query } = require('../config/postgres')
 
-		this._jsonargs = args
-		this._state = false
-		this._queue = []
-		this._isWriting = false
-		this._lastWriteMs = 0
+    class DatabasePG {
+        constructor() {
+            this.logger = console
+            this._data = {}
+        }
 
-		this._load()
+        get data() { return this._data }
+        set data(value) { this._data = value }
 
-		this._interval = setInterval(async () => {
-			if (!this._state && this._queue && this._queue[0]) {
-				this._state = true
-				await this[this._queue.shift()]().catch(this.logger.error)
-				this._state = false
-			}
-		}, 1000)
+        async load() {
+            // Assemble a snapshot similar to JSON db for backward compatibility
+            const snapshot = {}
+            // users
+            const users = await query('SELECT user_id, saldo, role, data FROM users')
+            snapshot.users = {}
+            for (const row of users.rows) {
+                const merged = (row.data && typeof row.data === 'object') ? { ...row.data } : {}
+                // Always prefer authoritative columns for saldo and role
+                merged.saldo = Number(row.saldo || 0)
+                merged.role = row.role || merged.role || 'bronze'
+                snapshot.users[row.user_id] = merged
+            }
+            // transaksi
+            const tr = await query('SELECT meta FROM transaksi ORDER BY id ASC')
+            const transaksiArray = tr.rows.map(r => r.meta)
+            // Intercept pushes to persist to Postgres transparently
+            const originalPush = transaksiArray.push
+            transaksiArray.push = function(...items) {
+                try {
+                    for (const item of items) {
+                        // Fire-and-forget insert; do not block caller
+                        query('INSERT INTO transaksi(ref_id, user_id, amount, status, meta) VALUES ($1,$2,$3,$4,$5)', [
+                            item && (item.ref_id || item.reffId) || null,
+                            item && (item.user_id || item.userId || item.user) || null,
+                            item && (Number(item.amount || item.totalBayar || (item.price * (item.jumlah || 1)) || 0)) || 0,
+                            item && (item.status || null),
+                            JSON.stringify(item)
+                        ]).catch(e => { try { console.error('[DBPG] insert transaksi failed:', e.message) } catch {} })
+                    }
+                } catch {}
+                return originalPush.apply(this, items)
+            }
+            snapshot.transaksi = transaksiArray
+            // produk
+            const produk = await query('SELECT id, data FROM produk')
+            snapshot.produk = {}
+            for (const row of produk.rows) snapshot.produk[row.id] = row.data
+            // settings
+            const settings = await query('SELECT key, value FROM settings')
+            snapshot.setting = {}
+            for (const row of settings.rows) snapshot.setting[row.key] = row.value
 
-		// Watch for external changes and hot-reload
-		try {
-			// Use polling watcher for better cross-platform reliability (incl. Windows)
-			_fs.watchFile(this.file, { interval: 1000 }, (curr, prev) => {
-				if (curr && prev && curr.mtimeMs !== prev.mtimeMs) {
-					// Ignore our own writes (within debounce window)
-					if (Date.now() - this._lastWriteMs < 1500 || this._isWriting) return
-					try {
-						const fresh = _fs.existsSync(this.file) ? JSON.parse(_fs.readFileSync(this.file)) : {}
-						this._data = fresh
-						if (this.logger && this.logger.info) this.logger.info('[Database] Reloaded after external change:', this.file)
-						try { process.emit && process.emit('database:reloaded'); } catch {}
-					} catch (e) {
-						this.logger.error('[Database] Failed to reload after external change:', e)
-					}
-				}
-			})
-			this._unwatch = () => _fs.unwatchFile(this.file)
-		} catch (e) {
-			this.logger.error('[Database] Failed to start file watcher:', e)
-			this._unwatch = () => {}
-		}
-	}
+            // dynamic tables made by migration (arrays as item, objects as k/v)
+            // We won't eagerly load all to keep startup fast.
+            this._data = snapshot
+            return this._data
+        }
 
-	get data() {
-		return this._data
-	}
+        async save() {
+            try {
+                // Persist users
+                if (this._data && this._data.users) {
+                    const entries = Object.entries(this._data.users)
+                    for (const [userId, u] of entries) {
+                        const saldo = Number(u && u.saldo || 0)
+                        const role = (u && u.role) || 'bronze'
+                        await query(
+                            "INSERT INTO users(user_id, saldo, role, data) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id) DO UPDATE SET saldo=EXCLUDED.saldo, role=EXCLUDED.role, data=EXCLUDED.data",
+                            [userId, saldo, role, JSON.stringify(u || {})]
+                        )
+                    }
+                }
+                // Persist produk
+                if (this._data && this._data.produk) {
+                    const entries = Object.entries(this._data.produk)
+                    for (const [id, p] of entries) {
+                        await query(
+                            'INSERT INTO produk(id, name, price, stock, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, price=EXCLUDED.price, stock=EXCLUDED.stock, data=EXCLUDED.data',
+                            [id, (p && (p.name || p.nama)) || null, Number(p && (p.price || p.harga) || 0), Number(p && (p.stock || (p.stok ? p.stok.length : 0)) || 0), JSON.stringify(p || {})]
+                        )
+                    }
+                }
+            } catch (e) {
+                try { console.error('[DBPG] save sync failed:', e.message) } catch {}
+            }
+            return true
+        }
+    }
 
-	set data(value) {
-		this._data = value
-		this.save()
-	}
-
-	/**
-	 * Queue Load
-	 */
-	load() {
-		this._queue.push('_load')
-	}
-
-	/**
-	 * Queue Save
-	 */
-	save() {
-		this._queue.push('_save')
-	}
-
-	_load() {
-		try {
-			return this._data = _fs.existsSync(this.file) ? JSON.parse(_fs.readFileSync(this.file)) : {}
-		} catch (e) {
-			this.logger.error(e)
-			return this._data = {}
-		}
-	}
-
-	async _save() {
-		let dirname = path.dirname(this.file)
-		if (!_fs.existsSync(dirname)) await fs.mkdir(dirname, { recursive: true })
-		try {
-			this._isWriting = true
-			await fs.writeFile(this.file, JSON.stringify(this._data, ...this._jsonargs))
-			this._lastWriteMs = Date.now()
-		} finally {
-			// Small delay to ensure mtime is settled
-			setTimeout(() => { this._isWriting = false }, 200)
-		}
-		return this.file
-	}
-
-	/**
-	 * Cleanup background timers and watchers
-	 */
-	destroy() {
-		if (this._interval) clearInterval(this._interval)
-		if (this._unwatch) this._unwatch()
-	}
+    module.exports = DatabasePG
 }
-
-module.exports = Database
