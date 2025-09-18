@@ -38,9 +38,14 @@ let pg; if (usePg) { pg = require('../config/postgres'); }
 async function loadDatabaseAsync() {
   if (usePg) {
     const result = { users: {}, transaksi: [], produk: {}, setting: {}, profit: {}, persentase: {} };
-    // users
-    const users = await pg.query('SELECT user_id, data FROM users');
-    for (const row of users.rows) result.users[row.user_id] = row.data || {};
+    // users (merge saldo & role columns into data for POS Web consistency)
+    const users = await pg.query('SELECT user_id, saldo, role, data FROM users');
+    for (const row of users.rows) {
+      const payload = Object.assign({}, row.data || {});
+      payload.saldo = typeof row.saldo === 'number' ? row.saldo : (payload.saldo || 0);
+      if (row.role) payload.role = row.role;
+      result.users[row.user_id] = payload;
+    }
     // transaksi
     const trx = await pg.query('SELECT meta FROM transaksi ORDER BY id ASC');
     result.transaksi = trx.rows.map(r => r.meta);
