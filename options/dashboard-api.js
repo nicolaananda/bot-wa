@@ -97,6 +97,41 @@ async function getFormattedDataAsync() {
   };
 }
 
+// Helper untuk load map produk {id: data} dari sumber sesuai mode
+async function loadProdukMapAsync() {
+  if (usePg) {
+    const pr = await pg.query('SELECT id, data FROM produk');
+    const map = {};
+    for (const row of pr.rows) map[row.id] = row.data || {};
+    return map;
+  }
+  const raw = await loadDatabaseAsync();
+  return (raw && raw.produk) ? raw.produk : {};
+}
+
+// Helper untuk mengambil satu produk by id (PG/file)
+async function loadSingleProdukAsync(productId) {
+  if (usePg) {
+    const pr = await pg.query('SELECT id, data FROM produk WHERE id=$1', [productId]);
+    return pr.rows[0] ? pr.rows[0].data || null : null;
+  }
+  const raw = await loadDatabaseAsync();
+  return (raw && raw.produk && raw.produk[productId]) ? raw.produk[productId] : null;
+}
+
+// Helper untuk update stok di PG
+async function updateProdukStockPg(productId, updater) {
+  const row = await pg.query('SELECT data FROM produk WHERE id=$1', [productId]);
+  if (!row.rows[0]) return { ok: false, error: 'Product not found' };
+  const data = row.rows[0].data || {};
+  const beforeCount = Array.isArray(data.stok) ? data.stok.length : 0;
+  const updated = await updater({ ...data });
+  if (!updated || typeof updated !== 'object') return { ok: false, error: 'Invalid update' };
+  const newCount = Array.isArray(updated.stok) ? updated.stok.length : 0;
+  await pg.query('UPDATE produk SET data=$2, stock=$3 WHERE id=$1', [productId, JSON.stringify(updated), newCount]);
+  return { ok: true, beforeCount, newCount, data: updated };
+}
+
 // Helper: Parse delivered account from TRX file if available
 function parseDeliveredAccountFromFile(reffId) {
   try {
@@ -1399,8 +1434,8 @@ function calculateUtilization(terjual, stockCount) {
 // 1. Get Product Stock Data
 app.get('/api/dashboard/products/stock', async (req, res) => {
   try {
-    const db = loadDatabase();
-    if (!db || !db.produk) {
+    const produkMap = await loadProdukMapAsync();
+    if (!produkMap || Object.keys(produkMap).length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Database or products not found'
@@ -1410,7 +1445,7 @@ app.get('/api/dashboard/products/stock', async (req, res) => {
     const products = [];
     let totalSold = 0;
 
-    for (const [productId, product] of Object.entries(db.produk)) {
+    for (const [productId, product] of Object.entries(produkMap)) {
       const stockCount = product.stok ? product.stok.length : 0;
       totalSold += product.terjual || 0;
 
@@ -1470,8 +1505,8 @@ app.get('/api/dashboard/products/stock', async (req, res) => {
 // 2. Get Stock Summary
 app.get('/api/dashboard/products/stock/summary', async (req, res) => {
   try {
-    const db = loadDatabase();
-    if (!db || !db.produk) {
+    const produkMap = await loadProdukMapAsync();
+    if (!produkMap || Object.keys(produkMap).length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Database or products not found'
@@ -1484,7 +1519,7 @@ app.get('/api/dashboard/products/stock/summary', async (req, res) => {
     const categories = new Set();
     const stockByCategory = {};
 
-    for (const [productId, product] of Object.entries(db.produk)) {
+    for (const [productId, product] of Object.entries(produkMap)) {
       const stockCount = product.stok ? product.stok.length : 0;
       const category = getProductCategory(productId, product.name);
       
@@ -1507,7 +1542,7 @@ app.get('/api/dashboard/products/stock/summary', async (req, res) => {
     res.json({
       success: true,
       data: {
-        totalProducts: Object.keys(db.produk).length,
+        totalProducts: Object.keys(produkMap).length,
         totalStockItems: totalStockItems,
         lowStockProducts: lowStockProducts,
         outOfStockProducts: outOfStockProducts,
@@ -1545,7 +1580,45 @@ app.put('/api/dashboard/products/:productId/stock', async (req, res) => {
       });
     }
 
-    const db = loadDatabase();
+    if (usePg) {
+      // PG mode
+      const result = await updateProdukStockPg(productId, async (prod) => {
+        const previousStockCount = Array.isArray(prod.stok) ? prod.stok.length : 0;
+        let newStockCount = previousStockCount;
+        if (action === 'add') {
+          if (!Array.isArray(prod.stok)) prod.stok = [];
+          const validStockItems = (stockItems || []).filter(item => typeof item === 'string' && item.includes('|') && item.split('|').length >= 4);
+          if (validStockItems.length === 0) throw new Error('Invalid stock item format. Expected: "email|password|profile|pin|notes"');
+          prod.stok.push(...validStockItems);
+          newStockCount = prod.stok.length;
+          prod.lastRestock = new Date().toISOString();
+        } else if (action === 'remove') {
+          if (!Array.isArray(prod.stok) || prod.stok.length === 0) throw new Error('No stock available to remove');
+          const itemsToRemove = Math.min(stockItems.length, prod.stok.length);
+          prod.stok.splice(0, itemsToRemove);
+          newStockCount = prod.stok.length;
+        }
+        if (notes) prod.notes = notes;
+        return prod;
+      }).catch(e => ({ ok: false, error: e.message }));
+      if (!result.ok) {
+        if (result.error === 'Product not found') return res.status(404).json({ success: false, message: 'Product not found' });
+        return res.status(400).json({ success: false, message: result.error });
+      }
+      return res.json({
+        success: true,
+        data: {
+          productId: productId,
+          previousStockCount: result.beforeCount,
+          newStockCount: result.newCount,
+          addedItems: action === 'add' ? stockItems.length : 0,
+          removedItems: action === 'remove' ? Math.min(stockItems.length, result.beforeCount) : 0,
+          updatedAt: new Date().toISOString(),
+          notes: notes || null
+        }
+      });
+    }
+    const db = loadDatabaseAsync ? await loadDatabaseAsync() : null;
     if (!db || !db.produk) {
       return res.status(404).json({
         success: false,
@@ -1640,8 +1713,8 @@ app.put('/api/dashboard/products/:productId/stock', async (req, res) => {
 // 4. Get Low Stock Alerts
 app.get('/api/dashboard/products/stock/alerts', async (req, res) => {
   try {
-    const db = loadDatabase();
-    if (!db || !db.produk) {
+    const produkMap = await loadProdukMapAsync();
+    if (!produkMap || Object.keys(produkMap).length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Database or products not found'
@@ -1651,7 +1724,7 @@ app.get('/api/dashboard/products/stock/alerts', async (req, res) => {
     const alerts = [];
     const threshold = 5; // Low stock threshold
 
-    for (const [productId, product] of Object.entries(db.produk)) {
+    for (const [productId, product] of Object.entries(produkMap)) {
       const stockCount = product.stok ? product.stok.length : 0;
       
       if (stockCount <= threshold) {
@@ -1700,16 +1773,14 @@ app.get('/api/dashboard/products/stock/alerts', async (req, res) => {
 app.get('/api/dashboard/products/:productId/stock/history', async (req, res) => {
   try {
     const { productId } = req.params;
-    const db = loadDatabase();
+    const product = await loadSingleProdukAsync(productId);
     
-    if (!db || !db.produk || !db.produk[productId]) {
+    if (!product) {
       return res.status(404).json({
         success: false,
         message: 'Product not found'
       });
     }
-
-    const product = db.produk[productId];
     
     // Basic history - in a real implementation, you'd want to track this separately
     const history = [];
@@ -1747,7 +1818,7 @@ app.get('/api/dashboard/products/:productId/stock/history', async (req, res) => 
 // 6. Get Advanced Stock Analytics
 app.get('/api/dashboard/products/stock/analytics', async (req, res) => {
   try {
-    const analytics = stockHelper.getStockAnalytics();
+    const analytics = stockHelper.getStockAnalytics && !usePg ? stockHelper.getStockAnalytics() : null;
     
     if (!analytics) {
       return res.status(404).json({
@@ -1773,7 +1844,7 @@ app.get('/api/dashboard/products/stock/analytics', async (req, res) => {
 // 7. Generate Stock Report
 app.get('/api/dashboard/products/stock/report', async (req, res) => {
   try {
-    const report = stockHelper.generateStockReport();
+    const report = stockHelper.generateStockReport && !usePg ? stockHelper.generateStockReport() : null;
     
     if (!report) {
       return res.status(404).json({
@@ -1799,7 +1870,7 @@ app.get('/api/dashboard/products/stock/report', async (req, res) => {
 // 8. Export Stock Data to CSV
 app.get('/api/dashboard/products/stock/export', async (req, res) => {
   try {
-    const csv = stockHelper.exportStockToCSV();
+    const csv = stockHelper.exportStockToCSV && !usePg ? stockHelper.exportStockToCSV() : null;
     
     if (!csv) {
       return res.status(404).json({
@@ -1835,7 +1906,41 @@ app.post('/api/dashboard/products/stock/bulk-update', async (req, res) => {
       });
     }
 
-    const db = stockHelper.loadDatabase();
+    if (usePg) {
+      if (!updates.length) return res.json({ success: true, data: { totalUpdates: 0, successfulUpdates: 0, failedUpdates: 0, results: [] } });
+      const results = [];
+      let successCount = 0;
+      let errorCount = 0;
+      for (const update of updates) {
+        const { productId, action, stockItems, notes } = update;
+        try {
+          const r = await updateProdukStockPg(productId, async (prod) => {
+            const previousStockCount = Array.isArray(prod.stok) ? prod.stok.length : 0;
+            if (action === 'add') {
+              if (!Array.isArray(prod.stok)) prod.stok = [];
+              const validItems = (stockItems || []).filter(item => stockHelper.validateStockItem ? stockHelper.validateStockItem(item) : (typeof item === 'string'));
+              prod.stok.push(...validItems);
+              prod.lastRestock = new Date().toISOString();
+            } else if (action === 'remove') {
+              if (Array.isArray(prod.stok) && prod.stok.length > 0) {
+                const itemsToRemove = Math.min((stockItems || []).length, prod.stok.length);
+                prod.stok.splice(0, itemsToRemove);
+              }
+            }
+            if (notes) prod.notes = notes;
+            return prod;
+          });
+          if (!r.ok) throw new Error(r.error || 'Update failed');
+          results.push({ productId, success: true });
+          successCount++;
+        } catch (error) {
+          results.push({ productId, success: false, error: error.message });
+          errorCount++;
+        }
+      }
+      return res.json({ success: true, data: { totalUpdates: updates.length, successfulUpdates: successCount, failedUpdates: errorCount, results } });
+    }
+    const db = stockHelper.loadDatabase ? stockHelper.loadDatabase() : null;
     if (!db || !db.produk) {
       return res.status(404).json({
         success: false,
