@@ -3130,6 +3130,7 @@ case 'buymidtrans': {
         }
         
         let targetUser = q.replace(/[^0-9]/g, '') + "@s.whatsapp.net"
+        let alluserTransaksi = db.data.transaksi.filter(t => t.user === q.replace(/[^0-9]/g, ''))
         let userTransaksi = (db.data.transaksi || [])
           .filter(t => t && (t.user === q.replace(/[^0-9]/g, '')))
           .slice(-10)
@@ -3141,7 +3142,7 @@ case 'buymidtrans': {
         
         let teks = `*📊 RIWAYAT TRANSAKSI USER*\n\n`
         teks += `*📱 Nomor:* ${q}\n`
-        teks += `*📅 Total Transaksi:* ${userTransaksi.length}\n\n`
+        teks += `*📅 Total Transaksi:* ${alluserTransaksi.length}\n\n`
         
         userTransaksi.forEach((t, i) => {
           teks += `*${i + 1}. ${t.name}*\n`
