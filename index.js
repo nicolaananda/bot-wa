@@ -27,7 +27,7 @@ const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
 const { qrisDinamis } = require("./function/dinamis");
 const { createQRISCore, isPaymentCompleted } = require('./config/midtrans');
-const BASE_QRIS_DANA = "00020101021126570011ID.DANA.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
+const BASE_QRIS_DANA = "00020101021126570011id.bmri.livinmerchant.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 
 // Performance optimization: Cache for user saldo
@@ -2080,7 +2080,7 @@ function generateDynamicQrisFromStatic(baseQris, amount, reffId) {
 // ====== Validasi pembayaran via backend listener ======
 // Strategi: cari notifikasi terbaru setelah pembuatan QR, dengan:
 // - amountDetected == totalAmount (string/number sama2 dibandingkan)
-// - package_name "id.dana" atau appName "DANA" (kalau ada)
+// - package_name "id.bmri.livinmerchant" atau appName "DANA" (kalau ada)
 // - posted_at >= createdAt
 async function checkPaymentViaPG({ totalAmount, createdAtISO, deviceId = null }) {
   const url = `${PG_ENDPOINT}/notifications?limit=50` + (deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : "");
@@ -2096,7 +2096,7 @@ async function checkPaymentViaPG({ totalAmount, createdAtISO, deviceId = null })
       const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0;
       const amt = String(n.amountDetected || "").replace(/\D/g, "");
       const want = String(totalAmount);
-      const appOk = (n.packageName === "id.dana") || (String(n.appName || "").toUpperCase().includes("DANA"));
+      const appOk = (n.packageName === "id.bmri.livinmerchant") || (String(n.appName || "").toUpperCase().includes("DANA"));
       const textOk = /menerima|received/i.test(String(n.text || "")) || /masuk/i.test(String(n.text || ""));
       return appOk && textOk && postedAt >= createdAt && amt === want;
     } catch {
@@ -2370,7 +2370,7 @@ case 'buynow': {
                 const resp = await axios.get(url, { headers });
                 const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : []);
 
-                const paid = notifs.find(n => (n.package_name === 'id.dana' || (n.app_name||'').toUpperCase().includes('DANA')) && Number((n.amount_detected || '').toString().replace(/[^0-9]/g, '')) === Number(totalAmount));
+                const paid = notifs.find(n => (n.package_name === 'id.bmri.livinmerchant' || (n.app_name||'').toUpperCase().includes('DANA')) && Number((n.amount_detected || '').toString().replace(/[^0-9]/g, '')) === Number(totalAmount));
 
                 if (paid) {
                     await ronzz.sendMessage(from, { delete: message.key });
