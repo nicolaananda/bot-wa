@@ -3130,7 +3130,10 @@ case 'buymidtrans': {
         }
         
         let targetUser = q.replace(/[^0-9]/g, '') + "@s.whatsapp.net"
-        let userTransaksi = db.data.transaksi.filter(t => t.user === q.replace(/[^0-9]/g, ''))
+        let userTransaksi = (db.data.transaksi || [])
+          .filter(t => t && (t.user === q.replace(/[^0-9]/g, '')))
+          .slice(-10)
+          .reverse()
         
         if (userTransaksi.length === 0) {
           return reply(`Tidak ada riwayat transaksi untuk nomor *${q}*`)
