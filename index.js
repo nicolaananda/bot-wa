@@ -3156,6 +3156,15 @@ case 'buymidtrans': {
         })
         
         reply(teks)
+        
+        // Auto delete after 5 minutes
+        setTimeout(() => {
+          try {
+            client.deleteMessage(from, { id: m.key.id, remoteJid: from, participant: m.key.participant })
+          } catch (e) {
+            console.log('Failed to delete riwayat message:', e.message)
+          }
+        }, 5 * 60 * 1000)
       }
         break
         
