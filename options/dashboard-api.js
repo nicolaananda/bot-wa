@@ -3376,7 +3376,7 @@ if (require.main === module) {
 // 1. Get all receipts list
 app.get('/api/dashboard/receipts', async (req, res) => {
   try {
-    const receiptsDir = './options/receipts';
+    const receiptsDir = path.join(__dirname, 'receipts');
     
     if (!fs.existsSync(receiptsDir)) {
       return res.json({
@@ -3429,7 +3429,7 @@ app.get('/api/dashboard/receipts', async (req, res) => {
 app.get('/api/dashboard/receipts/:reffId', async (req, res) => {
   try {
     const { reffId } = req.params;
-    const receiptPath = `./options/receipts/${reffId}.txt`;
+    const receiptPath = path.join(__dirname, 'receipts', `${reffId}.txt`);
     
     if (!fs.existsSync(receiptPath)) {
       return res.status(404).json({
@@ -3467,7 +3467,7 @@ app.get('/api/dashboard/receipts/:reffId', async (req, res) => {
 app.get('/api/dashboard/receipts/:reffId/download', async (req, res) => {
   try {
     const { reffId } = req.params;
-    const receiptPath = `./options/receipts/${reffId}.txt`;
+    const receiptPath = path.join(__dirname, 'receipts', `${reffId}.txt`);
     
     if (!fs.existsSync(receiptPath)) {
       return res.status(404).json({
@@ -3520,7 +3520,7 @@ app.get('/api/dashboard/transactions/:reffId/with-receipt', async (req, res) => 
     }
 
     // Get receipt content
-    const receiptPath = `./options/receipts/${reffId}.txt`;
+    const receiptPath = path.join(__dirname, 'receipts', `${reffId}.txt`);
     let receiptContent = null;
     let receiptExists = false;
     
@@ -3555,7 +3555,7 @@ app.get('/api/dashboard/transactions/:reffId/with-receipt', async (req, res) => 
 app.delete('/api/dashboard/receipts/:reffId', async (req, res) => {
   try {
     const { reffId } = req.params;
-    const receiptPath = `./options/receipts/${reffId}.txt`;
+    const receiptPath = path.join(__dirname, 'receipts', `${reffId}.txt`);
     
     if (!fs.existsSync(receiptPath)) {
       return res.status(404).json({
