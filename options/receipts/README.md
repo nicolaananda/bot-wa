@@ -62,7 +62,40 @@ GET /api/dashboard/receipts/:reffId/download
 ```
 Mengunduh file receipt dalam format .txt
 
-### 4. Delete Receipt
+### 4. Get Transaction with Receipt Content
+```
+GET /api/dashboard/transactions/:reffId/with-receipt
+```
+Menggabungkan data transaksi dengan isi receipt untuk kemudahan frontend.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "transaction": {
+      "reffId": "ABC123",
+      "user": "6287887842985",
+      "metodeBayar": "Saldo",
+      "userRole": "bronze",
+      "produk": "Sewa Zoom 100P 1 Jam",
+      "idProduk": "zoom1j",
+      "harga": 2000,
+      "jumlah": 1,
+      "totalBayar": 2000,
+      "tanggal": "2025-09-20 18:09:42",
+      "profit": 40
+    },
+    "receipt": {
+      "exists": true,
+      "content": "Receipt content here...",
+      "reffId": "ABC123"
+    }
+  }
+}
+```
+
+### 5. Delete Receipt
 ```
 DELETE /api/dashboard/receipts/:reffId
 ```
