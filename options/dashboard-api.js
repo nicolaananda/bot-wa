@@ -3362,6 +3362,181 @@ if (require.main === module) {
   console.log(`- GET /api/dashboard/products/stock/export`);
   console.log(`- POST /api/dashboard/products/stock/bulk-update`);
   console.log(`- GET /api/dashboard/products/:productId/stock/details`);
+  
+  console.log(`\n🧾 Receipt Management:`);
+  console.log(`- GET /api/dashboard/receipts`);
+  console.log(`- GET /api/dashboard/receipts/:reffId`);
+  console.log(`- GET /api/dashboard/receipts/:reffId/download`);
+  console.log(`- DELETE /api/dashboard/receipts/:reffId`);
+}
+
+// ===== RECEIPT MANAGEMENT API ENDPOINTS =====
+
+// 1. Get all receipts list
+app.get('/api/dashboard/receipts', async (req, res) => {
+  try {
+    const receiptsDir = './options/receipts';
+    
+    if (!fs.existsSync(receiptsDir)) {
+      return res.json({
+        success: true,
+        data: {
+          receipts: [],
+          total: 0,
+          message: 'No receipts found'
+        }
+      });
+    }
+
+    const files = fs.readdirSync(receiptsDir);
+    const receiptFiles = files.filter(file => file.endsWith('.txt'));
+    
+    const receipts = receiptFiles.map(file => {
+      const reffId = file.replace('.txt', '');
+      const filePath = path.join(receiptsDir, file);
+      const stats = fs.statSync(filePath);
+      
+      return {
+        reffId: reffId,
+        filename: file,
+        createdAt: stats.birthtime,
+        modifiedAt: stats.mtime,
+        size: stats.size,
+        sizeFormatted: formatBytes(stats.size)
+      };
+    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({
+      success: true,
+      data: {
+        receipts: receipts,
+        total: receipts.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting receipts list:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 2. Get specific receipt content
+app.get('/api/dashboard/receipts/:reffId', async (req, res) => {
+  try {
+    const { reffId } = req.params;
+    const receiptPath = `./options/receipts/${reffId}.txt`;
+    
+    if (!fs.existsSync(receiptPath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Receipt not found'
+      });
+    }
+
+    const content = fs.readFileSync(receiptPath, 'utf8');
+    const stats = fs.statSync(receiptPath);
+    
+    res.json({
+      success: true,
+      data: {
+        reffId: reffId,
+        content: content,
+        createdAt: stats.birthtime,
+        modifiedAt: stats.mtime,
+        size: stats.size,
+        sizeFormatted: formatBytes(stats.size)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting receipt content:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 3. Download receipt file
+app.get('/api/dashboard/receipts/:reffId/download', async (req, res) => {
+  try {
+    const { reffId } = req.params;
+    const receiptPath = `./options/receipts/${reffId}.txt`;
+    
+    if (!fs.existsSync(receiptPath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Receipt not found'
+      });
+    }
+
+    res.download(receiptPath, `${reffId}.txt`, (err) => {
+      if (err) {
+        console.error('Error downloading receipt:', err);
+        res.status(500).json({
+          success: false,
+          message: 'Error downloading file',
+          error: err.message
+        });
+      }
+    });
+
+  } catch (error) {
+    console.error('Error downloading receipt:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 4. Delete receipt
+app.delete('/api/dashboard/receipts/:reffId', async (req, res) => {
+  try {
+    const { reffId } = req.params;
+    const receiptPath = `./options/receipts/${reffId}.txt`;
+    
+    if (!fs.existsSync(receiptPath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Receipt not found'
+      });
+    }
+
+    fs.unlinkSync(receiptPath);
+    
+    res.json({
+      success: true,
+      message: 'Receipt deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting receipt:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Helper function to format bytes
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+  
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 module.exports = app; 
