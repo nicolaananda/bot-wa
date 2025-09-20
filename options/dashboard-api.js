@@ -3367,6 +3367,7 @@ if (require.main === module) {
   console.log(`- GET /api/dashboard/receipts`);
   console.log(`- GET /api/dashboard/receipts/:reffId`);
   console.log(`- GET /api/dashboard/receipts/:reffId/download`);
+  console.log(`- GET /api/dashboard/transactions/:reffId/with-receipt`);
   console.log(`- DELETE /api/dashboard/receipts/:reffId`);
 }
 
@@ -3496,7 +3497,61 @@ app.get('/api/dashboard/receipts/:reffId/download', async (req, res) => {
   }
 });
 
-// 4. Delete receipt
+// 4. Get transaction with receipt content (combined data for frontend)
+app.get('/api/dashboard/transactions/:reffId/with-receipt', async (req, res) => {
+  try {
+    const { reffId } = req.params;
+    
+    // Get transaction data
+    const db = await loadDatabaseAsync();
+    if (!db || !db.transaksi) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transaction database not found'
+      });
+    }
+
+    const transaction = db.transaksi.find(t => t.reffId === reffId);
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transaction not found'
+      });
+    }
+
+    // Get receipt content
+    const receiptPath = `./options/receipts/${reffId}.txt`;
+    let receiptContent = null;
+    let receiptExists = false;
+    
+    if (fs.existsSync(receiptPath)) {
+      receiptContent = fs.readFileSync(receiptPath, 'utf8');
+      receiptExists = true;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        transaction: transaction,
+        receipt: {
+          exists: receiptExists,
+          content: receiptContent,
+          reffId: reffId
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting transaction with receipt:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// 5. Delete receipt
 app.delete('/api/dashboard/receipts/:reffId', async (req, res) => {
   try {
     const { reffId } = req.params;
