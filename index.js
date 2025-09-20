@@ -2545,62 +2545,9 @@ case 'buynow': {
                     // Skip sending alert to admin about failed delivery
                     }
 
-                    // Simpan receipt ke file txt
+                    // Simpan receipt ke file txt (sama dengan detailAkunCustomer)
                     try {
-                      const receiptContent = `╔══════════════════════════════════════════════════════════════╗
-║                        RECEIPT TRANSAKSI                        ║
-╚══════════════════════════════════════════════════════════════╝
-
-📋 INFORMASI TRANSAKSI:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🆔 Reference ID: ${reffId}
-📦 Produk: ${db.data.produk[data[0]].name}
-💰 Harga Satuan: Rp${toRupiah(totalHarga / jumlah)}
-🔢 Jumlah: ${jumlah}
-💵 Subtotal: Rp${toRupiah(totalHarga)}
-🎯 Kode Unik: ${uniqueCode}
-💸 Total Bayar: Rp${toRupiah(totalAmount)}
-💳 Metode Bayar: QRIS
-👤 Pembeli: ${sender.split("@")[0]}
-📅 Tanggal: ${tanggal}
-⏰ Jam: ${jamwib} WIB
-🏷️ Role: ${db.data.users[sender].role}
-
-╔══════════════════════════════════════════════════════════════╗
-║                        DETAIL AKUN                           ║
-╚══════════════════════════════════════════════════════════════╝
-
-${dataStok.map((i, index) => {
-  const dataAkun = i.split("|");
-  return `AKUN ${index + 1}:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📧 Email: ${dataAkun[0] || 'Tidak ada'}
-🔐 Password: ${dataAkun[1] || 'Tidak ada'}
-👤 Profil: ${dataAkun[2] || 'Tidak ada'}
-🔢 Pin: ${dataAkun[3] || 'Tidak ada'}
-🔒 2FA: ${dataAkun[4] || 'Tidak ada'}
-
-`;
-}).join('')}
-╔══════════════════════════════════════════════════════════════╗
-║                    SYARAT & KETENTUAN                        ║
-╚══════════════════════════════════════════════════════════════╝
-
-📋 SNK PRODUK: ${db.data.produk[data[0]].name}
-
-${db.data.produk[data[0]].snk}
-
-⚠️ PENTING:
-• Baca dan pahami SNK sebelum menggunakan akun
-• Akun yang sudah dibeli tidak dapat dikembalikan
-• Hubungi admin jika ada masalah dengan akun
-
-╔══════════════════════════════════════════════════════════════╗
-║                    TERIMA KASIH!                             ║
-╚══════════════════════════════════════════════════════════════╝
-
-Receipt ini disimpan otomatis pada: ${new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" })}`;
-
+                      const receiptContent = detailAkunCustomer;
                       const receiptPath = `./options/receipts/${reffId}.txt`;
                       
                       // Pastikan folder receipts ada
@@ -2776,60 +2723,9 @@ case 'buy': {
 
     
 
-    // Simpan receipt ke file txt
+    // Simpan receipt ke file txt (sama dengan detailAkunCustomer)
     try {
-      const receiptContent = `╔══════════════════════════════════════════════════════════════╗
-║                        RECEIPT TRANSAKSI                        ║
-╚══════════════════════════════════════════════════════════════╝
-
-📋 INFORMASI TRANSAKSI:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🆔 Reference ID: ${reffId}
-📦 Produk: ${db.data.produk[data[0]].name}
-💰 Harga Satuan: Rp${toRupiah(totalHarga / jumlah)}
-🔢 Jumlah: ${jumlah}
-💵 Subtotal: Rp${toRupiah(totalHarga)}
-💳 Metode Bayar: Saldo
-👤 Pembeli: ${sender.split("@")[0]}
-📅 Tanggal: ${tanggal}
-⏰ Jam: ${jamwib} WIB
-🏷️ Role: ${db.data.users[sender].role}
-
-╔══════════════════════════════════════════════════════════════╗
-║                        DETAIL AKUN                           ║
-╚══════════════════════════════════════════════════════════════╝
-
-${dataStok.map((i, index) => {
-  const dataAkun = i.split("|");
-  return `AKUN ${index + 1}:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📧 Email: ${dataAkun[0] || 'Tidak ada'}
-🔐 Password: ${dataAkun[1] || 'Tidak ada'}
-👤 Profil: ${dataAkun[2] || 'Tidak ada'}
-🔢 Pin: ${dataAkun[3] || 'Tidak ada'}
-🔒 2FA: ${dataAkun[4] || 'Tidak ada'}
-
-`;
-}).join('')}
-╔══════════════════════════════════════════════════════════════╗
-║                    SYARAT & KETENTUAN                        ║
-╚══════════════════════════════════════════════════════════════╝
-
-📋 SNK PRODUK: ${db.data.produk[data[0]].name}
-
-${db.data.produk[data[0]].snk}
-
-⚠️ PENTING:
-• Baca dan pahami SNK sebelum menggunakan akun
-• Akun yang sudah dibeli tidak dapat dikembalikan
-• Hubungi admin jika ada masalah dengan akun
-
-╔══════════════════════════════════════════════════════════════╗
-║                    TERIMA KASIH!                             ║
-╚══════════════════════════════════════════════════════════════╝
-
-Receipt ini disimpan otomatis pada: ${new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" })}`;
-
+      const receiptContent = detailAkunCustomer;
       const receiptPath = `./options/receipts/${reffId}.txt`;
       
       // Pastikan folder receipts ada
