@@ -1244,6 +1244,19 @@ app.get('/api/dashboard/transactions/search/:reffId', async (req, res) => {
     // Parse delivered account if exists
     const deliveredAccount = parseDeliveredAccountFromFile(reffId);
     
+    // Get receipt content if exists
+    let receiptContent = null;
+    let receiptExists = false;
+    try {
+      const receiptPath = path.join(__dirname, 'receipts', `${reffId}.txt`);
+      if (fs.existsSync(receiptPath)) {
+        receiptContent = fs.readFileSync(receiptPath, 'utf8');
+        receiptExists = true;
+      }
+    } catch (error) {
+      console.error('Error reading receipt:', error);
+    }
+    
     // Transform data sebelum kirim ke frontend
     const transformedTransaction = {
       reffId: reffId,
@@ -1259,6 +1272,9 @@ app.get('/api/dashboard/transactions/search/:reffId', async (req, res) => {
       tanggal: transaction.date,
       profit: profit,
       deliveredAccount: deliveredAccount || null,
+      // Receipt data
+      receiptExists: receiptExists,
+      receiptContent: receiptContent,
       // Keep original fields for reference
       user_name: transaction.user_name || transaction.user,
       payment_method: transaction.payment_method || transaction.metodeBayar,
