@@ -84,5 +84,7 @@ Setiap receipt berisi:
 - Syarat & Ketentuan (SNK)
 - Timestamp pembuatan receipt
 
+**Catatan Penting:** Receipt menggunakan format yang sama persis dengan `detailAkunCustomer` yang dikirim ke customer via WhatsApp, sehingga memastikan konsistensi antara pesan yang diterima customer dan file receipt yang disimpan.
+
 ## Authentication
 Semua endpoint dapat diakses tanpa authentication karena dashboard tidak memiliki fitur login.
