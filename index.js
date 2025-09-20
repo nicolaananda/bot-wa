@@ -1794,10 +1794,16 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           teks += `*┊・* _⏰ Pesan ini akan terhapus otomatis dalam 5 menit_\n`
           teks += `*╰┈┈┈┈┈┈┈┈*\n\n`
 
+          // Convert products to array and sort by sales (terjual) in descending order
+          const productsArray = Object.keys(products).map(productId => ({
+            id: productId,
+            ...products[productId]
+          })).sort((a, b) => (b.terjual || 0) - (a.terjual || 0))
+
           // Process each product safely
-          for (const productId of Object.keys(products)) {
+          for (const produk of productsArray) {
+            const productId = produk.id
             try {
-              const produk = products[productId]
               if (!produk) continue
               
               // Safe property access with defaults
