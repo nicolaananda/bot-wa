@@ -2322,31 +2322,18 @@ case 'deposit': {
           await ronzz.sendMessage(from, { delete: message.key })
 
           const credit = baseAmount + bonus + uniqueCode
-          db.data.users[sender].saldo = Number(db.data.users[sender].saldo || 0) + credit
+          const previousSaldo = Number(db.data.users[sender].saldo || 0)
+          db.data.users[sender].saldo = previousSaldo + credit
           try { setCachedSaldo(sender, db.data.users[sender].saldo) } catch {}
           await db.save()
 
-          let successText = `*✅ DEPOSIT BERHASIL*\n\n` +
-            `Nominal: Rp${toRupiah(baseAmount)}\n` +
-            `Kode Unik: Rp${toRupiah(uniqueCode)} (ikut masuk saldo)\n` +
-            `Bonus: Rp${toRupiah(bonus)}\n` +
-            `Total Diterima: Rp${toRupiah(credit)}\n` +
-            `Saldo Saat Ini: Rp${toRupiah(db.data.users[sender].saldo)}`
+          const newSaldo = db.data.users[sender].saldo
+          const successText = `✅ DEPOSIT BERHASIL\n\n` +
+            `Saldo sebelum: Rp${toRupiah(previousSaldo)}\n` +
+            `Bertambah: Rp${toRupiah(credit)}\n` +
+            `Saldo sesudah: Rp${toRupiah(newSaldo)}`
 
-          await ronzz.sendMessage(from, {
-            footer: `${botName} © ${ownerName}`,
-            buttons: [ { buttonId: 'saldo', buttonText: { displayText: 'Saldo' }, type: 1 } ],
-            headerType: 1,
-            viewOnce: true,
-            image: fs.readFileSync(thumbnail),
-            caption: successText,
-            contextInfo: {
-              forwardingScore: 999,
-              isForwarded: true,
-              mentionedJid: parseMention(successText),
-              externalAdReply: { title: botName, body: `By ${ownerName}`, thumbnailUrl: ppuser, sourceUrl: '', mediaType: 1, renderLargerThumbnail: false }
-            }
-          }, { quoted: m })
+          await ronzz.sendMessage(from, { text: successText }, { quoted: m })
 
           delete db.data.orderDeposit[sender]
           break
