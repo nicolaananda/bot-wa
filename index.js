@@ -1720,61 +1720,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       }
         break
 
-      case 'deposit': case 'depo': {
-        let teks = `Hai *@${sender.split('@')[0]}*\nIngin melakukan deposit? silahkan pilih payment di bawah ini`
-        ronzz.sendMessage(from, {
-          footer: `${botName} © ${ownerName}`,
-          buttons: [
-            {
-              buttonId: 'action',
-              buttonText: { displayText: 'ini pesan interactiveMeta' },
-              type: 4,
-              nativeFlowInfo: {
-                name: 'single_select',
-                paramsJson: JSON.stringify({
-                  title: 'Click To List',
-                  sections: [
-                    {
-                      title: 'PAYMENT',
-                      rows: [
-                        {
-                          title: 'Qris',
-                          description: 'Sistem: Otomatis',
-                          id: '.payqris'
-                        },
-                        {
-                          title: 'E-Wallet',
-                          description: 'Sistem: Manual',
-                          id: '.paywallet'
-                        }
-                      ]
-                    }
-                  ]
-                })
-              }
-            }
-          ],
-          headerType: 1,
-          viewOnce: true,
-          image: fs.readFileSync(thumbnail),
-          caption: teks,
-          contextInfo: {
-            forwardingScore: 999,
-            isForwarded: true,
-            mentionedJid: parseMention(teks),
-            externalAdReply: {
-              title: botName,
-              body: `By ${ownerName}`,
-              thumbnailUrl: ppuser,
-              sourceUrl: '',
-              mediaType: 1,
-              renderLargerThumbnail: false
-            }
-          }
-        }, { quoted: m });
-      }
-        break
-
+     
       case 'stok': case 'stock': {
         try {
           // Check database structure
@@ -2297,6 +2243,130 @@ case 'qris': {
 break;
 
 
+
+case 'deposit': {
+  const parts = (q || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts[0]) return reply(`Contoh: ${prefix + command} 10000`)
+  const baseAmount = Number(parts[0])
+  if (!Number.isFinite(baseAmount) || baseAmount <= 0) return reply("Nominal harus berupa angka lebih dari 0")
+
+  if (!db.data.users[sender]) db.data.users[sender] = { saldo: 0, role: 'bronze' }
+  if (!db.data.orderDeposit) db.data.orderDeposit = {}
+  if (db.data.orderDeposit[sender]) return reply(`Kamu sedang memiliki deposit yang belum selesai. Ketik *${prefix}batal* untuk membatalkan.`)
+
+  const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
+  const uniqueCode = Math.floor(1 + Math.random() * 99)
+  const totalAmount = baseAmount + uniqueCode
+  // Bonus 4% dari nominal deposit (contoh: 50.000 -> 52.000; 100.000 -> 104.000)
+  const bonus = Math.floor(baseAmount * 0.04)
+
+  db.data.orderDeposit[sender] = { status: 'processing', reffId, metode: 'QRIS', startedAt: Date.now(), baseAmount, totalAmount, uniqueCode, bonus }
+
+  try {
+    reply("Sedang membuat QR Code...")
+
+    const orderId = `DEP-${reffId}-${Date.now()}`
+    const qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg")
+
+    const expirationTime = Date.now() + toMs("30m")
+    const expireDate = new Date(expirationTime)
+    const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000))
+    const currentTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" })
+    const expireTimeJakarta = new Date(new Date(currentTime).getTime() + timeLeft * 60000)
+    const formattedTime = `${expireTimeJakarta.getHours().toString().padStart(2, '0')}:${expireTimeJakarta.getMinutes().toString().padStart(2, '0')}`
+
+    const caption = `*🧾 MENUNGGU PEMBAYARAN DEPOSIT 🧾*\n\n` +
+      `*Nominal:* Rp${toRupiah(baseAmount)}\n` +
+      `*Bonus:* Rp${toRupiah(bonus)} (Rp2.000 tiap kelipatan Rp50.000)\n` +
+      `*Kode Unik:* ${uniqueCode}\n` +
+      `*Total Transfer:* Rp${toRupiah(totalAmount)}\n` +
+      `*Waktu:* ${timeLeft} menit\n\n` +
+      `Silakan scan QRIS di atas sebelum ${formattedTime}. Transfer sesuai total agar otomatis terdeteksi.\n\n` +
+      `Ketik *${prefix}batal* untuk membatalkan.`
+
+    const message = await ronzz.sendMessage(from, {
+      image: fs.readFileSync(qrImagePath),
+      caption: caption
+    }, { quoted: m })
+
+    db.data.orderDeposit[sender] = {
+      from,
+      key: message.key,
+      orderId,
+      reffId,
+      baseAmount,
+      totalAmount,
+      uniqueCode,
+      bonus,
+    }
+
+    while (db.data.orderDeposit[sender]) {
+      await sleep(10000)
+
+      if (Date.now() >= expirationTime) {
+        await ronzz.sendMessage(from, { delete: message.key })
+        reply("Deposit dibatalkan karena melewati batas waktu 30 menit.")
+        delete db.data.orderDeposit[sender]
+        break
+      }
+
+      try {
+        const url = `${listener.baseUrl}/notifications?limit=50`
+        const headers = listener.apiKey ? { 'X-API-Key': listener.apiKey } : {}
+        const resp = await axios.get(url, { headers })
+        const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : [])
+
+        const paid = notifs.find(n => (n.package_name === 'id.bmri.livinmerchant' || (n.app_name||'').toUpperCase().includes('DANA')) && Number((n.amount_detected || '').toString().replace(/[^0-9]/g, '')) === Number(totalAmount))
+
+        if (paid) {
+          await ronzz.sendMessage(from, { delete: message.key })
+
+          const credit = baseAmount + bonus + uniqueCode
+          db.data.users[sender].saldo = Number(db.data.users[sender].saldo || 0) + credit
+          try { setCachedSaldo(sender, db.data.users[sender].saldo) } catch {}
+          await db.save()
+
+          let successText = `*✅ DEPOSIT BERHASIL*\n\n` +
+            `Nominal: Rp${toRupiah(baseAmount)}\n` +
+            `Kode Unik: Rp${toRupiah(uniqueCode)} (ikut masuk saldo)\n` +
+            `Bonus: Rp${toRupiah(bonus)}\n` +
+            `Total Diterima: Rp${toRupiah(credit)}\n` +
+            `Saldo Saat Ini: Rp${toRupiah(db.data.users[sender].saldo)}`
+
+          await ronzz.sendMessage(from, {
+            footer: `${botName} © ${ownerName}`,
+            buttons: [ { buttonId: 'saldo', buttonText: { displayText: 'Saldo' }, type: 1 } ],
+            headerType: 1,
+            viewOnce: true,
+            image: fs.readFileSync(thumbnail),
+            caption: successText,
+            contextInfo: {
+              forwardingScore: 999,
+              isForwarded: true,
+              mentionedJid: parseMention(successText),
+              externalAdReply: { title: botName, body: `By ${ownerName}`, thumbnailUrl: ppuser, sourceUrl: '', mediaType: 1, renderLargerThumbnail: false }
+            }
+          }, { quoted: m })
+
+          delete db.data.orderDeposit[sender]
+          break
+        }
+      } catch (err) {
+        if (err.message?.includes("timeout")) continue
+
+        await ronzz.sendMessage(from, { delete: message.key })
+        reply("Deposit dibatalkan karena error sistem.")
+        delete db.data.orderDeposit[sender]
+        break
+      }
+    }
+  } catch (error) {
+    console.error(`Error creating QRIS DEPOSIT for ${sender}:`, error)
+    reply("Gagal membuat QR Code deposit. Silakan coba lagi.")
+    delete db.data.orderDeposit[sender]
+  }
+}
+break;
 
 case 'buynow': {
   if (db.data.order[sender] !== undefined) return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
@@ -3137,11 +3207,18 @@ case 'buymidtrans': {
     break
   
       case 'batal': {
-        if (db.data.order[sender] == undefined) return
-        
-        await ronzz.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
-        reply("Berhasil membatalkan pembayaran")
-        delete db.data.order[sender]
+        let cancelled = false
+        if (db.data.order && db.data.order[sender] !== undefined) {
+          await ronzz.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
+          delete db.data.order[sender]
+          cancelled = true
+        }
+        if (db.data.orderDeposit && db.data.orderDeposit[sender] !== undefined) {
+          try { await ronzz.sendMessage(db.data.orderDeposit[sender].from, { delete: db.data.orderDeposit[sender].key }) } catch {}
+          delete db.data.orderDeposit[sender]
+          cancelled = true
+        }
+        if (cancelled) reply("Berhasil membatalkan pembayaran")
       }
         break
         
