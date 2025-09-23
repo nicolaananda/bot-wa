@@ -2451,7 +2451,8 @@ case 'buynow': {
                     // Buat detail akun untuk customer (gabungan akun + SNK)
                     let detailAkunCustomer = `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
                     detailAkunCustomer += `*📅 Tanggal:* ${tanggal}\n`
-                    detailAkunCustomer += `*⏰ Jam:* ${jamwib} WIB\n\n`
+                    detailAkunCustomer += `*⏰ Jam:* ${jamwib} WIB\n`
+                    detailAkunCustomer += `*Refid:* ${reffId}\n\n`
                     dataStok.forEach((i, index) => {
                       let dataAkun = i.split("|")
                       detailAkunCustomer += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
@@ -2474,7 +2475,8 @@ case 'buynow': {
                     // Buat detail akun untuk owner (hanya informasi akun)
                     let detailAkunOwner = `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
                     detailAkunOwner += `*📅 Tanggal:* ${tanggal}\n`
-                    detailAkunOwner += `*⏰ Jam:* ${jamwib} WIB\n\n`
+                    detailAkunOwner += `*⏰ Jam:* ${jamwib} WIB\n`
+                    detailAkunOwner += `*Refid:* ${reffId}\n\n`
                     dataStok.forEach((i, index) => {
                       let dataAkun = i.split("|")
                       detailAkunOwner += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
@@ -2694,7 +2696,8 @@ case 'buy': {
     // Buat detail akun untuk customer (gabungan akun + SNK)
     let detailAkunCustomer = `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
     detailAkunCustomer += `*📅 Tanggal:* ${tanggal}\n`
-    detailAkunCustomer += `*⏰ Jam:* ${jamwib} WIB\n\n`
+    detailAkunCustomer += `*⏰ Jam:* ${jamwib} WIB\n`
+    detailAkunCustomer += `*Refid:* ${reffId}\n\n`
     dataStok.forEach((i, index) => {
       let dataAkun = i.split("|")
       detailAkunCustomer += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
@@ -2717,7 +2720,8 @@ case 'buy': {
     // Buat detail akun untuk owner (hanya informasi akun)
     let detailAkunOwner = `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
     detailAkunOwner += `*📅 Tanggal:* ${tanggal}\n`
-    detailAkunOwner += `*⏰ Jam:* ${jamwib} WIB\n\n`
+    detailAkunOwner += `*⏰ Jam:* ${jamwib} WIB\n`
+    detailAkunOwner += `*Refid:* ${reffId}\n\n`
     dataStok.forEach((i, index) => {
       let dataAkun = i.split("|")
       detailAkunOwner += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
