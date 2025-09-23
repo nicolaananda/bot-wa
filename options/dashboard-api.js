@@ -2168,18 +2168,25 @@ app.post('/api/dashboard/products/stock/bulk-update', async (req, res) => {
 app.get('/api/dashboard/products/:productId/stock/details', async (req, res) => {
   try {
     const { productId } = req.params;
-    const db = stockHelper.loadDatabase();
-    
-    if (!db || !db.produk || !db.produk[productId]) {
+
+    // Load product data supporting both Postgres and JSON file modes
+    let product = null;
+    if (usePg) {
+      product = await loadSingleProdukAsync(productId);
+    } else {
+      const db = await loadDatabaseAsync();
+      product = db && db.produk ? db.produk[productId] : null;
+    }
+
+    if (!product) {
       return res.status(404).json({
         success: false,
         message: 'Product not found'
       });
     }
 
-    const product = db.produk[productId];
     const metrics = stockHelper.calculateStockMetrics(product);
-    
+
     // Parse stock items for detailed view
     const stockItems = (product.stok || []).map(item => {
       const parsed = stockHelper.parseStockItem(item);
@@ -2191,7 +2198,7 @@ app.get('/api/dashboard/products/:productId/stock/details', async (req, res) => 
     });
 
     const response = {
-      productId: product.id,
+      productId: product.id || productId,
       productName: product.name,
       description: product.desc,
       prices: {
