@@ -1693,6 +1693,94 @@ app.get('/api/dashboard/products/stock/summary', async (req, res) => {
   }
 });
 
+// ===== PRODUCT CRUD (BEGIN) =====
+// Create product
+app.post('/api/dashboard/products', async (req, res) => {
+  try {
+    const { id, name, desc, priceB = 0, priceS = 0, priceG = 0, snk = '', minStock = 5 } = req.body || {};
+    if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) return res.status(400).json({ success: false, message: 'Invalid or missing id' });
+    if (!name) return res.status(400).json({ success: false, message: 'name required' });
+
+    if (usePg) {
+      const existing = await pg.query('SELECT id FROM produk WHERE id=$1', [id]);
+      if (existing.rows[0]) return res.status(409).json({ success: false, message: 'Product already exists' });
+      const data = { id, name, desc, priceB, priceS, priceG, snk, minStock, stok: [], terjual: 0 };
+      await pg.query('INSERT INTO produk(id, name, price, stock, data) VALUES ($1,$2,$3,$4,$5)', [id, name, parseInt(priceB)||0, 0, JSON.stringify(data)]);
+      return res.json({ success: true, data });
+    }
+
+    const db = await loadDatabaseAsync();
+    if (!db) return res.status(500).json({ success: false, message: 'Database not available' });
+    if (!db.produk) db.produk = {};
+    if (db.produk[id]) return res.status(409).json({ success: false, message: 'Product already exists' });
+    db.produk[id] = { id, name, desc, priceB, priceS, priceG, snk, minStock, stok: [], terjual: 0 };
+    if (!saveDatabase(db)) return res.status(500).json({ success: false, message: 'Failed to save database' });
+    return res.json({ success: true, data: db.produk[id] });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// Read product
+app.get('/api/dashboard/products/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const product = usePg ? await loadSingleProdukAsync(productId) : (await loadDatabaseAsync())?.produk?.[productId];
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+    return res.json({ success: true, data: product });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// Update product fields
+app.patch('/api/dashboard/products/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const payload = req.body || {};
+
+    if (usePg) {
+      const row = await pg.query('SELECT data FROM produk WHERE id=$1', [productId]);
+      if (!row.rows[0]) return res.status(404).json({ success: false, message: 'Product not found' });
+      const data = row.rows[0].data || {};
+      const updated = { ...data, ...payload };
+      const stockCount = Array.isArray(updated.stok) ? updated.stok.length : 0;
+      const price = parseInt(updated.priceB || updated.price || 0) || 0;
+      await pg.query('UPDATE produk SET name=$2, price=$3, stock=$4, data=$5 WHERE id=$1', [productId, updated.name || data.name || null, price, stockCount, JSON.stringify(updated)]);
+      return res.json({ success: true, data: updated });
+    }
+
+    const db = await loadDatabaseAsync();
+    if (!db || !db.produk || !db.produk[productId]) return res.status(404).json({ success: false, message: 'Product not found' });
+    db.produk[productId] = { ...(db.produk[productId] || {}), ...payload };
+    if (!saveDatabase(db)) return res.status(500).json({ success: false, message: 'Failed to save database' });
+    return res.json({ success: true, data: db.produk[productId] });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// Delete product
+app.delete('/api/dashboard/products/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    if (usePg) {
+      const row = await pg.query('SELECT id FROM produk WHERE id=$1', [productId]);
+      if (!row.rows[0]) return res.status(404).json({ success: false, message: 'Product not found' });
+      await pg.query('DELETE FROM produk WHERE id=$1', [productId]);
+      return res.json({ success: true });
+    }
+    const db = await loadDatabaseAsync();
+    if (!db || !db.produk || !db.produk[productId]) return res.status(404).json({ success: false, message: 'Product not found' });
+    delete db.produk[productId];
+    if (!saveDatabase(db)) return res.status(500).json({ success: false, message: 'Failed to save database' });
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+// ===== PRODUCT CRUD (END) =====
+
 // 3. Update Product Stock
 app.put('/api/dashboard/products/:productId/stock', async (req, res) => {
   try {
@@ -1840,6 +1928,104 @@ app.put('/api/dashboard/products/:productId/stock', async (req, res) => {
       message: 'Internal server error',
       error: error.message
     });
+  }
+});
+
+// 3a. Add single stock item (optional position)
+app.post('/api/dashboard/products/:productId/stock/item', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { value, position } = req.body || {};
+    if (typeof value !== 'string') return res.status(400).json({ success: false, message: 'value must be string' });
+    if (stockHelper.validateStockItem && !stockHelper.validateStockItem(value)) return res.status(400).json({ success: false, message: 'Invalid stock item format. Expected: "email|password|profile|pin|notes"' });
+
+    if (usePg) {
+      const r = await updateProdukStockPg(productId, async (prod) => {
+        if (!Array.isArray(prod.stok)) prod.stok = [];
+        const idx = Number.isInteger(position) ? Math.max(0, Math.min(position, prod.stok.length)) : prod.stok.length;
+        prod.stok.splice(idx, 0, value);
+        prod.lastRestock = new Date().toISOString();
+        return prod;
+      });
+      if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Failed to update' });
+      return res.json({ success: true, data: { newStockCount: r.newCount } });
+    }
+
+    const db = await loadDatabaseAsync();
+    if (!db || !db.produk || !db.produk[productId]) return res.status(404).json({ success: false, message: 'Product not found' });
+    const prod = db.produk[productId];
+    if (!Array.isArray(prod.stok)) prod.stok = [];
+    const idx = Number.isInteger(position) ? Math.max(0, Math.min(position, prod.stok.length)) : prod.stok.length;
+    prod.stok.splice(idx, 0, value);
+    prod.lastRestock = new Date().toISOString();
+    if (!saveDatabase(db)) return res.status(500).json({ success: false, message: 'Failed to save database' });
+    return res.json({ success: true, data: { newStockCount: prod.stok.length } });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// 3b. Edit stock item by index or exact match
+app.patch('/api/dashboard/products/:productId/stock/item', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { index, match, value } = req.body || {};
+    if (typeof value !== 'string') return res.status(400).json({ success: false, message: 'value must be string' });
+    if (stockHelper.validateStockItem && !stockHelper.validateStockItem(value)) return res.status(400).json({ success: false, message: 'Invalid stock item format' });
+
+    const mutate = async (prod) => {
+      if (!Array.isArray(prod.stok)) prod.stok = [];
+      let idx = Number.isInteger(index) ? index : -1;
+      if (idx < 0 && typeof match === 'string') idx = prod.stok.findIndex(i => i === match);
+      if (idx < 0 || idx >= prod.stok.length) throw new Error('Stock item not found');
+      prod.stok[idx] = value;
+      return prod;
+    };
+
+    if (usePg) {
+      const r = await updateProdukStockPg(productId, mutate).catch(e => ({ ok: false, error: e.message }));
+      if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Failed to update' });
+      return res.json({ success: true });
+    }
+
+    const db = await loadDatabaseAsync();
+    if (!db || !db.produk || !db.produk[productId]) return res.status(404).json({ success: false, message: 'Product not found' });
+    try { mutate(db.produk[productId]); } catch (e) { return res.status(404).json({ success: false, message: e.message }); }
+    if (!saveDatabase(db)) return res.status(500).json({ success: false, message: 'Failed to save database' });
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// 3c. Delete stock item by index or exact match
+app.delete('/api/dashboard/products/:productId/stock/item', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { index, match } = req.body || {};
+
+    const removeOne = async (prod) => {
+      if (!Array.isArray(prod.stok) || prod.stok.length === 0) throw new Error('No stock available to remove');
+      let idx = Number.isInteger(index) ? index : -1;
+      if (idx < 0 && typeof match === 'string') idx = prod.stok.findIndex(i => i === match);
+      if (idx < 0 || idx >= prod.stok.length) throw new Error('Stock item not found');
+      prod.stok.splice(idx, 1);
+      return prod;
+    };
+
+    if (usePg) {
+      const r = await updateProdukStockPg(productId, removeOne).catch(e => ({ ok: false, error: e.message }));
+      if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Failed to update' });
+      return res.json({ success: true });
+    }
+
+    const db = await loadDatabaseAsync();
+    if (!db || !db.produk || !db.produk[productId]) return res.status(404).json({ success: false, message: 'Product not found' });
+    try { removeOne(db.produk[productId]); } catch (e) { return res.status(404).json({ success: false, message: e.message }); }
+    if (!saveDatabase(db)) return res.status(500).json({ success: false, message: 'Failed to save database' });
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
   }
 });
 
