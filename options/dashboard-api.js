@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const http = require('http');
+const { exec, spawn } = require('child_process');
 const { getDashboardData, getDailyChartData, getMonthlyChartData, getUserActivityData } = require('./dashboard-helper');
 
 // Import stock helper functions
@@ -3279,12 +3280,12 @@ app.get('/api/dashboard/realtime', async (req, res) => {
 });
 // === LOGS API ===
 // Endpoint: GET /logs (static last 100 lines)
-// Endpoint: GET /logs
 app.get("/logs", (req, res) => {
   // udah bisa diapakai kan ?
   try {
     exec("journalctl -u bot-wa -n 100 --no-pager", (error, stdout, stderr) => {
       if (error) {
+        // Jika terjadi error, kirim status 500 dan pesan error
         return res.status(500).send(`Error: ${stderr || error.message}`);
       }
       res.type("text/plain").send(stdout);
@@ -3296,16 +3297,19 @@ app.get("/logs", (req, res) => {
 
 // Endpoint: GET /logs/stream (realtime)
 app.get("/logs/stream", (req, res) => {
-  // udah bisa diapakai kan ?
   try {
     res.type("text/plain");
+
     const journal = spawn("journalctl", ["-u", "bot-wa", "-f", "--no-pager"]);
+
     journal.stdout.on("data", (data) => {
       res.write(data.toString());
     });
+
     journal.stderr.on("data", (data) => {
       res.write(`ERR: ${data.toString()}`);
     });
+
     journal.on("error", (err) => {
       res.write(`Process error: ${err.message}\n`);
     });
