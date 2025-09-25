@@ -164,7 +164,18 @@ module.exports = async (ronzz, m, mek) => {
     }
 
     const reply = (teks, options = {}) => { ronzz.sendMessage(from, { text: teks, ...options }, { quoted: m }) }
-    const Reply = (teks) => ronzz.sendMessage(from, { text: Styles(teks), contextInfo: { mentionedJid: parseMention(teks), externalAdReply: { showAdAttribution: true, title: `${botName} © ${ownerName}`, body: ownerName + botName, thumbnail: fs.readFileSync(thumbnail), sourceUrl: linkGroup, mediaType: 1, renderLargerThumbnail: true } } }, { quoted: m })
+    let cachedThumbnailBuffer = null
+    function getThumbnailBuffer() {
+      if (!cachedThumbnailBuffer) {
+        try {
+          cachedThumbnailBuffer = fs.readFileSync(thumbnail)
+        } catch (e) {
+          cachedThumbnailBuffer = undefined
+        }
+      }
+      return cachedThumbnailBuffer
+    }
+    const Reply = (teks) => ronzz.sendMessage(from, { text: Styles(teks), contextInfo: { mentionedJid: parseMention(teks), externalAdReply: { showAdAttribution: true, title: `${botName} © ${ownerName}`, body: ownerName + botName, thumbnail: getThumbnailBuffer(), sourceUrl: linkGroup, mediaType: 1, renderLargerThumbnail: true } } }, { quoted: m })
 
     const mentionByTag = m.mtype == "extendedTextMessage" && m.message.extendedTextMessage.contextInfo != null ? m.message.extendedTextMessage.contextInfo.mentionedJid : []
     const mentionByReply = m.mtype == "extendedTextMessage" && m.message.extendedTextMessage.contextInfo != null ? m.message.extendedTextMessage.contextInfo.participant || "" : ""
@@ -1734,8 +1745,11 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           }
 
           let teks = `*╭────〔 PRODUCT LIST📦 〕─*\n`
-          teks += `*┊・* Cara membeli: ${prefix}buy kodeproduk jumlah\n`
-          teks += `*┊・* Contoh: ${prefix}buy netflix 2\n`
+          teks += `*┊・* Cara membeli:\n`
+          teks += `*┊・* 1. Buynow (QRIS Otomatis): ${prefix}buynow kodeproduk jumlah\n`
+          teks += `*┊・*    Contoh: ${prefix}buynow netflix 2\n`
+          teks += `*┊・* 2. Buy (Saldo): ${prefix}buy kodeproduk jumlah\n`
+          teks += `*┊・*    Contoh: ${prefix}buy netflix 2\n`
           teks += `*┊・* Kontak Admin: @${ownerNomer}\n`
           teks += `*┊・* _⏰ Pesan ini akan terhapus otomatis dalam 5 menit_\n`
           teks += `*╰┈┈┈┈┈┈┈┈*\n\n`
@@ -3170,7 +3184,11 @@ case 'buymidtrans': {
       })
   
             teks += `*╰────「 END LIST 」────╯*\n\n`
-      teks += `*💡 Cara membeli:* ${prefix}buy kodeproduk jumlah\n`
+      teks += `*💡 Cara membeli:*\n`
+      teks += `*┊・* Buynow (QRIS Otomatis): ${prefix}buynow kodeproduk jumlah\n`
+      teks += `*┊・*    Contoh: ${prefix}buynow netflix 2\n`
+      teks += `*┊・* Buy (Saldo): ${prefix}buy kodeproduk jumlah\n`
+      teks += `*┊・*    Contoh: ${prefix}buy netflix 2\n`
       teks += `*📞 Kontak Admin:* @${ownerNomer}\n\n`
       teks += `_⏰ Pesan ini akan terhapus otomatis dalam 5 menit_`
 
