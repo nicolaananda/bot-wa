@@ -3321,6 +3321,47 @@ app.get("/logs/stream", (req, res) => {
   }
 });
 
+// Realtime via Server-Sent Events (better compatibility, auto-reconnect on client)
+app.get("/logs/sse", (req, res) => {
+  try {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no' // avoid buffering in some proxies
+    });
+
+    const journal = spawn("journalctl", ["-u", "bot-wa", "-f", "--no-pager"]);
+
+    const send = (line) => {
+      res.write(`data: ${line.replace(/\n/g, ' ')}\n\n`);
+    };
+
+    journal.stdout.on("data", (data) => {
+      const text = data.toString();
+      for (const line of text.split(/\r?\n/)) {
+        if (line.trim().length) send(line);
+      }
+    });
+    journal.stderr.on("data", (data) => {
+      const text = data.toString();
+      for (const line of text.split(/\r?\n/)) {
+        if (line.trim().length) send(`ERR: ${line}`);
+      }
+    });
+    journal.on("error", (err) => {
+      send(`Process error: ${err.message}`);
+    });
+
+    const cleanup = () => {
+      try { journal.kill(); } catch {}
+    };
+    req.on("close", cleanup);
+  } catch (e) {
+    res.status(500).send(`Exception: ${e.message}`);
+  }
+});
+
 // Simple HTML viewer with auto-prepend (newest at top) and auto-scroll to top
 app.get("/logs/view", (req, res) => {
   res.type("text/html").send(
@@ -3368,11 +3409,19 @@ app.get("/logs/view", (req, res) => {
         window.scrollTo({ top: 0, behavior: 'instant' });
       }
 
-      async function connect() {
+      function connectSSE() {
+        statusEl.textContent = 'Connecting…';
+        const es = new EventSource('/logs/sse');
+        es.onopen = () => statusEl.textContent = 'Live (SSE)';
+        es.onmessage = (ev) => { if (!paused && ev.data) prependLine(ev.data); };
+        es.onerror = () => { statusEl.textContent = 'Reconnecting…'; };
+      }
+
+      async function connectFetchFallback() {
         statusEl.textContent = 'Connecting…';
         try {
           const resp = await fetch('/logs/stream');
-          statusEl.textContent = 'Live';
+          statusEl.textContent = 'Live (stream)';
           const reader = resp.body.getReader();
           const decoder = new TextDecoder();
           let buffer = '';
@@ -3390,10 +3439,14 @@ app.get("/logs/view", (req, res) => {
           statusEl.textContent = 'Disconnected';
         } catch (e) {
           statusEl.textContent = 'Error: ' + e.message;
-          setTimeout(connect, 2000);
+          setTimeout(connectFetchFallback, 2000);
         }
       }
-      connect();
+
+      // Prefer SSE, fallback to fetch streaming if blocked
+      try {
+        connectSSE();
+      } catch { connectFetchFallback(); }
     </script>
   </body>
 </html>`
