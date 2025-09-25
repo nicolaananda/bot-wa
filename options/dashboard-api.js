@@ -3298,7 +3298,9 @@ app.get("/logs", (req, res) => {
 // Endpoint: GET /logs/stream (realtime)
 app.get("/logs/stream", (req, res) => {
   try {
-    res.type("text/plain");
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Accel-Buffering', 'no');
 
     const journal = spawn("journalctl", ["-u", "bot-wa", "-f", "--no-pager"]);
 
@@ -3313,8 +3315,10 @@ app.get("/logs/stream", (req, res) => {
     journal.on("error", (err) => {
       res.write(`Process error: ${err.message}\n`);
     });
+    const keepAlive = setInterval(() => { try { res.write("\n"); } catch {} }, 15000);
     req.on("close", () => {
-      journal.kill();
+      clearInterval(keepAlive);
+      try { journal.kill(); } catch {}
     });
   } catch (e) {
     res.status(500).send(`Exception: ${e.message}`);
@@ -3330,6 +3334,8 @@ app.get("/logs/sse", (req, res) => {
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no' // avoid buffering in some proxies
     });
+    if (res.flushHeaders) try { res.flushHeaders(); } catch {}
+    res.write('retry: 2000\n\n');
 
     const journal = spawn("journalctl", ["-u", "bot-wa", "-f", "--no-pager"]);
 
@@ -3353,7 +3359,9 @@ app.get("/logs/sse", (req, res) => {
       send(`Process error: ${err.message}`);
     });
 
+    const keepAlive = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 15000);
     const cleanup = () => {
+      clearInterval(keepAlive);
       try { journal.kill(); } catch {}
     };
     req.on("close", cleanup);
@@ -3409,19 +3417,11 @@ app.get("/logs/view", (req, res) => {
         window.scrollTo({ top: 0, behavior: 'instant' });
       }
 
-      function connectSSE() {
-        statusEl.textContent = 'Connecting…';
-        const es = new EventSource('/logs/sse');
-        es.onopen = () => statusEl.textContent = 'Live (SSE)';
-        es.onmessage = (ev) => { if (!paused && ev.data) prependLine(ev.data); };
-        es.onerror = () => { statusEl.textContent = 'Reconnecting…'; };
-      }
-
-      async function connectFetchFallback() {
+      async function connectStream() {
         statusEl.textContent = 'Connecting…';
         try {
           const resp = await fetch('/logs/stream');
-          statusEl.textContent = 'Live (stream)';
+          statusEl.textContent = 'Live';
           const reader = resp.body.getReader();
           const decoder = new TextDecoder();
           let buffer = '';
@@ -3439,14 +3439,10 @@ app.get("/logs/view", (req, res) => {
           statusEl.textContent = 'Disconnected';
         } catch (e) {
           statusEl.textContent = 'Error: ' + e.message;
-          setTimeout(connectFetchFallback, 2000);
+          setTimeout(connectStream, 2000);
         }
       }
-
-      // Prefer SSE, fallback to fetch streaming if blocked
-      try {
-        connectSSE();
-      } catch { connectFetchFallback(); }
+      connectStream();
     </script>
   </body>
 </html>`
