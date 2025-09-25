@@ -3283,7 +3283,7 @@ app.get('/api/dashboard/realtime', async (req, res) => {
 app.get("/logs", (req, res) => {
   // udah bisa diapakai kan ?
   try {
-    exec("journalctl -u bot-wa -n 100 --no-pager", (error, stdout, stderr) => {
+    exec("journalctl -u bot-wa -n 100 --no-pager -r", (error, stdout, stderr) => {
       if (error) {
         // Jika terjadi error, kirim status 500 dan pesan error
         return res.status(500).send(`Error: ${stderr || error.message}`);
@@ -3319,6 +3319,85 @@ app.get("/logs/stream", (req, res) => {
   } catch (e) {
     res.status(500).send(`Exception: ${e.message}`);
   }
+});
+
+// Simple HTML viewer with auto-prepend (newest at top) and auto-scroll to top
+app.get("/logs/view", (req, res) => {
+  res.type("text/html").send(
+    `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>bot-wa logs</title>
+    <style>
+      body { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #0b0e14; color: #e6e1cf; }
+      #bar { position: sticky; top: 0; background: #11151c; padding: 8px 12px; border-bottom: 1px solid #232936; display: flex; gap: 8px; align-items: center; }
+      #logs { padding: 8px 12px; white-space: pre-wrap; word-break: break-word; }
+      .line { border-bottom: 1px dashed #232936; padding: 4px 0; }
+      button { background: #1f2430; color: #e6e1cf; border: 1px solid #2b3245; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+      button:hover { background: #2b3245; }
+    </style>
+  </head>
+  <body>
+    <div id="bar">
+      <button id="pauseBtn">Pause</button>
+      <button id="clearBtn">Clear</button>
+      <span id="status">Connecting…</span>
+    </div>
+    <div id="logs"></div>
+    <script>
+      const logsEl = document.getElementById('logs');
+      const statusEl = document.getElementById('status');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      let paused = false;
+
+      pauseBtn.onclick = () => {
+        paused = !paused;
+        pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+      };
+      clearBtn.onclick = () => { logsEl.innerHTML = ''; };
+
+      function prependLine(text) {
+        const div = document.createElement('div');
+        div.className = 'line';
+        div.textContent = text;
+        logsEl.prepend(div);
+        // Keep view focused on the newest entries at the top
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+
+      async function connect() {
+        statusEl.textContent = 'Connecting…';
+        try {
+          const resp = await fetch('/logs/stream');
+          statusEl.textContent = 'Live';
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            let idx;
+            while ((idx = buffer.indexOf('\n')) >= 0) {
+              const line = buffer.slice(0, idx);
+              buffer = buffer.slice(idx + 1);
+              if (!paused && line.trim().length) prependLine(line);
+            }
+          }
+          statusEl.textContent = 'Disconnected';
+        } catch (e) {
+          statusEl.textContent = 'Error: ' + e.message;
+          setTimeout(connect, 2000);
+        }
+      }
+      connect();
+    </script>
+  </body>
+</html>`
+  );
 });
 
 // 16. Predictive Analytics
