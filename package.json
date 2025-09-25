@@ -15,7 +15,10 @@
     "start-safe": "npm run backup && npm run start",
     "pg:schema": "node -e \"require('dotenv').config(); const fs=require('fs'); const sql=fs.readFileSync('./options/schema.sql','utf8'); require('./config/postgres').query(sql).then(()=>{console.log('Schema applied')}).catch(e=>{console.error(e);process.exit(1)})\"",
     "pg:migrate": "node ./options/migrate-to-postgres.js",
-    "pg:dedup": "node ./options/dedup-transaksi.js"
+    "pg:dedup": "node ./options/dedup-transaksi.js",
+    "lint": "eslint index.js",
+    "lint:fix": "eslint --fix index.js",
+    "format": "prettier --write index.js"
   },
   "author": "Ronzz YT",
   "license": "ISC",
@@ -55,5 +58,13 @@
     "readline": "latest",
     "xendit-node": "^7.0.0",
     "yargs": "^17.2.1"
+  },
+  "devDependencies": {
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "prettier": "^3.6.2"
   }
 }
