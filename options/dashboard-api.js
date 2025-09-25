@@ -3277,6 +3277,45 @@ app.get('/api/dashboard/realtime', async (req, res) => {
     });
   }
 });
+// === LOGS API ===
+// Endpoint: GET /logs (static last 100 lines)
+// Endpoint: GET /logs
+app.get("/logs", (req, res) => {
+  // udah bisa diapakai kan ?
+  try {
+    exec("journalctl -u bot-wa -n 100 --no-pager", (error, stdout, stderr) => {
+      if (error) {
+        return res.status(500).send(`Error: ${stderr || error.message}`);
+      }
+      res.type("text/plain").send(stdout);
+    });
+  } catch (e) {
+    res.status(500).send(`Exception: ${e.message}`);
+  }
+});
+
+// Endpoint: GET /logs/stream (realtime)
+app.get("/logs/stream", (req, res) => {
+  // udah bisa diapakai kan ?
+  try {
+    res.type("text/plain");
+    const journal = spawn("journalctl", ["-u", "bot-wa", "-f", "--no-pager"]);
+    journal.stdout.on("data", (data) => {
+      res.write(data.toString());
+    });
+    journal.stderr.on("data", (data) => {
+      res.write(`ERR: ${data.toString()}`);
+    });
+    journal.on("error", (err) => {
+      res.write(`Process error: ${err.message}\n`);
+    });
+    req.on("close", () => {
+      journal.kill();
+    });
+  } catch (e) {
+    res.status(500).send(`Exception: ${e.message}`);
+  }
+});
 
 // 16. Predictive Analytics
 app.get('/api/dashboard/predictions', async (req, res) => {
@@ -3706,12 +3745,10 @@ app.get('/api/dashboard/receipts/:reffId/download', async (req, res) => {
   }
 });
 
-// 4. Get transaction with receipt content (combined data for frontend)
 app.get('/api/dashboard/transactions/:reffId/with-receipt', async (req, res) => {
   try {
     const { reffId } = req.params;
     
-    // Get transaction data
     const db = await loadDatabaseAsync();
     if (!db || !db.transaksi) {
       return res.status(404).json({
