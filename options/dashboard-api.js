@@ -3414,7 +3414,7 @@ app.get("/logs/view", (req, res) => {
         div.textContent = text;
         logsEl.prepend(div);
         // Keep view focused on the newest entries at the top
-        window.scrollTo({ top: 0, behavior: 'instant' });
+        window.scrollTo(0, 0);
       }
 
       async function connectStream() {
