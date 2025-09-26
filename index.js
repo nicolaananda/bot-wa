@@ -26,7 +26,7 @@ const { expiredCheck, getAllSewa } = require("./function/sewa");
 const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
 const { qrisDinamis } = require("./function/dinamis");
-const { createQRISCore, isPaymentCompleted } = require('./config/midtrans');
+const { createPaymentLink, getPaymentLinkStatus } = require('./config/midtrans');
 const BASE_QRIS_DANA = "00020101021126570011id.bmri.livinmerchant.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 
@@ -2925,8 +2925,15 @@ case 'buymidtrans': {
       quantity: quantityNum
     };
 
-    // Buat QRIS via Core API untuk mendapatkan gambar QR langsung
-    const paymentData = await createQRISCore(totalAmount, orderId, customerDetails);
+    // Buat Payment Link (hosted page menampilkan QRIS)
+    const pl = await createPaymentLink(totalAmount, orderId, customerDetails, [{
+      id: productId,
+      price: totalAmount,
+      quantity: 1,
+      name: product.name
+    }], { title: `${product.name}`, description: `Pembelian ${product.name} x${quantityNum}` });
+    const paymentLinkUrl = pl && pl.payment_url;
+    const paymentLinkId = pl && pl.id;
 
     const expirationTime = Date.now() + toMs("30m");
     const expireDate = new Date(expirationTime);
@@ -2935,23 +2942,12 @@ case 'buymidtrans': {
     const expireTimeJakarta = new Date(new Date(currentTime).getTime() + timeLeft * 60000);
     const formattedTime = `${expireTimeJakarta.getHours().toString().padStart(2, '0')}:${expireTimeJakarta.getMinutes().toString().padStart(2, '0')}`;
 
-    // Buat QR image dari Payment Link (scan → buka halaman Midtrans yang menampilkan QRIS)
+    // Buat QR image dari URL Payment Link (scan → buka halaman Midtrans yang menampilkan QRIS)
     let qrImagePath;
     try {
-      if (paymentData.qr_image_url) {
-        const axios = require('axios');
-        const response = await axios.get(paymentData.qr_image_url, { responseType: 'stream' });
-        qrImagePath = "./options/sticker/qris_midtrans.jpg";
-        const writer = fs.createWriteStream(qrImagePath);
-        response.data.pipe(writer);
-        await new Promise((resolve, reject) => {
-          writer.on('finish', resolve);
-          writer.on('error', reject);
-        });
-      } else {
-        // Fallback: QR dinamis nominal (bukan payment link)
-        qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
-      }
+      const QRCode = require('qrcode');
+      qrImagePath = "./options/sticker/qris_midtrans.jpg";
+      await QRCode.toFile(qrImagePath, paymentLinkUrl || String(totalAmount), { width: 512 });
     } catch (qrError) {
       console.error('Error downloading Midtrans QRIS image:', qrError);
       // Fallback ke QRIS lokal
@@ -2967,7 +2963,8 @@ case 'buymidtrans': {
       `*Kode Unik:* ${uniqueCode}\n` +
       `*Total:* Rp${toRupiah(totalAmount)}\n` +
       `*Waktu:* ${timeLeft} menit\n\n` +
-      `📱 *Scan QRIS Midtrans di atas untuk pembayaran cepat*\n\n` +
+      `📱 *Scan QR di atas untuk membuka halaman pembayaran Midtrans (QRIS)*\n\n` +
+      (paymentLinkUrl ? `🌐 *Payment Link:*\n${paymentLinkUrl}\n\n` : '') +
       `💳 *Pembayaran melalui QRIS Midtrans*\n\n` +
       `*💳 E-Wallet yang Didukung:*\n` +
       `• 🟢 GoPay\n` +
@@ -2993,11 +2990,11 @@ case 'buymidtrans': {
       reffId,
       totalAmount,
       uniqueCode,
-      paymentToken: orderId,
-      metode: 'Midtrans'
+      paymentToken: paymentLinkId,
+      metode: 'Midtrans Payment Link'
     };
 
-    // Check status pembayaran via Core API
+    // Check status pembayaran via Payment Link
     let checkCount = 0;
     while (db.data.order[sender]) {
       checkCount++;
@@ -3013,9 +3010,9 @@ case 'buymidtrans': {
       }
 
       try {
-        const paymentStatus = await isPaymentCompleted(orderId);
-        console.log(`QRIS Payment Status: ${paymentStatus.status}`);
-        if (paymentStatus.status === 'PAID') {
+        const plStatus = await getPaymentLinkStatus(paymentLinkId);
+        console.log(`Payment Link Status: ${plStatus.status}`);
+        if (plStatus.status === 'PAID') {
           await ronzz.sendMessage(from, { delete: message.key });
           reply("Pembayaran berhasil! Data akun akan segera diproses.");
 
@@ -3074,7 +3071,7 @@ case 'buymidtrans': {
              reffId,
              metodeBayar: "Midtrans QRIS",
              totalBayar: totalAmount,
-            paymentType: paymentStatus.payment_type || 'QRIS'
+            paymentType: 'QRIS'
            });
           await db.save();
 
