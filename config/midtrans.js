@@ -376,18 +376,23 @@ async function getPaymentDetails(orderId) {
  */
 async function createPaymentLink(amount, orderId, customerDetails = {}, itemDetails = []) {
   try {
+    // Ensure item total equals gross_amount
+    const items = Array.isArray(itemDetails) && itemDetails.length > 0 ? itemDetails : [{ id: 'ITEM', price: amount, quantity: 1, name: 'Order' }];
+    const calculatedTotal = items.reduce((sum, it) => sum + Number(it.price) * Number(it.quantity), 0);
+
     const payload = {
       transaction_details: {
         order_id: orderId,
-        gross_amount: amount
+        gross_amount: calculatedTotal
       },
       customer_details: {
         first_name: customerDetails.first_name || 'Customer',
-        last_name: customerDetails.last_name || '',
+        // omit last_name if empty to avoid 400
+        ...(customerDetails.last_name ? { last_name: customerDetails.last_name } : {}),
         email: customerDetails.email || 'customer@example.com',
         phone: customerDetails.phone || '08123456789'
       },
-      item_details: Array.isArray(itemDetails) && itemDetails.length > 0 ? itemDetails : undefined,
+      item_details: items,
       usage_limit: 1
     };
 
