@@ -366,19 +366,115 @@ async function getPaymentDetails(orderId) {
  * Get Midtrans Payment Link status
  */
 async function getPaymentLinkStatus(paymentLinkId) {
+  // Helper to normalize various shapes into a simple status
+  const normalizeFromObject = (obj) => {
+    if (!obj) return 'PENDING';
+    const rawStatus = String(
+      obj.status || obj.transaction_status || obj.payment_status || ''
+    );
+    if (/paid|settlement|capture|success/i.test(rawStatus)) return 'PAID';
+    if (/expire|expired|cancel/i.test(rawStatus)) return 'EXPIRED';
+    return 'PENDING';
+  };
+
+  // Try a sequence of endpoints and base URLs for resiliency
+  const bases = [MIDTRANS_BASE_URL];
+  const otherBase = MIDTRANS_BASE_URL.includes('sandbox')
+    ? 'https://api.midtrans.com'
+    : 'https://api.sandbox.midtrans.com';
+  // Only try the opposite base if we get 404 on first attempts
+
+  const endpoints = [
+    `/v1/payment-links/${paymentLinkId}`,
+    `/v1/payment-links/${paymentLinkId}/transactions`
+  ];
+
+  // Attempt requests
+  let lastError = null;
+  for (const base of bases) {
+    for (const ep of endpoints) {
+      try {
+        const url = new URL(ep, base).toString();
+        // Allow absolute URL passing by stripping host from ep above
+        const result = await makeMidtransRequest(new URL(ep, base).pathname + new URL(ep, base).search, 'GET');
+        // If transactions endpoint, determine paid by any settlement/capture
+        let status = 'PENDING';
+        if (Array.isArray(result?.transactions)) {
+          const anyPaid = result.transactions.some((tx) =>
+            /settlement|capture|success|paid/i.test(String(tx.transaction_status))
+          );
+          status = anyPaid ? 'PAID' : 'PENDING';
+        } else {
+          status = normalizeFromObject(result);
+        }
+        return { status, raw: result };
+      } catch (err) {
+        lastError = err;
+        const is404 = /404/.test(String(err.message)) && /Not found/i.test(String(err.message));
+        if (!is404) {
+          // Non-404 errors: no need to try next endpoint
+          break;
+        }
+        // On 404, continue to next endpoint or later fallback base
+      }
+    }
+  }
+
+  // Fallback: try opposite environment base if previous attempts 404
   try {
-    const result = await makeMidtransRequest(`/v1/payment-links/${paymentLinkId}`, 'GET');
-    // Normalize status to PAID/PENDING/EXPIRED
-    const rawStatus = (result && (result.status || result.transaction_status)) || '';
-    const normalized = /paid|settlement|success/i.test(rawStatus)
-      ? 'PAID'
-      : /expire|expired/i.test(rawStatus)
-      ? 'EXPIRED'
-      : 'PENDING';
-    return {
-      status: normalized,
-      raw: result
+    const tryOpposite = async () => {
+      for (const ep of endpoints) {
+        try {
+          const result = await new Promise((resolve, reject) => {
+            // Make request by temporarily overriding base URL
+            const urlObj = new URL(ep, otherBase);
+            const options = {
+              hostname: urlObj.hostname,
+              port: urlObj.port || 443,
+              path: urlObj.pathname + urlObj.search,
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Basic ${Buffer.from(MIDTRANS_SERVER_KEY + ':').toString('base64')}`
+              }
+            };
+            const https = require('https');
+            const req = https.request(options, (res) => {
+              let data = '';
+              res.on('data', (c) => (data += c));
+              res.on('end', () => {
+                try {
+                  const json = JSON.parse(data);
+                  if (res.statusCode >= 200 && res.statusCode < 300) return resolve(json);
+                  return reject(new Error(`Midtrans API Error: ${res.statusCode} - ${json.error_message || json.error_messages || data}`));
+                } catch (e) {
+                  return reject(new Error(`Failed to parse Midtrans response: ${e.message}`));
+                }
+              });
+            });
+            req.on('error', reject);
+            req.end();
+          });
+
+          let status = 'PENDING';
+          if (Array.isArray(result?.transactions)) {
+            const anyPaid = result.transactions.some((tx) =>
+              /settlement|capture|success|paid/i.test(String(tx.transaction_status))
+            );
+            status = anyPaid ? 'PAID' : 'PENDING';
+          } else {
+            status = normalizeFromObject(result);
+          }
+          return { status, raw: result };
+        } catch (e) {
+          lastError = e;
+        }
+      }
+      throw lastError || new Error('Unknown error fetching Payment Link status');
     };
+
+    return await tryOpposite();
   } catch (error) {
     console.error('Error getting Payment Link status:', error);
     return { status: 'ERROR', error: error.message };
