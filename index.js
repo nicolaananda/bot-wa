@@ -26,7 +26,7 @@ const { expiredCheck, getAllSewa } = require("./function/sewa");
 const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
 const { qrisDinamis } = require("./function/dinamis");
-const { createQRISCore, createPaymentLink, isPaymentCompleted } = require('./config/midtrans');
+const { createQRISCore, createPaymentLink, getPaymentLinkStatus } = require('./config/midtrans');
 const BASE_QRIS_DANA = "00020101021126570011id.bmri.livinmerchant.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 
@@ -2935,6 +2935,14 @@ case 'buymidtrans': {
     }]);
     paymentLinkUrl = pl && (pl.payment_url || null);
 
+    // Buat QRIS via Core API untuk mendapatkan gambar QR langsung (supaya yang discan adalah QR pembayaran, bukan URL)
+    let paymentData = { qr_image_url: null };
+    try {
+      paymentData = await createQRISCore(totalAmount, orderId, customerDetails);
+    } catch (e) {
+      try { console.warn('Create Core API QR failed:', e.message) } catch {}
+    }
+
     const expirationTime = Date.now() + toMs("30m");
     const expireDate = new Date(expirationTime);
     const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
@@ -2945,9 +2953,20 @@ case 'buymidtrans': {
     // Buat QR image dari Payment Link (scan → buka halaman Midtrans yang menampilkan QRIS)
     let qrImagePath;
     try {
-      const QRCode = require('qrcode');
-      qrImagePath = "./options/sticker/qris_midtrans.jpg";
-      await QRCode.toFile(qrImagePath, paymentLinkUrl || String(totalAmount), { width: 512 });
+      if (paymentData.qr_image_url) {
+        const axios = require('axios');
+        const response = await axios.get(paymentData.qr_image_url, { responseType: 'stream' });
+        qrImagePath = "./options/sticker/qris_midtrans.jpg";
+        const writer = fs.createWriteStream(qrImagePath);
+        response.data.pipe(writer);
+        await new Promise((resolve, reject) => {
+          writer.on('finish', resolve);
+          writer.on('error', reject);
+        });
+      } else {
+        // Fallback: QR dinamis nominal (bukan payment link)
+        qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
+      }
     } catch (qrError) {
       console.error('Error downloading Midtrans QRIS image:', qrError);
       // Fallback ke QRIS lokal
@@ -2994,7 +3013,7 @@ case 'buymidtrans': {
       metode: 'Midtrans'
     };
 
-    // Check payment status periodically (lebih sering untuk responsivitas)
+    // Check Payment Link status periodically (lebih sering untuk responsivitas)
     let checkCount = 0;
     while (db.data.order[sender]) {
       checkCount++;
@@ -3010,13 +3029,12 @@ case 'buymidtrans': {
       }
 
       try {
-        // Cek status pembayaran QRIS Core API saja
-        const paymentStatus = await isPaymentCompleted(orderId);
-        
-        console.log(`QRIS Payment Status: ${paymentStatus.status}`);
-        
-        // Jika pembayaran berhasil
-        if (paymentStatus.status === 'PAID') {
+        // Poll status Payment Link (bukan Core API status by orderId)
+        const plId = (paymentLinkUrl || '').split('/').pop();
+        const plStatus = await getPaymentLinkStatus(plId);
+        console.log(`Payment Link Status: ${plStatus.status}`);
+
+        if (plStatus.status === 'PAID') {
           await ronzz.sendMessage(from, { delete: message.key });
           reply("Pembayaran berhasil! Data akun akan segera diproses.");
 
@@ -3075,7 +3093,7 @@ case 'buymidtrans': {
              reffId,
              metodeBayar: "Midtrans QRIS",
              totalBayar: totalAmount,
-             paymentType: paymentStatus.payment_type || 'QRIS'
+            paymentType: 'QRIS'
            });
           await db.save();
 

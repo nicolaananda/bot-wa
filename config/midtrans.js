@@ -372,6 +372,29 @@ async function getPaymentDetails(orderId) {
 }
 
 /**
+ * Get Midtrans Payment Link status
+ */
+async function getPaymentLinkStatus(paymentLinkId) {
+  try {
+    const result = await makeMidtransRequest(`/v1/payment-links/${paymentLinkId}`, 'GET');
+    // Normalize status to PAID/PENDING/EXPIRED
+    const rawStatus = (result && (result.status || result.transaction_status)) || '';
+    const normalized = /paid|settlement|success/i.test(rawStatus)
+      ? 'PAID'
+      : /expire|expired/i.test(rawStatus)
+      ? 'EXPIRED'
+      : 'PENDING';
+    return {
+      status: normalized,
+      raw: result
+    };
+  } catch (error) {
+    console.error('Error getting Payment Link status:', error);
+    return { status: 'ERROR', error: error.message };
+  }
+}
+
+/**
  * Create Midtrans Payment Link (includes QRIS option in hosted page)
  */
 async function createPaymentLink(amount, orderId, customerDetails = {}, itemDetails = []) {
@@ -437,6 +460,7 @@ module.exports = {
   isPaymentCompleted,
   getPaymentDetails,
   createPaymentLink,
+  getPaymentLinkStatus,
   getServiceStatus,
   clearCachedPaymentData,
   MIDTRANS_SERVER_KEY,
