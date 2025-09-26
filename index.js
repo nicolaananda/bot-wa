@@ -26,7 +26,7 @@ const { expiredCheck, getAllSewa } = require("./function/sewa");
 const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
 const { qrisDinamis } = require("./function/dinamis");
-const { createQRISCore, isPaymentCompleted } = require('./config/midtrans');
+const { createQRISCore, createPaymentLink, isPaymentCompleted } = require('./config/midtrans');
 const BASE_QRIS_DANA = "00020101021126570011id.bmri.livinmerchant.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 
@@ -2927,6 +2927,20 @@ case 'buymidtrans': {
 
     const paymentData = await createQRISCore(totalAmount, orderId, customerDetails);
 
+    // Buat Payment Link sebagai alternatif manual (mengandung QRIS di halaman hosted)
+    let paymentLinkUrl = null;
+    try {
+      const pl = await createPaymentLink(totalAmount, orderId, customerDetails, [{
+        id: productId,
+        price: unitPrice,
+        quantity: quantityNum,
+        name: product.name
+      }]);
+      paymentLinkUrl = pl && (pl.payment_url || null);
+    } catch (e) {
+      try { console.warn('Create Payment Link failed:', e.message) } catch {}
+    }
+
     const expirationTime = Date.now() + toMs("30m");
     const expireDate = new Date(expirationTime);
     const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
@@ -2970,7 +2984,8 @@ case 'buymidtrans': {
       `*Total:* Rp${toRupiah(totalAmount)}\n` +
       `*Waktu:* ${timeLeft} menit\n\n` +
       `📱 *Scan QRIS Midtrans di atas untuk pembayaran cepat*\n\n` +
-      `🔗 *Link QRIS (jika gambar tidak muncul):*\n${paymentData.qr_image_url}\n\n` +
+      (paymentData.qr_image_url ? `🔗 *Link QRIS (jika gambar tidak muncul):*\n${paymentData.qr_image_url}\n\n` : '') +
+      (paymentLinkUrl ? `🌐 *Payment Link (opsional):*\n${paymentLinkUrl}\n\n` : '') +
       `💳 *Pembayaran melalui QRIS Midtrans*\n\n` +
       `*💳 E-Wallet yang Didukung:*\n` +
       `• 🟢 GoPay\n` +

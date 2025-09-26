@@ -372,6 +372,38 @@ async function getPaymentDetails(orderId) {
 }
 
 /**
+ * Create Midtrans Payment Link (includes QRIS option in hosted page)
+ */
+async function createPaymentLink(amount, orderId, customerDetails = {}, itemDetails = []) {
+  try {
+    const payload = {
+      transaction_details: {
+        order_id: orderId,
+        gross_amount: amount
+      },
+      customer_details: {
+        first_name: customerDetails.first_name || 'Customer',
+        last_name: customerDetails.last_name || '',
+        email: customerDetails.email || 'customer@example.com',
+        phone: customerDetails.phone || '08123456789'
+      },
+      item_details: Array.isArray(itemDetails) && itemDetails.length > 0 ? itemDetails : undefined,
+      usage_limit: 1
+    };
+
+    const result = await makeMidtransRequest('/v1/payment-links', 'POST', payload);
+    return {
+      id: result.id,
+      payment_url: result.payment_url || result.short_url || result.url,
+      created_at: result.created_at
+    };
+  } catch (error) {
+    console.error('Error creating Midtrans Payment Link:', error);
+    throw new Error(`Failed to create Payment Link: ${error.message}`);
+  }
+}
+
+/**
  * Get Midtrans service status
  */
 async function getServiceStatus() {
@@ -399,6 +431,7 @@ module.exports = {
   getPaymentStatus,
   isPaymentCompleted,
   getPaymentDetails,
+  createPaymentLink,
   getServiceStatus,
   clearCachedPaymentData,
   MIDTRANS_SERVER_KEY,
