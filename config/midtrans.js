@@ -399,15 +399,19 @@ async function getPaymentLinkStatus(paymentLinkId) {
         const result = await makeMidtransRequest(new URL(ep, base).pathname + new URL(ep, base).search, 'GET');
         // If transactions endpoint, determine paid by any settlement/capture
         let status = 'PENDING';
+        let derivedOrderId = undefined;
         if (Array.isArray(result?.transactions)) {
           const anyPaid = result.transactions.some((tx) =>
             /settlement|capture|success|paid/i.test(String(tx.transaction_status))
           );
           status = anyPaid ? 'PAID' : 'PENDING';
+          // Prefer the first/latest transaction's order_id if present (often includes the timestamp suffix)
+          const latest = result.transactions[0];
+          if (latest && latest.order_id) derivedOrderId = latest.order_id;
         } else {
           status = normalizeFromObject(result);
         }
-        return { status, raw: result };
+        return { status, raw: result, derived_order_id: derivedOrderId };
       } catch (err) {
         lastError = err;
         const is404 = /404/.test(String(err.message)) && /Not found/i.test(String(err.message));
@@ -458,15 +462,18 @@ async function getPaymentLinkStatus(paymentLinkId) {
           });
 
           let status = 'PENDING';
+          let derivedOrderId = undefined;
           if (Array.isArray(result?.transactions)) {
             const anyPaid = result.transactions.some((tx) =>
               /settlement|capture|success|paid/i.test(String(tx.transaction_status))
             );
             status = anyPaid ? 'PAID' : 'PENDING';
+            const latest = result.transactions[0];
+            if (latest && latest.order_id) derivedOrderId = latest.order_id;
           } else {
             status = normalizeFromObject(result);
           }
-          return { status, raw: result };
+          return { status, raw: result, derived_order_id: derivedOrderId };
         } catch (e) {
           lastError = e;
         }
