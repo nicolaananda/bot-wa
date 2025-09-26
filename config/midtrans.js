@@ -204,27 +204,18 @@ async function createQRISCore(amount, orderId, customerDetails = {}) {
     console.log('Midtrans Core API QRIS request:', JSON.stringify(coreRequest, null, 2));
     
     // Gunakan Core API charge endpoint
-    let result;
-    try {
-      result = await makeMidtransRequest('/v2/charge', 'POST', coreRequest);
-    } catch (e) {
-      const message = String(e && e.message || '');
-      const looksLikeChannelInactive = message.includes('402') || /not activated/i.test(message);
-      const isAcquirerGoPay = coreRequest && coreRequest.qris && coreRequest.qris.acquirer === 'gopay';
+    let result = await makeMidtransRequest('/v2/charge', 'POST', coreRequest);
 
-      // Fallback: coba tanpa menentukan acquirer jika kanal belum diaktifkan spesifik untuk GoPay
-      if (isAcquirerGoPay && looksLikeChannelInactive) {
-        const fallbackRequest = {
-          payment_type: 'qris',
-          transaction_details: transactionDetails,
-          item_details: itemDetails,
-          customer_details: customerDetailsObj
-        };
-        console.warn('Midtrans charge failed with 402/not activated for acquirer=gopay, retrying without acquirer...');
-        result = await makeMidtransRequest('/v2/charge', 'POST', fallbackRequest);
-      } else {
-        throw e;
-      }
+    // Beberapa response sukses (HTTP 201) tapi field status_code='402' saat kanal belum aktif.
+    if (result && String(result.status_code) === '402') {
+      const fallbackRequest = {
+        payment_type: 'qris',
+        transaction_details: transactionDetails,
+        item_details: itemDetails,
+        customer_details: customerDetailsObj
+      };
+      console.warn('Midtrans charge returned status_code=402 for acquirer=gopay, retrying without acquirer...');
+      result = await makeMidtransRequest('/v2/charge', 'POST', fallbackRequest);
     }
     console.log('Midtrans Core API QRIS created successfully:', result);
     
@@ -397,7 +388,7 @@ async function getPaymentLinkStatus(paymentLinkId) {
 /**
  * Create Midtrans Payment Link (includes QRIS option in hosted page)
  */
-async function createPaymentLink(amount, orderId, customerDetails = {}, itemDetails = []) {
+async function createPaymentLink(amount, orderId, customerDetails = {}, itemDetails = [], meta = {}) {
   try {
     // Ensure item total equals gross_amount
     const items = Array.isArray(itemDetails) && itemDetails.length > 0 ? itemDetails : [{ id: 'ITEM', price: amount, quantity: 1, name: 'Order' }];
@@ -408,6 +399,8 @@ async function createPaymentLink(amount, orderId, customerDetails = {}, itemDeta
         order_id: orderId,
         gross_amount: calculatedTotal
       },
+      title: meta.title || `Order ${orderId}`,
+      description: meta.description || `Pembayaran pesanan ${orderId}`,
       customer_details: {
         first_name: customerDetails.first_name || 'Customer',
         // omit last_name if empty to avoid 400
