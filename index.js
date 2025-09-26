@@ -2998,14 +2998,22 @@ case 'buymidtrans': {
     // No polling needed - Midtrans will notify via webhook when payment is completed
     console.log(`Payment Link created: ${paymentLinkUrl}`);
     console.log(`Order ID: ${orderId} - Waiting for webhook notification...`);
+
+    // Optional: background hint — try to fetch derived order_id (with suffix) once for logging
+    try {
+      const hint = await getPaymentLinkStatus(paymentLinkId);
+      if (hint && hint.derived_order_id) {
+        console.log(`Derived Midtrans order_id: ${hint.derived_order_id}`);
+      }
+    } catch {}
     
     // Set a timeout to clean up expired orders (30 minutes)
     setTimeout(async () => {
       if (db.data.order[sender] && db.data.order[sender].orderId === orderId) {
         await ronzz.sendMessage(from, { delete: message.key });
         reply("Pembayaran dibatalkan karena melewati batas waktu 30 menit.");
-        delete db.data.order[sender];
-      }
+          delete db.data.order[sender];
+         }
     }, 30 * 60 * 1000); // 30 minutes
   } catch (error) {
     console.error(`Error processing Midtrans payment for ${productId}:`, error);
