@@ -2932,8 +2932,9 @@ case 'buymidtrans': {
       price: totalAmount, // total termasuk kode unik
       quantity: 1,
       name: product.name
-    }]);
+    }], { title: `${product.name}`, description: `Pembelian ${product.name} x${quantityNum}` });
     paymentLinkUrl = pl && (pl.payment_url || null);
+    const paymentLinkId = pl && pl.id;
 
     // Buat QRIS via Core API untuk mendapatkan gambar QR langsung (supaya yang discan adalah QR pembayaran, bukan URL)
     let paymentData = { qr_image_url: null };
@@ -3030,8 +3031,7 @@ case 'buymidtrans': {
 
       try {
         // Poll status Payment Link (bukan Core API status by orderId)
-        const plId = (paymentLinkUrl || '').split('/').pop();
-        const plStatus = await getPaymentLinkStatus(plId);
+        const plStatus = await getPaymentLinkStatus(paymentLinkId);
         console.log(`Payment Link Status: ${plStatus.status}`);
 
         if (plStatus.status === 'PAID') {
