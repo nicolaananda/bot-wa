@@ -26,7 +26,7 @@ const { expiredCheck, getAllSewa } = require("./function/sewa");
 const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
 const { qrisDinamis } = require("./function/dinamis");
-const { createQRISCore, createPaymentLink, getPaymentLinkStatus } = require('./config/midtrans');
+const { createQRISCore, isPaymentCompleted } = require('./config/midtrans');
 const BASE_QRIS_DANA = "00020101021126570011id.bmri.livinmerchant.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 
@@ -2925,24 +2925,8 @@ case 'buymidtrans': {
       quantity: quantityNum
     };
 
-    // Gunakan Payment Link (hosted page berisi QRIS)
-    let paymentLinkUrl = null;
-    const pl = await createPaymentLink(totalAmount, orderId, customerDetails, [{
-      id: productId,
-      price: totalAmount, // total termasuk kode unik
-      quantity: 1,
-      name: product.name
-    }], { title: `${product.name}`, description: `Pembelian ${product.name} x${quantityNum}` });
-    paymentLinkUrl = pl && (pl.payment_url || null);
-    const paymentLinkId = pl && pl.id;
-
-    // Buat QRIS via Core API untuk mendapatkan gambar QR langsung (supaya yang discan adalah QR pembayaran, bukan URL)
-    let paymentData = { qr_image_url: null };
-    try {
-      paymentData = await createQRISCore(totalAmount, orderId, customerDetails);
-    } catch (e) {
-      try { console.warn('Create Core API QR failed:', e.message) } catch {}
-    }
+    // Buat QRIS via Core API untuk mendapatkan gambar QR langsung
+    const paymentData = await createQRISCore(totalAmount, orderId, customerDetails);
 
     const expirationTime = Date.now() + toMs("30m");
     const expireDate = new Date(expirationTime);
@@ -2983,8 +2967,7 @@ case 'buymidtrans': {
       `*Kode Unik:* ${uniqueCode}\n` +
       `*Total:* Rp${toRupiah(totalAmount)}\n` +
       `*Waktu:* ${timeLeft} menit\n\n` +
-      `📱 *Scan QR di atas untuk membuka halaman pembayaran Midtrans (QRIS)*\n\n` +
-      (paymentLinkUrl ? `🌐 *Payment Link:*\n${paymentLinkUrl}\n\n` : '') +
+      `📱 *Scan QRIS Midtrans di atas untuk pembayaran cepat*\n\n` +
       `💳 *Pembayaran melalui QRIS Midtrans*\n\n` +
       `*💳 E-Wallet yang Didukung:*\n` +
       `• 🟢 GoPay\n` +
@@ -3014,7 +2997,7 @@ case 'buymidtrans': {
       metode: 'Midtrans'
     };
 
-    // Check Payment Link status periodically (lebih sering untuk responsivitas)
+    // Check status pembayaran via Core API
     let checkCount = 0;
     while (db.data.order[sender]) {
       checkCount++;
@@ -3030,11 +3013,9 @@ case 'buymidtrans': {
       }
 
       try {
-        // Poll status Payment Link (bukan Core API status by orderId)
-        const plStatus = await getPaymentLinkStatus(paymentLinkId);
-        console.log(`Payment Link Status: ${plStatus.status}`);
-
-        if (plStatus.status === 'PAID') {
+        const paymentStatus = await isPaymentCompleted(orderId);
+        console.log(`QRIS Payment Status: ${paymentStatus.status}`);
+        if (paymentStatus.status === 'PAID') {
           await ronzz.sendMessage(from, { delete: message.key });
           reply("Pembayaran berhasil! Data akun akan segera diproses.");
 
@@ -3093,7 +3074,7 @@ case 'buymidtrans': {
              reffId,
              metodeBayar: "Midtrans QRIS",
              totalBayar: totalAmount,
-            paymentType: 'QRIS'
+            paymentType: paymentStatus.payment_type || 'QRIS'
            });
           await db.save();
 
