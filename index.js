@@ -2915,7 +2915,7 @@ case 'buymidtrans': {
     const reffId = crypto.randomBytes(5).toString("hex").toUpperCase();
     const orderId = `TRX-${reffId}-${Date.now()}`;
 
-    // Create Midtrans payment menggunakan Core API untuk mendapatkan QRIS
+    // Data customer untuk Payment Link
     const customerDetails = {
       first_name: pushname || 'Customer',
       phone: sender.split('@')[0],
@@ -2925,21 +2925,15 @@ case 'buymidtrans': {
       quantity: quantityNum
     };
 
-    const paymentData = await createQRISCore(totalAmount, orderId, customerDetails);
-
-    // Buat Payment Link sebagai alternatif manual (mengandung QRIS di halaman hosted)
+    // Gunakan Payment Link (hosted page berisi QRIS)
     let paymentLinkUrl = null;
-    try {
-      const pl = await createPaymentLink(totalAmount, orderId, customerDetails, [{
-        id: productId,
-        price: unitPrice,
-        quantity: quantityNum,
-        name: product.name
-      }]);
-      paymentLinkUrl = pl && (pl.payment_url || null);
-    } catch (e) {
-      try { console.warn('Create Payment Link failed:', e.message) } catch {}
-    }
+    const pl = await createPaymentLink(totalAmount, orderId, customerDetails, [{
+      id: productId,
+      price: totalAmount, // total termasuk kode unik
+      quantity: 1,
+      name: product.name
+    }]);
+    paymentLinkUrl = pl && (pl.payment_url || null);
 
     const expirationTime = Date.now() + toMs("30m");
     const expireDate = new Date(expirationTime);
@@ -2948,26 +2942,12 @@ case 'buymidtrans': {
     const expireTimeJakarta = new Date(new Date(currentTime).getTime() + timeLeft * 60000);
     const formattedTime = `${expireTimeJakarta.getHours().toString().padStart(2, '0')}:${expireTimeJakarta.getMinutes().toString().padStart(2, '0')}`;
 
-    // Download QRIS image dari Midtrans
+    // Buat QR image dari Payment Link (scan → buka halaman Midtrans yang menampilkan QRIS)
     let qrImagePath;
     try {
-      if (paymentData.qr_image_url) {
-        // Download gambar QRIS dari Midtrans
-        const axios = require('axios');
-        const response = await axios.get(paymentData.qr_image_url, { responseType: 'stream' });
-        qrImagePath = "./options/sticker/qris_midtrans.jpg";
-        
-        const writer = fs.createWriteStream(qrImagePath);
-        response.data.pipe(writer);
-        
-        await new Promise((resolve, reject) => {
-          writer.on('finish', resolve);
-          writer.on('error', reject);
-        });
-      } else {
-        // Fallback ke QRIS lokal jika gagal
-        qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
-      }
+      const QRCode = require('qrcode');
+      qrImagePath = "./options/sticker/qris_midtrans.jpg";
+      await QRCode.toFile(qrImagePath, paymentLinkUrl || String(totalAmount), { width: 512 });
     } catch (qrError) {
       console.error('Error downloading Midtrans QRIS image:', qrError);
       // Fallback ke QRIS lokal
@@ -2983,9 +2963,8 @@ case 'buymidtrans': {
       `*Kode Unik:* ${uniqueCode}\n` +
       `*Total:* Rp${toRupiah(totalAmount)}\n` +
       `*Waktu:* ${timeLeft} menit\n\n` +
-      `📱 *Scan QRIS Midtrans di atas untuk pembayaran cepat*\n\n` +
-      (paymentData.qr_image_url ? `🔗 *Link QRIS (jika gambar tidak muncul):*\n${paymentData.qr_image_url}\n\n` : '') +
-      (paymentLinkUrl ? `🌐 *Payment Link (opsional):*\n${paymentLinkUrl}\n\n` : '') +
+      `📱 *Scan QR di atas untuk membuka halaman pembayaran Midtrans (QRIS)*\n\n` +
+      (paymentLinkUrl ? `🌐 *Payment Link:*\n${paymentLinkUrl}\n\n` : '') +
       `💳 *Pembayaran melalui QRIS Midtrans*\n\n` +
       `*💳 E-Wallet yang Didukung:*\n` +
       `• 🟢 GoPay\n` +
@@ -3011,7 +2990,7 @@ case 'buymidtrans': {
       reffId,
       totalAmount,
       uniqueCode,
-      paymentToken: paymentData.transaction_id,
+      paymentToken: orderId,
       metode: 'Midtrans'
     };
 
