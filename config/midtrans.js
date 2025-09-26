@@ -204,7 +204,28 @@ async function createQRISCore(amount, orderId, customerDetails = {}) {
     console.log('Midtrans Core API QRIS request:', JSON.stringify(coreRequest, null, 2));
     
     // Gunakan Core API charge endpoint
-    const result = await makeMidtransRequest('/v2/charge', 'POST', coreRequest);
+    let result;
+    try {
+      result = await makeMidtransRequest('/v2/charge', 'POST', coreRequest);
+    } catch (e) {
+      const message = String(e && e.message || '');
+      const looksLikeChannelInactive = message.includes('402') || /not activated/i.test(message);
+      const isAcquirerGoPay = coreRequest && coreRequest.qris && coreRequest.qris.acquirer === 'gopay';
+
+      // Fallback: coba tanpa menentukan acquirer jika kanal belum diaktifkan spesifik untuk GoPay
+      if (isAcquirerGoPay && looksLikeChannelInactive) {
+        const fallbackRequest = {
+          payment_type: 'qris',
+          transaction_details: transactionDetails,
+          item_details: itemDetails,
+          customer_details: customerDetailsObj
+        };
+        console.warn('Midtrans charge failed with 402/not activated for acquirer=gopay, retrying without acquirer...');
+        result = await makeMidtransRequest('/v2/charge', 'POST', fallbackRequest);
+      } else {
+        throw e;
+      }
+    }
     console.log('Midtrans Core API QRIS created successfully:', result);
     
     // Dapatkan QRIS dari respons Midtrans (mendukung versi baru)
