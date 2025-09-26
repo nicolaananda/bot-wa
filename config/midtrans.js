@@ -207,15 +207,26 @@ async function createQRISCore(amount, orderId, customerDetails = {}) {
     const result = await makeMidtransRequest('/v2/charge', 'POST', coreRequest);
     console.log('Midtrans Core API QRIS created successfully:', result);
     
-    // Dapatkan QRIS string dari actions
+    // Dapatkan QRIS dari respons Midtrans (mendukung versi baru)
     let qrisString = null;
     let qrImageUrl = null;
-    
-    if (result.actions && result.actions.length > 0) {
-      const qrAction = result.actions.find(action => action.name === 'generate-qr-code');
-      if (qrAction && qrAction.url) {
-        qrImageUrl = qrAction.url;
-        qrisString = qrAction.url; // URL to get QR image
+
+    // Prefer field langsung jika tersedia
+    if (result.qr_string) {
+      qrisString = result.qr_string;
+    }
+    if (result.qr_code || result.qr_url) {
+      qrImageUrl = result.qr_code || result.qr_url;
+    }
+
+    // Cek daftar actions (nama baru generate-qr-code-v2 atau lama generate-qr-code)
+    if ((!qrImageUrl || !qrisString) && Array.isArray(result.actions) && result.actions.length > 0) {
+      const qrActionV2 = result.actions.find(action => action.name === 'generate-qr-code-v2');
+      const qrActionV1 = result.actions.find(action => action.name === 'generate-qr-code');
+      const chosen = qrActionV2 || qrActionV1;
+      if (chosen && chosen.url) {
+        qrImageUrl = qrImageUrl || chosen.url;
+        qrisString = qrisString || chosen.url;
       }
     }
     
