@@ -3012,7 +3012,16 @@ case 'buymidtrans': {
       try {
         const plStatus = await getPaymentLinkStatus(paymentLinkId);
         console.log(`Payment Link Status: ${plStatus.status}`);
-        if (plStatus.status === 'PAID') {
+
+        // Fallback: if Payment Link API errors (e.g., 401), try Core API by order_id
+        let paidViaCore = false;
+        if (plStatus.status === 'ERROR') {
+          const coreCheck = await isPaymentCompleted(orderId);
+          console.log(`Core status by order_id: ${coreCheck.status} (${coreCheck.transaction_status || ''})`);
+          paidViaCore = coreCheck.status === 'PAID';
+        }
+
+        if (plStatus.status === 'PAID' || paidViaCore) {
           await ronzz.sendMessage(from, { delete: message.key });
           reply("Pembayaran berhasil! Data akun akan segera diproses.");
 
