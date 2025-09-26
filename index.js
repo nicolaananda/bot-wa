@@ -3016,8 +3016,18 @@ case 'buymidtrans': {
         // Fallback: if Payment Link API errors (e.g., 401), try Core API by order_id
         let paidViaCore = false;
         if (plStatus.status === 'ERROR') {
-          const coreCheck = await isPaymentCompleted(orderId);
+          // Try original orderId first
+          let coreCheck = await isPaymentCompleted(orderId);
           console.log(`Core status by order_id: ${coreCheck.status} (${coreCheck.transaction_status || ''})`);
+          
+          // If still ERROR, try with timestamp suffix (Midtrans sometimes adds this)
+          if (coreCheck.status === 'ERROR') {
+            const timestampSuffix = Date.now();
+            const orderIdWithSuffix = `${orderId}-${timestampSuffix}`;
+            coreCheck = await isPaymentCompleted(orderIdWithSuffix);
+            console.log(`Core status by order_id with suffix: ${coreCheck.status} (${coreCheck.transaction_status || ''})`);
+          }
+          
           paidViaCore = coreCheck.status === 'PAID';
         }
 
