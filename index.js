@@ -2994,137 +2994,19 @@ case 'buymidtrans': {
       metode: 'Midtrans Payment Link'
     };
 
-    // Check status pembayaran via Payment Link
-    let checkCount = 0;
-    while (db.data.order[sender]) {
-      checkCount++;
-      // Check lebih sering di awal (setiap 5 detik), kemudian setiap 10 detik
-      const sleepTime = checkCount <= 6 ? 5000 : 10000;
-      await sleep(sleepTime);
-
-      if (Date.now() >= expirationTime) {
+    // Payment status will be handled by webhook-midtrans.js
+    // No polling needed - Midtrans will notify via webhook when payment is completed
+    console.log(`Payment Link created: ${paymentLinkUrl}`);
+    console.log(`Order ID: ${orderId} - Waiting for webhook notification...`);
+    
+    // Set a timeout to clean up expired orders (30 minutes)
+    setTimeout(async () => {
+      if (db.data.order[sender] && db.data.order[sender].orderId === orderId) {
         await ronzz.sendMessage(from, { delete: message.key });
         reply("Pembayaran dibatalkan karena melewati batas waktu 30 menit.");
         delete db.data.order[sender];
-        break;
       }
-
-      try {
-        const plStatus = await getPaymentLinkStatus(paymentLinkId);
-        console.log(`Payment Link Status: ${plStatus.status}`);
-
-        // Fallback: if Payment Link API errors (e.g., 401), try Core API by order_id
-        let paidViaCore = false;
-        if (plStatus.status === 'ERROR') {
-          // Try original orderId first
-          let coreCheck = await isPaymentCompleted(orderId);
-          console.log(`Core status by order_id: ${coreCheck.status} (${coreCheck.transaction_status || ''})`);
-          
-          // If still ERROR, try with timestamp suffix (Midtrans sometimes adds this)
-          if (coreCheck.status === 'ERROR') {
-            const timestampSuffix = Date.now();
-            const orderIdWithSuffix = `${orderId}-${timestampSuffix}`;
-            coreCheck = await isPaymentCompleted(orderIdWithSuffix);
-            console.log(`Core status by order_id with suffix: ${coreCheck.status} (${coreCheck.transaction_status || ''})`);
-          }
-          
-          paidViaCore = coreCheck.status === 'PAID';
-        }
-
-        if (plStatus.status === 'PAID' || paidViaCore) {
-          await ronzz.sendMessage(from, { delete: message.key });
-          reply("Pembayaran berhasil! Data akun akan segera diproses.");
-
-          // Process the purchase
-          product.terjual += quantityNum;
-          const soldItems = stock.splice(0, quantityNum);
-          await db.save();
-
-          // Create account details
-          let detailAkun = `*📦 Produk:* ${product.name}\n`;
-          detailAkun += `*📅 Tanggal:* ${tanggal}\n`;
-          detailAkun += `*⏰ Jam:* ${jamwib} WIB\n\n`;
-
-          soldItems.forEach((i) => {
-            const dataAkun = i.split("|");
-            detailAkun += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`;
-            detailAkun += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`;
-            detailAkun += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`;
-            detailAkun += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`;
-            detailAkun += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`;
-          });
-
-          await ronzz.sendMessage(sender, { text: detailAkun }, { quoted: m });
-          await ronzz.sendMessage("6281389592985@s.whatsapp.net", { text: detailAkun }, { quoted: m });
-
-          // SNK produk
-          let snkProduk = `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`;
-          snkProduk += `*📋 SNK PRODUK: ${product.name}*\n\n`;
-          snkProduk += `${product.snk}\n\n`;
-          snkProduk += `*⚠️ PENTING:*\n`;
-          snkProduk += `• Baca dan pahami SNK sebelum menggunakan akun\n`;
-          snkProduk += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`;
-          snkProduk += `• Hubungi admin jika ada masalah dengan akun\n\n`;
-          snkProduk += `*╰────「 END SNK 」────╯*`;
-          await ronzz.sendMessage(sender, { text: snkProduk }, { quoted: m });
-
-          // Send single comprehensive success message
-          if (isGroup) {
-            reply("🎉 Pembayaran Midtrans QRIS berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!");
-          } else {
-            reply("🎉 Pembayaran Midtrans QRIS berhasil! Detail akun telah dikirim di atas. Terima kasih!");
-          }
-
-                           
-
-                           // Add to transaction database
-           db.data.transaksi.push({
-             id: productId,
-             name: product.name,
-             price: unitPrice,
-             date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
-             profit: product.profit,
-             jumlah: quantityNum,
-             user: sender.split("@")[0],
-             userRole: db.data.users[sender].role,
-             reffId,
-             metodeBayar: "Midtrans QRIS",
-             totalBayar: totalAmount,
-            paymentType: 'QRIS'
-           });
-          await db.save();
-
-          // Check if stock is empty
-          if (stock.length === 0) {
-            const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
-              `*📦 Produk:* ${product.name}\n` +
-              `*🆔 ID Produk:* ${productId}\n` +
-              `*📊 Stok Sebelumnya:* ${quantityNum}\n` +
-              `*📉 Stok Sekarang:* 0 (HABIS)\n` +
-              `*🛒 Terjual Terakhir:* ${quantityNum} akun\n` +
-              `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
-              `*💰 Total Transaksi:* Rp${toRupiahLocal(totalAmount)}\n` +
-                                   `*💳 Metode Bayar:* Midtrans QRIS\n` +
-              `*📅 Tanggal:* ${tanggal}\n` +
-              `*⏰ Jam:* ${jamwib} WIB\n\n` +
-              `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
-              `• Segera restok produk ini\n` +
-              `• Update harga jika diperlukan\n` +
-              `• Cek profit margin\n\n` +
-              `*💡 Tips:* Gunakan command *${prefix}addstok ${productId} jumlah* untuk menambah stok`;
-
-            // Skip admin stock-empty notifications
-          }
-
-          delete db.data.order[sender];
-          await db.save();
-                           console.log(`✅ Midtrans QRIS Transaction completed: ${orderId} - ${reffId}`);
-           break;
-         }
-                   } catch (error) {
-         console.error(`Error checking Midtrans QRIS payment for ${orderId}:`, error);
-       }
-    }
+    }, 30 * 60 * 1000); // 30 minutes
   } catch (error) {
     console.error(`Error processing Midtrans payment for ${productId}:`, error);
     reply("Gagal membuat link pembayaran Midtrans. Silakan coba lagi.");
