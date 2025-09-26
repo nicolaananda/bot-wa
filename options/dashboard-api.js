@@ -7,6 +7,12 @@ const https = require('https');
 const http = require('http');
 const { exec, spawn } = require('child_process');
 const { getDashboardData, getDailyChartData, getMonthlyChartData, getUserActivityData } = require('./dashboard-helper');
+// Midtrans webhook integration
+const crypto = require('crypto');
+const envValidator = require('../config/env-validator');
+envValidator.validateOrExit();
+const { clearCachedPaymentData } = require('../config/midtrans');
+const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
 
 // Import stock helper functions
 const stockHelper = require('./stock-helper');
@@ -114,6 +120,47 @@ async function loadProdukMapAsync() {
   const raw = await loadDatabaseAsync();
   return (raw && raw.produk) ? raw.produk : {};
 }
+
+// ===== Midtrans Webhook (merged) =====
+function verifyMidtransSignature(notification) {
+  const { order_id, status_code, gross_amount, signature_key } = notification || {};
+  const input = String(order_id || '') + String(status_code || '') + String(gross_amount || '') + String(MIDTRANS_SERVER_KEY || '');
+  const hash = crypto.createHash('sha512').update(input).digest('hex');
+  return hash === signature_key;
+}
+
+app.post('/webhook/midtrans', (req, res) => {
+  try {
+    const notification = req.body || {};
+    console.log('🔔 [Webhook] Midtrans notification:', JSON.stringify(notification));
+
+    if (!verifyMidtransSignature(notification)) {
+      console.error('❌ [Webhook] Invalid signature for', notification.order_id);
+      return res.status(400).json({ status: 'error', message: 'Invalid signature' });
+    }
+
+    const { order_id, transaction_status, payment_type, settlement_time } = notification;
+    console.log(`📋 [Webhook] Order: ${order_id}, Status: ${transaction_status}, Payment: ${payment_type}`);
+
+    // Clear any cached status to avoid stale reads
+    try { clearCachedPaymentData(order_id); } catch {}
+
+    if (/(settlement|capture)/i.test(String(transaction_status))) {
+      console.log(`✅ [Webhook] Payment successful for ${order_id}`);
+      process.emit('payment-completed', {
+        orderId: order_id,
+        transactionStatus: transaction_status,
+        paymentType: payment_type,
+        settlementTime: settlement_time
+      });
+    }
+
+    return res.status(200).json({ status: 'ok' });
+  } catch (e) {
+    console.error('❌ [Webhook] Error:', e);
+    return res.status(500).json({ status: 'error', message: e.message });
+  }
+});
 
 // Helper untuk mengambil satu produk by id (PG/file)
 async function loadSingleProdukAsync(productId) {
