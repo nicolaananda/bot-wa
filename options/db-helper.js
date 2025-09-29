@@ -89,19 +89,31 @@ async function updateUserSaldo(userId, amount, operation = 'add') {
 function getUserSaldo(userId) {
   try {
     if (usePg) {
-      const users = global.db && global.db.data && global.db.data.users ? global.db.data.users : {};
+      // For PostgreSQL, read directly from database to ensure accuracy
       const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`;
       const idNo = userId.replace(/@s\.whatsapp\.net$/, '');
       
-      // Check both formats in cache
-      const u = users[idWith] || users[idNo];
-      if (u) {
-        return Number(u.saldo || 0);
+      // Try both formats in database (synchronous for now)
+      try {
+        const result1 = pg.query('SELECT saldo FROM users WHERE user_id = $1', [idNo]);
+        const result2 = pg.query('SELECT saldo FROM users WHERE user_id = $1', [idWith]);
+        
+        // Use Promise.all to wait for both queries
+        return Promise.all([result1, result2]).then(([res1, res2]) => {
+          const saldo1 = res1.rows[0] ? Number(res1.rows[0].saldo) : 0;
+          const saldo2 = res2.rows[0] ? Number(res2.rows[0].saldo) : 0;
+          return Math.max(saldo1, saldo2); // Return the higher value if both exist
+        }).catch(error => {
+          console.error('Error getting user saldo from PG:', error);
+          return 0;
+        });
+      } catch (syncError) {
+        // Fallback to cache if sync query fails
+        console.warn('Sync query failed, falling back to cache:', syncError.message);
+        const users = global.db && global.db.data && global.db.data.users ? global.db.data.users : {};
+        const u = users[idWith] || users[idNo];
+        return u ? Number(u.saldo || 0) : 0;
       }
-      
-      // If not in cache, return 0 (cache should be populated by database loader)
-      console.warn(`User ${userId} not found in cache, returning 0. This might indicate a cache sync issue.`);
-      return 0;
     } else {
       if (!global.db || !global.db.data || !global.db.data.users) return 0;
       const users = global.db.data.users;
