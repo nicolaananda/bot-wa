@@ -58,19 +58,25 @@ async function updateUserSaldo(userId, amount, operation = 'add') {
         console.error('Database not initialized');
         return false;
       }
-      if (!global.db.data.users[userId]) {
-        global.db.data.users[userId] = { saldo: 0, role: "bronze" };
-      }
-      if (operation === 'add') {
-        global.db.data.users[userId].saldo += Number(amount);
-      } else if (operation === 'subtract') {
-        global.db.data.users[userId].saldo -= Number(amount);
-        if (global.db.data.users[userId].saldo < 0) global.db.data.users[userId].saldo = 0;
-      } else if (operation === 'set') {
-        global.db.data.users[userId].saldo = Number(amount);
-      }
+      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`;
+      const idNo = userId.replace(/@s\.whatsapp\.net$/, '');
+
+      if (!global.db.data.users[idWith]) global.db.data.users[idWith] = { saldo: 0, role: 'bronze' };
+      if (!global.db.data.users[idNo]) global.db.data.users[idNo] = { saldo: 0, role: 'bronze' };
+
+      const applyOp = (current, op, amt) => {
+        if (op === 'add') return Number(current || 0) + Number(amt);
+        if (op === 'subtract') return Math.max(0, Number(current || 0) - Number(amt));
+        if (op === 'set') return Number(amt);
+        return Number(current || 0);
+      };
+
+      const nextSaldo = applyOp(global.db.data.users[idWith].saldo, operation, amount);
+      global.db.data.users[idWith].saldo = nextSaldo;
+      global.db.data.users[idNo].saldo = nextSaldo;
+
       await global.db.save();
-      console.log(`User ${userId} saldo updated: ${global.db.data.users[userId].saldo}`);
+      console.log(`User ${idWith}/${idNo} saldo updated: ${nextSaldo}`);
       return true;
     }
   } catch (error) {
@@ -90,11 +96,19 @@ function getUserSaldo(userId) {
       return u ? Number(u.saldo || 0) : 0;
     } else {
       if (!global.db || !global.db.data || !global.db.data.users) return 0;
-      if (!global.db.data.users[userId]) {
-        global.db.data.users[userId] = { saldo: 0, role: "bronze" };
+      const users = global.db.data.users;
+      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`;
+      const idNo = userId.replace(/@s\.whatsapp\.net$/, '');
+
+      const u = users[idWith] || users[idNo];
+      if (!u) {
+        users[idWith] = { saldo: 0, role: 'bronze' };
+        users[idNo] = { saldo: 0, role: 'bronze' };
         return 0;
       }
-      return global.db.data.users[userId].saldo || 0;
+      if (!users[idWith]) users[idWith] = { saldo: Number(u.saldo || 0), role: u.role || 'bronze' };
+      if (!users[idNo]) users[idNo] = { saldo: Number(u.saldo || 0), role: u.role || 'bronze' };
+      return Number(u.saldo || 0);
     }
   } catch (error) {
     console.error('Error getting user saldo:', error);
