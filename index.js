@@ -2687,7 +2687,7 @@ case 'buy': {
   try {
     // Cek saldo user (PG-aware)
     let totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * jumlah
-    const currentSaldo = dbHelper.getUserSaldo(sender)
+    const currentSaldo = typeof dbHelper.getUserSaldoAsync === 'function' ? await dbHelper.getUserSaldoAsync(sender) : dbHelper.getUserSaldo(sender)
     if (currentSaldo < totalHarga) {
       delete db.data.order[sender]
       return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(currentSaldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}payment*`)
@@ -3844,7 +3844,7 @@ Ada yang deposit nih kak, coba dicek saldonya`
           // If not reply and no parameter, check own saldo (all users can do this)
           // Self saldo check
           const senderWithoutSuffix = sender.replace(/@s\.whatsapp\.net$/, '');
-          const saldo = dbHelper.getUserSaldo(sender);
+          const saldo = typeof dbHelper.getUserSaldoAsync === 'function' ? await dbHelper.getUserSaldoAsync(sender) : dbHelper.getUserSaldo(sender);
 
           // Try to find user record key for display
           let foundKey = sender;

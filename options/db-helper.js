@@ -124,6 +124,40 @@ function getUserSaldo(userId) {
   }
 }
 
+// Async version that reads directly from PostgreSQL when enabled
+async function getUserSaldoAsync(userId) {
+  try {
+    if (usePg) {
+      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`;
+      const idNo = userId.replace(/@s\.whatsapp\.net$/, '');
+      try {
+        const [resNo, resWith] = await Promise.all([
+          pg.query('SELECT saldo FROM users WHERE user_id=$1', [idNo]),
+          pg.query('SELECT saldo FROM users WHERE user_id=$1', [idWith])
+        ]);
+        const saldo1 = resNo.rows[0] ? Number(resNo.rows[0].saldo) : 0;
+        const saldo2 = resWith.rows[0] ? Number(resWith.rows[0].saldo) : 0;
+
+        // Update in-memory snapshot if present
+        if (!global.db) global.db = { data: { users: {} } };
+        if (!global.db.data) global.db.data = { users: {} };
+        if (!global.db.data.users) global.db.data.users = {};
+        const finalSaldo = Math.max(saldo1, saldo2);
+        global.db.data.users[idWith] = Object.assign({ saldo: 0, role: 'bronze' }, global.db.data.users[idWith], { saldo: finalSaldo });
+        global.db.data.users[idNo] = Object.assign({ saldo: 0, role: 'bronze' }, global.db.data.users[idNo], { saldo: finalSaldo });
+        return finalSaldo;
+      } catch (e) {
+        // Fallback to cache
+        return getUserSaldo(userId);
+      }
+    } else {
+      return getUserSaldo(userId);
+    }
+  } catch (error) {
+    return 0;
+  }
+}
+
 // Helper function untuk check apakah user punya saldo cukup
 function hasEnoughSaldo(userId, requiredAmount) {
   const currentSaldo = getUserSaldo(userId);
@@ -134,5 +168,6 @@ module.exports = {
   ensureDatabaseSaved,
   updateUserSaldo,
   getUserSaldo,
+  getUserSaldoAsync,
   hasEnoughSaldo
 }; 
