@@ -92,8 +92,16 @@ function getUserSaldo(userId) {
       const users = global.db && global.db.data && global.db.data.users ? global.db.data.users : {};
       const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`;
       const idNo = userId.replace(/@s\.whatsapp\.net$/, '');
+      
+      // Check both formats in cache
       const u = users[idWith] || users[idNo];
-      return u ? Number(u.saldo || 0) : 0;
+      if (u) {
+        return Number(u.saldo || 0);
+      }
+      
+      // If not in cache, return 0 (cache should be populated by database loader)
+      console.warn(`User ${userId} not found in cache, returning 0. This might indicate a cache sync issue.`);
+      return 0;
     } else {
       if (!global.db || !global.db.data || !global.db.data.users) return 0;
       const users = global.db.data.users;
