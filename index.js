@@ -2704,22 +2704,25 @@ case 'buymidtrans': {
 
     const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
     const orderId = `TRX-${reffId}-${Date.now()}`
-    let usingStatic = false
+    const forceStatic = String(process.env.MIDTRANS_USE_STATIC_ONLY || '').toLowerCase() === 'true'
+    let usingStatic = forceStatic
     let qrImagePath
-    try {
-      const qrisPayment = await createQRISPayment(totalAmount, orderId)
-      if (!qrisPayment?.qr_string) {
-        try { console.error('Midtrans QRIS charge missing qr_string:', JSON.stringify(qrisPayment)) } catch {}
-        usingStatic = true
-      } else {
-        qrImagePath = await qrisDinamis(qrisPayment.qr_string, "./options/sticker/qris.jpg")
-      }
-    } catch (e) {
-      const msg = (e && e.message) ? e.message : String(e)
-      if (msg.includes('Payment channel is not activated') || msg.toLowerCase().includes('midtrans charge failed')) {
-        usingStatic = true
-      } else {
-        throw e
+    if (!forceStatic) {
+      try {
+        const qrisPayment = await createQRISPayment(totalAmount, orderId)
+        if (!qrisPayment?.qr_string) {
+          try { console.error('Midtrans QRIS charge missing qr_string:', JSON.stringify(qrisPayment)) } catch {}
+          usingStatic = true
+        } else {
+          qrImagePath = await qrisDinamis(qrisPayment.qr_string, "./options/sticker/qris.jpg")
+        }
+      } catch (e) {
+        const msg = (e && e.message) ? e.message : String(e)
+        if (msg.includes('Payment channel is not activated') || msg.toLowerCase().includes('midtrans charge failed')) {
+          usingStatic = true
+        } else {
+          throw e
+        }
       }
     }
 
