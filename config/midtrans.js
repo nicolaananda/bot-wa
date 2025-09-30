@@ -552,6 +552,27 @@ async function createPaymentLink(amount, orderId, customerDetails = {}, itemDeta
 }
 
 /**
+ * Create Midtrans QRIS payment (includes QRIS option in hosted page)
+ */
+async function createQRISPayment(amount, orderId, customerDetails = {}) {
+  try {
+    const items = [{ id: 'PRODUCT', price: amount, quantity: 1, name: 'Pembelian Produk Digital' }];
+    const link = await createPaymentLink(amount, orderId, customerDetails, items, { title: `Order ${orderId}`, description: `Pembayaran pesanan ${orderId}` });
+    return {
+      transaction_id: undefined,
+      order_id: orderId,
+      amount,
+      status: 'pending',
+      qr_string: link.payment_url,
+      snap_url: link.payment_url
+    };
+  } catch (error) {
+    console.error('Error creating Midtrans QRIS payment (link):', error);
+    throw new Error(`Failed to create Midtrans payment: ${error.message}`);
+  }
+}
+
+/**
  * Get Midtrans service status
  */
 async function getServiceStatus() {
@@ -574,6 +595,7 @@ async function getServiceStatus() {
 }
 
 module.exports = {
+  createQRISPayment,
   createQRISCore,
   getQRISString,
   getPaymentStatus,

@@ -26,7 +26,7 @@ const { expiredCheck, getAllSewa } = require("./function/sewa");
 const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
 const { qrisDinamis } = require("./function/dinamis");
-const { createPaymentLink, getPaymentLinkStatus, isPaymentCompleted, createQRISCore } = require('./config/midtrans');
+const { createPaymentLink, getPaymentLinkStatus, isPaymentCompleted, createQRISCore, createQRISPayment } = require('./config/midtrans');
 const BASE_QRIS_DANA = "00020101021126570011id.bmri.livinmerchant.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 
@@ -2667,6 +2667,179 @@ case 'buynow': {
     }
   }
   break;
+
+case 'midtrans': {
+  if (db.data.order[sender]) {
+    return reply(`Kamu sedang melakukan order. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`)
+  }
+
+  const [productId, quantity] = q.split(" ")
+  if (!productId || !quantity) {
+    return reply(`Contoh: ${prefix + command} idproduk jumlah`)
+  }
+
+  const product = db.data.produk[productId]
+  if (!product) return reply(`Produk dengan ID *${productId}* tidak ditemukan.`)
+
+  const stock = product.stok
+  const quantityNum = Number(quantity)
+  if (!Number.isInteger(quantityNum) || quantityNum <= 0) return reply(`Jumlah harus berupa angka positif.`)
+  if (stock.length === 0) return reply("Stok habis, silakan hubungi Owner untuk restok.")
+  if (stock.length < quantityNum) return reply(`Stok tersedia ${stock.length}, jumlah pesanan tidak boleh melebihi stok.`)
+
+  reply("Sedang membuat QR Code...")
+
+  try {
+    const unitPrice = Number(hargaProduk(productId, db.data.users[sender].role))
+    if (!unitPrice || unitPrice <= 0) throw new Error('Harga produk tidak valid')
+
+    const amount = unitPrice * quantityNum
+    const feeOriginal = (amount * 0.007) + 0.20
+    const fee = Math.ceil(feeOriginal * 0.5)
+    const totalAmount = amount + fee
+    if (totalAmount <= 0) throw new Error('Total amount tidak valid')
+
+    const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
+    const orderId = `TRX-${reffId}-${Date.now()}`
+
+    const qrisPayment = await createQRISPayment(totalAmount, orderId)
+    if (!qrisPayment?.qr_string) throw new Error('Gagal membuat QRIS payment')
+
+    const qrImagePath = await qrisDinamis(qrisPayment.qr_string, "./options/sticker/qris.jpg")
+
+    const expirationTime = Date.now() + toMs("10m")
+    const expireDate = new Date(expirationTime)
+    const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000))
+    const currentTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" })
+    const expireTimeJakarta = new Date(new Date(currentTime).getTime() + timeLeft * 60000)
+    const formattedTime = `${expireTimeJakarta.getHours().toString().padStart(2, '0')}:${expireTimeJakarta.getMinutes().toString().padStart(2, '0')}`
+
+    const caption = `*🧾 MENUNGGU PEMBAYARAN 🧾*\n\n` +
+      `*Produk ID:* ${productId}\n` +
+      `*Nama Produk:* ${product.name}\n` +
+      `*Harga:* Rp${toRupiah(unitPrice)}\n` +
+      `*Jumlah:* ${quantityNum}\n` +
+      `*Biaya Admin:* Rp${toRupiah(fee)}\n` +
+      `*Total:* Rp${toRupiah(totalAmount)}\n` +
+      `*Waktu:* ${timeLeft} menit\n\n` +
+      `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n\n` +
+      `*🔗 Link Invoice:* ${qrisPayment.snap_url || qrisPayment.qr_string}\n\n` +
+      `Jika ingin membatalkan, ketik *${prefix}batal*`
+
+    const message = await ronzz.sendMessage(from, {
+      image: fs.readFileSync(qrImagePath),
+      caption: caption
+    }, { quoted: m })
+
+    db.data.order[sender] = { id: productId, jumlah: quantityNum, from, key: message.key, orderId, reffId }
+
+    while (db.data.order[sender]) {
+      await sleep(15000)
+      if (Date.now() >= expirationTime) {
+        await ronzz.sendMessage(from, { delete: message.key })
+        reply("Pembayaran dibatalkan karena melewati batas waktu 10 menit.")
+        delete db.data.order[sender]
+        break
+      }
+      try {
+        const paymentStatus = await Promise.race([
+          isPaymentCompleted(orderId),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('API Timeout')), 10000))
+        ])
+        console.log(`Checking payment status for ${orderId}:`, paymentStatus)
+        if (paymentStatus.status === "PAID" && Number(paymentStatus.paid_amount) >= Number(totalAmount)) {
+          await ronzz.sendMessage(from, { delete: message.key })
+          reply("Pembayaran berhasil, data akun akan segera diproses.")
+
+          product.terjual += quantityNum
+          const soldItems = stock.splice(0, quantityNum)
+          await db.save()
+
+          let detailAkun = `*📦 Produk:* ${product.name}\n`
+          detailAkun += `*📅 Tanggal:* ${tanggal}\n`
+          detailAkun += `*⏰ Jam:* ${jamwib} WIB\n\n`
+          soldItems.forEach((i) => {
+            let dataAkun = i.split("|")
+            detailAkun += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
+            detailAkun += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
+            detailAkun += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`
+            detailAkun += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`
+            detailAkun += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`
+          })
+
+          await ronzz.sendMessage(sender, { text: detailAkun }, { quoted: m })
+
+          let snkProduk = `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`
+          snkProduk += `*📋 SNK PRODUK: ${product.name}*\n\n`
+          snkProduk += `${product.snk}\n\n`
+          snkProduk += `*⚠️ PENTING:*\n`
+          snkProduk += `• Baca dan pahami SNK sebelum menggunakan akun\n`
+          snkProduk += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`
+          snkProduk += `• Hubungi admin jika ada masalah dengan akun\n\n`
+          snkProduk += `*╰────「 END SNK 」────╯*`
+          await ronzz.sendMessage(sender, { text: snkProduk }, { quoted: m })
+
+          if (isGroup) reply("Pembelian berhasil! Detail akun telah dikirim ke chat.")
+
+          await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: `Hai Owner,\nAda transaksi dengan QRIS-MIDTRANS yang telah selesai!\n\n*╭────「 TRANSAKSI DETAIL 」───*\n*┊・ 🧾| Reff Id:* ${reffId}\n*┊・ 📮| Nomor:* @${sender.split("@")[0]}\n*┊・ 📦| Nama Barang:* ${product.name}\n*┊・ 🏷️️| Harga Barang:* Rp${toRupiah(unitPrice)}\n*┊・ 🛍️| Jumlah Order:* ${quantityNum}\n*┊・ 💰| Total Bayar:* Rp${toRupiah(totalAmount)}\n*┊・ 💳| Metode Bayar:* QRIS-MIDTRANS\n*┊・ 📅| Tanggal:* ${tanggal}\n*┊・ ⏰| Jam:* ${jamwib} WIB\n*╰┈┈┈┈┈┈┈┈*`, mentions: [sender] })
+
+          db.data.transaksi.push({
+            id: productId,
+            name: product.name,
+            price: unitPrice,
+            date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+            profit: product.profit,
+            jumlah: quantityNum,
+            user: sender.split("@")[0],
+            userRole: db.data.users[sender].role,
+            reffId,
+            metodeBayar: "QRIS",
+            totalBayar: totalAmount
+          })
+          await db.save()
+
+          if (stock.length === 0) {
+            const stokHabisMessage = `🚨 *STOK HABIS ALERT!* 🚨\n\n` +
+              `*📦 Produk:* ${product.name}\n` +
+              `*🆔 ID Produk:* ${productId}\n` +
+              `*📊 Stok Sebelumnya:* ${quantityNum}\n` +
+              `*📉 Stok Sekarang:* 0 (HABIS)\n` +
+              `*🛒 Terjual Terakhir:* ${quantityNum} akun\n` +
+              `*👤 Pembeli:* @${sender.split("@")[0]}\n` +
+              `*💰 Total Transaksi:* Rp${toRupiah(totalAmount)}\n` +
+              `*📅 Tanggal:* ${tanggal}\n` +
+              `*⏰ Jam:* ${jamwib} WIB\n\n` +
+              `*⚠️ TINDAKAN YANG DIPERLUKAN:*\n` +
+              `• Segera restok produk ini\n` +
+              `• Update harga jika diperlukan\n` +
+              `• Cek profit margin\n\n` +
+              `*💡 Tips:* Gunakan command *${prefix}addstok ${productId} jumlah* untuk menambah stok`
+            await ronzz.sendMessage(ownerNomer + "@s.whatsapp.net", { text: stokHabisMessage, mentions: [sender] })
+          }
+
+          delete db.data.order[sender]
+          await db.save()
+          console.log(`✅ Transaction completed: ${orderId} - ${reffId}`)
+          break
+        }
+      } catch (error) {
+        console.error(`Error checking payment status for ${orderId}:`, error)
+        if (error.message === 'API Timeout') {
+          console.log(`API timeout for ${orderId}, continuing...`)
+          continue
+        }
+        await ronzz.sendMessage(from, { delete: message.key })
+        reply("Pesanan dibatalkan karena error sistem.")
+        delete db.data.order[sender]
+        break
+      }
+    }
+  } catch (error) {
+    console.error(`Error creating QRIS payment for ${orderId}:`, error)
+    reply("Gagal membuat QR Code pembayaran. Silakan coba lagi.")
+  }
+}
+break;
 
 case 'buymidtrans': {
   if (db.data.order[sender] !== undefined) return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
