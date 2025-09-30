@@ -2699,14 +2699,16 @@ case 'buymidtrans': {
       product_name: db.data.produk[data[0]].name
     }
 
-    const payment = await createQRISCore(totalAmount, orderId, customerDetails)
+    // Create Midtrans Payment Link directly (prod/sandbox based on env)
+    const items = [{ id: data[0], price: totalAmount, quantity: 1, name: db.data.produk[data[0]].name }]
+    const paymentLink = await createPaymentLink(totalAmount, orderId, customerDetails, items, { title: `Order ${orderId}`, description: `Pembayaran pesanan ${orderId}` })
 
     // Generate QR image file from qr_string/url
     let qrImagePath
     try {
       const QRCode = require('qrcode')
       qrImagePath = "./options/sticker/qris_midtrans.jpg"
-      await QRCode.toFile(qrImagePath, payment.qr_string || String(totalAmount), { width: 512 })
+      await QRCode.toFile(qrImagePath, paymentLink.payment_url || String(totalAmount), { width: 512 })
     } catch (qrError) {
       console.error('Error generating Midtrans QR image:', qrError)
       qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg")
@@ -2728,8 +2730,8 @@ case 'buymidtrans': {
       `*Kode Unik:* ${uniqueCode}\n` +
       `*Total:* Rp${toRupiah(totalAmount)}\n` +
       `*Waktu:* ${timeLeft} menit\n\n` +
-      `📱 Scan QR untuk bayar via QRIS GoPay (Midtrans).\n` +
-      (payment.payment_url ? `🌐 Atau buka link: ${payment.payment_url}\n` : '') +
+      `📱 Scan QR untuk bayar via QRIS (Midtrans).\n` +
+      (paymentLink.payment_url ? `🌐 Atau buka link: ${paymentLink.payment_url}\n` : '') +
       `\n` +
       `Jika ingin membatalkan, ketik *${prefix}batal*`
 
@@ -2747,9 +2749,9 @@ case 'buymidtrans': {
       reffId,
       totalAmount,
       uniqueCode,
-      paymentToken: payment.transaction_id,
-      paymentLinkId: payment.payment_link_id,
-      metode: 'Midtrans QRIS (GoPay)'
+      paymentToken: undefined,
+      paymentLinkId: paymentLink.id,
+      metode: 'Midtrans QRIS'
     }
 
     // Poll Midtrans for status (webhook also available if configured)
@@ -2765,8 +2767,8 @@ case 'buymidtrans': {
       try {
         // Prefer Payment Link status when using fallback
         let paid = false
-        if (payment.payment_type === 'payment_link' && (db.data.order[sender]?.paymentLinkId || payment.payment_link_id)) {
-          const linkId = db.data.order[sender]?.paymentLinkId || payment.payment_link_id
+        if (db.data.order[sender]?.paymentLinkId) {
+          const linkId = db.data.order[sender]?.paymentLinkId
           const linkStatus = await getPaymentLinkStatus(linkId)
           if (linkStatus.status === 'PAID') {
             paid = true
@@ -2778,6 +2780,7 @@ case 'buymidtrans': {
             } catch {}
           }
         }
+        // Optional fallback to orderId status
         if (!paid) {
           const status = await isPaymentCompleted(orderId)
           paid = status.status === 'PAID'
