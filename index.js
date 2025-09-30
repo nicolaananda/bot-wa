@@ -2724,8 +2724,13 @@ case 'buymidtrans': {
     }
 
     if (usingStatic) {
-      // fallback to static QR image configured for Midtrans/GoPay
-      qrImagePath = "./options/sticker/qris_midtrans.jpg"
+      // fallback to static QR. If MIDTRANS_STATIC_QRIS provided, render that; else use image file
+      const staticQris = process.env.MIDTRANS_STATIC_QRIS
+      if (staticQris && staticQris.length > 50) {
+        qrImagePath = await qrisDinamis(staticQris, "./options/sticker/qris_midtrans.jpg")
+      } else {
+        qrImagePath = "./options/sticker/qris_midtrans.jpg"
+      }
     }
 
     const expirationTime = Date.now() + toMs("10m")
