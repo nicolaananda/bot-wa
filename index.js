@@ -2706,7 +2706,10 @@ case 'buymidtrans': {
     const orderId = `TRX-${reffId}-${Date.now()}`
 
     const qrisPayment = await createQRISPayment(totalAmount, orderId)
-    if (!qrisPayment?.qr_string) throw new Error('Gagal membuat QRIS payment')
+    if (!qrisPayment?.qr_string) {
+      try { console.error('Midtrans QRIS charge missing qr_string:', JSON.stringify(qrisPayment)) } catch {}
+      throw new Error('Gagal membuat QRIS payment: response tidak berisi qr_string (aktifkan QRIS di Midtrans).')
+    }
 
     const qrImagePath = await qrisDinamis(qrisPayment.qr_string, "./options/sticker/qris.jpg")
 
