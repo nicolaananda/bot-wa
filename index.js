@@ -2768,7 +2768,15 @@ case 'buymidtrans': {
         if (payment.payment_type === 'payment_link' && (db.data.order[sender]?.paymentLinkId || payment.payment_link_id)) {
           const linkId = db.data.order[sender]?.paymentLinkId || payment.payment_link_id
           const linkStatus = await getPaymentLinkStatus(linkId)
-          if (linkStatus.status === 'PAID') paid = true
+          if (linkStatus.status === 'PAID') {
+            paid = true
+          } else if (linkStatus.derived_order_id) {
+            // Some payment link transactions use a generated order_id; check that too
+            try {
+              const derived = await isPaymentCompleted(linkStatus.derived_order_id)
+              if (derived.status === 'PAID') paid = true
+            } catch {}
+          }
         }
         if (!paid) {
           const status = await isPaymentCompleted(orderId)
