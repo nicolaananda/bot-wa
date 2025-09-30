@@ -2728,7 +2728,9 @@ case 'buymidtrans': {
       `*Kode Unik:* ${uniqueCode}\n` +
       `*Total:* Rp${toRupiah(totalAmount)}\n` +
       `*Waktu:* ${timeLeft} menit\n\n` +
-      `📱 Scan QR untuk bayar via QRIS GoPay (Midtrans).\n\n` +
+      `📱 Scan QR untuk bayar via QRIS GoPay (Midtrans).\n` +
+      (payment.payment_url ? `🌐 Atau buka link: ${payment.payment_url}\n` : '') +
+      `\n` +
       `Jika ingin membatalkan, ketik *${prefix}batal*`
 
     const message = await ronzz.sendMessage(from, {
@@ -2760,6 +2762,13 @@ case 'buymidtrans': {
       }
 
       try {
+        // If we used payment link fallback, check both
+        if (db.data.order[sender]?.paymentToken && payment.payment_type === 'payment_link' && payment.payment_link_id) {
+          const linkStatus = await getPaymentLinkStatus(payment.payment_link_id)
+          if (linkStatus.status === 'PAID') {
+            status = { status: 'PAID' }
+          }
+        }
         const status = await isPaymentCompleted(orderId)
         if (status.status === 'PAID') {
           try { await ronzz.sendMessage(from, { delete: message.key }) } catch {}
