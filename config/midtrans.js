@@ -30,15 +30,27 @@ async function createQRISCore(amount, orderId) {
 
 async function createQRISPayment(amount, orderId) {
   const url = `${baseUrl}/v2/charge`
+  const acquirerEnv = (process.env.MIDTRANS_QRIS_ACQUIRER || 'gopay').toLowerCase()
+  const acquirer = ['gopay', 'shopee', 'ovo'].includes(acquirerEnv) ? acquirerEnv : 'gopay'
   const payload = {
     payment_type: 'qris',
     transaction_details: {
       order_id: orderId,
       gross_amount: Number(amount)
+    },
+    qris: {
+      acquirer
     }
   }
 
-  const { data } = await axios.post(url, payload, { headers: { ...getAuthHeader(), 'Content-Type': 'application/json', Accept: 'application/json' } })
+  let data
+  try {
+    ({ data } = await axios.post(url, payload, { headers: { ...getAuthHeader(), 'Content-Type': 'application/json', Accept: 'application/json' } }))
+  } catch (err) {
+    const resp = err.response
+    const detail = resp ? (typeof resp.data === 'object' ? JSON.stringify(resp.data) : String(resp.data)) : err.message
+    throw new Error(`Midtrans charge failed: ${detail}`)
+  }
   // Normalize possible shapes
   let qrString = data.qr_string
   if (!qrString && Array.isArray(data.actions)) {
