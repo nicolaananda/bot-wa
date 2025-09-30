@@ -2837,7 +2837,7 @@ case 'buymidtrans': {
       }
     }
   } catch (error) {
-    console.error(`Error creating QRIS payment for ${orderId}:`, error)
+    console.error('Error creating QRIS payment for buymidtrans:', error)
     reply("Gagal membuat QR Code pembayaran. Silakan coba lagi.")
   }
 }
