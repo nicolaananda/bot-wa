@@ -2704,14 +2704,29 @@ case 'buymidtrans': {
 
     const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
     const orderId = `TRX-${reffId}-${Date.now()}`
-
-    const qrisPayment = await createQRISPayment(totalAmount, orderId)
-    if (!qrisPayment?.qr_string) {
-      try { console.error('Midtrans QRIS charge missing qr_string:', JSON.stringify(qrisPayment)) } catch {}
-      throw new Error('Gagal membuat QRIS payment: response tidak berisi qr_string (aktifkan QRIS di Midtrans).')
+    let usingStatic = false
+    let qrImagePath
+    try {
+      const qrisPayment = await createQRISPayment(totalAmount, orderId)
+      if (!qrisPayment?.qr_string) {
+        try { console.error('Midtrans QRIS charge missing qr_string:', JSON.stringify(qrisPayment)) } catch {}
+        usingStatic = true
+      } else {
+        qrImagePath = await qrisDinamis(qrisPayment.qr_string, "./options/sticker/qris.jpg")
+      }
+    } catch (e) {
+      const msg = (e && e.message) ? e.message : String(e)
+      if (msg.includes('Payment channel is not activated') || msg.toLowerCase().includes('midtrans charge failed')) {
+        usingStatic = true
+      } else {
+        throw e
+      }
     }
 
-    const qrImagePath = await qrisDinamis(qrisPayment.qr_string, "./options/sticker/qris.jpg")
+    if (usingStatic) {
+      // fallback to static QR image configured for Midtrans/GoPay
+      qrImagePath = "./options/sticker/qris_midtrans.jpg"
+    }
 
     const expirationTime = Date.now() + toMs("10m")
     const expireDate = new Date(expirationTime)
@@ -2728,7 +2743,7 @@ case 'buymidtrans': {
       `*Biaya Admin:* Rp${toRupiah(fee)}\n` +
       `*Total:* Rp${toRupiah(totalAmount)}\n` +
       `*Waktu:* ${timeLeft} menit\n\n` +
-      `Scan QR ini (mendukung GoPay via QRIS). Bayar sebelum ${formattedTime}.\n\n` +
+      (usingStatic ? `Scan QR statis Midtrans (GoPay via QRIS). Bayar sebelum ${formattedTime}.\n\n` : `Scan QR ini (mendukung GoPay via QRIS). Bayar sebelum ${formattedTime}.\n\n`) +
       `Jika ingin membatalkan, ketik *${prefix}batal*`
 
     const message = await ronzz.sendMessage(from, {
@@ -2747,12 +2762,29 @@ case 'buymidtrans': {
         break
       }
       try {
-        const paymentStatus = await Promise.race([
-          isPaymentCompleted(orderId),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('API Timeout')), 10000))
-        ])
-        console.log(`Checking payment status for ${orderId}:`, paymentStatus)
-        if (paymentStatus.status === "PAID" && Number(paymentStatus.paid_amount) >= Number(totalAmount)) {
+        let paidNow = false
+        if (!usingStatic) {
+          const paymentStatus = await Promise.race([
+            isPaymentCompleted(orderId),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('API Timeout')), 10000))
+          ])
+          console.log(`Checking payment status for ${orderId}:`, paymentStatus)
+          paidNow = (paymentStatus.status === "PAID" && Number(paymentStatus.paid_amount) >= Number(totalAmount))
+        } else {
+          // Check via external listener by matching the total amount
+          try {
+            const url = `${listener.baseUrl}/notifications?limit=50`
+            const headers = listener.apiKey ? { 'X-API-Key': listener.apiKey } : {}
+            const resp = await axios.get(url, { headers })
+            const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : [])
+            const paid = notifs.find(n => (n.package_name === 'id.bmri.livinmerchant' || (n.app_name||'').toUpperCase().includes('DANA') || (n.app_name||'').toUpperCase().includes('GOPAY')) && Number((n.amount_detected || '').toString().replace(/[^0-9]/g, '')) === Number(totalAmount))
+            paidNow = !!paid
+          } catch (e) {
+            console.error('Listener polling failed (static QR check):', e && e.message ? e.message : e)
+          }
+        }
+
+        if (paidNow) {
           await ronzz.sendMessage(from, { delete: message.key })
           reply("Pembayaran berhasil, data akun akan segera diproses.")
 
