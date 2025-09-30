@@ -38,8 +38,16 @@ async function createQRISPayment(amount, orderId) {
     }
   }
 
-  const { data } = await axios.post(url, payload, { headers: { ...getAuthHeader(), 'Content-Type': 'application/json' } })
-  return data
+  const { data } = await axios.post(url, payload, { headers: { ...getAuthHeader(), 'Content-Type': 'application/json', Accept: 'application/json' } })
+  // Normalize possible shapes
+  let qrString = data.qr_string
+  if (!qrString && Array.isArray(data.actions)) {
+    const qrAction = data.actions.find(a => (a.name || '').toLowerCase().includes('qr') || (a.method || '').toLowerCase().includes('qr'))
+    if (qrAction && (qrAction.url || qrAction.deep_link)) {
+      qrString = qrAction.url || qrAction.deep_link
+    }
+  }
+  return { ...data, qr_string: qrString }
 }
 
 async function isPaymentCompleted(orderId) {
