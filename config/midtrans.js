@@ -75,6 +75,18 @@ async function isPaymentCompleted(orderId) {
   }
 }
 
+async function getTransactionStatusByOrderId(orderId) {
+  const url = `${baseUrl}/v2/${orderId}/status`
+  const { data } = await axios.get(url, { headers: getAuthHeader() })
+  return data
+}
+
+async function getTransactionStatusByTransactionId(transactionId) {
+  const url = `${baseUrl}/v2/${transactionId}/status`
+  const { data } = await axios.get(url, { headers: getAuthHeader() })
+  return data
+}
+
 const core = {
   serverKey: MIDTRANS_SERVER_KEY,
   baseUrl
@@ -89,6 +101,8 @@ module.exports = {
   isPaymentCompleted,
   createQRISCore,
   createQRISPayment,
+  getTransactionStatusByOrderId,
+  getTransactionStatusByTransactionId,
   core,
   isProduction
 }

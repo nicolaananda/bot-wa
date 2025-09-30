@@ -27,7 +27,7 @@ const { expiredCheck, getAllSewa } = require("./function/sewa");
 const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
 const { qrisDinamis } = require("./function/dinamis");
-const { createPaymentLink, getPaymentLinkStatus, isPaymentCompleted, createQRISCore, createQRISPayment } = require('./config/midtrans');
+const { createPaymentLink, getPaymentLinkStatus, isPaymentCompleted, createQRISCore, createQRISPayment, getTransactionStatusByOrderId, getTransactionStatusByTransactionId } = require('./config/midtrans');
 const BASE_QRIS_DANA = "00020101021126570011id.bmri.livinmerchant.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 const { core, isProduction } = require('./config/midtrans');
@@ -3047,6 +3047,37 @@ case 'midtrans': {
   } catch (error) {
     console.error(`Error creating QRIS payment for ${orderId}:`, error)
     reply("Gagal membuat QR Code pembayaran. Silakan coba lagi.")
+  }
+}
+break;
+
+case 'cekmidtrans': {
+  const id = (q || '').trim()
+  if (!id) return reply(`Contoh: ${prefix + command} <order_id ATAU transaction_id>`)
+  try {
+    let data
+    // Try order_id first
+    try {
+      data = await getTransactionStatusByOrderId(id)
+    } catch (e1) {
+      // fallback to transaction_id
+      data = await getTransactionStatusByTransactionId(id)
+    }
+    const lines = []
+    lines.push(`*Midtrans Status*`)
+    if (data.order_id) lines.push(`Order ID: ${data.order_id}`)
+    if (data.transaction_id) lines.push(`Transaction ID: ${data.transaction_id}`)
+    if (data.payment_type) lines.push(`Channel: ${data.payment_type.toUpperCase()}`)
+    if (data.transaction_status) lines.push(`Status: ${data.transaction_status}`)
+    if (data.gross_amount) lines.push(`Amount: Rp${toRupiah(Number(data.gross_amount))}`)
+    if (data.acquirer) lines.push(`Acquirer: ${data.acquirer}`)
+    if (data.issuer) lines.push(`Issuer: ${data.issuer}`)
+    if (data.payment_reference) lines.push(`Payment Ref: ${data.payment_reference}`)
+    lines.push(`Raw code: ${data.status_code || '-'} | ${data.status_message || '-'}`)
+    reply(lines.join("\n"))
+  } catch (error) {
+    console.error('cekmidtrans error:', error && error.message ? error.message : error)
+    reply('Gagal cek status Midtrans. Pastikan ID benar (order_id atau transaction_id).')
   }
 }
 break;
