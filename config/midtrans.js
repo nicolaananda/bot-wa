@@ -242,6 +242,30 @@ async function createQRISCore(amount, orderId, customerDetails = {}) {
       }
     }
     
+    // If still no usable QR or payment channel inactive, fallback to Payment Link
+    const stillInactive = result && String(result.status_code) === '402';
+    const noUsableQr = !qrisString && !qrImageUrl;
+    if (stillInactive || noUsableQr) {
+      console.warn('Midtrans QRIS via Core API unavailable, falling back to Payment Link...');
+      const items = [{ id: customerDetails.product_id || 'PRODUCT', price: amount, quantity: 1, name: customerDetails.product_name || 'Pembelian Produk Digital' }];
+      const link = await createPaymentLink(amount, orderId, customerDetailsObj, items, { title: `Order ${orderId}`, description: `Pembayaran pesanan ${orderId}` });
+      const fallbackData = {
+        transaction_id: result?.transaction_id || undefined,
+        order_id: orderId,
+        amount: amount,
+        status: 'pending',
+        qr_string: link.payment_url,
+        qr_image_url: link.payment_url,
+        payment_url: link.payment_url,
+        payment_link_id: link.id,
+        created: new Date().toISOString(),
+        payment_type: 'payment_link',
+        acquirer: 'gopay'
+      };
+      storePaymentData(orderId, fallbackData);
+      return fallbackData;
+    }
+
     const paymentData = {
       transaction_id: result.transaction_id,
       order_id: orderId,
@@ -253,7 +277,7 @@ async function createQRISCore(amount, orderId, customerDetails = {}) {
       payment_type: 'qris',
       acquirer: 'gopay'
     };
-    
+
     storePaymentData(orderId, paymentData);
     return paymentData;
   } catch (error) {
