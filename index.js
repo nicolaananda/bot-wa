@@ -2748,6 +2748,7 @@ case 'buymidtrans': {
       totalAmount,
       uniqueCode,
       paymentToken: payment.transaction_id,
+      paymentLinkId: payment.payment_link_id,
       metode: 'Midtrans QRIS (GoPay)'
     }
 
@@ -2762,15 +2763,18 @@ case 'buymidtrans': {
       }
 
       try {
-        // If we used payment link fallback, check both
-        if (db.data.order[sender]?.paymentToken && payment.payment_type === 'payment_link' && payment.payment_link_id) {
-          const linkStatus = await getPaymentLinkStatus(payment.payment_link_id)
-          if (linkStatus.status === 'PAID') {
-            status = { status: 'PAID' }
-          }
+        // Prefer Payment Link status when using fallback
+        let paid = false
+        if (payment.payment_type === 'payment_link' && (db.data.order[sender]?.paymentLinkId || payment.payment_link_id)) {
+          const linkId = db.data.order[sender]?.paymentLinkId || payment.payment_link_id
+          const linkStatus = await getPaymentLinkStatus(linkId)
+          if (linkStatus.status === 'PAID') paid = true
         }
-        const status = await isPaymentCompleted(orderId)
-        if (status.status === 'PAID') {
+        if (!paid) {
+          const status = await isPaymentCompleted(orderId)
+          paid = status.status === 'PAID'
+        }
+        if (paid) {
           try { await ronzz.sendMessage(from, { delete: message.key }) } catch {}
           reply("Pembayaran berhasil, data akun akan segera diproses.")
 
