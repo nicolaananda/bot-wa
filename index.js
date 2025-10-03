@@ -3279,7 +3279,7 @@ case 'buy': {
       if (isGroup) {
         reply("🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!");
       } else {
-        reply("🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim di atas. Terima kasih!");
+        reply("🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim di atas. Apabila tidak terlihat rechat agar dikirim ulang Terima kasih!");
       }
     } else {
       reply("⚠️ Pembelian dengan saldo berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
