@@ -7,6 +7,7 @@ const PG_CONN_TIMEOUT = Number(process.env.PG_CONN_TIMEOUT_MS || 15000);
 const PG_STATEMENT_TIMEOUT = Number(process.env.PG_STATEMENT_TIMEOUT_MS || 60000);
 const PG_SLOW_MS = Number(process.env.PG_SLOW_MS || 500);
 const PG_KEEPALIVE = String(process.env.PG_KEEPALIVE || 'true').toLowerCase() !== 'false';
+const PG_WARMUP_CONNECTIONS = Math.max(1, Number(process.env.PG_WARMUP_CONNECTIONS || 3));
 const PG_RETRIES = Number(process.env.PG_QUERY_RETRIES || 2); // retries after initial attempt
 
 const pool = new Pool({
@@ -74,7 +75,8 @@ async function getClient() {
 // Best-effort warm-up to reduce cold-start latency
 (async function warmup() {
   try {
-    await query('SELECT 1');
+    const warmups = Array.from({ length: PG_WARMUP_CONNECTIONS }, () => query('SELECT 1'));
+    await Promise.allSettled(warmups);
   } catch (e) {
     try { console.warn('[PG] warmup failed:', e.message); } catch {}
   }

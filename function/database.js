@@ -18,8 +18,15 @@ if (!usePg) {
         async load() {
             // Assemble a snapshot similar to JSON db for backward compatibility
             const snapshot = {}
+
+            // Kick off queries in parallel to reduce cold start latency
+            const usersPromise = query('SELECT user_id, saldo, role, data FROM users')
+            const transaksiPromise = query('SELECT meta FROM transaksi ORDER BY id ASC')
+            const produkPromise = query('SELECT id, data FROM produk')
+            const settingsPromise = query('SELECT key, value FROM settings')
+
             // users
-            const users = await query('SELECT user_id, saldo, role, data FROM users')
+            const users = await usersPromise
             snapshot.users = {}
             for (const row of users.rows) {
                 const merged = (row.data && typeof row.data === 'object') ? { ...row.data } : {}
@@ -28,8 +35,9 @@ if (!usePg) {
                 merged.role = row.role || merged.role || 'bronze'
                 snapshot.users[row.user_id] = merged
             }
+
             // transaksi
-            const tr = await query('SELECT meta FROM transaksi ORDER BY id ASC')
+            const tr = await transaksiPromise
             const transaksiArray = tr.rows.map(r => r.meta)
             // Intercept pushes to persist to Postgres transparently
             const originalPush = transaksiArray.push
@@ -49,12 +57,14 @@ if (!usePg) {
                 return originalPush.apply(this, items)
             }
             snapshot.transaksi = transaksiArray
+
             // produk
-            const produk = await query('SELECT id, data FROM produk')
+            const produk = await produkPromise
             snapshot.produk = {}
             for (const row of produk.rows) snapshot.produk[row.id] = row.data
+
             // settings
-            const settings = await query('SELECT key, value FROM settings')
+            const settings = await settingsPromise
             snapshot.setting = {}
             for (const row of settings.rows) snapshot.setting[row.key] = row.value
 
