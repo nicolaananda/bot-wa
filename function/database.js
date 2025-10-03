@@ -5,6 +5,7 @@ if (!usePg) {
     module.exports = require('./database-fs')
 } else {
     const { query } = require('../config/postgres')
+    const UPSERT_CHUNK = Math.max(1, Number(process.env.PG_UPSERT_CHUNK || 100))
 
     class DatabasePG {
         constructor() {
@@ -79,7 +80,7 @@ if (!usePg) {
 				// Persist users (bulk upsert)
 				if (this._data && this._data.users) {
 					const entries = Object.entries(this._data.users)
-					const chunkSize = 100
+					const chunkSize = UPSERT_CHUNK
 					for (let i = 0; i < entries.length; i += chunkSize) {
 						const chunk = entries.slice(i, i + chunkSize)
 						if (chunk.length === 0) continue
@@ -99,7 +100,7 @@ if (!usePg) {
 				// Persist produk (bulk upsert)
 				if (this._data && this._data.produk) {
 					const entries = Object.entries(this._data.produk)
-					const chunkSize = 100
+					const chunkSize = UPSERT_CHUNK
 					for (let i = 0; i < entries.length; i += chunkSize) {
 						const chunk = entries.slice(i, i + chunkSize)
 						if (chunk.length === 0) continue
