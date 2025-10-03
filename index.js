@@ -2274,8 +2274,8 @@ case 'deposit': {
   const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
   const uniqueCode = Math.floor(1 + Math.random() * 99)
   const totalAmount = baseAmount + uniqueCode
-  // Bonus 4% dari nominal deposit (contoh: 50.000 -> 52.000; 100.000 -> 104.000)
-  const bonus = Math.floor(baseAmount * 0.04)
+  // Bonus Rp2.000 per Rp50.000 topup (minimal Rp50.000; contoh: 50.000 -> 2.000; 100.000 -> 4.000)
+  const bonus = baseAmount >= 50000 ? Math.floor(baseAmount / 50000) * 2000 : 0
 
   db.data.orderDeposit[sender] = { status: 'processing', reffId, metode: 'QRIS', startedAt: Date.now(), baseAmount, totalAmount, uniqueCode, bonus }
 
@@ -8190,6 +8190,9 @@ Ada yang upgrade role!
         if (!isGroupAdmins && !isOwner) return reply(mess.admin)
         let mem = groupMembers.map(i => i.id)
         ronzz.sendMessage(from, { text: q ? q : '', mentions: mem })
+        if (isBotGroupAdmins) {
+          try { await ronzz.sendMessage(from, { delete: m.key }) } catch {}
+        }
       }
         break
 
