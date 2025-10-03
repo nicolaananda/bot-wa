@@ -76,28 +76,47 @@ if (!usePg) {
 
         async save() {
             try {
-                // Persist users
-                if (this._data && this._data.users) {
-                    const entries = Object.entries(this._data.users)
-                    for (const [userId, u] of entries) {
-                        const saldo = Number(u && u.saldo || 0)
-                        const role = (u && u.role) || 'bronze'
-                        await query(
-                            "INSERT INTO users(user_id, saldo, role, data) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id) DO UPDATE SET saldo=EXCLUDED.saldo, role=EXCLUDED.role, data=EXCLUDED.data",
-                            [userId, saldo, role, JSON.stringify(u || {})]
-                        )
-                    }
-                }
-                // Persist produk
-                if (this._data && this._data.produk) {
-                    const entries = Object.entries(this._data.produk)
-                    for (const [id, p] of entries) {
-                        await query(
-                            'INSERT INTO produk(id, name, price, stock, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, price=EXCLUDED.price, stock=EXCLUDED.stock, data=EXCLUDED.data',
-                            [id, (p && (p.name || p.nama)) || null, Number(p && (p.price || p.harga) || 0), Number(p && (p.stock || (p.stok ? p.stok.length : 0)) || 0), JSON.stringify(p || {})]
-                        )
-                    }
-                }
+				// Persist users (bulk upsert)
+				if (this._data && this._data.users) {
+					const entries = Object.entries(this._data.users)
+					const chunkSize = 100
+					for (let i = 0; i < entries.length; i += chunkSize) {
+						const chunk = entries.slice(i, i + chunkSize)
+						if (chunk.length === 0) continue
+						const values = []
+						const params = []
+						let paramIndex = 1
+						for (const [userId, u] of chunk) {
+							const saldo = Number(u && u.saldo || 0)
+							const role = (u && u.role) || 'bronze'
+							values.push(`($${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++})`)
+							params.push(userId, saldo, role, JSON.stringify(u || {}))
+						}
+						const sql = `INSERT INTO users(user_id, saldo, role, data) VALUES ${values.join(',')} ON CONFLICT (user_id) DO UPDATE SET saldo=EXCLUDED.saldo, role=EXCLUDED.role, data=EXCLUDED.data`
+						await query(sql, params)
+					}
+				}
+				// Persist produk (bulk upsert)
+				if (this._data && this._data.produk) {
+					const entries = Object.entries(this._data.produk)
+					const chunkSize = 100
+					for (let i = 0; i < entries.length; i += chunkSize) {
+						const chunk = entries.slice(i, i + chunkSize)
+						if (chunk.length === 0) continue
+						const values = []
+						const params = []
+						let paramIndex = 1
+						for (const [id, p] of chunk) {
+							const name = (p && (p.name || p.nama)) || null
+							const price = Number(p && (p.price || p.harga) || 0)
+							const stock = Number(p && (p.stock || (p.stok ? p.stok.length : 0)) || 0)
+							values.push(`($${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++})`)
+							params.push(id, name, price, stock, JSON.stringify(p || {}))
+						}
+						const sql = `INSERT INTO produk(id, name, price, stock, data) VALUES ${values.join(',')} ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, price=EXCLUDED.price, stock=EXCLUDED.stock, data=EXCLUDED.data`
+						await query(sql, params)
+					}
+				}
             } catch (e) {
                 try { console.error('[DBPG] save sync failed:', e.message) } catch {}
             }
