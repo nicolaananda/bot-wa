@@ -8191,7 +8191,14 @@ Ada yang upgrade role!
         let mem = groupMembers.map(i => i.id)
         ronzz.sendMessage(from, { text: q ? q : '', mentions: mem })
         if (isBotGroupAdmins) {
-          try { await ronzz.sendMessage(from, { delete: m.key }) } catch {}
+          try {
+            const deleteKey = m.isGroup
+              ? { remoteJid: from, id: (mek && mek.key && mek.key.id) || (m.key && m.key.id), participant: (mek && (mek.key && mek.key.participant)) || mek.participant || sender, fromMe: false }
+              : { remoteJid: from, id: (mek && mek.key && mek.key.id) || (m.key && m.key.id), fromMe: false }
+            if (deleteKey && deleteKey.id) {
+              await ronzz.sendMessage(from, { delete: deleteKey })
+            }
+          } catch {}
         }
       }
         break
