@@ -2386,7 +2386,9 @@ case 'buynow': {
   if (stok.length < jumlah) return reply(`Stok tersedia ${stok.length}, jadi harap jumlah tidak melebihi stok`)
 
   const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
-  db.data.order[sender] = { status: 'processing', reffId, idProduk: data[0], jumlah, metode: 'QRIS', startedAt: Date.now() }
+  // Catat waktu pembuatan order untuk menghindari match notifikasi lama
+  const createdAtTs = Date.now()
+  db.data.order[sender] = { status: 'processing', reffId, idProduk: data[0], jumlah, metode: 'QRIS', startedAt: createdAtTs }
 
   try {
     // Hitung harga (sama seperti case 'buy')
@@ -2431,7 +2433,9 @@ case 'buynow': {
         orderId,
         reffId,
         totalAmount,
-        uniqueCode
+        uniqueCode,
+        // Simpan timestamp utk validasi notifikasi pembayaran
+        createdAt: createdAtTs
     };
 
         while (db.data.order[sender]) {
@@ -2450,7 +2454,17 @@ case 'buynow': {
                 const resp = await axios.get(url, { headers });
                 const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : []);
 
-                const paid = notifs.find(n => (n.package_name === 'id.bmri.livinmerchant' || (n.app_name||'').toUpperCase().includes('DANA')) && Number((n.amount_detected || '').toString().replace(/[^0-9]/g, '')) === Number(totalAmount));
+                // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
+                const paid = notifs.find(n => {
+                  try {
+                    const pkgOk = (n.package_name === 'id.bmri.livinmerchant') || (String(n.app_name||'').toUpperCase().includes('DANA'))
+                    const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''))
+                    const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0
+                    return pkgOk && amt === Number(totalAmount) && postedAt >= createdAtTs
+                  } catch {
+                    return false
+                  }
+                });
 
                 if (paid) {
                     await ronzz.sendMessage(from, { delete: message.key });
