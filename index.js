@@ -2420,8 +2420,10 @@ case 'buynow': {
         `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n\n` +
         `Jika ingin membatalkan, ketik *${prefix}batal*`;
 
+    // Improvement #3: Async file read
+    const qrImage = await fs.promises.readFile(qrImagePath);
     const message = await ronzz.sendMessage(from, {
-        image: fs.readFileSync(qrImagePath),
+        image: qrImage,
         caption: caption
     }, { quoted: m });
 
@@ -2438,8 +2440,19 @@ case 'buynow': {
         createdAt: createdAtTs
     };
 
+        // Improvement #1: Exponential backoff polling
+        let pollInterval = 3000;  // Mulai dari 3 detik
+        const maxInterval = 15000; // Maksimal 15 detik
+        let pollCount = 0;
+
         while (db.data.order[sender]) {
-            await sleep(10000);
+            await sleep(pollInterval);
+
+            // Tingkatkan interval secara bertahap
+            if (pollCount < 10) {
+                pollInterval = Math.min(Math.floor(pollInterval * 1.2), maxInterval);
+            }
+            pollCount++;
 
             if (Date.now() >= expirationTime) {
                 await ronzz.sendMessage(from, { delete: message.key });
@@ -2451,7 +2464,7 @@ case 'buynow': {
             try {
                 const url = `${listener.baseUrl}/notifications?limit=50`;
                 const headers = listener.apiKey ? { 'X-API-Key': listener.apiKey } : {};
-                const resp = await axios.get(url, { headers });
+                const resp = await axios.get(url, { headers, timeout: 5000 });
                 const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : []);
 
                 // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
@@ -2476,151 +2489,140 @@ case 'buynow': {
                     for (let i = 0; i < jumlah; i++) {
                       dataStok.push(db.data.produk[data[0]].stok.shift())
                     }
-                    
-                    await db.save();
 
-                    // Buat detail akun untuk customer (gabungan akun + SNK)
-                    let detailAkunCustomer = `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
-                    detailAkunCustomer += `*📅 Tanggal:* ${tanggal}\n`
-                    detailAkunCustomer += `*⏰ Jam:* ${jamwib} WIB\n`
-                    detailAkunCustomer += `*Refid:* ${reffId}\n\n`
-                    dataStok.forEach((i, index) => {
-                      let dataAkun = i.split("|")
-                      detailAkunCustomer += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
-                      detailAkunCustomer += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
-                      detailAkunCustomer += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`
-                      detailAkunCustomer += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`
-                      detailAkunCustomer += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`
-                    })
-                    
-                    // Tambahkan SNK ke pesan customer
-                    detailAkunCustomer += `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`
-                    detailAkunCustomer += `*📋 SNK PRODUK: ${db.data.produk[data[0]].name}*\n\n`
-                    detailAkunCustomer += `${db.data.produk[data[0]].snk}\n\n`
-                    detailAkunCustomer += `*⚠️ PENTING:*\n`
-                    detailAkunCustomer += `• Baca dan pahami SNK sebelum menggunakan akun\n`
-                    detailAkunCustomer += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`
-                    detailAkunCustomer += `• Hubungi admin jika ada masalah dengan akun\n\n`
-                    detailAkunCustomer += `*╰────「 END SNK 」────╯*`
+                    // Improvement #4: Optimize string building dengan array.join()
+                    const detailParts = [
+                      `*📦 Produk:* ${db.data.produk[data[0]].name}`,
+                      `*📅 Tanggal:* ${tanggal}`,
+                      `*⏰ Jam:* ${jamwib} WIB`,
+                      `*Refid:* ${reffId}`,
+                      ''
+                    ];
 
-                    // Buat detail akun untuk owner (hanya informasi akun)
-                    let detailAkunOwner = `*📦 Produk:* ${db.data.produk[data[0]].name}\n`
-                    detailAkunOwner += `*📅 Tanggal:* ${tanggal}\n`
-                    detailAkunOwner += `*⏰ Jam:* ${jamwib} WIB\n`
-                    detailAkunOwner += `*Refid:* ${reffId}\n\n`
-                    dataStok.forEach((i, index) => {
-                      let dataAkun = i.split("|")
-                      detailAkunOwner += `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`
-                      detailAkunOwner += `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`
-                      detailAkunOwner += `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}\n`
-                      detailAkunOwner += `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}\n`
-                      detailAkunOwner += `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}\n\n`
-                    })
+                    dataStok.forEach((i) => {
+                      const dataAkun = i.split("|");
+                      detailParts.push(
+                        `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
+                        `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}`,
+                        `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}`,
+                        `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}`,
+                        `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}`,
+                        ''
+                      );
+                    });
 
-                    // Kirim ke customer (1 pesan gabungan akun + SNK) - PRIORITAS UTAMA
-                    console.log('🚀 STARTING CUSTOMER MESSAGE SEND PROCESS');
-                    console.log('Customer ID:', sender);
-                    console.log('Message length:', detailAkunCustomer.length);
-                    console.log('First 100 chars of message:', detailAkunCustomer.substring(0, 100));
-                    
+                    // Tambahkan SNK
+                    detailParts.push(
+                      `*╭────「 SYARAT & KETENTUAN 」────╮*`,
+                      '',
+                      `*📋 SNK PRODUK: ${db.data.produk[data[0]].name}*`,
+                      '',
+                      db.data.produk[data[0]].snk,
+                      '',
+                      `*⚠️ PENTING:*`,
+                      `• Baca dan pahami SNK sebelum menggunakan akun`,
+                      `• Akun yang sudah dibeli tidak dapat dikembalikan`,
+                      `• Hubungi admin jika ada masalah dengan akun`,
+                      '',
+                      `*╰────「 END SNK 」────╯*`
+                    );
+
+                    const detailAkunCustomer = detailParts.join('\n');
+
+                    // Improvement #5: Remove unused detailAkunOwner variable
+
+                    // Improvement #6: Optimize message sending dengan better retry logic
+                    const sendMessageWithRetry = async (target, content, maxRetries = 3) => {
+                      for (let attempt = 0; attempt < maxRetries; attempt++) {
+                        try {
+                          if (attempt > 0) {
+                            await sleep(500 * attempt); // Progressive delay: 0ms, 500ms, 1000ms
+                          }
+                          return await ronzz.sendMessage(target, content);
+                        } catch (err) {
+                          if (attempt === maxRetries - 1) throw err;
+                          console.error(`❌ Attempt ${attempt + 1} failed: ${err.message}`);
+                        }
+                      }
+                    };
+
+                    console.log('🚀 Sending account details to customer...');
                     let customerMessageSent = false;
                     
-                    // Attempt 1: Send with basic format
                     try {
-                      console.log('📤 Attempt 1: Sending account details to customer...');
-                      console.log('📞 Customer WhatsApp ID:', sender);
-                      console.log('📏 Message length:', detailAkunCustomer.length);
-                      
-                      // Add delay before sending to avoid rate limits
-                      await sleep(1000);
-                      
-                      const messageResult = await ronzz.sendMessage(sender, { text: detailAkunCustomer });
-                      console.log('📨 Message result:', messageResult ? 'Message object returned' : 'No result returned');
-                      console.log('✅ SUCCESS: Account details sent to customer!');
-                      
-                      // Wait a bit and try to send a confirmation
-                      await sleep(2000);
-                      try {
-                        await ronzz.sendMessage(sender, { text: "✅ Detail akun telah dikirim di pesan sebelumnya. Jika tidak terlihat, silahkan hubungi admin." });
-                        console.log('✅ Confirmation message sent');
-                      } catch (confirmError) {
-                        console.error('❌ Confirmation message failed:', confirmError.message);
-                      }
-                      
+                      // Attempt 1: Send as single message
+                      await sendMessageWithRetry(sender, { text: detailAkunCustomer });
+                      console.log('✅ Account details sent to customer successfully!');
                       customerMessageSent = true;
                       
                     } catch (error) {
-                      console.error('❌ ATTEMPT 1 FAILED:', error.message);
-                      console.error('❌ Full error:', error);
+                      console.error('❌ Single message failed, trying multiple messages...');
                       
-                      // Attempt 2: Send in multiple smaller messages
                       try {
-                        console.log('📤 Attempt 2: Sending account details in multiple messages...');
+                        // Attempt 2: Send in multiple smaller messages
+                        const headerParts = [
+                          `*📦 DETAIL AKUN PEMBELIAN*`,
+                          '',
+                          `*Produk:* ${db.data.produk[data[0]].name}`,
+                          `*Tanggal:* ${tanggal}`,
+                          `*Jam:* ${jamwib} WIB`,
+                          `*Jumlah Akun:* ${dataStok.length}`,
+                          '',
+                          `📋 Detail akun akan dikirim dalam pesan terpisah...`
+                        ];
                         
-                        // Send header first
-                        let headerMessage = `*📦 DETAIL AKUN PEMBELIAN*\n\n`;
-                        headerMessage += `*Produk:* ${db.data.produk[data[0]].name}\n`;
-                        headerMessage += `*Tanggal:* ${tanggal}\n`;
-                        headerMessage += `*Jam:* ${jamwib} WIB\n`;
-                        headerMessage += `*Jumlah Akun:* ${dataStok.length}\n\n`;
-                        headerMessage += `📋 Detail akun akan dikirim dalam pesan terpisah...`;
+                        await sendMessageWithRetry(sender, { text: headerParts.join('\n') });
                         
-                        await sleep(1000);
-                        await ronzz.sendMessage(sender, { text: headerMessage });
-                        console.log('✅ Header message sent');
-                        
-                        // Send each account separately
+                        // Send each account
                         for (let index = 0; index < dataStok.length; index++) {
-                          await sleep(2000); // Delay between messages
-                          let dataAkun = dataStok[index].split("|");
-                          let accountMessage = `*═══ AKUN ${index + 1} ═══*\n`;
-                          accountMessage += `📧 Email: ${dataAkun[0] || 'Tidak ada'}\n`;
-                          accountMessage += `🔐 Password: ${dataAkun[1] || 'Tidak ada'}\n`;
-                          if (dataAkun[2]) accountMessage += `👤 Profil: ${dataAkun[2]}\n`;
-                          if (dataAkun[3]) accountMessage += `🔢 Pin: ${dataAkun[3]}\n`;
-                          if (dataAkun[4]) accountMessage += `🔒 2FA: ${dataAkun[4]}\n`;
+                          const dataAkun = dataStok[index].split("|");
+                          const accountParts = [
+                            `*═══ AKUN ${index + 1} ═══*`,
+                            `📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
+                            `🔐 Password: ${dataAkun[1] || 'Tidak ada'}`
+                          ];
+                          if (dataAkun[2]) accountParts.push(`👤 Profil: ${dataAkun[2]}`);
+                          if (dataAkun[3]) accountParts.push(`🔢 Pin: ${dataAkun[3]}`);
+                          if (dataAkun[4]) accountParts.push(`🔒 2FA: ${dataAkun[4]}`);
                           
-                          await ronzz.sendMessage(sender, { text: accountMessage });
-                          console.log(`✅ Account ${index + 1} details sent`);
+                          await sleep(800);
+                          await sendMessageWithRetry(sender, { text: accountParts.join('\n') });
                         }
                         
-                        // Send SNK separately if it exists
+                        // Send SNK
                         if (db.data.produk[data[0]].snk) {
-                          await sleep(2000);
-                          let snkMessage = `*╭────「 SYARAT & KETENTUAN 」────╮*\n\n`;
-                          snkMessage += `${db.data.produk[data[0]].snk}\n\n`;
-                          snkMessage += `*⚠️ PENTING:*\n`;
-                          snkMessage += `• Baca dan pahami SNK sebelum menggunakan akun\n`;
-                          snkMessage += `• Akun yang sudah dibeli tidak dapat dikembalikan\n`;
-                          snkMessage += `• Hubungi admin jika ada masalah dengan akun\n\n`;
-                          snkMessage += `*╰────「 END SNK 」────╯*`;
-                          
-                          await ronzz.sendMessage(sender, { text: snkMessage });
-                          console.log('✅ SNK message sent');
+                          await sleep(800);
+                          const snkParts = [
+                            `*╭────「 SYARAT & KETENTUAN 」────╮*`,
+                            '',
+                            db.data.produk[data[0]].snk,
+                            '',
+                            `*⚠️ PENTING:*`,
+                            `• Baca dan pahami SNK sebelum menggunakan akun`,
+                            `• Akun yang sudah dibeli tidak dapat dikembalikan`,
+                            `• Hubungi admin jika ada masalah dengan akun`,
+                            '',
+                            `*╰────「 END SNK 」────╯*`
+                          ];
+                          await sendMessageWithRetry(sender, { text: snkParts.join('\n') });
                         }
                         
-                        console.log('✅ SUCCESS: All account details sent in separate messages!');
+                        console.log('✅ All account details sent in separate messages!');
                         customerMessageSent = true;
                         
                       } catch (fallbackError) {
-                        console.error('❌ ATTEMPT 2 ALSO FAILED:', fallbackError.message);
+                        console.error('❌ Multiple messages also failed, sending basic notification...');
                         
-                        // Attempt 3: Send basic text only
                         try {
-                          console.log('📤 Attempt 3: Sending basic notification...');
                           const basicMessage = `Akun berhasil dibeli!\n\nProduk: ${db.data.produk[data[0]].name}\nJumlah: ${jumlah} akun\n\nSilahkan hubungi admin untuk mendapatkan detail akun.`;
-                          await ronzz.sendMessage(sender, { text: basicMessage })
-                          console.log('✅ SUCCESS: Basic notification sent to customer!');
+                          await sendMessageWithRetry(sender, { text: basicMessage });
+                          console.log('✅ Basic notification sent!');
                           customerMessageSent = true;
-                          
                         } catch (finalError) {
                           console.error('❌ ALL ATTEMPTS FAILED:', finalError.message);
-                          console.error('❌ CUSTOMER WILL NOT RECEIVE ACCOUNT DETAILS!');
                         }
                       }
                     }
-                    
-                    console.log('🏁 CUSTOMER MESSAGE SEND RESULT:', customerMessageSent ? 'SUCCESS' : 'FAILED');
 
                     // Send single comprehensive success message
                     if (customerMessageSent) {
@@ -2635,9 +2637,8 @@ case 'buynow': {
                     // Skip sending alert to admin about failed delivery
                     }
 
-                    // Simpan receipt ke file txt (sama dengan detailAkunCustomer)
+                    // Improvement #3: Async file write untuk receipt
                     try {
-                      const receiptContent = detailAkunCustomer;
                       const receiptPath = `./options/receipts/${reffId}.txt`;
                       
                       // Pastikan folder receipts ada
@@ -2645,7 +2646,7 @@ case 'buynow': {
                         fs.mkdirSync('./options/receipts', { recursive: true });
                       }
                       
-                      fs.writeFileSync(receiptPath, receiptContent, 'utf8');
+                      await fs.promises.writeFile(receiptPath, detailAkunCustomer, 'utf8');
                       console.log(`✅ Receipt saved: ${receiptPath}`);
                     } catch (receiptError) {
                       console.error('❌ Error saving receipt:', receiptError.message);
@@ -2665,11 +2666,12 @@ case 'buynow': {
                       metodeBayar: "QRIS",
                       totalBayar: totalAmount
                     });
-                    await db.save();
 
                     // Skip stock-empty admin notifications
 
                     delete db.data.order[sender];
+                    
+                    // Improvement #2: Batch database save (save sekali saja di akhir)
                     await db.save();
                     console.log(`✅ Transaction completed: ${orderId} - ${reffId}`);
                     break;
@@ -2679,8 +2681,12 @@ case 'buynow': {
             }
         }
     } catch (error) {
-        console.error(`Error processing QRIS for ${productId}:`, error);
+        console.error(`Error processing QRIS for ${data[0]}:`, error);
         reply("Gagal membuat QR Code pembayaran. Silakan coba lagi.");
+        // Cleanup order yang gagal
+        if (db.data.order[sender]) {
+            delete db.data.order[sender];
+        }
     }
   }
   break;
