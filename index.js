@@ -2531,35 +2531,36 @@ case 'buynow': {
 
                     // Improvement #5: Remove unused detailAkunOwner variable
 
-                    // Improvement #6: Optimize message sending dengan better retry logic
-                    const sendMessageWithRetry = async (target, content, maxRetries = 3) => {
-                      for (let attempt = 0; attempt < maxRetries; attempt++) {
-                        try {
-                          if (attempt > 0) {
-                            await sleep(500 * attempt); // Progressive delay: 0ms, 500ms, 1000ms
-                          }
-                          return await ronzz.sendMessage(target, content);
-                        } catch (err) {
-                          if (attempt === maxRetries - 1) throw err;
-                          console.error(`❌ Attempt ${attempt + 1} failed: ${err.message}`);
-                        }
-                      }
-                    };
-
-                    console.log('🚀 Sending account details to customer...');
+                    // Kirim ke customer (1 pesan gabungan akun + SNK) - PRIORITAS UTAMA
+                    console.log('🚀 STARTING CUSTOMER MESSAGE SEND PROCESS');
+                    console.log('📞 Customer WhatsApp ID:', sender);
+                    console.log('📏 Message length:', detailAkunCustomer.length);
+                    console.log('📋 First 100 chars:', detailAkunCustomer.substring(0, 100));
+                    
                     let customerMessageSent = false;
                     
+                    // Attempt 1: Send with basic format
                     try {
-                      // Attempt 1: Send as single message
-                      await sendMessageWithRetry(sender, { text: detailAkunCustomer });
-                      console.log('✅ Account details sent to customer successfully!');
+                      console.log('📤 ATTEMPT 1: Sending full account details to customer...');
+                      
+                      // Add delay before sending to avoid rate limits
+                      await sleep(1000);
+                      
+                      const messageResult = await ronzz.sendMessage(sender, { text: detailAkunCustomer });
+                      console.log('📨 Message result:', JSON.stringify(messageResult?.key || 'no key'));
+                      console.log('✅ SUCCESS: Account details sent to customer!');
+                      
                       customerMessageSent = true;
                       
                     } catch (error) {
-                      console.error('❌ Single message failed, trying multiple messages...');
+                      console.error('❌ ATTEMPT 1 FAILED:', error.message);
+                      console.error('❌ Full error:', JSON.stringify(error, null, 2));
                       
+                      // Attempt 2: Send in multiple smaller messages
                       try {
-                        // Attempt 2: Send in multiple smaller messages
+                        console.log('📤 ATTEMPT 2: Sending account details in multiple messages...');
+                        
+                        // Send header first
                         const headerParts = [
                           `*📦 DETAIL AKUN PEMBELIAN*`,
                           '',
@@ -2571,10 +2572,13 @@ case 'buynow': {
                           `📋 Detail akun akan dikirim dalam pesan terpisah...`
                         ];
                         
-                        await sendMessageWithRetry(sender, { text: headerParts.join('\n') });
+                        await sleep(1000);
+                        const headerMsg = await ronzz.sendMessage(sender, { text: headerParts.join('\n') });
+                        console.log('✅ Header message sent:', headerMsg?.key?.id);
                         
-                        // Send each account
+                        // Send each account separately
                         for (let index = 0; index < dataStok.length; index++) {
+                          await sleep(1500); // Delay between messages
                           const dataAkun = dataStok[index].split("|");
                           const accountParts = [
                             `*═══ AKUN ${index + 1} ═══*`,
@@ -2585,13 +2589,13 @@ case 'buynow': {
                           if (dataAkun[3]) accountParts.push(`🔢 Pin: ${dataAkun[3]}`);
                           if (dataAkun[4]) accountParts.push(`🔒 2FA: ${dataAkun[4]}`);
                           
-                          await sleep(800);
-                          await sendMessageWithRetry(sender, { text: accountParts.join('\n') });
+                          const accMsg = await ronzz.sendMessage(sender, { text: accountParts.join('\n') });
+                          console.log(`✅ Account ${index + 1} sent:`, accMsg?.key?.id);
                         }
                         
-                        // Send SNK
+                        // Send SNK separately if it exists
                         if (db.data.produk[data[0]].snk) {
-                          await sleep(800);
+                          await sleep(1500);
                           const snkParts = [
                             `*╭────「 SYARAT & KETENTUAN 」────╮*`,
                             '',
@@ -2604,25 +2608,34 @@ case 'buynow': {
                             '',
                             `*╰────「 END SNK 」────╯*`
                           ];
-                          await sendMessageWithRetry(sender, { text: snkParts.join('\n') });
+                          
+                          const snkMsg = await ronzz.sendMessage(sender, { text: snkParts.join('\n') });
+                          console.log('✅ SNK message sent:', snkMsg?.key?.id);
                         }
                         
-                        console.log('✅ All account details sent in separate messages!');
+                        console.log('✅ SUCCESS: All account details sent in separate messages!');
                         customerMessageSent = true;
                         
                       } catch (fallbackError) {
-                        console.error('❌ Multiple messages also failed, sending basic notification...');
+                        console.error('❌ ATTEMPT 2 ALSO FAILED:', fallbackError.message);
+                        console.error('❌ Full error:', JSON.stringify(fallbackError, null, 2));
                         
+                        // Attempt 3: Send basic text only
                         try {
+                          console.log('📤 ATTEMPT 3: Sending basic notification...');
                           const basicMessage = `Akun berhasil dibeli!\n\nProduk: ${db.data.produk[data[0]].name}\nJumlah: ${jumlah} akun\n\nSilahkan hubungi admin untuk mendapatkan detail akun.`;
-                          await sendMessageWithRetry(sender, { text: basicMessage });
-                          console.log('✅ Basic notification sent!');
+                          const basicMsg = await ronzz.sendMessage(sender, { text: basicMessage });
+                          console.log('✅ SUCCESS: Basic notification sent:', basicMsg?.key?.id);
                           customerMessageSent = true;
+                          
                         } catch (finalError) {
                           console.error('❌ ALL ATTEMPTS FAILED:', finalError.message);
+                          console.error('❌ CUSTOMER WILL NOT RECEIVE ACCOUNT DETAILS!');
                         }
                       }
                     }
+                    
+                    console.log('🏁 CUSTOMER MESSAGE SEND RESULT:', customerMessageSent ? 'SUCCESS' : 'FAILED');
 
                     // Send single comprehensive success message
                     if (customerMessageSent) {
