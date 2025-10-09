@@ -8271,7 +8271,7 @@ Ada yang upgrade role!
         )
         
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const backupFileName = `SC-TOPUP-ORKUT-BUTTON-${timestamp}.zip`;
+        const backupFileName = `backup-bot-wa-${timestamp}.zip`;
         const backupPath = `${backupDir}/${backupFileName}`;
         
         await execSync(`zip -r ${backupPath} ${ls.join(" ")}`)
@@ -8288,7 +8288,7 @@ Ada yang upgrade role!
         const sevenDays = 7 * 24 * 60 * 60 * 1000;
         
         files.forEach(file => {
-          if (file.startsWith('SC-TOPUP-ORKUT-BUTTON-') && file.endsWith('.zip')) {
+          if (file.startsWith('backup-bot-wa-') && file.endsWith('.zip')) {
             const filePath = `${backupDir}/${file}`;
             const stats = fs.statSync(filePath);
             if (now - stats.mtime.getTime() > sevenDays) {
