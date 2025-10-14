@@ -8360,6 +8360,36 @@ Ada yang upgrade role!
       }
         break
 
+      case 'reloaddb': {
+        try {
+          if (!isOwner) return reply('❌ Command ini hanya untuk owner!')
+          
+          await reply('🔄 Sedang reload database dari PostgreSQL...')
+          
+          if (usePg && typeof db.load === 'function') {
+            await db.load()
+            
+            // Clear saldo cache
+            saldoCache.clear()
+            
+            // Emit reload event
+            process.emit('database:reloaded')
+            
+            const productCount = Object.keys(db.data.produk || {}).length
+            const userCount = Object.keys(db.data.users || {}).length
+            
+            await reply(`✅ Database berhasil di-reload!\n📊 Produk: ${productCount}\n👥 Users: ${userCount}\n🔄 Cache dibersihkan`)
+          } else {
+            await reply('❌ PostgreSQL tidak aktif atau database tidak mendukung reload')
+          }
+          
+        } catch (error) {
+          console.error('Reload database error:', error)
+          await reply('❌ Gagal reload database: ' + error.message)
+        }
+      }
+        break
+
       default:
         if (budy.startsWith('=>')) {
           if (!isOwner) return
