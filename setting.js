@@ -204,6 +204,7 @@ ${readmore}
 │☛ ${prefix}block
 │☛ ${prefix}unblock
 │☛ ${prefix}backup
+│☛ ${prefix}reloaddb
 ╰─────╼
 
 ╭─────╼「 *STALKER MENU* 」
@@ -399,6 +400,7 @@ ${readmore}
 │☛ ${prefix}block
 │☛ ${prefix}unblock
 │☛ ${prefix}backup
+│☛ ${prefix}reloaddb
 ╰─────╼
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
