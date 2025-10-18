@@ -3150,6 +3150,7 @@ case 'buy': {
   // Cek apakah ini adalah command untuk owner/admin dengan nomor tujuan
   let targetNumber = null
   let isOwnerBuy = false
+  let cleanedNumber = null
   
   if (isOwner && data.length >= 3) {
     // Format: buy kode nominal nomorcust
@@ -3184,7 +3185,7 @@ case 'buy': {
       return cleaned
     }
     
-    const cleanedNumber = cleanWhatsAppNumber(nomorTujuan)
+    cleanedNumber = cleanWhatsAppNumber(nomorTujuan)
     
     if (cleanedNumber && cleanedNumber.match(/^62\d{9,13}$/)) {
       // Validasi nomor WhatsApp Indonesia (62 + 9-13 digit)
@@ -3362,7 +3363,7 @@ case 'buy': {
       console.log(`🎯 OWNER BUY SUMMARY:`);
       console.log(`   - Owner: ${sender}`);
       console.log(`   - Target: ${targetNumber}`);
-      console.log(`   - Cleaned Number: ${cleanedNumber}`);
+      console.log(`   - Cleaned Number: ${cleanedNumber || 'N/A'}`);
       console.log(`   - Product: ${data[0]} (${jumlah} items)`);
       console.log(`   - Delivery: ${customerMessageSent ? 'SUCCESS' : 'FAILED'}`);
     } else {
@@ -3401,7 +3402,7 @@ case 'buy': {
       metodeBayar: "Saldo",
       totalBayar: totalHarga,
       isOwnerBuy: isOwnerBuy,
-      targetNumber: isOwnerBuy ? cleanedNumber : null
+      targetNumber: isOwnerBuy ? (cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '')) : null
     })
 
     await db.save()
@@ -3417,7 +3418,7 @@ case 'buy': {
         `*📊 Stok Sebelumnya:* ${jumlah}`,
         `*📉 Stok Sekarang:* 0 (HABIS)`,
         `*🛒 Terjual Terakhir:* ${jumlah} akun`,
-        `*👤 Pembeli:* @${sender.split("@")[0]}${isOwnerBuy ? ` (Owner buy ke ${cleanedNumber})` : ''}`,
+        `*👤 Pembeli:* @${sender.split("@")[0]}${isOwnerBuy ? ` (Owner buy ke ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'})` : ''}`,
         `*💰 Total Transaksi:* Rp${toRupiah(totalHarga)}`,
         `*📅 Tanggal:* ${tanggal}`,
         `*⏰ Jam:* ${jamwib} WIB`,
@@ -3437,7 +3438,7 @@ case 'buy': {
     // Send single comprehensive success message
     if (customerMessageSent) {
       if (isOwnerBuy) {
-        reply(`🎉 Pembelian berhasil! Detail akun telah dikirim ke nomor ${cleanedNumber}. Terima kasih!`)
+        reply(`🎉 Pembelian berhasil! Detail akun telah dikirim ke nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}. Terima kasih!`)
         
         // Kirim notifikasi ke owner tentang transaksi yang berhasil
         const ownerNotification = `📋 *OWNER BUY NOTIFICATION*
@@ -3445,7 +3446,7 @@ case 'buy': {
 *✅ Transaksi Berhasil*
 *📦 Produk:* ${db.data.produk[data[0]].name}
 *🔢 Jumlah:* ${jumlah} akun
-*📞 Nomor Tujuan:* ${cleanedNumber}
+*📞 Nomor Tujuan:* ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}
 *💰 Total Harga:* Rp${toRupiah(totalHarga)}
 *📅 Tanggal:* ${tanggal}
 *⏰ Jam:* ${jamwib} WIB
@@ -3466,7 +3467,7 @@ case 'buy': {
       }
     } else {
       if (isOwnerBuy) {
-        reply(`⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun ke nomor ${cleanedNumber}. Silakan coba kirim ulang atau hubungi admin.`);
+        reply(`⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun ke nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}. Silakan coba kirim ulang atau hubungi admin.`);
         
         // Kirim notifikasi error ke owner
         const errorNotification = `📋 *OWNER BUY ERROR NOTIFICATION*
@@ -3474,7 +3475,7 @@ case 'buy': {
 *⚠️ Transaksi Berhasil - Pengiriman Gagal*
 *📦 Produk:* ${db.data.produk[data[0]].name}
 *🔢 Jumlah:* ${jumlah} akun
-*📞 Nomor Tujuan:* ${cleanedNumber}
+*📞 Nomor Tujuan:* ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}
 *💰 Total Harga:* Rp${toRupiah(totalHarga)}
 *📅 Tanggal:* ${tanggal}
 *⏰ Jam:* ${jamwib} WIB
