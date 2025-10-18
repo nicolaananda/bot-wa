@@ -3362,10 +3362,11 @@ case 'buy': {
     if (isOwnerBuy) {
       console.log(`🎯 OWNER BUY SUMMARY:`);
       console.log(`   - Owner: ${sender}`);
-      console.log(`   - Target: ${targetNumber}`);
-      console.log(`   - Cleaned Number: ${cleanedNumber || 'N/A'}`);
+      console.log(`   - Target User: ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}`);
+      console.log(`   - Target WhatsApp: ${targetNumber}`);
       console.log(`   - Product: ${data[0]} (${jumlah} items)`);
       console.log(`   - Delivery: ${customerMessageSent ? 'SUCCESS' : 'FAILED'}`);
+      console.log(`   - Database User: ${isOwnerBuy ? (cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || sender.split("@")[0]) : sender.split("@")[0]}`);
     } else {
       console.log(`👤 REGULAR BUY SUMMARY:`);
       console.log(`   - Customer: ${sender}`);
@@ -3396,13 +3397,14 @@ case 'buy': {
       date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
       profit: db.data.produk[data[0]].profit,
       jumlah: jumlah,
-      user: sender.split("@")[0],
+      user: isOwnerBuy ? (cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || sender.split("@")[0]) : sender.split("@")[0],
       userRole: db.data.users[sender].role,
       reffId: reffId,
       metodeBayar: "Saldo",
       totalBayar: totalHarga,
       isOwnerBuy: isOwnerBuy,
-      targetNumber: isOwnerBuy ? (cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '')) : null
+      targetNumber: isOwnerBuy ? (cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '')) : null,
+      ownerNumber: isOwnerBuy ? sender.split("@")[0] : null
     })
 
     await db.save()
@@ -3446,13 +3448,15 @@ case 'buy': {
 *✅ Transaksi Berhasil*
 *📦 Produk:* ${db.data.produk[data[0]].name}
 *🔢 Jumlah:* ${jumlah} akun
+*👤 User Penerima:* ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}
 *📞 Nomor Tujuan:* ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}
 *💰 Total Harga:* Rp${toRupiah(totalHarga)}
 *📅 Tanggal:* ${tanggal}
 *⏰ Jam:* ${jamwib} WIB
 *🆔 Ref ID:* ${reffId}
 
-*📤 Status Pengiriman:* ✅ Berhasil dikirim ke nomor tujuan`
+*📤 Status Pengiriman:* ✅ Berhasil dikirim ke nomor tujuan
+*💾 Database:* Disimpan sebagai user ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}`
         
         try {
           await ronzz.sendMessage(sender, { text: ownerNotification })
@@ -3475,6 +3479,7 @@ case 'buy': {
 *⚠️ Transaksi Berhasil - Pengiriman Gagal*
 *📦 Produk:* ${db.data.produk[data[0]].name}
 *🔢 Jumlah:* ${jumlah} akun
+*👤 User Penerima:* ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}
 *📞 Nomor Tujuan:* ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}
 *💰 Total Harga:* Rp${toRupiah(totalHarga)}
 *📅 Tanggal:* ${tanggal}
@@ -3482,7 +3487,8 @@ case 'buy': {
 *🆔 Ref ID:* ${reffId}
 
 *📤 Status Pengiriman:* ❌ Gagal dikirim ke nomor tujuan
-*🔧 Tindakan:* Silakan kirim manual atau coba ulang`
+*🔧 Tindakan:* Silakan kirim manual atau coba ulang
+*💾 Database:* Disimpan sebagai user ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}`
         
         try {
           await ronzz.sendMessage(sender, { text: errorNotification })
