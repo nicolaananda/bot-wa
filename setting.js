@@ -172,6 +172,7 @@ ${readmore}
 ╭─────╼「 *ORDER MENU* 」
 │☛ ${prefix}stok
 │☛ ${prefix}buy
+│☛ ${prefix}buynow
 ╰─────╼
 
 ╭─────╼「 *OWNER MENU* 」
@@ -205,6 +206,7 @@ ${readmore}
 │☛ ${prefix}unblock
 │☛ ${prefix}backup
 │☛ ${prefix}reloaddb
+│☛ ${prefix}buy <kode> <jumlah> <nomor> (Owner buy)
 ╰─────╼
 
 ╭─────╼「 *STALKER MENU* 」
@@ -401,7 +403,14 @@ ${readmore}
 │☛ ${prefix}unblock
 │☛ ${prefix}backup
 │☛ ${prefix}reloaddb
+│☛ ${prefix}buy <kode> <jumlah> <nomor> (Owner buy)
 ╰─────╼
+
+*💡 OWNER BUY FEATURE:*
+• Format: ${prefix}buy kodeproduk jumlah nomorcust
+• Contoh: ${prefix}buy net2u 1 6281389592981
+• Akun akan dikirim ke nomor tujuan
+• Saldo dikurangi dari owner/admin
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
 
@@ -559,7 +568,13 @@ ${readmore}
 ╭─────╼「 *ORDER MENU* 」
 │☛ ${prefix}stok
 │☛ ${prefix}buy
+│☛ ${prefix}buynow
 ╰─────╼
+
+*💡 CARA PEMBELIAN:*
+• *Buy (Saldo):* ${prefix}buy kodeproduk jumlah
+• *Buynow (QRIS):* ${prefix}buynow kodeproduk jumlah
+• *Owner Buy:* ${prefix}buy kodeproduk jumlah nomor (Owner only)
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
 • ${ownerName} (Owner)
