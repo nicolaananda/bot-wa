@@ -3146,45 +3146,7 @@ break;
 case 'buy': {
   if (db.data.order[sender] !== undefined) return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
   let data = q.split(" ")
-  
-  // Cek apakah ini adalah command untuk owner/admin dengan nomor tujuan
-  let targetNumber = null
-  let isOwnerBuy = false
-  
-  if (isOwner && data.length >= 3) {
-    // Format: buy kode nominal nomorcust
-    // Contoh: buy net2u 1 6281389592981
-    const nomorTujuan = data[2]
-    if (nomorTujuan && nomorTujuan.match(/^[0-9]+$/)) {
-      // Validasi nomor WhatsApp
-      if (nomorTujuan.length < 10 || nomorTujuan.length > 15) {
-        return reply(`❌ Nomor WhatsApp tidak valid. Pastikan nomor memiliki 10-15 digit.\nContoh: ${prefix + command} ${data[0]} ${data[1]} 6281389592981`)
-      }
-      targetNumber = nomorTujuan + '@s.whatsapp.net'
-      isOwnerBuy = true
-      console.log(`🛒 Owner/Admin buy detected - Target: ${targetNumber}`)
-    } else {
-      return reply(`❌ Format nomor tidak valid. Gunakan hanya angka.\nContoh: ${prefix + command} ${data[0]} ${data[1]} 6281389592981`)
-    }
-  } else if (!isOwner && data.length >= 3) {
-    // Jika bukan owner tapi ada 3 parameter, abaikan parameter ketiga
-    console.log(`⚠️ Non-owner user tried to use 3 parameters, ignoring third parameter`)
-    reply(`ℹ️ Parameter ketiga diabaikan. Untuk membeli akun dan mengirim ke nomor lain, hubungi owner/admin.`)
-  }
-  
-  if (!data[1]) {
-    if (isOwner) {
-      return reply(`Contoh: ${prefix + command} idproduk jumlah\nAtau untuk kirim ke nomor lain: ${prefix + command} idproduk jumlah nomorcust`)
-    } else {
-      return reply(`Contoh: ${prefix + command} idproduk jumlah`)
-    }
-  }
-  
-  // Pastikan minimal ada 2 parameter (kode dan jumlah)
-  if (data.length < 2) {
-    return reply(`Contoh: ${prefix + command} idproduk jumlah`)
-  }
-  
+  if (!data[1]) return reply(`Contoh: ${prefix + command} idproduk jumlah`)
   if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
 
   const jumlah = Number(data[1])
@@ -3206,7 +3168,7 @@ case 'buy': {
       return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(currentSaldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}deposit nominal*`)
     }
 
-    reply(isOwnerBuy ? `Sedang memproses pembelian untuk nomor ${data[2]}...` : "Sedang memproses pembelian dengan saldo...")
+    reply("Sedang memproses pembelian dengan saldo...")
 
     // Kurangi saldo user (PG)
     await dbHelper.updateUserSaldo(sender, totalHarga, 'subtract')
@@ -3262,23 +3224,19 @@ case 'buy': {
     // Improvement: Remove unused detailAkunOwner variable
 
     // Improvement: Better message sending with detailed logging
-    const recipientNumber = isOwnerBuy ? targetNumber : sender
-    const recipientType = isOwnerBuy ? 'target customer' : 'customer'
-    
     console.log('🚀 STARTING CUSTOMER MESSAGE SEND PROCESS (BUY CASE)');
-    console.log('📞 Customer WhatsApp ID:', recipientNumber);
+    console.log('📞 Customer WhatsApp ID:', sender);
     console.log('📏 Message length:', detailAkunCustomer.length);
-    console.log('🎯 Owner buy mode:', isOwnerBuy ? 'YES' : 'NO');
     
     let customerMessageSent = false;
     
     try {
-      console.log(`📤 ATTEMPT 1: Sending complete account details to ${recipientType}...`);
+      console.log('📤 ATTEMPT 1: Sending complete account details to customer...');
       
       await sleep(500)
-      const messageResult = await ronzz.sendMessage(recipientNumber, { text: detailAkunCustomer }, { quoted: m })
+      const messageResult = await ronzz.sendMessage(sender, { text: detailAkunCustomer }, { quoted: m })
       console.log('📨 Message result:', JSON.stringify(messageResult?.key || 'no key'))
-      console.log(`✅ SUCCESS: Complete account details sent to ${recipientType}!`)
+      console.log('✅ SUCCESS: Complete account details sent to customer!')
       customerMessageSent = true;
       
     } catch (error) {
@@ -3287,11 +3245,11 @@ case 'buy': {
       
       // Attempt 2: coba kirim tanpa quoted message
       try {
-        console.log(`📤 ATTEMPT 2: Sending without quoted message to ${recipientType}...`);
+        console.log('📤 ATTEMPT 2: Sending without quoted message...');
         await sleep(500)
-        const msg2 = await ronzz.sendMessage(recipientNumber, { text: detailAkunCustomer })
+        const msg2 = await ronzz.sendMessage(sender, { text: detailAkunCustomer })
         console.log('📨 Message result:', JSON.stringify(msg2?.key || 'no key'))
-        console.log(`✅ SUCCESS: Account details sent without quoted message to ${recipientType}!`)
+        console.log('✅ SUCCESS: Account details sent without quoted message!')
         customerMessageSent = true;
       } catch (fallbackError1) {
         console.error('❌ ATTEMPT 2 FAILED:', fallbackError1.message);
@@ -3299,7 +3257,7 @@ case 'buy': {
         
         // Attempt 3: send simple account info
         try {
-          console.log(`📤 ATTEMPT 3: Sending simple account info to ${recipientType}...`);
+          console.log('📤 ATTEMPT 3: Sending simple account info...');
           const simpleParts = [
             `*📦 AKUN PEMBELIAN*`,
             '',
@@ -3317,9 +3275,9 @@ case 'buy': {
             )
           })
           await sleep(500)
-          const msg3 = await ronzz.sendMessage(recipientNumber, { text: simpleParts.join('\n') })
+          const msg3 = await ronzz.sendMessage(sender, { text: simpleParts.join('\n') })
           console.log('📨 Message result:', JSON.stringify(msg3?.key || 'no key'))
-          console.log(`✅ SUCCESS: Simple account details sent to ${recipientType}!`)
+          console.log('✅ SUCCESS: Simple account details sent!')
           customerMessageSent = true;
         } catch (fallbackError2) {
           console.error('❌ ALL ATTEMPTS FAILED:', fallbackError2.message);
@@ -3329,18 +3287,6 @@ case 'buy': {
     }
     
     console.log('🏁 CUSTOMER MESSAGE SEND RESULT (BUY CASE):', customerMessageSent ? 'SUCCESS' : 'FAILED');
-    if (isOwnerBuy) {
-      console.log(`🎯 OWNER BUY SUMMARY:`);
-      console.log(`   - Owner: ${sender}`);
-      console.log(`   - Target: ${targetNumber}`);
-      console.log(`   - Product: ${data[0]} (${jumlah} items)`);
-      console.log(`   - Delivery: ${customerMessageSent ? 'SUCCESS' : 'FAILED'}`);
-    } else {
-      console.log(`👤 REGULAR BUY SUMMARY:`);
-      console.log(`   - Customer: ${sender}`);
-      console.log(`   - Product: ${data[0]} (${jumlah} items)`);
-      console.log(`   - Delivery: ${customerMessageSent ? 'SUCCESS' : 'FAILED'}`);
-    }
 
     // Improvement: Async file write untuk receipt
     try {
@@ -3358,20 +3304,18 @@ case 'buy': {
     }
 
     // Tambah ke database transaksi
-    db.data.transaksi.push({
+                    db.data.transaksi.push({
       id: data[0],
       name: db.data.produk[data[0]].name,
       price: hargaProduk(data[0], db.data.users[sender].role),
-      date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+                        date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
       profit: db.data.produk[data[0]].profit,
       jumlah: jumlah,
-      user: sender.split("@")[0],
-      userRole: db.data.users[sender].role,
+                        user: sender.split("@")[0],
+                        userRole: db.data.users[sender].role,
       reffId: reffId,
       metodeBayar: "Saldo",
-      totalBayar: totalHarga,
-      isOwnerBuy: isOwnerBuy,
-      targetNumber: isOwnerBuy ? data[2] : null
+      totalBayar: totalHarga
     })
 
     await db.save()
@@ -3387,7 +3331,7 @@ case 'buy': {
         `*📊 Stok Sebelumnya:* ${jumlah}`,
         `*📉 Stok Sekarang:* 0 (HABIS)`,
         `*🛒 Terjual Terakhir:* ${jumlah} akun`,
-        `*👤 Pembeli:* @${sender.split("@")[0]}${isOwnerBuy ? ` (Owner buy ke ${data[2]})` : ''}`,
+        `*👤 Pembeli:* @${sender.split("@")[0]}`,
         `*💰 Total Transaksi:* Rp${toRupiah(totalHarga)}`,
         `*📅 Tanggal:* ${tanggal}`,
         `*⏰ Jam:* ${jamwib} WIB`,
@@ -3406,62 +3350,13 @@ case 'buy': {
     
     // Send single comprehensive success message
     if (customerMessageSent) {
-      if (isOwnerBuy) {
-        reply(`🎉 Pembelian berhasil! Detail akun telah dikirim ke nomor ${data[2]}. Terima kasih!`)
-        
-        // Kirim notifikasi ke owner tentang transaksi yang berhasil
-        const ownerNotification = `📋 *OWNER BUY NOTIFICATION*
-        
-*✅ Transaksi Berhasil*
-*📦 Produk:* ${db.data.produk[data[0]].name}
-*🔢 Jumlah:* ${jumlah} akun
-*📞 Nomor Tujuan:* ${data[2]}
-*💰 Total Harga:* Rp${toRupiah(totalHarga)}
-*📅 Tanggal:* ${tanggal}
-*⏰ Jam:* ${jamwib} WIB
-*🆔 Ref ID:* ${reffId}
-
-*📤 Status Pengiriman:* ✅ Berhasil dikirim ke nomor tujuan`
-        
-        try {
-          await ronzz.sendMessage(sender, { text: ownerNotification })
-          console.log('✅ Owner notification sent successfully')
-        } catch (notifError) {
-          console.error('❌ Failed to send owner notification:', notifError.message)
-        }
-      } else if (isGroup) {
+      if (isGroup) {
         reply("🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!");
       } else {
         reply("🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim di atas. Apabila tidak terlihat rechat agar dikirim ulang Terima kasih!");
       }
     } else {
-      if (isOwnerBuy) {
-        reply(`⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun ke nomor ${data[2]}. Silakan coba kirim ulang atau hubungi admin.`);
-        
-        // Kirim notifikasi error ke owner
-        const errorNotification = `📋 *OWNER BUY ERROR NOTIFICATION*
-        
-*⚠️ Transaksi Berhasil - Pengiriman Gagal*
-*📦 Produk:* ${db.data.produk[data[0]].name}
-*🔢 Jumlah:* ${jumlah} akun
-*📞 Nomor Tujuan:* ${data[2]}
-*💰 Total Harga:* Rp${toRupiah(totalHarga)}
-*📅 Tanggal:* ${tanggal}
-*⏰ Jam:* ${jamwib} WIB
-*🆔 Ref ID:* ${reffId}
-
-*📤 Status Pengiriman:* ❌ Gagal dikirim ke nomor tujuan
-*🔧 Tindakan:* Silakan kirim manual atau coba ulang`
-        
-        try {
-          await ronzz.sendMessage(sender, { text: errorNotification })
-          console.log('✅ Owner error notification sent successfully')
-        } catch (notifError) {
-          console.error('❌ Failed to send owner error notification:', notifError.message)
-        }
-      } else {
-        reply("⚠️ Pembelian dengan saldo berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
-      }
+      reply("⚠️ Pembelian dengan saldo berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
       
       // Skip failed-delivery alert to admin
     }
@@ -8462,36 +8357,6 @@ Ada yang upgrade role!
             }
           }
         });
-      }
-        break
-
-      case 'reloaddb': {
-        try {
-          if (!isOwner) return reply('❌ Command ini hanya untuk owner!')
-          
-          await reply('🔄 Sedang reload database dari PostgreSQL...')
-          
-          if (usePg && typeof db.load === 'function') {
-            await db.load()
-            
-            // Clear saldo cache
-            saldoCache.clear()
-            
-            // Emit reload event
-            process.emit('database:reloaded')
-            
-            const productCount = Object.keys(db.data.produk || {}).length
-            const userCount = Object.keys(db.data.users || {}).length
-            
-            await reply(`✅ Database berhasil di-reload!\n📊 Produk: ${productCount}\n👥 Users: ${userCount}\n🔄 Cache dibersihkan`)
-          } else {
-            await reply('❌ PostgreSQL tidak aktif atau database tidak mendukung reload')
-          }
-          
-        } catch (error) {
-          console.error('Reload database error:', error)
-          await reply('❌ Gagal reload database: ' + error.message)
-        }
       }
         break
 

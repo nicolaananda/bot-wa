@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Dashboard API Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .api-section {
+            margin-bottom: 40px;
+        }
+        
+        .api-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #3498db;
+            font-size: 1.5rem;
+        }
+        
+        .api-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .api-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .api-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border-color: #3498db;
+        }
+        
+        .api-card h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+        
+        .api-card .endpoint {
+            background: #2c3e50;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            word-break: break-all;
+        }
+        
+        .api-card .description {
+            color: #6c757d;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        
+        .test-button {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        .result-area {
+            background: #1e1e1e;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            display: none;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-success { background: #27ae60; }
+        .status-error { background: #e74c3c; }
+        .status-loading { background: #f39c12; animation: pulse 1s infinite; }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .feature-card {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .feature-card h4 {
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .feature-card p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Advanced Dashboard API</h1>
+            <p>Comprehensive analytics and insights for your WhatsApp Bot business</p>
+        </div>
+        
+        <div class="content">
+            <!-- Basic Endpoints -->
+            <div class="api-section">
+                <h2>🔧 Basic Endpoints</h2>
+                <div class="api-grid">
+                    <div class="api-card" onclick="testEndpoint('/api/dashboard/overview')">
+                        <h3>Dashboard Overview</h3>
+                        <div class="endpoint">GET /api/dashboard/overview</div>
+                        <div class="description">Get basic dashboard metrics and overview data including total users, transactions, revenue, and profit.</div>
+                        <button class="test-button">Test Endpoint</button>
+                    </div>
+                    
+                    <div class="api-card" onclick="testEndpoint('/api/dashboard/users/all?page=1&limit=5')">
+                        <h3>All Users (Paginated)</h3>
+                        <div class="endpoint">GET /api/dashboard/users/all</div>
+                        <div class="description">Get paginated list of users with search and filter capabilities.</div>
+                        <button class="test-button">Test Endpoint</button>
+                    </div>
+                    
+                    <div class="api-card" onclick="testEndpoint('/api/dashboard/transactions/recent?limit=10')">
+                        <h3>Recent Transactions</h3>
+                        <div class="endpoint">GET /api/dashboard/transactions/recent</div>
+                        <div class="description">Get the most recent transactions across all users.</div>
+                        <button class="test-button">Test Endpoint</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Advanced Analytics -->
+            <div class="api-section">
+                <h2>📊 Advanced Analytics</h2>
+                <div class="api-grid">
+                    <div class="api-card" onclick="testEndpoint('/api/dashboard/analytics/advanced')">
+                        <h3>Advanced Analytics</h3>
+                        <div class="endpoint">GET /api/dashboard/analytics/advanced</div>
+                        <div class="description">Comprehensive analytics with trends, user metrics, and business insights.</div>
+                        <button class="test-button">Test Endpoint</button>
+                    </div>
+                    
+                    <div class="api-card" onclick="testEndpoint('/api/dashboard/products/performance')">
+                        <h3>Product Performance</h3>
+                        <div class="endpoint">GET /api/dashboard/products/performance</div>
+                        <div class="description">Detailed product performance analysis with categories and conversion rates.</div>
+                        <button class="test-button">Test Endpoint</button>
+                    </div>
+                    
+                    <div class="api-card" onclick="testEndpoint('/api/dashboard/users/behavior')">
+                        <h3>User Behavior Analytics</h3>
+                        <div class="endpoint">GET /api/dashboard/users/behavior</div>
+                        <div class="description">User segmentation, behavior patterns, and churn analysis.</div>
+                        <button class="test-button">Test Endpoint</button>
+                    </div>
+                    
+                    <div class="api-card" onclick="testEndpoint('/api/dashboard/finance/analytics')">
+                        <h3>Financial Analytics</h3>
+                        <div class="endpoint">GET /api/dashboard/finance/analytics</div>
+                        <div class="description">Revenue analysis, profit margins, and financial health metrics.</div>
+                        <button class="test-button">Test Endpoint</button>
+                    </div>
+                    
+                    <div class="api-card" onclick="testEndpoint('/api/dashboard/realtime')">
+                        <h3>Real-time Data</h3>
+                        <div class="endpoint">GET /api/dashboard/realtime</div>
+                        <div class="description">Live dashboard data with today's metrics and hourly breakdowns.</div>
+                        <button class="test-button">Test Endpoint</button>
+                    </div>
+                    
+                    <div class="api-card" onclick="testEndpoint('/api/dashboard/predictions')">
+                        <h3>Predictive Analytics</h3>
+                        <div class="endpoint">GET /api/dashboard/predictions</div>
+                        <div class="description">AI-powered predictions for revenue, user growth, and inventory needs.</div>
+                        <button class="test-button">Test Endpoint</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stock Management -->
+            <div class="api-section">
+                <h2>📦 Stock Management</h2>
+                <div class="api-grid">
+                    <div class="api-card" onclick="testEndpoint('/api/dashboard/products/stock')">
+                        <h3>Product Stock Overview</h3>
+                        <div class="endpoint">GET /api/dashboard/products/stock</div>
+                        <div class="description">All products with stock information and performance metrics.</div>
+                        <button class="test-button">Test Endpoint</button>
+                    </div>
+                    
+                    <div class="api-card" onclick="testEndpoint('/api/dashboard/products/stock/summary')">
+                        <h3>Stock Summary</h3>
+                        <div class="endpoint">GET /api/dashboard/products/stock/summary</div>
+                        <div class="description">Stock summary statistics and category breakdown.</div>
+                        <button class="test-button">Test Endpoint</button>
+                    </div>
+                    
+                    <div class="api-card" onclick="testEndpoint('/api/dashboard/products/stock/alerts')">
+                        <h3>Stock Alerts</h3>
+                        <div class="endpoint">GET /api/dashboard/products/stock/alerts</div>
+                        <div class="description">Low stock and out-of-stock alerts with urgency levels.</div>
+                        <button class="test-button">Test Endpoint</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Key Features -->
+            <div class="api-section">
+                <h2>🎯 Key Features</h2>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>📈 Advanced Analytics</h4>
+                        <p>User segmentation, behavioral analysis, churn prediction, and financial health monitoring</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>⚡ Real-time Monitoring</h4>
+                        <p>Live metrics, hourly breakdowns, recent activity tracking, and performance alerts</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔮 Predictive Intelligence</h4>
+                        <p>Revenue forecasting, stock optimization, user growth predictions, and market trends</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📦 Stock Management</h4>
+                        <p>Inventory tracking, automated alerts, bulk operations, and performance metrics</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Results Area -->
+            <div id="results" class="result-area"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3002'; // Change this to your API URL
+        
+        async function testEndpoint(endpoint) {
+            const resultsArea = document.getElementById('results');
+            resultsArea.style.display = 'block';
+            resultsArea.innerHTML = '🔄 Loading...\n\nTesting endpoint: ' + endpoint;
+            
+            try {
+                const response = await fetch(API_BASE + endpoint);
+                const data = await response.json();
+                
+                resultsArea.innerHTML = `✅ Success! Status: ${response.status}\n\n` +
+                    `Endpoint: ${endpoint}\n\n` +
+                    `Response:\n${JSON.stringify(data, null, 2)}`;
+                    
+            } catch (error) {
+                resultsArea.innerHTML = `❌ Error!\n\n` +
+                    `Endpoint: ${endpoint}\n\n` +
+                    `Error: ${error.message}\n\n` +
+                    `Make sure your API server is running on ${API_BASE}`;
+            }
+        }
+        
+        // Auto-scroll to results when they appear
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.target.id === 'results' && mutation.target.style.display === 'block') {
+                    mutation.target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+        
+        observer.observe(document.getElementById('results'), {
+            attributes: true,
+            attributeFilter: ['style']
+        });
+    </script>
+</body>
+</html> 
