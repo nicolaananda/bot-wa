@@ -3153,18 +3153,47 @@ case 'buy': {
   
   if (isOwner && data.length >= 3) {
     // Format: buy kode nominal nomorcust
-    // Contoh: buy net2u 1 6281389592981
-    const nomorTujuan = data[2]
-    if (nomorTujuan && nomorTujuan.match(/^[0-9]+$/)) {
-      // Validasi nomor WhatsApp
-      if (nomorTujuan.length < 10 || nomorTujuan.length > 15) {
-        return reply(`❌ Nomor WhatsApp tidak valid. Pastikan nomor memiliki 10-15 digit.\nContoh: ${prefix + command} ${data[0]} ${data[1]} 6281389592981`)
+    // Contoh: buy net2u 1 6281389592981 atau buy net2u 1 +62 852-3554-0944
+    // Gabungkan semua parameter setelah jumlah menjadi nomor (untuk handle spasi dan dash)
+    const nomorTujuan = data.slice(2).join(' ')
+    
+    // Fungsi untuk membersihkan nomor WhatsApp
+    function cleanWhatsAppNumber(input) {
+      if (!input) return null
+      
+      // Hapus semua karakter selain angka dan +
+      let cleaned = input.replace(/[^\d+]/g, '')
+      
+      // Jika dimulai dengan +62, hapus + dan ganti dengan 62
+      if (cleaned.startsWith('+62')) {
+        cleaned = '62' + cleaned.substring(3)
       }
-      targetNumber = nomorTujuan + '@s.whatsapp.net'
+      // Jika dimulai dengan 62, biarkan
+      else if (cleaned.startsWith('62')) {
+        // Sudah benar
+      }
+      // Jika dimulai dengan 0, ganti dengan 62
+      else if (cleaned.startsWith('0')) {
+        cleaned = '62' + cleaned.substring(1)
+      }
+      // Jika dimulai dengan 8 (tanpa 0), tambahkan 62
+      else if (cleaned.startsWith('8')) {
+        cleaned = '62' + cleaned
+      }
+      
+      return cleaned
+    }
+    
+    const cleanedNumber = cleanWhatsAppNumber(nomorTujuan)
+    
+    if (cleanedNumber && cleanedNumber.match(/^62\d{9,13}$/)) {
+      // Validasi nomor WhatsApp Indonesia (62 + 9-13 digit)
+      targetNumber = cleanedNumber + '@s.whatsapp.net'
       isOwnerBuy = true
       console.log(`🛒 Owner/Admin buy detected - Target: ${targetNumber}`)
+      console.log(`📱 Original input: ${nomorTujuan} -> Cleaned: ${cleanedNumber}`)
     } else {
-      return reply(`❌ Format nomor tidak valid. Gunakan hanya angka.\nContoh: ${prefix + command} ${data[0]} ${data[1]} 6281389592981`)
+      return reply(`❌ Format nomor tidak valid.\n\n✅ Format yang diterima:\n• ${prefix + command} ${data[0]} ${data[1]} 6281389592981\n• ${prefix + command} ${data[0]} ${data[1]} +62 852-3554-0944\n• ${prefix + command} ${data[0]} ${data[1]} 085235540944\n• ${prefix + command} ${data[0]} ${data[1]} 85235540944`)
     }
   } else if (!isOwner && data.length >= 3) {
     // Jika bukan owner tapi ada 3 parameter, abaikan parameter ketiga
@@ -3174,7 +3203,7 @@ case 'buy': {
   
   if (!data[1]) {
     if (isOwner) {
-      return reply(`Contoh: ${prefix + command} idproduk jumlah\nAtau untuk kirim ke nomor lain: ${prefix + command} idproduk jumlah nomorcust`)
+      return reply(`Contoh: ${prefix + command} idproduk jumlah\nAtau untuk kirim ke nomor lain: ${prefix + command} idproduk jumlah nomorcust\n\n✅ Format nomor yang diterima:\n• 6281389592981\n• +62 852-3554-0944\n• 085235540944\n• 85235540944`)
     } else {
       return reply(`Contoh: ${prefix + command} idproduk jumlah`)
     }
@@ -3333,6 +3362,7 @@ case 'buy': {
       console.log(`🎯 OWNER BUY SUMMARY:`);
       console.log(`   - Owner: ${sender}`);
       console.log(`   - Target: ${targetNumber}`);
+      console.log(`   - Cleaned Number: ${cleanedNumber}`);
       console.log(`   - Product: ${data[0]} (${jumlah} items)`);
       console.log(`   - Delivery: ${customerMessageSent ? 'SUCCESS' : 'FAILED'}`);
     } else {
@@ -3371,7 +3401,7 @@ case 'buy': {
       metodeBayar: "Saldo",
       totalBayar: totalHarga,
       isOwnerBuy: isOwnerBuy,
-      targetNumber: isOwnerBuy ? data[2] : null
+      targetNumber: isOwnerBuy ? cleanedNumber : null
     })
 
     await db.save()
@@ -3387,7 +3417,7 @@ case 'buy': {
         `*📊 Stok Sebelumnya:* ${jumlah}`,
         `*📉 Stok Sekarang:* 0 (HABIS)`,
         `*🛒 Terjual Terakhir:* ${jumlah} akun`,
-        `*👤 Pembeli:* @${sender.split("@")[0]}${isOwnerBuy ? ` (Owner buy ke ${data[2]})` : ''}`,
+        `*👤 Pembeli:* @${sender.split("@")[0]}${isOwnerBuy ? ` (Owner buy ke ${cleanedNumber})` : ''}`,
         `*💰 Total Transaksi:* Rp${toRupiah(totalHarga)}`,
         `*📅 Tanggal:* ${tanggal}`,
         `*⏰ Jam:* ${jamwib} WIB`,
@@ -3407,7 +3437,7 @@ case 'buy': {
     // Send single comprehensive success message
     if (customerMessageSent) {
       if (isOwnerBuy) {
-        reply(`🎉 Pembelian berhasil! Detail akun telah dikirim ke nomor ${data[2]}. Terima kasih!`)
+        reply(`🎉 Pembelian berhasil! Detail akun telah dikirim ke nomor ${cleanedNumber}. Terima kasih!`)
         
         // Kirim notifikasi ke owner tentang transaksi yang berhasil
         const ownerNotification = `📋 *OWNER BUY NOTIFICATION*
@@ -3415,7 +3445,7 @@ case 'buy': {
 *✅ Transaksi Berhasil*
 *📦 Produk:* ${db.data.produk[data[0]].name}
 *🔢 Jumlah:* ${jumlah} akun
-*📞 Nomor Tujuan:* ${data[2]}
+*📞 Nomor Tujuan:* ${cleanedNumber}
 *💰 Total Harga:* Rp${toRupiah(totalHarga)}
 *📅 Tanggal:* ${tanggal}
 *⏰ Jam:* ${jamwib} WIB
@@ -3436,7 +3466,7 @@ case 'buy': {
       }
     } else {
       if (isOwnerBuy) {
-        reply(`⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun ke nomor ${data[2]}. Silakan coba kirim ulang atau hubungi admin.`);
+        reply(`⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun ke nomor ${cleanedNumber}. Silakan coba kirim ulang atau hubungi admin.`);
         
         // Kirim notifikasi error ke owner
         const errorNotification = `📋 *OWNER BUY ERROR NOTIFICATION*
@@ -3444,7 +3474,7 @@ case 'buy': {
 *⚠️ Transaksi Berhasil - Pengiriman Gagal*
 *📦 Produk:* ${db.data.produk[data[0]].name}
 *🔢 Jumlah:* ${jumlah} akun
-*📞 Nomor Tujuan:* ${data[2]}
+*📞 Nomor Tujuan:* ${cleanedNumber}
 *💰 Total Harga:* Rp${toRupiah(totalHarga)}
 *📅 Tanggal:* ${tanggal}
 *⏰ Jam:* ${jamwib} WIB
