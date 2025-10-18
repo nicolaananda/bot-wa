@@ -3236,7 +3236,7 @@ case 'buy': {
       return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(currentSaldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}deposit nominal*`)
     }
 
-    reply(isOwnerBuy ? `Sedang memproses pembelian untuk nomor ${data[2]}...` : "Sedang memproses pembelian dengan saldo...")
+    reply(isOwnerBuy ? `Sedang memproses pembelian untuk nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}.` : "Sedang memproses pembelian dengan saldo...")
 
     // Kurangi saldo user (PG)
     await dbHelper.updateUserSaldo(sender, totalHarga, 'subtract')
@@ -3278,11 +3278,6 @@ case 'buy': {
       `*📋 SNK PRODUK: ${db.data.produk[data[0]].name}*`,
       '',
       db.data.produk[data[0]].snk,
-      '',
-      `*⚠️ PENTING:*`,
-      `• Baca dan pahami SNK sebelum menggunakan akun`,
-      `• Akun yang sudah dibeli tidak dapat dikembalikan`,
-      `• Hubungi admin jika ada masalah dengan akun`,
       '',
       `*╰────「 END SNK 」────╯*`
     )
