@@ -3197,9 +3197,9 @@ case 'buy': {
       return reply(`❌ Format nomor tidak valid.\n\n✅ Format yang diterima:\n• ${prefix + command} ${data[0]} ${data[1]} 6281389592981\n• ${prefix + command} ${data[0]} ${data[1]} +62 852-3554-0944\n• ${prefix + command} ${data[0]} ${data[1]} 085235540944\n• ${prefix + command} ${data[0]} ${data[1]} 85235540944`)
     }
   } else if (!isOwner && data.length >= 3) {
-    // Jika bukan owner tapi ada 3 parameter, abaikan parameter ketiga
+    // Jika bukan owner tapi ada 3 parameter, abaikan parameter ketiga dan stop
     console.log(`⚠️ Non-owner user tried to use 3 parameters, ignoring third parameter`)
-    reply(`ℹ️ Parameter ketiga diabaikan. Untuk membeli akun dan mengirim ke nomor lain, hubungi owner/admin.`)
+    return reply(`ℹ️ Parameter ketiga diabaikan. Untuk membeli akun dan mengirim ke nomor lain, hubungi owner/admin.\n\nGunakan format: ${prefix + command} ${data[0]} ${data[1]}`)
   }
   
   if (!data[1]) {
