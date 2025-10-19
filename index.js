@@ -3437,28 +3437,6 @@ case 'buy': {
       if (isOwnerBuy) {
         reply(`🎉 Pembelian berhasil! Detail akun telah dikirim ke nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}. Terima kasih!`)
         
-        // Kirim notifikasi ke owner tentang transaksi yang berhasil
-        const ownerNotification = `📋 *OWNER BUY NOTIFICATION*
-        
-*✅ Transaksi Berhasil*
-*📦 Produk:* ${db.data.produk[data[0]].name}
-*🔢 Jumlah:* ${jumlah} akun
-*👤 User Penerima:* ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}
-*📞 Nomor Tujuan:* ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}
-*💰 Total Harga:* Rp${toRupiah(totalHarga)}
-*📅 Tanggal:* ${tanggal}
-*⏰ Jam:* ${jamwib} WIB
-*🆔 Ref ID:* ${reffId}
-
-*📤 Status Pengiriman:* ✅ Berhasil dikirim ke nomor tujuan
-*💾 Database:* Disimpan sebagai user ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}`
-        
-        try {
-          await ronzz.sendMessage(sender, { text: ownerNotification })
-          console.log('✅ Owner notification sent successfully')
-        } catch (notifError) {
-          console.error('❌ Failed to send owner notification:', notifError.message)
-        }
       } else if (isGroup) {
         reply("🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!");
       } else {
@@ -3468,29 +3446,6 @@ case 'buy': {
       if (isOwnerBuy) {
         reply(`⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun ke nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}. Silakan coba kirim ulang atau hubungi admin.`);
         
-        // Kirim notifikasi error ke owner
-        const errorNotification = `📋 *OWNER BUY ERROR NOTIFICATION*
-        
-*⚠️ Transaksi Berhasil - Pengiriman Gagal*
-*📦 Produk:* ${db.data.produk[data[0]].name}
-*🔢 Jumlah:* ${jumlah} akun
-*👤 User Penerima:* ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}
-*📞 Nomor Tujuan:* ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}
-*💰 Total Harga:* Rp${toRupiah(totalHarga)}
-*📅 Tanggal:* ${tanggal}
-*⏰ Jam:* ${jamwib} WIB
-*🆔 Ref ID:* ${reffId}
-
-*📤 Status Pengiriman:* ❌ Gagal dikirim ke nomor tujuan
-*🔧 Tindakan:* Silakan kirim manual atau coba ulang
-*💾 Database:* Disimpan sebagai user ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}`
-        
-        try {
-          await ronzz.sendMessage(sender, { text: errorNotification })
-          console.log('✅ Owner error notification sent successfully')
-        } catch (notifError) {
-          console.error('❌ Failed to send owner error notification:', notifError.message)
-        }
       } else {
         reply("⚠️ Pembelian dengan saldo berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
       }
