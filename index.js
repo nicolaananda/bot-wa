@@ -2276,8 +2276,10 @@ case 'deposit': {
   const totalAmount = baseAmount + uniqueCode
   // Bonus Rp2.000 per Rp50.000 topup (minimal Rp50.000; contoh: 50.000 -> 2.000; 100.000 -> 4.000)
   const bonus = baseAmount >= 50000 ? Math.floor(baseAmount / 50000) * 2000 : 0
+  // Catat waktu pembuatan order untuk menghindari match notifikasi lama
+  const createdAtTs = Date.now()
 
-  db.data.orderDeposit[sender] = { status: 'processing', reffId, metode: 'QRIS', startedAt: Date.now(), baseAmount, totalAmount, uniqueCode, bonus }
+  db.data.orderDeposit[sender] = { status: 'processing', reffId, metode: 'QRIS', startedAt: createdAtTs, baseAmount, totalAmount, uniqueCode, bonus }
 
   try {
     reply("Sedang membuat QR Code...")
@@ -2317,6 +2319,8 @@ case 'deposit': {
       totalAmount,
       uniqueCode,
       bonus,
+      // Simpan timestamp utk validasi notifikasi pembayaran
+      createdAt: createdAtTs
     }
 
     // Improvement: Exponential backoff polling
@@ -2346,7 +2350,17 @@ case 'deposit': {
         const resp = await axios.get(url, { headers, timeout: 5000 })
         const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : [])
 
-        const paid = notifs.find(n => (n.package_name === 'id.bmri.livinmerchant' || (n.app_name||'').toUpperCase().includes('DANA')) && Number((n.amount_detected || '').toString().replace(/[^0-9]/g, '')) === Number(totalAmount))
+        // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
+        const paid = notifs.find(n => {
+          try {
+            const pkgOk = (n.package_name === 'id.bmri.livinmerchant') || (String(n.app_name||'').toUpperCase().includes('DANA'))
+            const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''))
+            const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0
+            return pkgOk && amt === Number(totalAmount) && postedAt >= createdAtTs
+          } catch {
+            return false
+          }
+        })
 
         if (paid) {
           await ronzz.sendMessage(from, { delete: message.key })
