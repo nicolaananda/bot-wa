@@ -62,8 +62,9 @@ User WhatsApp → Bot Server → Redis Check → Database → Response
 
 ### **🛒 E-commerce Purchase Flow**
 
+#### **Option 1: `.buy` - Saldo Payment**
 ```
-1. User: ".buy"
+1. User: ".buy idproduk jumlah"
    ↓
 2. Bot: Check rate limit (Redis)
    ↓
@@ -73,19 +74,42 @@ User WhatsApp → Bot Server → Redis Check → Database → Response
    ↓
 5. Bot: Check product stock (PostgreSQL)
    ↓
-6. Bot: Generate payment link (Midtrans API)
+6. Bot: Deduct saldo from user account
    ↓
-7. Bot: Send payment link to user
+7. Bot: Process purchase immediately
    ↓
-8. User: Complete payment
+8. Bot: Send product details to user
    ↓
-9. Midtrans: Send webhook to bot
+9. Bot: Release transaction lock (Redis)
+```
+
+#### **Option 2: `.buynow` - QRIS Payment**
+```
+1. User: ".buynow idproduk jumlah"
    ↓
-10. Bot: Update transaction status (PostgreSQL)
+2. Bot: Check rate limit (Redis)
+   ↓
+3. Bot: Acquire transaction lock (Redis)
+   ↓
+4. Bot: Check product stock (PostgreSQL)
+   ↓
+5. Bot: Generate unique code (1-99)
+   ↓
+6. Bot: Create QRIS with total amount + unique code
+   ↓
+7. Bot: Send QRIS image to user
+   ↓
+8. User: Scan QRIS and complete payment
+   ↓
+9. Bot: Monitor payment via app listener
+   ↓
+10. Bot: Detect payment completion
     ↓
-11. Bot: Release transaction lock (Redis)
+11. Bot: Process purchase automatically
     ↓
-12. Bot: Send confirmation to user
+12. Bot: Send product details to user
+    ↓
+13. Bot: Release transaction lock (Redis)
 ```
 
 ### **📱 Product Browsing Flow**

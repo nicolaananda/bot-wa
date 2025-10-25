@@ -16,10 +16,11 @@
 - **Input Validation**: Comprehensive sanitization and SQL injection prevention
 
 ### 💰 **E-commerce Capabilities**
+- **Dual Payment System**: Saldo-based and QRIS payment options
 - **Product Catalog**: Real-time inventory management
-- **Payment Integration**: Midtrans payment gateway integration
 - **Order Management**: Complete order lifecycle management
 - **User Management**: Balance tracking and role-based access
+- **QRIS Integration**: Custom QRIS with unique codes and app listener
 
 ### ⚡ **Performance Optimization**
 - **Redis Caching**: Sub-100ms response times
@@ -68,7 +69,7 @@ npm start
 | **Runtime** | Node.js 18+ | JavaScript runtime |
 | **Database** | PostgreSQL | Primary data storage |
 | **Cache** | Redis 6.0+ | Session management & caching |
-| **Payment** | Midtrans API | Payment processing |
+| **Payment** | Dual System | Saldo (PostgreSQL) + QRIS (Custom) |
 | **Messaging** | WhatsApp Web API | Real-time communication |
 | **Process Manager** | PM2/Systemctl | Production process management |
 
@@ -105,11 +106,8 @@ PG_PASSWORD=your_password
 # Redis
 REDIS_URL=redis://localhost:6379
 
-# Payment Gateway
-MIDTRANS_MERCHANT_ID=your_merchant_id
-MIDTRANS_SERVER_KEY=your_server_key
-MIDTRANS_CLIENT_KEY=your_client_key
-MIDTRANS_IS_PRODUCTION=true
+# Payment System (Optional - for QRIS)
+# QRIS configuration can be added here if needed
 ```
 
 ## 📈 Performance Metrics
@@ -125,8 +123,8 @@ MIDTRANS_IS_PRODUCTION=true
 
 ### **E-commerce Businesses**
 - Online stores selling through WhatsApp
-- Digital product distribution
-- Service booking and payment
+- Digital product distribution with dual payment options
+- Service booking with instant saldo or QRIS payment
 
 ### **Small to Medium Enterprises**
 - Customer service automation
@@ -158,11 +156,11 @@ if (!rateLimit.allowed) {
 const products = await cacheAside('produk:list', loadProducts, 300);
 ```
 
-### **Payment Processing**
-- Secure payment gateway integration
-- Transaction status tracking
-- Automatic order confirmation
-- Refund processing support
+### **Dual Payment System**
+- **Saldo Payment (`.buy`)**: Instant purchase using user balance
+- **QRIS Payment (`.buynow`)**: Custom QRIS with unique codes
+- **App Listener**: Automatic payment detection and processing
+- **Transaction Tracking**: Complete order lifecycle management
 
 ### **User Management**
 - Role-based access control
@@ -202,7 +200,9 @@ docker-compose up -d
 
 ### Bot Interface
 - Product browsing through WhatsApp
-- Secure payment processing
+- Dual payment system (Saldo + QRIS)
+- Instant purchase with saldo
+- QRIS payment with unique codes
 - Order confirmation and tracking
 - User balance management
 
@@ -235,8 +235,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - WhatsApp Web API for messaging capabilities
 - Redis team for excellent caching solution
-- Midtrans for payment gateway integration
 - PostgreSQL community for robust database system
+- QRIS integration for seamless payment processing
 
 ---
 
