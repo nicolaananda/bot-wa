@@ -146,16 +146,16 @@ User Payment → App Detection → Process → Send Product → Release Lock
 
 ```mermaid
 flowchart LR
-    A[User: .buy] --> B{Rate Check}
-    B -->|OK| C{Lock Acquired}
-    B -->|Limit| D[Wait Message]
-    C -->|OK| E{Balance OK?}
-    C -->|Busy| F[Busy Message]
-    E -->|OK| G[Deduct Saldo]
-    E -->|Low| H[Low Balance]
-    G --> I[Update Stock]
-    I --> J[Send Product]
-    J --> K[Release Lock]
+    A["User: .buy"] --> B{"Rate Check"}
+    B -->|"OK"| C{"Lock Acquired"}
+    B -->|"Limit"| D["Wait Message"]
+    C -->|"OK"| E{"Balance OK?"}
+    C -->|"Busy"| F["Busy Message"]
+    E -->|"OK"| G["Deduct Saldo"]
+    E -->|"Low"| H["Low Balance"]
+    G --> I["Update Stock"]
+    I --> J["Send Product"]
+    J --> K["Release Lock"]
     
     style A fill:#e3f2fd
     style G fill:#c8e6c9
@@ -166,18 +166,18 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A[User: .buynow] --> B{Rate Check}
-    B -->|OK| C{Lock Acquired}
-    B -->|Limit| D[Wait Message]
-    C -->|OK| E{Stock OK?}
-    C -->|Busy| F[Busy Message]
-    E -->|OK| G[Generate QRIS]
-    E -->|Low| H[Low Stock]
-    G --> I[Send QR Code]
-    I --> J[Monitor Payment]
-    J -->|Paid| K[Send Product]
-    J -->|Timeout| L[Cancel Order]
-    K --> M[Release Lock]
+    A["User: .buynow"] --> B{"Rate Check"}
+    B -->|"OK"| C{"Lock Acquired"}
+    B -->|"Limit"| D["Wait Message"]
+    C -->|"OK"| E{"Stock OK?"}
+    C -->|"Busy"| F["Busy Message"]
+    E -->|"OK"| G["Generate QRIS"]
+    E -->|"Low"| H["Low Stock"]
+    G --> I["Send QR Code"]
+    I --> J["Monitor Payment"]
+    J -->|"Paid"| K["Send Product"]
+    J -->|"Timeout"| L["Cancel Order"]
+    K --> M["Release Lock"]
     L --> M
     
     style A fill:#e3f2fd
