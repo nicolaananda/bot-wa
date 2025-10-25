@@ -142,209 +142,47 @@ User Payment → App Detection → Process → Send Product → Release Lock
 
 ## 🔍 Detailed Payment Flow Analysis
 
-### **🏦 Saldo Payment Flow (`.buy`) - Complete Journey**
+### **🏦 Saldo Payment Flow (`.buy`) - Simple Overview**
 
 ```mermaid
-sequenceDiagram
-    participant U as User
-    participant B as Bot
-    participant R as Redis
-    participant D as PostgreSQL
-    participant L as Logger
+flowchart LR
+    A[User: .buy] --> B{Rate Check}
+    B -->|OK| C{Lock Acquired}
+    B -->|Limit| D[Wait Message]
+    C -->|OK| E{Balance OK?}
+    C -->|Busy| F[Busy Message]
+    E -->|OK| G[Deduct Saldo]
+    E -->|Low| H[Low Balance]
+    G --> I[Update Stock]
+    I --> J[Send Product]
+    J --> K[Release Lock]
     
-    Note over U,L: User initiates purchase with saldo
-    
-    U->>B: .buy idproduk jumlah
-    B->>L: Log: User command received
-    
-    Note over B,R: Rate Limiting Check
-    B->>R: Check rate limit for user
-    R-->>B: Rate limit status (allowed/blocked)
-    
-    alt Rate limit exceeded
-        B->>U: "⚠️ Terlalu banyak request! Tunggu X detik"
-        B->>L: Log: Rate limit exceeded
-    else Rate limit OK
-        Note over B,R: Transaction Locking
-        B->>R: Acquire lock for user transaction
-        R-->>B: Lock acquired/failed
-        
-        alt Lock failed
-            B->>U: "⚠️ Transaksi sedang diproses"
-            B->>L: Log: Lock acquisition failed
-        else Lock acquired
-            B->>L: Log: Transaction lock acquired
-            
-            Note over B,D: Validation Phase
-            B->>D: Check user exists and get role
-            D-->>B: User data (role, status)
-            
-            B->>D: Check product exists and get details
-            D-->>B: Product data (name, price, stock)
-            
-            B->>D: Check current stock quantity
-            D-->>B: Available stock count
-            
-            alt Stock insufficient
-                B->>R: Release transaction lock
-                B->>U: "Stok tersedia X, harap kurangi jumlah"
-                B->>L: Log: Insufficient stock
-            else Stock sufficient
-                Note over B,D: Balance Check
-                B->>D: Get user current saldo
-                D-->>B: Current balance amount
-                
-                B->>B: Calculate total price (price × quantity)
-                
-                alt Insufficient balance
-                    B->>R: Release transaction lock
-                    B->>U: "Saldo tidak cukup! Saldo: RpX, Total: RpY"
-                    B->>L: Log: Insufficient balance
-                else Sufficient balance
-                    Note over B,D: Payment Processing
-                    B->>U: "Sedang memproses pembelian dengan saldo..."
-                    B->>L: Log: Starting payment processing
-                    
-                    B->>D: Deduct saldo from user account
-                    D-->>B: Balance updated successfully
-                    
-                    B->>D: Update product stock (remove items)
-                    D-->>B: Stock updated successfully
-                    
-                    B->>D: Increment product sold counter
-                    D-->>B: Counter updated
-                    
-                    B->>D: Create transaction record
-                    D-->>B: Transaction saved with reference ID
-                    
-                    Note over B,U: Product Delivery
-                    B->>B: Generate product details message
-                    B->>U: Send product details and receipt
-                    B->>L: Log: Transaction completed successfully
-                    
-                    Note over B,R: Cleanup
-                    B->>R: Release transaction lock
-                    B->>L: Log: Transaction lock released
-                end
-            end
-        end
-    end
+    style A fill:#e3f2fd
+    style G fill:#c8e6c9
+    style J fill:#fff3e0
 ```
 
-### **📱 QRIS Payment Flow (`.buynow`) - Complete Journey**
+### **📱 QRIS Payment Flow (`.buynow`) - Simple Overview**
 
 ```mermaid
-sequenceDiagram
-    participant U as User
-    participant B as Bot
-    participant R as Redis
-    participant D as PostgreSQL
-    participant Q as QRIS Generator
-    participant A as App Listener
-    participant L as Logger
+flowchart LR
+    A[User: .buynow] --> B{Rate Check}
+    B -->|OK| C{Lock Acquired}
+    B -->|Limit| D[Wait Message]
+    C -->|OK| E{Stock OK?}
+    C -->|Busy| F[Busy Message]
+    E -->|OK| G[Generate QRIS]
+    E -->|Low| H[Low Stock]
+    G --> I[Send QR Code]
+    I --> J[Monitor Payment]
+    J -->|Paid| K[Send Product]
+    J -->|Timeout| L[Cancel Order]
+    K --> M[Release Lock]
+    L --> M
     
-    Note over U,L: User initiates QRIS payment
-    
-    U->>B: .buynow idproduk jumlah
-    B->>L: Log: QRIS payment initiated
-    
-    Note over B,R: Rate Limiting Check
-    B->>R: Check rate limit for user
-    R-->>B: Rate limit status (allowed/blocked)
-    
-    alt Rate limit exceeded
-        B->>U: "⚠️ Terlalu banyak request! Tunggu X detik"
-        B->>L: Log: Rate limit exceeded
-    else Rate limit OK
-        Note over B,R: Transaction Locking
-        B->>R: Acquire lock for user transaction
-        R-->>B: Lock acquired/failed
-        
-        alt Lock failed
-            B->>U: "⚠️ Transaksi sedang diproses"
-            B->>L: Log: Lock acquisition failed
-        else Lock acquired
-            B->>L: Log: QRIS transaction lock acquired
-            
-            Note over B,D: Validation Phase
-            B->>D: Check user exists
-            D-->>B: User data confirmed
-            
-            B->>D: Check product exists and get details
-            D-->>B: Product data (name, price, stock)
-            
-            B->>D: Check current stock quantity
-            D-->>B: Available stock count
-            
-            alt Stock insufficient
-                B->>R: Release transaction lock
-                B->>U: "Stok tersedia X, harap kurangi jumlah"
-                B->>L: Log: Insufficient stock
-            else Stock sufficient
-                Note over B,Q: QRIS Generation
-                B->>B: Calculate total price (price × quantity)
-                B->>B: Generate unique code (1-99)
-                B->>B: Calculate final amount (total + unique code)
-                
-                B->>U: "Sedang membuat QR Code..."
-                B->>L: Log: Generating QRIS
-                
-                B->>Q: Generate QRIS image with final amount
-                Q-->>B: QRIS image file path
-                
-                Note over B,U: Payment Request
-                B->>B: Create payment message with details
-                B->>U: Send QRIS image + payment details
-                B->>L: Log: QRIS sent to user
-                
-                Note over B,D: Order Tracking
-                B->>D: Save pending order with reference ID
-                D-->>B: Order saved successfully
-                
-                Note over A,B: Payment Monitoring
-                A->>A: Monitor payment notifications
-                
-                loop Payment Detection Loop
-                    A->>A: Check for payment with unique code
-                    
-                    alt Payment detected
-                        A->>B: Payment confirmed notification
-                        B->>L: Log: Payment detected
-                        
-                        Note over B,D: Payment Processing
-                        B->>D: Update order status to 'paid'
-                        D-->>B: Order status updated
-                        
-                        B->>D: Update product stock (remove items)
-                        D-->>B: Stock updated successfully
-                        
-                        B->>D: Increment product sold counter
-                        D-->>B: Counter updated
-                        
-                        B->>D: Create transaction record
-                        D-->>B: Transaction saved
-                        
-                        Note over B,U: Product Delivery
-                        B->>B: Generate product details message
-                        B->>U: Send product details and receipt
-                        B->>L: Log: QRIS transaction completed
-                        
-                        Note over B,R: Cleanup
-                        B->>R: Release transaction lock
-                        B->>D: Remove pending order
-                        B->>L: Log: Transaction lock released
-                    else Payment timeout (30 minutes)
-                        B->>U: "Pembayaran expired, order dibatalkan"
-                        B->>R: Release transaction lock
-                        B->>D: Remove pending order
-                        B->>L: Log: Payment timeout
-                    else Payment not detected
-                        A->>A: Continue monitoring
-                    end
-                end
-            end
-        end
-    end
+    style A fill:#e3f2fd
+    style G fill:#fce4ec
+    style K fill:#fff3e0
 ```
 
 ### **🏦 Saldo Payment (`.buy`) - Step by Step**
