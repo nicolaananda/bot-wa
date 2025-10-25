@@ -8081,8 +8081,6 @@ Ada yang upgrade role!
 
       case 'kirimulang': case 'resend': case 'sendagain':
         try {
-          reply('⏳ Mencari transaksi terakhir Anda...')
-          
           // Get user phone number
           const userPhone = sender.split("@")[0]
           
@@ -8154,24 +8152,33 @@ Ada yang upgrade role!
           // Read receipt file
           const receiptContent = fs.readFileSync(receiptPath, 'utf8')
           
-          // Send receipt
+          // Send receipt to private chat first
           await ronzz.sendMessage(sender, { text: receiptContent }, { quoted: m })
           
-          // Send confirmation
-          let confirmMsg = `✅ *Transaksi terakhir berhasil dikirim ulang!*\n\n`
-          confirmMsg += `*╭────「 DETAIL 」────╮*\n`
-          confirmMsg += `*┊・ 🆔 | Reff ID:* ${lastTransaksi.reffId}\n`
-          confirmMsg += `*┊・ 📦 | Produk:* ${lastTransaksi.name || 'N/A'}\n`
-          confirmMsg += `*┊・ 🛍️ | Jumlah:* ${lastTransaksi.jumlah || 1}\n`
-          confirmMsg += `*┊・ 📅 | Tanggal:* ${lastTransaksi.date || 'N/A'}\n`
-          confirmMsg += `*╰┈┈┈┈┈┈┈┈*\n\n`
-          confirmMsg += `📝 *Info:* Detail akun telah dikirim ke chat pribadi Anda.\n\n`
-          confirmMsg += `💡 *Tips:* Simpan detail akun dengan baik dan jangan bagikan ke orang lain!`
+          // Wait a bit to ensure receipt is delivered first
+          await sleep(500)
           
+          // Send confirmation based on context
           if (isGroup) {
-            reply(confirmMsg)
+            // If in group, send confirmation to group
+            let confirmMsg = `✅ *Transaksi terakhir berhasil dikirim ulang!*\n\n`
+            confirmMsg += `*╭────「 DETAIL 」────╮*\n`
+            confirmMsg += `*┊・ 🆔 | Reff ID:* ${lastTransaksi.reffId}\n`
+            confirmMsg += `*┊・ 📦 | Produk:* ${lastTransaksi.name || 'N/A'}\n`
+            confirmMsg += `*┊・ 🛍️ | Jumlah:* ${lastTransaksi.jumlah || 1}\n`
+            confirmMsg += `*┊・ 📅 | Tanggal:* ${lastTransaksi.date || 'N/A'}\n`
+            confirmMsg += `*╰┈┈┈┈┈┈┈┈*\n\n`
+            confirmMsg += `📝 *Info:* Detail akun telah dikirim ke chat pribadi Anda.\n\n`
+            confirmMsg += `💡 *Tips:* Simpan detail akun dengan baik dan jangan bagikan ke orang lain!`
+            await reply(confirmMsg)
           } else {
-            reply(`✅ Berhasil mengirim ulang detail akun dari transaksi terakhir!\n\n📦 *Produk:* ${lastTransaksi.name}\n📅 *Tanggal:* ${lastTransaksi.date}`)
+            // If in private, send simple confirmation
+            let confirmMsg = `✅ *Berhasil mengirim ulang detail akun!*\n\n`
+            confirmMsg += `📦 *Produk:* ${lastTransaksi.name}\n`
+            confirmMsg += `📅 *Tanggal:* ${lastTransaksi.date}\n`
+            confirmMsg += `🆔 *Reff ID:* ${lastTransaksi.reffId}\n\n`
+            confirmMsg += `💡 *Tips:* Simpan detail akun dengan baik!`
+            await ronzz.sendMessage(from, { text: confirmMsg }, { quoted: m })
           }
           
           // Log for owner/admin tracking
