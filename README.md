@@ -146,16 +146,16 @@ User Payment → App Detection → Process → Send Product → Release Lock
 
 ```mermaid
 flowchart LR
-    A["👤 User<br/>Sends .buy command"] --> B{"🔍 Bot<br/>Rate Check"}
-    B -->|"OK"| C{"🔒 Redis<br/>Lock Acquired"}
-    B -->|"Limit"| D["⚠️ Bot<br/>Wait Message"]
-    C -->|"OK"| E{"💾 PostgreSQL<br/>Balance OK?"}
-    C -->|"Busy"| F["⚠️ Bot<br/>Busy Message"]
-    E -->|"OK"| G["💾 PostgreSQL<br/>Deduct Saldo"]
-    E -->|"Low"| H["⚠️ Bot<br/>Low Balance"]
-    G --> I["💾 PostgreSQL<br/>Update Stock"]
-    I --> J["📱 Bot<br/>Send Product"]
-    J --> K["🔒 Redis<br/>Release Lock"]
+    A["User<br/>Sends .buy command"] --> B{"Bot<br/>Rate Check"}
+    B -->|"OK"| C{"Redis<br/>Lock Acquired"}
+    B -->|"Limit"| D["Bot<br/>Wait Message"]
+    C -->|"OK"| E{"PostgreSQL<br/>Balance OK?"}
+    C -->|"Busy"| F["Bot<br/>Busy Message"]
+    E -->|"OK"| G["PostgreSQL<br/>Deduct Saldo"]
+    E -->|"Low"| H["Bot<br/>Low Balance"]
+    G --> I["PostgreSQL<br/>Update Stock"]
+    I --> J["Bot<br/>Send Product"]
+    J --> K["Redis<br/>Release Lock"]
     
     style A fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
     style B fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
@@ -174,18 +174,18 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A["👤 User<br/>Sends .buynow command"] --> B{"🔍 Bot<br/>Rate Check"}
-    B -->|"OK"| C{"🔒 Redis<br/>Lock Acquired"}
-    B -->|"Limit"| D["⚠️ Bot<br/>Wait Message"]
-    C -->|"OK"| E{"💾 PostgreSQL<br/>Stock OK?"}
-    C -->|"Busy"| F["⚠️ Bot<br/>Busy Message"]
-    E -->|"OK"| G["🎨 QRIS Generator<br/>Generate QRIS"]
-    E -->|"Low"| H["⚠️ Bot<br/>Low Stock"]
-    G --> I["📱 Bot<br/>Send QR Code"]
-    I --> J["👁️ App Listener<br/>Monitor Payment"]
-    J -->|"Paid"| K["📱 Bot<br/>Send Product"]
-    J -->|"Timeout"| L["⚠️ Bot<br/>Cancel Order"]
-    K --> M["🔒 Redis<br/>Release Lock"]
+    A["User<br/>Sends .buynow command"] --> B{"Bot<br/>Rate Check"}
+    B -->|"OK"| C{"Redis<br/>Lock Acquired"}
+    B -->|"Limit"| D["Bot<br/>Wait Message"]
+    C -->|"OK"| E{"PostgreSQL<br/>Stock OK?"}
+    C -->|"Busy"| F["Bot<br/>Busy Message"]
+    E -->|"OK"| G["QRIS Generator<br/>Generate QRIS"]
+    E -->|"Low"| H["Bot<br/>Low Stock"]
+    G --> I["Bot<br/>Send QR Code"]
+    I --> J["App Listener<br/>Monitor Payment"]
+    J -->|"Paid"| K["Bot<br/>Send Product"]
+    J -->|"Timeout"| L["Bot<br/>Cancel Order"]
+    K --> M["Redis<br/>Release Lock"]
     L --> M
     
     style A fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
@@ -205,16 +205,14 @@ flowchart LR
 
 ### **🔍 Component Legend**
 
-| Icon | Component | Description |
-|------|-----------|-------------|
-| 👤 | **User** | WhatsApp user sending commands |
-| 🔍 | **Bot** | WhatsApp bot processing requests |
-| 🔒 | **Redis** | Cache & locking system |
-| 💾 | **PostgreSQL** | Database for data storage |
-| 🎨 | **QRIS Generator** | QR code generation service |
-| 👁️ | **App Listener** | Payment detection service |
-| 📱 | **Bot** | Bot sending responses to user |
-| ⚠️ | **Bot** | Bot sending error/warning messages |
+| Component | Description |
+|-----------|-------------|
+| **User** | WhatsApp user sending commands |
+| **Bot** | WhatsApp bot processing requests |
+| **Redis** | Cache & locking system |
+| **PostgreSQL** | Database for data storage |
+| **QRIS Generator** | QR code generation service |
+| **App Listener** | Payment detection service |
 
 ### **🏦 Saldo Payment (`.buy`) - Step by Step**
 
