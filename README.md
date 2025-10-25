@@ -150,6 +150,8 @@ sequenceDiagram
     B->>U: Send product details
 ```
 
+> 📋 **For detailed payment flow documentation with step-by-step breakdowns, security features, and performance metrics, see [PAYMENT-FLOWS.md](PAYMENT-FLOWS.md)**
+
 ## 🔧 Configuration
 
 ### Environment Variables
