@@ -24,7 +24,15 @@ function createRedisClient() {
     // Option 1: Use REDIS_URL (for Upstash, Redis Cloud, etc)
     if (process.env.REDIS_URL) {
       console.log('📡 [REDIS] Connecting using REDIS_URL...');
-      redis = new Redis(process.env.REDIS_URL, {
+      
+      // Auto-convert to TLS for Upstash
+      let redisUrl = process.env.REDIS_URL;
+      if (redisUrl.includes('upstash.io') && !redisUrl.startsWith('rediss://')) {
+        redisUrl = redisUrl.replace('redis://', 'rediss://').replace(':6379', ':6380');
+        console.log('🔒 [REDIS] Auto-converting to TLS for Upstash');
+      }
+      
+      redis = new Redis(redisUrl, {
         maxRetriesPerRequest: 5,
         enableReadyCheck: true,
         lazyConnect: true,
