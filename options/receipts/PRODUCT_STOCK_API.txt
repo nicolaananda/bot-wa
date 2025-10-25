@@ -1,0 +1,147 @@
+PRODUCT & STOCK API (TXT) - For Frontend Team
+
+Base URL
+- Local: http://localhost:3002
+- Prod (example): https://api-botwa.nicola.id
+
+Auth
+- If server requires, send header: Authorization: Bearer <DB_TOKEN>
+- Some admin endpoints may also require: X-Admin-User: <phoneNumber>
+
+============================
+PRODUCT CRUD
+============================
+1) Create Product
+- POST /api/dashboard/products
+- Body (JSON):
+  {
+    "id": "viu1t",
+    "name": "VIU 1 Tahun",
+    "desc": "Akun premium 1 tahun",
+    "priceB": 25000,
+    "priceS": 24000,
+    "priceG": 23000,
+    "snk": "Tidak ganti email",
+    "minStock": 5
+  }
+- 201/200 -> { success: true, data: { ...product } }
+- 409 -> already exists
+
+curl -X POST "$BASE/api/dashboard/products" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"viu1t","name":"VIU 1 Tahun","priceB":25000}'
+
+2) Read Product
+- GET /api/dashboard/products/:productId
+- 200 -> { success: true, data: { ...product } }
+- 404 -> not found
+
+curl "$BASE/api/dashboard/products/viu1t"
+
+3) Update Product (partial)
+- PATCH /api/dashboard/products/:productId
+- Body: any fields to update, e.g. { "name": "VIU 12M", "priceB": 26000 }
+- 200 -> { success: true, data: { ...updated } }
+
+curl -X PATCH "$BASE/api/dashboard/products/viu1t" \
+  -H "Content-Type: application/json" \
+  -d '{"priceB":26000,"desc":"Update desc"}'
+
+4) Delete Product
+- DELETE /api/dashboard/products/:productId
+- 200 -> { success: true }
+
+curl -X DELETE "$BASE/api/dashboard/products/viu1t"
+
+============================
+STOCK MANAGEMENT
+============================
+Stock item format (recommended):
+  "email|password|profile|pin|notes"
+
+A) Batch Add/Remove
+- PUT /api/dashboard/products/:productId/stock
+- Body (add):
+  { "action": "add", "stockItems": ["e1|p1|pf1|0000|n1","e2|p2|pf2|0000|n2"], "notes": "restock" }
+- Body (remove FIFO):
+  { "action": "remove", "stockItems": ["any","any"] }  // length = how many to remove
+- 200 -> { success: true, data: { previousStockCount, newStockCount, ... } }
+
+curl -X PUT "$BASE/api/dashboard/products/viu1t/stock" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"add","stockItems":["e1|p1|pf|1234|n","e2|p2|pf|1234|n"]}'
+
+B) Add Single Item (optional position index)
+- POST /api/dashboard/products/:productId/stock/item
+- Body: { "value": "email|pass|profile|pin|notes", "position": 0 }
+- 200 -> { success: true, data: { newStockCount } }
+
+curl -X POST "$BASE/api/dashboard/products/viu1t/stock/item" \
+  -H "Content-Type: application/json" \
+  -d '{"value":"e3|p3|pf3|1234|n3","position":0}'
+
+C) Edit Single Item (by index or exact match)
+- PATCH /api/dashboard/products/:productId/stock/item
+- Body by index: { "index": 1, "value": "newEmail|newPass|pf|0000|notes" }
+- OR by match: { "match": "e1|p1|pf|1234|n", "value": "..." }
+- 200 -> { success: true }
+
+curl -X PATCH "$BASE/api/dashboard/products/viu1t/stock/item" \
+  -H "Content-Type: application/json" \
+  -d '{"index":1,"value":"e1u|p1u|pf|0000|nU"}'
+
+D) Delete Single Item (by index or exact match)
+- DELETE /api/dashboard/products/:productId/stock/item
+- Body: { "index": 0 } OR { "match": "e1|p1|pf|1234|n" }
+- 200 -> { success: true }
+
+curl -X DELETE "$BASE/api/dashboard/products/viu1t/stock/item" \
+  -H "Content-Type: application/json" \
+  -d '{"index":0}'
+
+E) Details (metrics + items)
+- GET /api/dashboard/products/:productId/stock/details
+- 200 -> { success: true, data: { productId, productName, stock: { count, status, items[], metrics }, ... } }
+
+curl "$BASE/api/dashboard/products/viu1t/stock/details"
+
+============================
+RESPONSES (Examples)
+============================
+Create Product (200)
+{
+  "success": true,
+  "data": { "id":"viu1t","name":"VIU 1 Tahun","priceB":25000,"stok":[],"terjual":0 }
+}
+
+Add Stock (200)
+{
+  "success": true,
+  "data": { "productId":"viu1t","previousStockCount":0,"newStockCount":2 }
+}
+
+Edit Item (200)
+{ "success": true }
+
+Delete Item (200)
+{ "success": true }
+
+Details (200)
+{
+  "success": true,
+  "data": {
+    "productId":"viu1t",
+    "productName":"VIU 1 Tahun",
+    "stock":{
+      "count": 12,
+      "status": "in_stock",
+      "items":[ {"raw":"email|pass|pf|0000|notes", "parsed":{...}, "isValid":true} ],
+      "metrics": {"stockCount":12,"stockStatus":"in_stock","category":"Streaming"}
+    }
+  }
+}
+
+Notes
+- All endpoints support both JSON-file mode and Postgres (USE_PG=true) transparently.
+- For PG mode, server keeps stock count and base price synchronized.
+- Validation may reject malformed stock item strings.

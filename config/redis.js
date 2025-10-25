@@ -30,23 +30,29 @@ function createRedisClient() {
       if (redisUrl.includes('upstash.io') && !redisUrl.startsWith('rediss://')) {
         redisUrl = redisUrl.replace('redis://', 'rediss://').replace(':6379', ':6380');
         console.log('🔒 [REDIS] Auto-converting to TLS for Upstash');
+        console.log(`🔗 [REDIS] Using URL: ${redisUrl.replace(/:[^:]*@/, ':***@')}`);
       }
       
       redis = new Redis(redisUrl, {
-        maxRetriesPerRequest: 5,
+        maxRetriesPerRequest: 3,
         enableReadyCheck: true,
         lazyConnect: true,
-        connectTimeout: 10000,
-        commandTimeout: 5000,
+        connectTimeout: 30000,
+        commandTimeout: 10000,
         retryStrategy: (times) => {
-          const delay = Math.min(times * 100, 5000);
+          const delay = Math.min(times * 200, 10000);
           console.log(`🔄 [REDIS] Retry attempt ${times}, delay: ${delay}ms`);
           return delay;
         },
         reconnectOnError: (err) => {
           console.log(`🔄 [REDIS] Reconnecting on error: ${err.message}`);
-          return err.message.includes('READONLY') || err.message.includes('ECONNRESET');
-        }
+          return err.message.includes('READONLY') || err.message.includes('ECONNRESET') || err.message.includes('ETIMEDOUT');
+        },
+        // Additional TLS options for Upstash
+        tls: redisUrl.includes('upstash.io') ? {
+          rejectUnauthorized: false,
+          checkServerIdentity: () => undefined
+        } : undefined
       });
     }
     // Option 2: Use individual config (for local Redis)
