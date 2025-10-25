@@ -140,7 +140,108 @@ User Payment → App Detection → Process → Send Product → Release Lock
 **✅ Success Rate**: 85%  
 **💰 Requirement**: External payment app
 
-> 📋 **For detailed payment flow documentation with step-by-step breakdowns, security features, and performance metrics, see [PAYMENT-FLOWS.md](PAYMENT-FLOWS.md)**
+## 🔍 Detailed Payment Flow Analysis
+
+### **🏦 Saldo Payment (`.buy`) - Step by Step**
+
+#### **1. Input Validation**
+- Parse command: `.buy idproduk jumlah`
+- Validate product ID exists
+- Validate quantity is positive number
+- Check product stock availability
+
+#### **2. Security Checks**
+- **Rate Limiting**: Max 3 transactions per minute per user
+- **Transaction Locking**: Prevent concurrent transactions
+- **Balance Validation**: Ensure sufficient saldo
+
+#### **3. Payment Processing**
+- Calculate total price based on user role (bronze/silver/gold)
+- Deduct saldo from user account
+- Update product stock
+- Create transaction record with reference ID
+
+#### **4. Product Delivery**
+- Generate product details message
+- Send account credentials to user
+- Include terms and conditions
+- Log transaction completion
+
+### **📱 QRIS Payment (`.buynow`) - Step by Step**
+
+#### **1. Input Validation**
+- Parse command: `.buynow idproduk jumlah`
+- Validate product ID exists
+- Validate quantity is positive number
+- Check product stock availability
+
+#### **2. Security Checks**
+- **Rate Limiting**: Max 3 transactions per minute per user
+- **Transaction Locking**: Prevent concurrent transactions
+- **Stock Validation**: Ensure sufficient inventory
+
+#### **3. QRIS Generation**
+- Calculate total price based on user role
+- Generate unique code (1-99) to prevent confusion
+- Create QRIS image with final amount
+- Set 30-minute expiration time
+
+#### **4. Payment Monitoring**
+- Save pending order to database
+- Start app listener for payment detection
+- Monitor for payment with matching unique code
+- Handle timeout scenarios
+
+#### **5. Payment Processing**
+- Detect payment completion via app listener
+- Update order status to 'paid'
+- Process product delivery
+- Clean up pending orders and locks
+
+## 🔄 Payment Method Comparison
+
+| Aspect | Saldo Payment (`.buy`) | QRIS Payment (`.buynow`) |
+|--------|------------------------|---------------------------|
+| **Speed** | Instant (immediate) | Delayed (wait for payment) |
+| **User Requirement** | Must have sufficient saldo | No saldo required |
+| **Processing Time** | < 5 seconds | 30 minutes max |
+| **Risk Level** | Low (internal balance) | Medium (external payment) |
+| **User Experience** | Seamless | Requires QRIS scan |
+| **Conversion Rate** | Higher (instant) | Lower (abandonment risk) |
+| **Technical Complexity** | Simple | Complex (monitoring) |
+
+## 🛡️ Security Features
+
+### **Both Payment Methods**
+- **Rate Limiting**: 3 transactions per minute per user
+- **Transaction Locking**: Prevent double purchases
+- **Input Validation**: Comprehensive sanitization
+- **Stock Validation**: Prevent overselling
+- **Error Handling**: Graceful failure recovery
+
+### **Saldo Payment Specific**
+- **Balance Validation**: Real-time saldo checking
+- **Atomic Transactions**: Database consistency
+- **Role-based Pricing**: Bronze/Silver/Gold tiers
+
+### **QRIS Payment Specific**
+- **Unique Codes**: Prevent payment confusion
+- **Timeout Handling**: 30-minute expiration
+- **App Listener**: Automatic payment detection
+- **Pending Order Management**: Track incomplete transactions
+
+## 📊 Performance Metrics
+
+### **Saldo Payment**
+- **Average Processing Time**: 2-3 seconds
+- **Success Rate**: 99.5%
+- **User Satisfaction**: High (instant delivery)
+
+### **QRIS Payment**
+- **Average Processing Time**: 5-15 minutes
+- **Success Rate**: 85%
+- **Abandonment Rate**: 15%
+- **User Satisfaction**: Medium (requires external app)
 
 ## 🔧 Configuration
 
