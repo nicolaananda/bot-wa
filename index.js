@@ -8021,6 +8021,152 @@ Ada yang upgrade role!
         reply('Sukses unblock nomor.')
         break
 
+      case 'checkuser': case 'cekuser':
+        if (!isOwner) return reply(mess.owner)
+        if (!q) return reply(`❌ Contoh: ${prefix + command} 628xxx\n\n💡 Command ini untuk cek status user yang tidak bisa chat bot`)
+        
+        try {
+          const cleanNum = q.replace(/[^0-9]/g, '')
+          const userJid = cleanNum + '@s.whatsapp.net'
+          
+          let statusText = `*🔍 USER DIAGNOSTIC REPORT*\n\n`
+          statusText += `📱 *Nomor:* ${cleanNum}\n`
+          statusText += `━━━━━━━━━━━━━━━━━━━━\n\n`
+          
+          // Check if owner
+          const isOwnerNum = owner.includes(cleanNum)
+          statusText += `👑 *Status Owner:* ${isOwnerNum ? '✅ YA' : '❌ Bukan owner'}\n\n`
+          
+          // Check database
+          if (db.data.users && db.data.users[userJid]) {
+            const userData = db.data.users[userJid]
+            statusText += `💾 *Database Status:* ✅ Ditemukan\n`
+            statusText += `   • Saldo: Rp${toRupiah(userData.saldo || 0)}\n`
+            statusText += `   • Role: ${userData.role || 'Bronze'}\n`
+            statusText += `   • Limit: ${userData.limit || 0}\n`
+          } else {
+            statusText += `💾 *Database Status:* ⚠️ User belum terdaftar\n`
+            statusText += `   (User akan otomatis terdaftar saat pertama kali chat)\n`
+          }
+          
+          // Check transaction history
+          if (db.data.transaksi && Array.isArray(db.data.transaksi)) {
+            const userTrans = db.data.transaksi.filter(t => 
+              t.user === cleanNum || 
+              t.buyer === cleanNum ||
+              (t.targetNumber && t.targetNumber === cleanNum)
+            )
+            statusText += `\n📦 *Riwayat Transaksi:* ${userTrans.length} transaksi\n`
+            if (userTrans.length > 0) {
+              const lastTrans = userTrans[userTrans.length - 1]
+              statusText += `   • Terakhir: ${lastTrans.date || 'N/A'}\n`
+            }
+          }
+          
+          statusText += `\n━━━━━━━━━━━━━━━━━━━━\n`
+          statusText += `\n💡 *SOLUSI JIKA BOT TIDAK MERESPON:*\n\n`
+          statusText += `1️⃣ Unblock user:\n   \`${prefix}unblock ${cleanNum}\`\n\n`
+          statusText += `2️⃣ Test dengan command:\n   Minta user kirim: \`${prefix}ping\`\n\n`
+          statusText += `3️⃣ Restart bot jika perlu:\n   \`pm2 restart all\`\n\n`
+          statusText += `4️⃣ Cek apakah user pernah call bot (auto-blocked)\n\n`
+          statusText += `━━━━━━━━━━━━━━━━━━━━\n`
+          statusText += `\n📝 *Info:* User yang menelepon bot akan otomatis di-block oleh sistem anti-call`
+          
+          reply(statusText)
+          
+        } catch (err) {
+          reply(`❌ Error saat cek user: ${err.message}\n\n💡 Pastikan format nomor benar (contoh: 628xxx)`)
+        }
+        break
+
+      case 'kirimulang': case 'resend': case 'sendagain':
+        try {
+          reply('⏳ Mencari transaksi terakhir Anda...')
+          
+          // Get user phone number
+          const userPhone = sender.split("@")[0]
+          
+          // Check if transaksi exists
+          if (!db.data.transaksi || !Array.isArray(db.data.transaksi)) {
+            return reply('❌ Database transaksi tidak ditemukan.')
+          }
+          
+          // Find user's last transaction
+          const userTransaksi = db.data.transaksi.filter(t => 
+            t.user === userPhone || 
+            t.buyer === userPhone ||
+            (t.targetNumber && t.targetNumber === userPhone)
+          )
+          
+          if (userTransaksi.length === 0) {
+            return reply('❌ Anda belum memiliki riwayat transaksi.\n\n💡 *Tips:* Lakukan pembelian terlebih dahulu dengan command:\n• `.buy <kode> <jumlah>` - Bayar dengan saldo\n• `.buynow <kode> <jumlah>` - Bayar dengan QRIS')
+          }
+          
+          // Get last transaction
+          const lastTransaksi = userTransaksi[userTransaksi.length - 1]
+          
+          if (!lastTransaksi.reffId) {
+            return reply(`❌ Transaksi terakhir tidak memiliki Reference ID.\n\n📦 *Detail Transaksi:*\n• Produk: ${lastTransaksi.name || 'N/A'}\n• Tanggal: ${lastTransaksi.date || 'N/A'}\n\n💡 Silakan hubungi admin untuk bantuan.`)
+          }
+          
+          // Try to read receipt file
+          const receiptPath = `./options/receipts/receipt_${lastTransaksi.reffId}.txt`
+          
+          if (!fs.existsSync(receiptPath)) {
+            // Receipt file doesn't exist, send basic info
+            let basicInfo = `*🔁 KIRIM ULANG TRANSAKSI TERAKHIR*\n\n`
+            basicInfo += `⚠️ File receipt tidak ditemukan, mengirim informasi dasar:\n\n`
+            basicInfo += `*╭────「 TRANSAKSI INFO 」────╮*\n`
+            basicInfo += `*┊・ 🆔 | Reff ID:* ${lastTransaksi.reffId}\n`
+            basicInfo += `*┊・ 📦 | Produk:* ${lastTransaksi.name || 'N/A'}\n`
+            basicInfo += `*┊・ 🛍️ | Jumlah:* ${lastTransaksi.jumlah || 1}\n`
+            basicInfo += `*┊・ 💰 | Total:* Rp${toRupiah(lastTransaksi.totalBayar || lastTransaksi.price || 0)}\n`
+            basicInfo += `*┊・ 💳 | Metode:* ${lastTransaksi.metodeBayar || 'N/A'}\n`
+            basicInfo += `*┊・ 📅 | Tanggal:* ${lastTransaksi.date || 'N/A'}\n`
+            basicInfo += `*╰┈┈┈┈┈┈┈┈*\n\n`
+            basicInfo += `⚠️ *PENTING:*\n`
+            basicInfo += `Detail akun tidak tersimpan dalam sistem.\n`
+            basicInfo += `Silakan hubungi admin @${ownerNomer} untuk mendapatkan detail akun Anda.\n\n`
+            basicInfo += `📝 *Berikan Reff ID:* \`${lastTransaksi.reffId}\` kepada admin untuk verifikasi.`
+            
+            return ronzz.sendMessage(from, { 
+              text: basicInfo, 
+              mentions: [ownerNomer + "@s.whatsapp.net"] 
+            }, { quoted: m })
+          }
+          
+          // Read receipt file
+          const receiptContent = fs.readFileSync(receiptPath, 'utf8')
+          
+          // Send receipt
+          await ronzz.sendMessage(sender, { text: receiptContent }, { quoted: m })
+          
+          // Send confirmation
+          let confirmMsg = `✅ *Transaksi terakhir berhasil dikirim ulang!*\n\n`
+          confirmMsg += `*╭────「 DETAIL 」────╮*\n`
+          confirmMsg += `*┊・ 🆔 | Reff ID:* ${lastTransaksi.reffId}\n`
+          confirmMsg += `*┊・ 📦 | Produk:* ${lastTransaksi.name || 'N/A'}\n`
+          confirmMsg += `*┊・ 🛍️ | Jumlah:* ${lastTransaksi.jumlah || 1}\n`
+          confirmMsg += `*┊・ 📅 | Tanggal:* ${lastTransaksi.date || 'N/A'}\n`
+          confirmMsg += `*╰┈┈┈┈┈┈┈┈*\n\n`
+          confirmMsg += `📝 *Info:* Detail akun telah dikirim ke chat pribadi Anda.\n\n`
+          confirmMsg += `💡 *Tips:* Simpan detail akun dengan baik dan jangan bagikan ke orang lain!`
+          
+          if (isGroup) {
+            reply(confirmMsg)
+          } else {
+            reply(`✅ Berhasil mengirim ulang detail akun dari transaksi terakhir!\n\n📦 *Produk:* ${lastTransaksi.name}\n📅 *Tanggal:* ${lastTransaksi.date}`)
+          }
+          
+          // Log for owner/admin tracking
+          console.log(`🔁 [RESEND] User ${userPhone} requested resend for transaction ${lastTransaksi.reffId}`)
+          
+        } catch (err) {
+          console.error('❌ Error kirimulang:', err)
+          reply(`❌ Terjadi kesalahan saat mengirim ulang transaksi.\n\n*Error:* ${err.message}\n\n💡 Silakan hubungi admin @${ownerNomer} jika masalah berlanjut.`)
+        }
+        break
+
       case 'script': case 'sc':
         reply(`*SCRIPT NO ENC*\nMau beli scriptnya?\n\nhttp://lynk.id/ronzzyt/q6rl11lpgoqw\nHarga terlalu mahal?\nNego tipis aja\n\n*Payment* 💳\n_All Payment_\n\nSudah termasuk tutorial.\nKalau error difixs.\nPasti dapet update dari *Ronzz YT.*\nSize script ringan.\nAnti ngelag/delay.`)
         break
