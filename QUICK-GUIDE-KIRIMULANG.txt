@@ -1,0 +1,159 @@
+═══════════════════════════════════════════════════════════════
+              🔁 QUICK GUIDE: KIRIM ULANG AKUN
+═══════════════════════════════════════════════════════════════
+
+📌 FUNGSI:
+   Mengirim ulang detail akun dari transaksi terakhir Anda
+
+⚡ COMMAND:
+   .kirimulang
+   .resend
+   .sendagain
+
+═══════════════════════════════════════════════════════════════
+
+🎯 CARA PAKAI:
+
+   Step 1: Ketik command
+   ────────────────────────
+   .kirimulang
+
+   Step 2: Bot proses
+   ────────────────────────
+   ⏳ Mencari transaksi terakhir Anda...
+
+   Step 3: Terima detail akun
+   ────────────────────────
+   ✅ Detail akun dikirim ke chat pribadi!
+
+═══════════════════════════════════════════════════════════════
+
+💡 KAPAN PAKAI FITUR INI?
+
+   ✅ Chat dengan bot terhapus
+   ✅ Lupa screenshot detail akun
+   ✅ Ganti HP baru, butuh akun lagi
+   ✅ Perlu referensi email/password
+   ✅ Screenshot hilang/corrupt
+
+═══════════════════════════════════════════════════════════════
+
+📝 CONTOH PENGGUNAAN:
+
+   User: .kirimulang
+   
+   Bot : ⏳ Mencari transaksi terakhir Anda...
+   
+   Bot : [Mengirim detail lengkap ke private chat]
+         
+         ╭────「 DETAIL AKUN 」────╮
+         ┊・ 📧 | Email: xxx@mail.com
+         ┊・ 🔐 | Password: xxxxxxx
+         ┊・ 📋 | PIN: xxxx
+         ╰┈┈┈┈┈┈┈┈
+         
+         ╭────「 TRANSAKSI 」────╮
+         ┊・ 🆔 | Reff: TRX-123456
+         ┊・ 📦 | Produk: Netflix
+         ┊・ 📅 | Tanggal: 2025-10-25
+         ╰┈┈┈┈┈┈┈┈
+   
+   Bot : ✅ Berhasil mengirim ulang!
+         📦 Produk: Netflix Premium
+         📅 Tanggal: 2025-10-25 14:30:00
+
+═══════════════════════════════════════════════════════════════
+
+⚠️ JIKA BELUM ADA TRANSAKSI:
+
+   Bot : ❌ Anda belum memiliki riwayat transaksi.
+   
+         💡 Tips: Lakukan pembelian terlebih dahulu:
+         • .buy <kode> <jumlah> - Bayar dengan saldo
+         • .buynow <kode> <jumlah> - Bayar dengan QRIS
+
+═══════════════════════════════════════════════════════════════
+
+🔐 KEAMANAN:
+
+   ✅ Hanya Anda yang bisa akses transaksi Anda
+   ✅ Detail dikirim ke chat PRIBADI (bukan group)
+   ✅ Data tersimpan aman di sistem
+   ✅ Tidak ada orang lain yang bisa lihat
+
+═══════════════════════════════════════════════════════════════
+
+💡 TIPS:
+
+   1. Simpan detail akun di tempat aman:
+      • Screenshot dan simpan di gallery
+      • Copy ke notes/memo
+      • Backup ke cloud storage
+
+   2. Jangan bagikan detail akun ke orang lain
+
+   3. Gunakan fitur ini hanya saat butuh
+
+   4. Jika ada masalah, hubungi admin
+
+═══════════════════════════════════════════════════════════════
+
+🆘 TROUBLESHOOTING:
+
+   Q: Bot tidak respon?
+   A: • Cek koneksi internet
+      • Pastikan bot online
+      • Coba command: .ping
+      • Hubungi admin jika masih error
+
+   Q: Receipt tidak ditemukan?
+   A: Bot akan kirim info basic + minta ke admin
+      • Berikan Reff ID ke admin
+      • Admin akan kirim manual
+
+   Q: Salah transaksi dikirim?
+   A: Fitur ini kirim transaksi TERAKHIR
+      • Untuk transaksi spesifik, tanya admin
+      • Berikan Reff ID yang diinginkan
+
+═══════════════════════════════════════════════════════════════
+
+📋 COMMAND TERKAIT:
+
+   .stok              - Lihat stok produk
+   .buy <kode> <jml>  - Beli dengan saldo
+   .buynow <kode>     - Beli dengan QRIS
+   .kirimulang        - Kirim ulang akun terakhir
+   .saldo             - Cek saldo
+   .riwayat           - Lihat riwayat transaksi
+   .menu              - Lihat semua command
+
+═══════════════════════════════════════════════════════════════
+
+✅ FITUR INI GRATIS & OTOMATIS!
+
+   • Tidak perlu tanya admin
+   • Available 24/7
+   • Instant response
+   • Self-service
+   • Mudah & cepat
+
+═══════════════════════════════════════════════════════════════
+
+📞 BUTUH BANTUAN?
+
+   Hubungi Admin:
+   wa.me/6287777657944
+
+   Sertakan:
+   • Reff ID transaksi
+   • Screenshot error (jika ada)
+   • Penjelasan masalah
+
+═══════════════════════════════════════════════════════════════
+
+Last Updated: 2025-10-25
+Bot: GiHa Smart Bot
+
+═══════════════════════════════════════════════════════════════
+

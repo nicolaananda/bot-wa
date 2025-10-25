@@ -173,6 +173,7 @@ ${readmore}
 │☛ ${prefix}stok
 │☛ ${prefix}buy
 │☛ ${prefix}buynow
+│☛ ${prefix}kirimulang (Kirim ulang akun)
 ╰─────╼
 
 ╭─────╼「 *OWNER MENU* 」
@@ -204,6 +205,7 @@ ${readmore}
 │☛ ${prefix}listsewa
 │☛ ${prefix}block
 │☛ ${prefix}unblock
+│☛ ${prefix}checkuser (Cek status user)
 │☛ ${prefix}backup
 │☛ ${prefix}reloaddb
 │☛ ${prefix}buy <kode> <jumlah> <nomor> (Owner buy)
@@ -252,6 +254,7 @@ ${readmore}
 │☛ ${prefix}saldo
 │☛ ${prefix}listharga
 │☛ ${prefix}upgrade
+│☛ ${prefix}kirimulang (Kirim ulang akun)
 ╰─────╼
 
 ╭─────╼「 *TRACKING MENU* 」
@@ -401,6 +404,7 @@ ${readmore}
 │☛ ${prefix}listsewa
 │☛ ${prefix}block
 │☛ ${prefix}unblock
+│☛ ${prefix}checkuser (Cek status user)
 │☛ ${prefix}backup
 │☛ ${prefix}reloaddb
 │☛ ${prefix}buy <kode> <jumlah> <nomor> (Owner buy)
@@ -536,6 +540,7 @@ ${readmore}
 │☛ ${prefix}saldo
 │☛ ${prefix}listharga
 │☛ ${prefix}upgrade
+│☛ ${prefix}kirimulang (Kirim ulang akun)
 ╰─────╼
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
@@ -569,12 +574,14 @@ ${readmore}
 │☛ ${prefix}stok
 │☛ ${prefix}buy
 │☛ ${prefix}buynow
+│☛ ${prefix}kirimulang
 ╰─────╼
 
 *💡 CARA PEMBELIAN:*
 • *Buy (Saldo):* ${prefix}buy kodeproduk jumlah
 • *Buynow (QRIS):* ${prefix}buynow kodeproduk jumlah
 • *Owner Buy:* ${prefix}buy kodeproduk jumlah nomor (Owner only)
+• *Kirim Ulang:* ${prefix}kirimulang (kirim ulang akun terakhir)
 
 *☘ ᴛʜᴀɴᴋs ᴛᴏ ☘*
 • ${ownerName} (Owner)
