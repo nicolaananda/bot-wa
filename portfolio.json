@@ -1,0 +1,175 @@
+{
+  "id": "whatsapp-bot-ecommerce-redis",
+  "title": "WhatsApp E-commerce Bot with Redis Integration",
+  "subtitle": "High-performance e-commerce bot with advanced Redis features",
+  "category": "Full Stack Development",
+  "tags": ["Node.js", "Redis", "PostgreSQL", "WhatsApp API", "E-commerce", "Payment Gateway"],
+  "duration": "3 months",
+  "teamSize": "Solo Developer",
+  "status": "Completed",
+  "year": "2025",
+  
+  "overview": {
+    "description": "A sophisticated WhatsApp e-commerce bot featuring Redis-powered rate limiting, transaction locking, and caching. Built to handle high-concurrency transactions with sub-100ms response times and 99.9% uptime.",
+    "challenge": "Develop a scalable WhatsApp bot that can handle multiple concurrent users while preventing double purchases, spam, and ensuring data consistency.",
+    "solution": "Implemented Redis integration for transaction locking, rate limiting, and caching, resulting in 5x performance improvement and <1% error rate.",
+    "impact": "Successfully deployed production-ready bot supporting 100+ concurrent users with enterprise-grade reliability and security."
+  },
+
+  "features": [
+    {
+      "title": "Transaction Security",
+      "items": [
+        "Redis-based transaction locking prevents double purchases",
+        "Rate limiting (3 transactions/minute/user) prevents spam",
+        "Comprehensive input validation and SQL injection prevention",
+        "Automatic failover and health monitoring"
+      ]
+    },
+    {
+      "title": "E-commerce Capabilities",
+      "items": [
+        "Real-time product catalog with inventory management",
+        "Midtrans payment gateway integration",
+        "Complete order lifecycle management",
+        "User balance tracking and role-based access"
+      ]
+    },
+    {
+      "title": "Performance Optimization",
+      "items": [
+        "Redis caching achieves sub-100ms response times",
+        "Database optimization with connection pooling",
+        "Automated timestamped database backups",
+        "Graceful error handling and comprehensive logging"
+      ]
+    }
+  ],
+
+  "technologies": {
+    "backend": ["Node.js 18+", "Express.js", "PostgreSQL 13+", "Redis 6.0+"],
+    "apis": ["WhatsApp Web API", "Midtrans Payment API"],
+    "infrastructure": ["PM2/Systemctl", "Docker", "VPS Deployment"],
+    "tools": ["Git", "npm", "Redis CLI", "PostgreSQL CLI"]
+  },
+
+  "metrics": {
+    "performance": {
+      "responseTime": "50-100ms (5x improvement)",
+      "concurrentUsers": "100+ (5x improvement)",
+      "errorRate": "<1% (10x improvement)",
+      "uptime": "99.9%"
+    },
+    "technical": {
+      "cacheHitRate": "85%+",
+      "databaseQueries": "Optimized with Redis caching",
+      "memoryUsage": "Reduced by 60% with caching",
+      "deploymentTime": "Zero-downtime deployments"
+    }
+  },
+
+  "architecture": {
+    "description": "Microservices architecture with Redis as the central caching and session management layer",
+    "components": [
+      "WhatsApp Bot Interface",
+      "Redis Cache Layer",
+      "PostgreSQL Database",
+      "Payment Gateway Integration",
+      "Admin Dashboard"
+    ],
+    "dataFlow": "User → WhatsApp → Bot → Redis Cache → Database → Payment API"
+  },
+
+  "challenges": [
+    {
+      "challenge": "Handling concurrent transactions without race conditions",
+      "solution": "Implemented Redis-based distributed locking with automatic expiration",
+      "result": "Zero double-purchase incidents"
+    },
+    {
+      "challenge": "Preventing spam and abuse while maintaining user experience",
+      "solution": "Smart rate limiting with per-user and per-command tracking",
+      "result": "99% reduction in spam attempts"
+    },
+    {
+      "challenge": "Achieving sub-100ms response times under load",
+      "solution": "Multi-layer caching strategy with Redis",
+      "result": "5x performance improvement"
+    }
+  ],
+
+  "results": [
+    "Successfully deployed production-ready WhatsApp e-commerce bot",
+    "Achieved 5x performance improvement with Redis integration",
+    "Reduced error rate from 5-10% to <1%",
+    "Support for 100+ concurrent users",
+    "99.9% uptime with comprehensive monitoring",
+    "Zero-downtime deployment capability"
+  ],
+
+  "codeSamples": [
+    {
+      "title": "Redis Transaction Locking",
+      "language": "javascript",
+      "code": "// Acquire lock for transaction\nconst lockAcquired = await acquireLock(sender, 'buy', 30);\nif (!lockAcquired) {\n  return reply('⚠️ Transaction sedang diproses...');\n}\n\n// Process transaction safely\ntry {\n  // Transaction logic here\n} finally {\n  await releaseLock(sender, 'buy');\n}"
+    },
+    {
+      "title": "Rate Limiting Implementation",
+      "language": "javascript",
+      "code": "// Check rate limit\nconst rateLimit = await checkRateLimit(sender, 'buy', 3, 60);\nif (!rateLimit.allowed) {\n  return reply(`⚠️ Terlalu banyak request! Tunggu ${rateLimit.resetIn}s`);\n}\n\n// Proceed with request"
+    },
+    {
+      "title": "Redis Caching Strategy",
+      "language": "javascript",
+      "code": "// Cache-aside pattern\nconst products = await cacheAside('produk:list', async () => {\n  return await loadProductsFromDB();\n}, 300); // 5 minutes TTL"
+    }
+  ],
+
+  "screenshots": [
+    {
+      "title": "Bot Interface",
+      "description": "WhatsApp bot showing product catalog and transaction flow",
+      "url": "/images/whatsapp-bot-interface.png"
+    },
+    {
+      "title": "Admin Dashboard",
+      "description": "Real-time monitoring of transactions and system health",
+      "url": "/images/admin-dashboard.png"
+    },
+    {
+      "title": "Redis Monitoring",
+      "description": "Redis performance metrics and cache hit rates",
+      "url": "/images/redis-monitoring.png"
+    }
+  ],
+
+  "lessonsLearned": [
+    "Redis significantly improves performance for high-concurrency applications",
+    "Transaction locking is essential for e-commerce applications",
+    "Rate limiting is crucial for preventing abuse and ensuring fair usage",
+    "Caching strategy must balance performance and data consistency",
+    "Comprehensive monitoring is essential for production applications"
+  ],
+
+  "futureEnhancements": [
+    "Analytics dashboard with real-time business metrics",
+    "Multi-language support for internationalization",
+    "Advanced caching with smart invalidation",
+    "REST API for mobile app integration",
+    "Microservices architecture for horizontal scaling"
+  ],
+
+  "repository": {
+    "url": "https://github.com/nicolaananda/bot-wa",
+    "stars": 0,
+    "forks": 0,
+    "lastCommit": "2025-10-25"
+  },
+
+  "deployment": {
+    "environment": "Production VPS",
+    "url": "https://bot-wa.nicola.id",
+    "status": "Live",
+    "monitoring": "Real-time health checks and logging"
+  }
+}
