@@ -80,15 +80,74 @@ graph TB
     A[WhatsApp Client] --> B[Bot Application]
     B --> C[Redis Cache]
     B --> D[PostgreSQL DB]
-    B --> E[Midtrans API]
+    B --> E[QRIS Generator]
+    B --> F[App Listener]
     
-    C --> F[Rate Limiting]
-    C --> G[Transaction Locking]
-    C --> H[Data Caching]
+    C --> G[Rate Limiting]
+    C --> H[Transaction Locking]
+    C --> I[Data Caching]
     
-    D --> I[User Data]
-    D --> J[Product Catalog]
-    D --> K[Transaction History]
+    D --> J[User Data & Saldo]
+    D --> K[Product Catalog]
+    D --> L[Transaction History]
+    
+    E --> M[QRIS Image]
+    F --> N[Payment Detection]
+    
+    subgraph "Payment Methods"
+        O[.buy - Saldo Payment]
+        P[.buynow - QRIS Payment]
+    end
+    
+    O --> D
+    P --> E
+    P --> F
+```
+
+## 🔄 Payment Flow Diagrams
+
+### **Saldo Payment Flow (`.buy`)**
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant B as Bot
+    participant R as Redis
+    participant D as PostgreSQL
+    
+    U->>B: .buy idproduk jumlah
+    B->>R: Check rate limit
+    B->>R: Acquire transaction lock
+    B->>D: Check user saldo
+    B->>D: Check product stock
+    B->>D: Deduct saldo
+    B->>D: Update product stock
+    B->>R: Release transaction lock
+    B->>U: Send product details
+```
+
+### **QRIS Payment Flow (`.buynow`)**
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant B as Bot
+    participant R as Redis
+    participant D as PostgreSQL
+    participant Q as QRIS Generator
+    participant A as App Listener
+    
+    U->>B: .buynow idproduk jumlah
+    B->>R: Check rate limit
+    B->>R: Acquire transaction lock
+    B->>D: Check product stock
+    B->>Q: Generate QRIS with unique code
+    Q->>B: Return QRIS image
+    B->>U: Send QRIS image
+    U->>U: Scan QRIS & pay
+    A->>A: Detect payment
+    A->>B: Payment confirmed
+    B->>D: Update product stock
+    B->>R: Release transaction lock
+    B->>U: Send product details
 ```
 
 ## 🔧 Configuration
