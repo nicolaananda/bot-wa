@@ -333,15 +333,11 @@ sequenceDiagram
                         B->>R: Release transaction lock
                         B->>D: Remove pending order
                         B->>L: Log: Transaction lock released
-                        
-                        break
                     else Payment timeout (30 minutes)
                         B->>U: "Pembayaran expired, order dibatalkan"
                         B->>R: Release transaction lock
                         B->>D: Remove pending order
                         B->>L: Log: Payment timeout
-                        
-                        break
                     else Payment not detected
                         A->>A: Continue monitoring
                     end
