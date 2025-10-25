@@ -28,6 +28,7 @@ const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
 const { qrisDinamis } = require("./function/dinamis");
 const { createPaymentLink, getPaymentLinkStatus, isPaymentCompleted, createQRISCore, createQRISPayment, getTransactionStatusByOrderId, getTransactionStatusByTransactionId } = require('./config/midtrans');
+const { acquireLock, releaseLock, checkRateLimit, getCache, setCache, invalidateCachePattern, cacheAside } = require('./function/redis-helper');
 const BASE_QRIS_DANA = "00020101021126570011id.bmri.livinmerchant.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 const { core, isProduction } = require('./config/midtrans');
@@ -2408,8 +2409,26 @@ case 'deposit': {
 break;
 
 case 'buynow': {
-  if (db.data.order[sender] !== undefined) return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
-  let data = q.split(" ")
+  // 🛡️ RATE LIMIT: Prevent spam (max 3 buynow per minute for non-owners)
+  if (!isOwner) {
+    const rateLimit = await checkRateLimit(sender, 'buynow', 3, 60)
+    if (!rateLimit.allowed) {
+      return reply(`⚠️ *Terlalu banyak request!*\n\nAnda sudah melakukan ${rateLimit.current} pembelian dalam 1 menit.\nSilakan tunggu ${rateLimit.resetIn} detik lagi.`)
+    }
+  }
+  
+  // 🔒 REDIS LOCK: Prevent race condition (double purchase)
+  const lockAcquired = await acquireLock(sender, 'buynow', 30)
+  if (!lockAcquired) {
+    return reply(`⚠️ *Transaksi sedang diproses*\n\nAnda sedang melakukan transaksi lain. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`)
+  }
+  
+  try {
+    if (db.data.order[sender] !== undefined) {
+      await releaseLock(sender, 'buynow')
+      return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
+    }
+    let data = q.split(" ")
   if (!data[1]) return reply(`Contoh: ${prefix + command} idproduk jumlah`)
   if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
 
@@ -2735,6 +2754,13 @@ case 'buynow': {
             delete db.data.order[sender];
         }
     }
+  } catch (outerError) {
+    console.error('❌ [BUYNOW] Outer error:', outerError)
+    reply("Terjadi kesalahan saat memproses pembelian. Silakan coba lagi.")
+  } finally {
+    // 🔓 REDIS UNLOCK: Always release lock
+    await releaseLock(sender, 'buynow')
+  }
   }
   break;
 
@@ -3158,8 +3184,26 @@ case 'cekmidtrans': {
 break;
 
 case 'buy': {
-  if (db.data.order[sender] !== undefined) return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
-  let data = q.split(" ")
+  // 🛡️ RATE LIMIT: Prevent spam (max 3 buy per minute for non-owners)
+  if (!isOwner) {
+    const rateLimit = await checkRateLimit(sender, 'buy', 3, 60)
+    if (!rateLimit.allowed) {
+      return reply(`⚠️ *Terlalu banyak request!*\n\nAnda sudah melakukan ${rateLimit.current} pembelian dalam 1 menit.\nSilakan tunggu ${rateLimit.resetIn} detik lagi.`)
+    }
+  }
+  
+  // 🔒 REDIS LOCK: Prevent race condition (double purchase)
+  const lockAcquired = await acquireLock(sender, 'buy', 30)
+  if (!lockAcquired) {
+    return reply(`⚠️ *Transaksi sedang diproses*\n\nAnda sedang melakukan transaksi lain. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`)
+  }
+  
+  try {
+    if (db.data.order[sender] !== undefined) {
+      await releaseLock(sender, 'buy')
+      return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
+    }
+    let data = q.split(" ")
   
   // Cek apakah ini adalah command untuk owner/admin dengan nomor tujuan
   let targetNumber = null
@@ -3472,6 +3516,13 @@ case 'buy': {
   } finally {
     delete db.data.order[sender]
     await db.save()
+  }
+  } catch (outerError) {
+    console.error('❌ [BUY] Outer error:', outerError)
+    reply("Terjadi kesalahan saat memproses pembelian. Silakan coba lagi.")
+  } finally {
+    // 🔓 REDIS UNLOCK: Always release lock
+    await releaseLock(sender, 'buy')
   }
 }
   break
