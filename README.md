@@ -142,7 +142,7 @@ User Payment → App Detection → Process → Send Product → Release Lock
 
 ## 🔍 Detailed Payment Flow Analysis
 
-### **🏦 Saldo Payment Flow (`.buy`) - Simple Overview**
+### **🏦 Saldo Payment Flow (`.buy`) - Professional Overview**
 
 ```mermaid
 flowchart LR
@@ -157,20 +157,20 @@ flowchart LR
     I --> J["Bot<br/>Send Product"]
     J --> K["Redis<br/>Release Lock"]
     
-    style A fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
-    style B fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
-    style C fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
-    style D fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
-    style E fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
-    style F fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
-    style G fill:#2196F3,stroke:#1976D2,stroke-width:3px,color:#fff
-    style H fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
-    style I fill:#9C27B0,stroke:#7B1FA2,stroke-width:2px,color:#fff
-    style J fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
-    style K fill:#607D8B,stroke:#455A64,stroke-width:2px,color:#fff
+    style A fill:#2563eb,stroke:#1d4ed8,stroke-width:2px,color:#ffffff
+    style B fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
+    style C fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
+    style D fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
+    style E fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
+    style F fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
+    style G fill:#059669,stroke:#047857,stroke-width:3px,color:#ffffff
+    style H fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
+    style I fill:#0891b2,stroke:#0e7490,stroke-width:2px,color:#ffffff
+    style J fill:#2563eb,stroke:#1d4ed8,stroke-width:3px,color:#ffffff
+    style K fill:#6b7280,stroke:#4b5563,stroke-width:2px,color:#ffffff
 ```
 
-### **📱 QRIS Payment Flow (`.buynow`) - Simple Overview**
+### **📱 QRIS Payment Flow (`.buynow`) - Professional Overview**
 
 ```mermaid
 flowchart LR
@@ -188,19 +188,19 @@ flowchart LR
     K --> M["Redis<br/>Release Lock"]
     L --> M
     
-    style A fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
-    style B fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
-    style C fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
-    style D fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
-    style E fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
-    style F fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
-    style G fill:#E91E63,stroke:#C2185B,stroke-width:3px,color:#fff
-    style H fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
-    style I fill:#9C27B0,stroke:#7B1FA2,stroke-width:2px,color:#fff
-    style J fill:#FF5722,stroke:#E64A19,stroke-width:2px,color:#fff
-    style K fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
-    style L fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
-    style M fill:#607D8B,stroke:#455A64,stroke-width:2px,color:#fff
+    style A fill:#2563eb,stroke:#1d4ed8,stroke-width:2px,color:#ffffff
+    style B fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
+    style C fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
+    style D fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
+    style E fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
+    style F fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
+    style G fill:#db2777,stroke:#be185d,stroke-width:3px,color:#ffffff
+    style H fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
+    style I fill:#0891b2,stroke:#0e7490,stroke-width:2px,color:#ffffff
+    style J fill:#ea580c,stroke:#c2410c,stroke-width:2px,color:#ffffff
+    style K fill:#2563eb,stroke:#1d4ed8,stroke-width:3px,color:#ffffff
+    style L fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
+    style M fill:#6b7280,stroke:#4b5563,stroke-width:2px,color:#ffffff
 ```
 
 ### **🔍 Component Legend**
