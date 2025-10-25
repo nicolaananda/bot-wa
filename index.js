@@ -8109,11 +8109,27 @@ Ada yang upgrade role!
             return reply(`❌ Transaksi terakhir tidak memiliki Reference ID.\n\n📦 *Detail Transaksi:*\n• Produk: ${lastTransaksi.name || 'N/A'}\n• Tanggal: ${lastTransaksi.date || 'N/A'}\n\n💡 Silakan hubungi admin untuk bantuan.`)
           }
           
-          // Try to read receipt file
-          const receiptPath = `./options/receipts/receipt_${lastTransaksi.reffId}.txt`
+          // Try to read receipt file (check multiple possible locations)
+          const possiblePaths = [
+            `./options/receipts/${lastTransaksi.reffId}.txt`,
+            `./options/receipts/receipt_${lastTransaksi.reffId}.txt`,
+            `./options/${lastTransaksi.reffId}.txt`,
+            `./options/receipt_${lastTransaksi.reffId}.txt`
+          ]
           
-          if (!fs.existsSync(receiptPath)) {
-            // Receipt file doesn't exist, send basic info
+          let receiptPath = null
+          for (const path of possiblePaths) {
+            if (fs.existsSync(path)) {
+              receiptPath = path
+              console.log(`✅ [RESEND] Receipt found at: ${path}`)
+              break
+            }
+          }
+          
+          if (!receiptPath) {
+            // Receipt file doesn't exist in any location, send basic info
+            console.log(`⚠️ [RESEND] Receipt not found for ${lastTransaksi.reffId}. Checked paths:`)
+            possiblePaths.forEach(p => console.log(`   - ${p}`))
             let basicInfo = `*🔁 KIRIM ULANG TRANSAKSI TERAKHIR*\n\n`
             basicInfo += `⚠️ File receipt tidak ditemukan, mengirim informasi dasar:\n\n`
             basicInfo += `*╭────「 TRANSAKSI INFO 」────╮*\n`
