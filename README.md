@@ -157,9 +157,17 @@ flowchart LR
     I --> J["Send Product"]
     J --> K["Release Lock"]
     
-    style A fill:#e3f2fd
-    style G fill:#c8e6c9
-    style J fill:#fff3e0
+    style A fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
+    style B fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
+    style C fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
+    style D fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
+    style E fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
+    style F fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
+    style G fill:#2196F3,stroke:#1976D2,stroke-width:3px,color:#fff
+    style H fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
+    style I fill:#9C27B0,stroke:#7B1FA2,stroke-width:2px,color:#fff
+    style J fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
+    style K fill:#607D8B,stroke:#455A64,stroke-width:2px,color:#fff
 ```
 
 ### **📱 QRIS Payment Flow (`.buynow`) - Simple Overview**
@@ -180,9 +188,19 @@ flowchart LR
     K --> M["Release Lock"]
     L --> M
     
-    style A fill:#e3f2fd
-    style G fill:#fce4ec
-    style K fill:#fff3e0
+    style A fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
+    style B fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
+    style C fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
+    style D fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
+    style E fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#fff
+    style F fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
+    style G fill:#E91E63,stroke:#C2185B,stroke-width:3px,color:#fff
+    style H fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
+    style I fill:#9C27B0,stroke:#7B1FA2,stroke-width:2px,color:#fff
+    style J fill:#FF5722,stroke:#E64A19,stroke-width:2px,color:#fff
+    style K fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
+    style L fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
+    style M fill:#607D8B,stroke:#455A64,stroke-width:2px,color:#fff
 ```
 
 ### **🏦 Saldo Payment (`.buy`) - Step by Step**
