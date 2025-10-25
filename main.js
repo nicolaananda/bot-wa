@@ -40,6 +40,31 @@ require('./options/graceful-shutdown')
 // Load database helper
 global.dbHelper = require('./options/db-helper')
 
+// Initialize Redis (Phase 1)
+const { isRedisAvailable, closeRedis } = require('./config/redis')
+;(async () => {
+  const redisReady = await isRedisAvailable()
+  if (redisReady) {
+    console.log('✅ [REDIS] Phase 1 features enabled: Locking, Rate Limiting, Caching')
+  } else {
+    console.log('⚠️ [REDIS] Not configured - Bot will run without Redis features')
+    console.log('💡 [REDIS] Setup guide: REDIS-SETUP.md')
+  }
+})()
+
+// Graceful shutdown for Redis
+process.on('SIGINT', async () => {
+  console.log('\n🔌 [SHUTDOWN] Closing Redis connection...')
+  await closeRedis()
+  process.exit(0)
+})
+
+process.on('SIGTERM', async () => {
+  console.log('\n🔌 [SHUTDOWN] Closing Redis connection...')
+  await closeRedis()
+  process.exit(0)
+})
+
 // Load full snapshot from PG (if enabled), then init defaults and log counts
 ;(async () => {
   try {
