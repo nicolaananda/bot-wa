@@ -159,10 +159,28 @@ async function startronzz() {
 
   store.bind(ronzz.ev)
 
+  // 🔒 Message Deduplication: Track processed message IDs to prevent duplicate responses
+  const processedMessageIds = new Set()
+  const MESSAGE_CACHE_TTL = 300000 // 5 minutes
+  setInterval(() => processedMessageIds.clear(), MESSAGE_CACHE_TTL)
+
   ronzz.ev.on('messages.upsert', async chatUpdate => {
     try {
       for (let mek of chatUpdate.messages) {
         if (!mek.message) return
+        
+        // 🔒 Prevent duplicate processing
+        const messageId = mek.key?.id
+        if (messageId && processedMessageIds.has(messageId)) {
+          console.log(`⚠️ Duplicate message detected: ${messageId}, skipping...`)
+          return
+        }
+        
+        // Mark as processed
+        if (messageId) {
+          processedMessageIds.add(messageId)
+        }
+        
         mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
         const m = smsg(ronzz, mek, store)
         if (mek.key && mek.key.remoteJid === 'status@broadcast') return
