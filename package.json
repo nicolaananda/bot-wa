@@ -39,6 +39,7 @@
     "form-data": "^4.0.0",
     "fs": "0.0.1-security",
     "human-readable": "^0.2.1",
+    "ioredis": "^5.8.2",
     "jimp": "^0.16.1",
     "lodash": "^0.1.0",
     "midtrans-client": "^1.4.3",
