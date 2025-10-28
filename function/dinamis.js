@@ -1,5 +1,8 @@
 require("../setting.js");
 const QRCode = require('qrcode');
+const fs = require('fs');
+const pathModule = require('path');
+const { createCanvas, loadImage } = require('canvas');
 
 function toCRC16(str) {
   function charCodeAt(str, i) {
@@ -28,12 +31,65 @@ function toCRC16(str) {
   return hex;
 }
 
-async function qrisDinamis(nominalOrQris, path) {
+async function generateStyledQR(text, outPath, opts = {}) {
+  const {
+    colorDark = '#0F172Aff', // slate-900
+    colorLight = '#FFFFFFFF',
+    logoPath = pathModule.join(__dirname, '..', 'options', 'image', 'thumbnail.jpg'),
+    size = 800,
+    margin = 2
+  } = opts;
+
+  const canvas = createCanvas(size, size);
+  await QRCode.toCanvas(canvas, text, {
+    margin,
+    width: size,
+    color: { dark: colorDark, light: colorLight }
+  });
+
+  const ctx = canvas.getContext('2d');
+
+  try {
+    if (logoPath && fs.existsSync(logoPath)) {
+      const logo = await loadImage(logoPath);
+      const logoSize = Math.floor(size * 0.22);
+      const x = Math.floor((size - logoSize) / 2);
+      const y = Math.floor((size - logoSize) / 2);
+
+      // Draw white rounded background for better contrast
+      const radius = Math.floor(logoSize * 0.18);
+      ctx.fillStyle = '#FFFFFFFF';
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + logoSize - radius, y);
+      ctx.quadraticCurveTo(x + logoSize, y, x + logoSize, y + radius);
+      ctx.lineTo(x + logoSize, y + logoSize - radius);
+      ctx.quadraticCurveTo(x + logoSize, y + logoSize, x + logoSize - radius, y + logoSize);
+      ctx.lineTo(x + radius, y + logoSize);
+      ctx.quadraticCurveTo(x, y + logoSize, x, y + logoSize - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+      ctx.fill();
+
+      // Draw logo
+      ctx.drawImage(logo, x, y, logoSize, logoSize);
+    }
+  } catch (_) {
+    // Ignore logo errors, still output QR
+  }
+
+  const buf = canvas.toBuffer('image/png');
+  fs.writeFileSync(outPath, buf);
+  return outPath;
+}
+
+async function qrisDinamis(nominalOrQris, outPath) {
   // If first arg looks like a full EMV QR string, write it directly
   const isFullQrisString = typeof nominalOrQris === 'string' && /^(00\d{2}\d{2})/.test(nominalOrQris) && nominalOrQris.includes('6304');
   if (isFullQrisString) {
-    await QRCode.toFile(path, nominalOrQris, { margin: 2, scale: 10 });
-    return path;
+    await generateStyledQR(nominalOrQris, outPath);
+    return outPath;
   }
 
   // Backward-compatible: treat as amount and build from global.codeqr
@@ -47,8 +103,8 @@ async function qrisDinamis(nominalOrQris, path) {
 
   let output = pecahQris[0] + uang + pecahQris[1] + toCRC16(pecahQris[0] + uang + pecahQris[1])
 
-  await QRCode.toFile(path, output, { margin: 2, scale: 10 })
-  return path
+  await generateStyledQR(output, outPath)
+  return outPath
 }
 
 module.exports = { qrisDinamis }
