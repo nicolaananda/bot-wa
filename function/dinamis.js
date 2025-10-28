@@ -35,7 +35,7 @@ async function generateStyledQR(text, outPath, opts = {}) {
   const {
     colorDark = '#0F172Aff', // slate-900
     colorLight = '#FFFFFFFF',
-    logoPath = pathModule.join(__dirname, '..', 'options', 'image', 'thumbnail.jpg'),
+    logoPath = pathModule.join(__dirname, '..', 'options', 'image', 'favicon.svg'),
     size = 800,
     margin = 2
   } = opts;
