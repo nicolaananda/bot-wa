@@ -1,5 +1,5 @@
 require("./setting.js");
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@dappaoffc/baileys");
 const pino = require('pino');
 
 /**

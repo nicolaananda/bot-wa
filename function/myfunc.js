@@ -1,4 +1,4 @@
-const { proto, delay, getContentType } = require('@whiskeysockets/baileys')
+const { proto, delay, getContentType } = require('@dappaoffc/baileys')
 const axios = require("axios");
 
 function getTypeMessage(message) {
