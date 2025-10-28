@@ -33,8 +33,8 @@ function toCRC16(str) {
 
 async function generateStyledQR(text, outPath, opts = {}) {
   const {
-    colorDark = '#0F172Aff', // slate-900
-    colorLight = '#FFFFFFFF',
+    colorDark = process.env.QR_COLOR_DARK || '#800000FF', // maroon
+    colorLight = process.env.QR_COLOR_LIGHT || '#FFFFFFFF',
     logoPath = pathModule.join(__dirname, '..', 'options', 'image', 'favicon.svg'),
     size = 800,
     margin = 2
