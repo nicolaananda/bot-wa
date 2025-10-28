@@ -4,7 +4,7 @@ const CommandRouter = require("./src/utils/command-router");
 const CommandContext = require("./src/utils/command-context");
 
 // Import existing modules
-const { downloadContentFromMessage } = require("@whiskeysockets/baileys");
+const { downloadContentFromMessage } = require("@dappaoffc/baileys");
 const fs = require("fs");
 const moment = require("moment-timezone");
 const crypto = require("crypto");
