@@ -36,25 +36,48 @@ async function generateStyledQR(text, outPath, opts = {}) {
     colorDark = process.env.QR_COLOR_DARK || '#800000FF', // maroon
     colorLight = process.env.QR_COLOR_LIGHT || '#FFFFFFFF',
     logoPath = pathModule.join(__dirname, '..', 'options', 'image', 'favicon.svg'),
+    backgroundPath = pathModule.join(__dirname, '..', 'options', 'image', 'background_qris.png'),
     size = 800,
     margin = 2
   } = opts;
 
-  const canvas = createCanvas(size, size);
-  await QRCode.toCanvas(canvas, text, {
+  // Draw background if provided, otherwise plain canvas
+  let bgImg = null;
+  try {
+    if (backgroundPath && fs.existsSync(backgroundPath)) {
+      bgImg = await loadImage(backgroundPath);
+    }
+  } catch (_) {}
+
+  const canvas = bgImg ? createCanvas(bgImg.width, bgImg.height) : createCanvas(size, size);
+  const ctx = canvas.getContext('2d');
+
+  if (bgImg) {
+    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+  } else {
+    ctx.fillStyle = '#FFFFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // Generate QR on an offscreen canvas for clean compositing
+  const qrSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.6);
+  const qrCanvas = createCanvas(qrSize, qrSize);
+  await QRCode.toCanvas(qrCanvas, text, {
     margin,
-    width: size,
+    width: qrSize,
     color: { dark: colorDark, light: colorLight }
   });
 
-  const ctx = canvas.getContext('2d');
+  const qrX = Math.floor((canvas.width - qrSize) / 2);
+  const qrY = Math.floor((canvas.height - qrSize) / 2);
+  ctx.drawImage(qrCanvas, qrX, qrY);
 
   try {
     if (logoPath && fs.existsSync(logoPath)) {
       const logo = await loadImage(logoPath);
-      const logoSize = Math.floor(size * 0.22);
-      const x = Math.floor((size - logoSize) / 2);
-      const y = Math.floor((size - logoSize) / 2);
+      const logoSize = Math.floor(qrSize * 0.22);
+      const x = qrX + Math.floor((qrSize - logoSize) / 2);
+      const y = qrY + Math.floor((qrSize - logoSize) / 2);
 
       // Draw white rounded background for better contrast
       const radius = Math.floor(logoSize * 0.18);
