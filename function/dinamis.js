@@ -37,6 +37,7 @@ async function generateStyledQR(text, outPath, opts = {}) {
     colorLight = process.env.QR_COLOR_LIGHT || '#FFFFFFFF',
     logoPath = pathModule.join(__dirname, '..', 'options', 'image', 'favicon.svg'),
     backgroundPath = pathModule.join(__dirname, '..', 'options', 'image', 'background_qris.png'),
+    showLogo = String(process.env.QR_SHOW_LOGO || 'false').toLowerCase() === 'true',
     size = 800,
     margin = 2
   } = opts;
@@ -73,27 +74,29 @@ async function generateStyledQR(text, outPath, opts = {}) {
   ctx.drawImage(qrCanvas, qrX, qrY);
 
   try {
-    if (logoPath && fs.existsSync(logoPath)) {
+    if (showLogo && logoPath && fs.existsSync(logoPath)) {
       const logo = await loadImage(logoPath);
       const logoSize = Math.floor(qrSize * 0.22);
       const x = qrX + Math.floor((qrSize - logoSize) / 2);
       const y = qrY + Math.floor((qrSize - logoSize) / 2);
 
-      // Draw white rounded background for better contrast
-      const radius = Math.floor(logoSize * 0.18);
-      ctx.fillStyle = '#FFFFFFFF';
-      ctx.beginPath();
-      ctx.moveTo(x + radius, y);
-      ctx.lineTo(x + logoSize - radius, y);
-      ctx.quadraticCurveTo(x + logoSize, y, x + logoSize, y + radius);
-      ctx.lineTo(x + logoSize, y + logoSize - radius);
-      ctx.quadraticCurveTo(x + logoSize, y + logoSize, x + logoSize - radius, y + logoSize);
-      ctx.lineTo(x + radius, y + logoSize);
-      ctx.quadraticCurveTo(x, y + logoSize, x, y + logoSize - radius);
-      ctx.lineTo(x, y + radius);
-      ctx.quadraticCurveTo(x, y, x + radius, y);
-      ctx.closePath();
-      ctx.fill();
+      // Optional white rounded background behind logo if enabled
+      if (String(process.env.QR_LOGO_BG || 'false').toLowerCase() === 'true') {
+        const radius = Math.floor(logoSize * 0.18);
+        ctx.fillStyle = '#FFFFFFFF';
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + logoSize - radius, y);
+        ctx.quadraticCurveTo(x + logoSize, y, x + logoSize, y + radius);
+        ctx.lineTo(x + logoSize, y + logoSize - radius);
+        ctx.quadraticCurveTo(x + logoSize, y + logoSize, x + logoSize - radius, y + logoSize);
+        ctx.lineTo(x + radius, y + logoSize);
+        ctx.quadraticCurveTo(x, y + logoSize, x, y + logoSize - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+        ctx.fill();
+      }
 
       // Draw logo
       ctx.drawImage(logo, x, y, logoSize, logoSize);
