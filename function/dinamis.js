@@ -33,35 +33,24 @@ function toCRC16(str) {
 
 async function generateStyledQR(text, outPath, opts = {}) {
   const {
-    colorDark = process.env.QR_COLOR_DARK || '#800000FF', // maroon
+    colorDark = process.env.QR_COLOR_DARK || '#000000FF',
     colorLight = process.env.QR_COLOR_LIGHT || '#FFFFFFFF',
-    logoPath = pathModule.join(__dirname, '..', 'options', 'image', 'favicon.svg'),
-    backgroundPath = pathModule.join(__dirname, '..', 'options', 'image', 'background_qris.png'),
-    showLogo = String(process.env.QR_SHOW_LOGO || 'false').toLowerCase() === 'true',
+    logoPath = null,
+    backgroundPath = null,
+    showLogo = false,
     size = 800,
     margin = 2
   } = opts;
 
-  // Draw background if provided, otherwise plain canvas
-  let bgImg = null;
-  try {
-    if (backgroundPath && fs.existsSync(backgroundPath)) {
-      bgImg = await loadImage(backgroundPath);
-    }
-  } catch (_) {}
-
-  const canvas = bgImg ? createCanvas(bgImg.width, bgImg.height) : createCanvas(size, size);
+  // Always plain canvas (no background)
+  const canvas = createCanvas(size, size);
   const ctx = canvas.getContext('2d');
 
-  if (bgImg) {
-    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-  } else {
-    ctx.fillStyle = '#FFFFFFFF';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
+  ctx.fillStyle = '#FFFFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Generate QR on an offscreen canvas for clean compositing
-  const qrSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.6);
+  const qrSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.9);
   const qrCanvas = createCanvas(qrSize, qrSize);
   await QRCode.toCanvas(qrCanvas, text, {
     margin,
@@ -73,37 +62,7 @@ async function generateStyledQR(text, outPath, opts = {}) {
   const qrY = Math.floor((canvas.height - qrSize) / 2);
   ctx.drawImage(qrCanvas, qrX, qrY);
 
-  try {
-    if (showLogo && logoPath && fs.existsSync(logoPath)) {
-      const logo = await loadImage(logoPath);
-      const logoSize = Math.floor(qrSize * 0.22);
-      const x = qrX + Math.floor((qrSize - logoSize) / 2);
-      const y = qrY + Math.floor((qrSize - logoSize) / 2);
-
-      // Optional white rounded background behind logo if enabled
-      if (String(process.env.QR_LOGO_BG || 'false').toLowerCase() === 'true') {
-        const radius = Math.floor(logoSize * 0.18);
-        ctx.fillStyle = '#FFFFFFFF';
-        ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + logoSize - radius, y);
-        ctx.quadraticCurveTo(x + logoSize, y, x + logoSize, y + radius);
-        ctx.lineTo(x + logoSize, y + logoSize - radius);
-        ctx.quadraticCurveTo(x + logoSize, y + logoSize, x + logoSize - radius, y + logoSize);
-        ctx.lineTo(x + radius, y + logoSize);
-        ctx.quadraticCurveTo(x, y + logoSize, x, y + logoSize - radius);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // Draw logo
-      ctx.drawImage(logo, x, y, logoSize, logoSize);
-    }
-  } catch (_) {
-    // Ignore logo errors, still output QR
-  }
+  // No logo drawing (explicitly disabled)
 
   const buf = canvas.toBuffer('image/png');
   fs.writeFileSync(outPath, buf);
