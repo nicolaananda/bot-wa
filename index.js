@@ -34,6 +34,53 @@ const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 const { core, isProduction } = require('./config/midtrans');
 const USE_POLLING = true; // true = pakai polling status Midtrans; false = andalkan webhook saja
 
+// Centralized, minimal send throttling + retry to avoid bursty spam patterns
+const SEND_MIN_INTERVAL_MS = Number(process.env.WA_SEND_MIN_INTERVAL_MS || 800);
+const SEND_MAX_RETRIES = Number(process.env.WA_SEND_RETRIES || 3);
+let __sendQueue = Promise.resolve();
+let __lastSendAt = 0;
+
+function __delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function __wrapSendMessageOnce(ronzz) {
+  try {
+    if (ronzz.__sendWrapped) return;
+    const originalSend = ronzz.sendMessage.bind(ronzz);
+    ronzz.sendMessage = async function(jid, content, options) {
+      __sendQueue = __sendQueue.then(async () => {
+        const now = Date.now();
+        const wait = Math.max(0, SEND_MIN_INTERVAL_MS - (now - __lastSendAt));
+        if (wait > 0) await __delay(wait);
+
+        let attempt = 0;
+        // Retry on transient/rate-limit-like errors with exponential backoff
+        while (true) {
+          try {
+            const res = await originalSend(jid, content, options);
+            __lastSendAt = Date.now();
+            return res;
+          } catch (e) {
+            attempt += 1;
+            const msg = String(e && e.message ? e.message : "");
+            const code = e && (e.status || e.statusCode || e.code);
+            const transient =
+              code === 429 ||
+              /rate|too many|retry|temporarily unavailable|timeout|timed out|flood/i.test(msg);
+            if (!transient || attempt > SEND_MAX_RETRIES) throw e;
+            const backoff = Math.min(1000 * 2 ** (attempt - 1), 8000);
+            try { console.warn('[WA] send retry', { attempt, backoff, code, message: msg }); } catch {}
+            await __delay(backoff);
+          }
+        }
+      });
+      return __sendQueue;
+    };
+    Object.defineProperty(ronzz, '__sendWrapped', { value: true, enumerable: false, configurable: false });
+  } catch {}
+}
+
 // Performance optimization: Cache for user saldo
 const saldoCache = new Map();
 const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
@@ -129,6 +176,7 @@ const tanggal = moment.tz('Asia/Jakarta').format('DD MMMM YYYY')
 
 module.exports = async (ronzz, m, mek) => {
   try {
+    __wrapSendMessageOnce(ronzz)
     const { isQuotedMsg, fromMe } = m
     if (fromMe) return
     const jamwib = moment.tz('Asia/Jakarta').format('HH:mm:ss')
