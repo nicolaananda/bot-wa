@@ -33,7 +33,7 @@ function toCRC16(str) {
 
 async function generateStyledQR(text, outPath, opts = {}) {
   const {
-    colorDark = process.env.QR_COLOR_DARK || '#000000FF',
+    colorDark = process.env.QR_COLOR_DARK || '#800000FF',
     colorLight = process.env.QR_COLOR_LIGHT || '#FFFFFFFF',
     logoPath = null,
     backgroundPath = null,
