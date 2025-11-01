@@ -3685,24 +3685,41 @@ case 'buy': {
         
       case 'riwayat': {
         if (!q) {
-          // Tampilkan 10 transaksi terbaru (global)
-          const trx = (db.data.transaksi || [])
-            .filter(Boolean)
-            .slice(-10)
-            .reverse();
-          if (trx.length === 0) return reply('Belum ada transaksi.');
-          let teks = `*📊 10 Transaksi Terbaru*\n\n`;
-          trx.forEach((t, i) => {
-            teks += `*${i + 1}. ${t.name}*\n`;
-            teks += `• ID: ${t.id}\n`;
-            teks += `• Harga: Rp${toRupiah(parseInt(t.price) || 0)}\n`;
-            teks += `• Jumlah: ${t.jumlah || 1}\n`;
-            teks += `• Total: Rp${toRupiah(t.totalBayar || ((parseInt(t.price) || 0) * (t.jumlah || 1)))}\n`;
-            teks += `• Metode: ${t.metodeBayar || t.payment_method || 'Tidak diketahui'}\n`;
-            teks += `• Tanggal: ${t.date || '-'}\n`;
-            teks += `• Reff ID: ${t.reffId || t.order_id || '-'}\n\n`;
-          });
-          return reply(teks);
+          // Tampilkan riwayat transaksi dari user yang mengetik command
+          const senderNumber = sender.replace(/[^0-9]/g, '')
+          const alluserTransaksi = (db.data.transaksi || []).filter(t => t && t.user === senderNumber)
+          const userTransaksi = alluserTransaksi.slice(-10).reverse()
+          
+          if (userTransaksi.length === 0) {
+            return reply('Belum ada riwayat transaksi.')
+          }
+          
+          let teks = `*📊 RIWAYAT TRANSAKSI ANDA*\n\n`
+          teks += `*📱 Nomor:* ${senderNumber}\n`
+          teks += `*📅 Total Transaksi:* ${alluserTransaksi.length}\n\n`
+          
+          userTransaksi.forEach((t, i) => {
+            teks += `*${i + 1}. ${t.name}*\n`
+            teks += `• ID: ${t.id}\n`
+            teks += `• Harga: Rp${toRupiah(parseInt(t.price) || 0)}\n`
+            teks += `• Jumlah: ${t.jumlah || 1}\n`
+            teks += `• Total: Rp${toRupiah(t.totalBayar || ((parseInt(t.price) || 0) * (t.jumlah || 1)))}\n`
+            teks += `• Metode: ${t.metodeBayar || t.payment_method || 'Tidak diketahui'}\n`
+            teks += `• Tanggal: ${t.date || '-'}\n`
+            teks += `• Reff ID: ${t.reffId || t.order_id || '-'}\n\n`
+          })
+          
+          const sentMessage = await reply(teks)
+          
+          // Auto delete after 5 minutes
+          setTimeout(async () => {
+            try {
+              await ronzz.sendMessage(from, { delete: sentMessage.key })
+            } catch (e) {
+              console.log('Failed to delete riwayat message:', e.message)
+            }
+          }, 5 * 60 * 1000)
+          return
         }
         
         let targetUser = q.replace(/[^0-9]/g, '') + "@s.whatsapp.net"
@@ -3731,12 +3748,12 @@ case 'buy': {
           teks += `• Reff ID: ${t.reffId || 'Tidak ada'}\n\n`
         })
         
-        reply(teks)
+        const sentMessage = await reply(teks)
         
         // Auto delete after 5 minutes
-        setTimeout(() => {
+        setTimeout(async () => {
           try {
-            client.deleteMessage(from, { id: m.key.id, remoteJid: from, participant: m.key.participant })
+            await ronzz.sendMessage(from, { delete: sentMessage.key })
           } catch (e) {
             console.log('Failed to delete riwayat message:', e.message)
           }
