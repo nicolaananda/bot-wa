@@ -1,5 +1,5 @@
 require("./setting.js")
-const { downloadContentFromMessage } = require('@dappaoffc/baileys');
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const fs = require("fs");
 const speed = require("performance-now");
 const moment = require("moment-timezone");
