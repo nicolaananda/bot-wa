@@ -18,8 +18,13 @@ require('dotenv').config();
  */
 
 let redis = null;
+const redisToggle = String(process.env.REDIS || 'ON').toUpperCase();
 
 function createRedisClient() {
+  if (redisToggle === 'OFF') {
+    console.log('⛔ [REDIS] Disabled by env REDIS=OFF');
+    return null;
+  }
   try {
     // Option 1: Use REDIS_URL (for Upstash, Redis Cloud, etc)
     if (process.env.REDIS_URL) {
@@ -108,7 +113,7 @@ function createRedisClient() {
   }
 }
 
-// Initialize Redis client
+// Initialize Redis client (honors REDIS=OFF)
 redis = createRedisClient();
 
 /**
@@ -124,6 +129,9 @@ function getRedis() {
  * @returns {boolean} True if Redis is connected and ready
  */
 async function isRedisAvailable() {
+  if (redisToggle === 'OFF') {
+    return false;
+  }
   if (!redis) {
     console.log('⚠️ [REDIS] Client not initialized');
     return false;

@@ -18,7 +18,8 @@
     "pg:dedup": "node ./options/dedup-transaksi.js",
     "lint": "eslint index.js",
     "lint:fix": "eslint --fix index.js",
-    "format": "prettier --write index.js"
+    "format": "prettier --write index.js",
+    "telegram": "node telegram-bot.js"
   },
   "author": "Ronzz YT",
   "license": "ISC",
@@ -58,6 +59,7 @@
     "qrcode-terminal": "^0.12.0",
     "qs": "^6.11.2",
     "readline": "latest",
+    "telegraf": "^4.16.3",
     "xendit-node": "^7.0.0",
     "yargs": "^17.2.1"
   },
