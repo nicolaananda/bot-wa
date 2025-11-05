@@ -525,12 +525,12 @@ async function pollPaymentsAndFulfill() {
       const totalAmount = Number(ord.total)
       if (!Number.isFinite(totalAmount)) continue
 
-      // Match incoming notifications by amount
+      // Match incoming notifications by amount (DANA only)
       const paid = notifData.find(n => {
         const amt = Number(String(n?.amount_detected || '').replace(/[^0-9]/g, ''))
         const app = (n?.package_name || n?.app_name || '').toString().toUpperCase()
-        const isKnownApp = app.includes('LIVIN') || app.includes('DANA') || app.includes('GOPAY') || app.includes('OVO') || app.includes('SHOPEE')
-        return isKnownApp && amt === totalAmount
+        const isDana = app.includes('DANA')
+        return isDana && amt === totalAmount
       })
 
       if (paid) {
