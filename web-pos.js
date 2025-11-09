@@ -351,8 +351,8 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
     console.log(`✅ [Web POS] Transaction added to array. Total transactions: ${db.data.transaksi.length}`);
     
     // For PostgreSQL: Insert transaction directly to avoid looping all transactions
-    if (typeof db.save === 'function' && !db._save) {
-      // This is PostgreSQL mode
+    const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
+    if (usePg) {
       try {
         const pg = require('./config/postgres');
         // Check if transaction already exists
