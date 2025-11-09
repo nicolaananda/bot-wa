@@ -193,6 +193,16 @@
             selectedProduct = allProducts.find(p => p.id === productId);
             if (!selectedProduct) return;
 
+            // Reset modal state
+            const btnPurchase = document.getElementById('btnPurchase');
+            btnPurchase.disabled = false;
+            btnPurchase.textContent = 'Beli Sekarang';
+            
+            // Clear any previous alerts
+            const alertBox = document.getElementById('modalAlert');
+            alertBox.className = 'alert';
+            alertBox.textContent = '';
+
             document.getElementById('modalProductName').textContent = selectedProduct.name;
             document.getElementById('modalProductDesc').textContent = 
                 selectedProduct.description || 'Tidak ada deskripsi';
@@ -264,6 +274,10 @@
                 const data = await response.json();
 
                 if (data.success) {
+                    // Reset button state first
+                    btnPurchase.disabled = false;
+                    btnPurchase.textContent = 'Beli Sekarang';
+                    
                     closePurchaseModal();
                     showSuccessModal(data.transaction);
                     
