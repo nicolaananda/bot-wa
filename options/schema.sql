@@ -4,9 +4,20 @@ CREATE TABLE IF NOT EXISTS users (
   saldo NUMERIC(18,2) NOT NULL DEFAULT 0,
   role TEXT NOT NULL DEFAULT 'bronze',
   data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  web_pos_pin TEXT DEFAULT '1234',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Add web_pos_pin column to existing users table if not exists
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'users' AND column_name = 'web_pos_pin'
+  ) THEN
+    ALTER TABLE users ADD COLUMN web_pos_pin TEXT DEFAULT '1234';
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS transaksi (
   id SERIAL PRIMARY KEY,
