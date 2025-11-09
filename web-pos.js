@@ -324,27 +324,19 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
     const tanggal = moment.tz('Asia/Jakarta').format('DD MMMM YYYY');
     const jamwib = moment.tz('Asia/Jakarta').format('HH:mm:ss');
     
-    // Save transaction to database (same format as bot)
+    // Save transaction to database (exact same format as bot)
     const transaction = {
       id: productId,
       name: product.name || product.nama,
-      price: pricePerItem,
+      price: String(pricePerItem), // String format like bot
       date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
       profit: product.profit || 0,
       jumlah: quantity,
       user: cleanPhone,
-      user_name: cleanPhone, // For dashboard compatibility
-      user_id: cleanPhone,
       userRole: userRole,
       reffId: reffId,
-      order_id: reffId, // For dashboard compatibility
       metodeBayar: 'Saldo',
-      payment_method: 'Saldo', // For dashboard compatibility
-      totalBayar: totalPrice,
-      status: 'completed',
-      isOwnerBuy: false,
-      targetNumber: null,
-      ownerNumber: null
+      totalBayar: totalPrice
     };
     
     db.data.transaksi.push(transaction);
