@@ -89,15 +89,48 @@ function isAdmin(phone) {
   return ADMIN_NUMBERS.includes(normalized);
 }
 
-function getUserPin(userId) {
-  if (!db.data.userPins) db.data.userPins = {};
-  return db.data.userPins[userId] || '1234'; // Default PIN
+async function getUserPin(userId) {
+  const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
+  
+  if (usePg) {
+    try {
+      const pg = require('./config/postgres');
+      const result = await pg.query('SELECT web_pos_pin FROM users WHERE user_id = $1', [userId]);
+      if (result.rows.length > 0 && result.rows[0].web_pos_pin) {
+        return result.rows[0].web_pos_pin;
+      }
+    } catch (error) {
+      console.error('[Web POS] Error getting PIN from PostgreSQL:', error.message);
+    }
+  } else {
+    // File-based database
+    if (!db.data.userPins) db.data.userPins = {};
+    if (db.data.userPins[userId]) {
+      return db.data.userPins[userId];
+    }
+  }
+  
+  return '1234'; // Default PIN
 }
 
-function setUserPin(userId, newPin) {
-  if (!db.data.userPins) db.data.userPins = {};
-  db.data.userPins[userId] = newPin;
-  db.save();
+async function setUserPin(userId, newPin) {
+  const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
+  
+  if (usePg) {
+    try {
+      const pg = require('./config/postgres');
+      await pg.query('UPDATE users SET web_pos_pin = $1 WHERE user_id = $2', [newPin, userId]);
+      console.log(`✅ [Web POS] PIN updated in PostgreSQL for user: ${userId}`);
+    } catch (error) {
+      console.error('[Web POS] Error saving PIN to PostgreSQL:', error.message);
+      throw error;
+    }
+  } else {
+    // File-based database
+    if (!db.data.userPins) db.data.userPins = {};
+    db.data.userPins[userId] = newPin;
+    await db.save();
+  }
 }
 
 function generateRefId() {
@@ -163,7 +196,7 @@ app.post('/api/login', async (req, res) => {
     }
     
     // Verify PIN
-    const storedPin = getUserPin(userId);
+    const storedPin = await getUserPin(userId);
     if (pin !== storedPin) {
       return res.status(401).json({ 
         success: false, 
@@ -628,15 +661,15 @@ app.post('/api/change-pin', requireAuth, async (req, res) => {
       });
     }
     
-    if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+    if (newPin.length < 4 || newPin.length > 6 || !/^\d+$/.test(newPin)) {
       return res.status(400).json({ 
         success: false, 
-        message: 'PIN baru harus 4 digit angka' 
+        message: 'PIN baru harus 4-6 digit angka' 
       });
     }
     
     // Verify old PIN
-    const storedPin = getUserPin(userId);
+    const storedPin = await getUserPin(userId);
     if (oldPin !== storedPin) {
       return res.status(401).json({ 
         success: false, 
@@ -645,7 +678,7 @@ app.post('/api/change-pin', requireAuth, async (req, res) => {
     }
     
     // Set new PIN
-    setUserPin(userId, newPin);
+    await setUserPin(userId, newPin);
     
     res.json({
       success: true,
