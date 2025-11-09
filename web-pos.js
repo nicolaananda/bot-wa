@@ -141,7 +141,10 @@ function formatPhoneForDb(phone) {
 
 function isOwner(phone) {
   const cleanPhone = normalizePhoneNumber(phone);
-  const ownerNumbers = require('./setting.js').owner || [];
+  
+  // Load setting.js to ensure global variables are set
+  require('./setting.js');
+  const ownerNumbers = global.owner || [];
   
   console.log('[Web POS] Checking admin access:', { cleanPhone, ownerNumbers });
   
