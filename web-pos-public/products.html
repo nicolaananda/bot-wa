@@ -1,491 +1,406 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Belanja - Web POS</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produk - GiHa Smart Bot POS</title>
+    <link rel="stylesheet" href="/css/style.css">
 </head>
-<body class="bg-gray-50 pb-20">
-  <!-- Toast Notification -->
-  <div id="toast" class="fixed top-4 right-4 z-50 transform translate-x-full transition-all duration-300"></div>
-
-  <!-- Header -->
-  <div class="sticky top-0 z-40 bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg">
-    <div class="container mx-auto px-4 py-4">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-          <a href="/dashboard.html" class="p-2 hover:bg-white/20 rounded-lg transition">
-            <i class="fas fa-arrow-left"></i>
-          </a>
-          <div>
-            <h1 class="text-lg font-bold">Belanja Produk</h1>
-            <p class="text-xs opacity-90">Pilih produk favorit Anda</p>
-          </div>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🤖 GiHa Smart Bot</div>
+        <div class="nav-links">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/products" class="active">Produk</a>
+            <a href="/settings">Pengaturan</a>
+            <button class="btn-logout" onclick="logout()">Logout</button>
         </div>
-        <div class="text-right">
-          <p class="text-xs opacity-90">Saldo</p>
-          <p class="font-bold" id="saldoAmount">Rp 0</p>
-        </div>
-      </div>
-    </div>
+    </nav>
 
-    <!-- Search & Filter -->
-    <div class="container mx-auto px-4 pb-4">
-      <div class="flex gap-2">
-        <div class="flex-1 relative">
-          <input 
-            type="text" 
-            id="searchInput" 
-            placeholder="Cari produk..."
-            class="w-full px-4 py-2 rounded-lg text-gray-800 focus:ring-2 focus:ring-white/50 outline-none"
-          >
-          <i class="fas fa-search absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-        </div>
-        <button id="filterBtn" class="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition">
-          <i class="fas fa-filter"></i>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Categories -->
-  <div class="container mx-auto px-4 py-4">
-    <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-      <button class="category-btn px-4 py-2 bg-blue-500 text-white rounded-full text-sm font-semibold whitespace-nowrap" data-category="all">
-        Semua
-      </button>
-      <button class="category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm font-semibold whitespace-nowrap hover:bg-gray-300" data-category="netflix">
-        Netflix
-      </button>
-      <button class="category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm font-semibold whitespace-nowrap hover:bg-gray-300" data-category="spotify">
-        Spotify
-      </button>
-      <button class="category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm font-semibold whitespace-nowrap hover:bg-gray-300" data-category="canva">
-        Canva
-      </button>
-      <button class="category-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm font-semibold whitespace-nowrap hover:bg-gray-300" data-category="youtube">
-        YouTube
-      </button>
-    </div>
-  </div>
-
-  <!-- Products Grid -->
-  <div class="container mx-auto px-4 pb-6">
-    <div id="productsList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      <!-- Products will be loaded here -->
-      <div class="col-span-full text-center py-12 text-gray-400">
-        <i class="fas fa-spinner fa-spin text-4xl mb-2"></i>
-        <p>Memuat produk...</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Bottom Navigation -->
-  <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden">
-    <div class="flex">
-      <a href="/dashboard.html" class="flex-1 py-4 text-center text-gray-400 hover:text-blue-500">
-        <i class="fas fa-home text-xl mb-1"></i>
-        <p class="text-xs">Dashboard</p>
-      </a>
-      <a href="/products.html" class="flex-1 py-4 text-center text-blue-500">
-        <i class="fas fa-shopping-cart text-xl mb-1"></i>
-        <p class="text-xs">Belanja</p>
-      </a>
-      <a href="/settings.html" class="flex-1 py-4 text-center text-gray-400 hover:text-blue-500">
-        <i class="fas fa-cog text-xl mb-1"></i>
-        <p class="text-xs">Settings</p>
-      </a>
-    </div>
-  </div>
-
-  <!-- Purchase Modal -->
-  <div id="purchaseModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-      <div class="sticky top-0 bg-white border-b p-4 flex items-center justify-between rounded-t-2xl">
-        <h3 class="font-bold text-lg">Konfirmasi Pembelian</h3>
-        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
-          <i class="fas fa-times text-xl"></i>
-        </button>
-      </div>
-      <div id="modalContent" class="p-6">
-        <!-- Modal content will be loaded here -->
-      </div>
-    </div>
-  </div>
-
-  <!-- Success Modal -->
-  <div id="successModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-      <div class="p-6 text-center">
-        <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <i class="fas fa-check text-green-500 text-3xl"></i>
-        </div>
-        <h3 class="text-2xl font-bold text-gray-800 mb-2">Pembelian Berhasil!</h3>
-        <p class="text-gray-600 mb-6">Terima kasih atas pembelian Anda</p>
-        
-        <div id="successDetail" class="bg-gray-50 rounded-xl p-4 mb-6 text-left">
-          <!-- Success details will be loaded here -->
-        </div>
-
-        <div class="space-y-3">
-          <button onclick="copyReceipt()" class="w-full bg-blue-500 text-white py-3 rounded-xl font-semibold hover:bg-blue-600 transition">
-            <i class="fas fa-copy mr-2"></i>Copy Receipt
-          </button>
-          <button onclick="closeSuccessModal()" class="w-full bg-gray-200 text-gray-800 py-3 rounded-xl font-semibold hover:bg-gray-300 transition">
-            Tutup
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    let allProducts = [];
-    let currentUser = null;
-    let currentReceipt = null;
-    let selectedCategory = 'all';
-
-    // Toast notification
-    function showToast(message, type = 'info') {
-      const toast = document.getElementById('toast');
-      const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
-      
-      toast.innerHTML = `
-        <div class="${bgColor} text-white px-6 py-4 rounded-xl shadow-lg flex items-center space-x-3">
-          <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-          <span>${message}</span>
-        </div>
-      `;
-      
-      toast.classList.remove('translate-x-full');
-      setTimeout(() => toast.classList.add('translate-x-full'), 3000);
-    }
-
-    // Format Rupiah
-    function toRupiah(amount) {
-      return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0
-      }).format(amount || 0);
-    }
-
-    // Load user data
-    async function loadUserData() {
-      try {
-        const response = await fetch('/api/user');
-        const data = await response.json();
-        
-        if (data.success) {
-          currentUser = data.user;
-          document.getElementById('saldoAmount').textContent = toRupiah(data.user.saldo);
-        } else {
-          window.location.href = '/login.html';
-        }
-      } catch (error) {
-        console.error('Load user error:', error);
-        window.location.href = '/login.html';
-      }
-    }
-
-    // Load products
-    async function loadProducts() {
-      try {
-        const response = await fetch('/api/products');
-        const data = await response.json();
-        
-        if (data.success) {
-          allProducts = data.products;
-          renderProducts(allProducts);
-        } else {
-          showToast('Gagal memuat produk', 'error');
-        }
-      } catch (error) {
-        console.error('Load products error:', error);
-        showToast('Terjadi kesalahan saat memuat produk', 'error');
-      }
-    }
-
-    // Render products
-    function renderProducts(products) {
-      const container = document.getElementById('productsList');
-      
-      if (products.length === 0) {
-        container.innerHTML = `
-          <div class="col-span-full text-center py-12 text-gray-400">
-            <i class="fas fa-box-open text-4xl mb-2"></i>
-            <p>Tidak ada produk tersedia</p>
-          </div>
-        `;
-        return;
-      }
-      
-      container.innerHTML = products.map(product => `
-        <div class="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all overflow-hidden border border-gray-100">
-          <div class="p-4">
-            <div class="flex items-start justify-between mb-3">
-              <h3 class="font-bold text-gray-800 text-sm leading-tight flex-1">${product.name}</h3>
-              <span class="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold whitespace-nowrap">
-                ${product.stock} stok
-              </span>
+    <div class="container">
+        <div class="page-header">
+            <h1>Produk Tersedia</h1>
+            <div class="user-balance">
+                Saldo: <strong id="userBalance">Rp 0</strong>
             </div>
+        </div>
+
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="🔍 Cari produk..." onkeyup="filterProducts()">
+        </div>
+
+        <div id="productGrid" class="product-grid">
+            <div class="loading-state">Memuat produk...</div>
+        </div>
+    </div>
+
+    <!-- Purchase Modal -->
+    <div id="purchaseModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closePurchaseModal()">&times;</span>
+            <h2>Konfirmasi Pembelian</h2>
             
-            ${product.description ? `<p class="text-xs text-gray-600 mb-3 line-clamp-2">${product.description}</p>` : ''}
+            <div class="product-detail">
+                <h3 id="modalProductName"></h3>
+                <p id="modalProductDesc"></p>
+            </div>
+
+            <div class="form-group">
+                <label for="quantity">Jumlah</label>
+                <input type="number" id="quantity" value="1" min="1" onchange="updateTotalPrice()">
+            </div>
+
+            <div class="purchase-summary">
+                <div class="summary-row">
+                    <span>Harga per item:</span>
+                    <span id="pricePerItem">Rp 0</span>
+                </div>
+                <div class="summary-row">
+                    <span>Jumlah:</span>
+                    <span id="summaryQty">1</span>
+                </div>
+                <div class="summary-row total">
+                    <span>Total:</span>
+                    <span id="totalPrice">Rp 0</span>
+                </div>
+            </div>
+
+            <div id="modalAlert" class="alert"></div>
+
+            <button class="btn-primary" id="btnPurchase" onclick="confirmPurchase()">
+                Beli Sekarang
+            </button>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeSuccessModal()">&times;</span>
+            <div class="success-icon">✅</div>
+            <h2>Pembelian Berhasil!</h2>
             
-            <div class="flex items-center justify-between mb-4">
-              <div>
-                <p class="text-xs text-gray-500">Harga</p>
-                <p class="text-lg font-bold text-blue-600">${toRupiah(product.price)}</p>
-              </div>
+            <div class="purchase-info">
+                <p><strong>Refid:</strong> <span id="successRefId"></span></p>
+                <p><strong>Saldo Baru:</strong> <span id="successBalance"></span></p>
             </div>
+
+            <div id="accountDetails" class="account-details"></div>
+
+            <div class="modal-actions">
+                <button class="btn-copy" onclick="copyPurchaseReceipt()">
+                    📋 Copy Receipt
+                </button>
+                <button class="btn-secondary" onclick="closeSuccessModal()">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        let allProducts = [];
+        let selectedProduct = null;
+        let currentUserData = null;
+        let currentReceiptText = null;
+        let currentRefId = null;
+
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/user');
+                const data = await response.json();
+
+                if (!data.success) {
+                    window.location.href = '/';
+                    return;
+                }
+
+                currentUserData = data.user;
+                document.getElementById('userBalance').textContent = formatRupiah(data.user.saldo);
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                window.location.href = '/';
+            }
+        }
+
+        async function loadProducts() {
+            try {
+                const response = await fetch('/api/products');
+                const data = await response.json();
+
+                if (!data.success) {
+                    document.getElementById('productGrid').innerHTML = 
+                        '<p class="empty-state">Gagal memuat produk</p>';
+                    return;
+                }
+
+                allProducts = data.products;
+                displayProducts(allProducts);
+            } catch (error) {
+                console.error('Load products failed:', error);
+                document.getElementById('productGrid').innerHTML = 
+                    '<p class="empty-state">Terjadi kesalahan saat memuat produk</p>';
+            }
+        }
+
+        function displayProducts(products) {
+            const productGrid = document.getElementById('productGrid');
+
+            if (products.length === 0) {
+                productGrid.innerHTML = '<p class="empty-state">Tidak ada produk tersedia</p>';
+                return;
+            }
+
+            productGrid.innerHTML = products.map(product => `
+                <div class="product-card" onclick="openPurchaseModal('${product.id}')">
+                    <div class="product-header">
+                        <h3>${product.name}</h3>
+                        <span class="product-stock">Stok: ${product.stock}</span>
+                    </div>
+                    <p class="product-description">${product.description || 'Tidak ada deskripsi'}</p>
+                    <div class="product-footer">
+                        <div class="product-price">${formatRupiah(product.price)}</div>
+                        <button class="btn-buy" onclick="event.stopPropagation(); openPurchaseModal('${product.id}')">
+                            Beli
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterProducts() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allProducts.filter(p => 
+                p.name.toLowerCase().includes(searchTerm) ||
+                (p.description && p.description.toLowerCase().includes(searchTerm))
+            );
+            displayProducts(filtered);
+        }
+
+        function openPurchaseModal(productId) {
+            selectedProduct = allProducts.find(p => p.id === productId);
+            if (!selectedProduct) return;
+
+            document.getElementById('modalProductName').textContent = selectedProduct.name;
+            document.getElementById('modalProductDesc').textContent = 
+                selectedProduct.description || 'Tidak ada deskripsi';
+            document.getElementById('pricePerItem').textContent = formatRupiah(selectedProduct.price);
+            document.getElementById('quantity').value = 1;
+            document.getElementById('quantity').max = selectedProduct.stock;
             
-            <button 
-              onclick="showPurchaseModal('${product.id}')" 
-              class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-2.5 rounded-lg font-semibold hover:shadow-md transition-all"
-              ${product.stock === 0 ? 'disabled class="opacity-50 cursor-not-allowed"' : ''}
-            >
-              <i class="fas fa-shopping-cart mr-2"></i>
-              ${product.stock === 0 ? 'Stok Habis' : 'Beli Sekarang'}
-            </button>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    // Show purchase modal
-    function showPurchaseModal(productId) {
-      const product = allProducts.find(p => p.id === productId);
-      if (!product) return;
-      
-      const modalContent = document.getElementById('modalContent');
-      modalContent.innerHTML = `
-        <div class="space-y-6">
-          <div>
-            <h4 class="font-bold text-lg text-gray-800 mb-2">${product.name}</h4>
-            <p class="text-sm text-gray-600">${product.description || 'Tidak ada deskripsi'}</p>
-          </div>
-          
-          <div class="bg-gray-50 rounded-xl p-4 space-y-3">
-            <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Harga per item:</span>
-              <span class="font-semibold">${toRupiah(product.price)}</span>
-            </div>
-            <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Stok tersedia:</span>
-              <span class="font-semibold text-green-600">${product.stock} item</span>
-            </div>
-          </div>
-          
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Jumlah Pembelian</label>
-            <div class="flex items-center gap-3">
-              <button onclick="changeQuantity(-1)" class="w-10 h-10 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
-                <i class="fas fa-minus"></i>
-              </button>
-              <input 
-                type="number" 
-                id="quantity" 
-                value="1" 
-                min="1" 
-                max="${product.stock}"
-                class="flex-1 text-center text-lg font-bold border border-gray-300 rounded-lg py-2"
-                oninput="updateTotal()"
-              >
-              <button onclick="changeQuantity(1)" class="w-10 h-10 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
-                <i class="fas fa-plus"></i>
-              </button>
-            </div>
-          </div>
-          
-          <div class="bg-blue-50 rounded-xl p-4">
-            <div class="flex justify-between items-center">
-              <span class="text-gray-700 font-medium">Total Pembayaran:</span>
-              <span class="text-2xl font-bold text-blue-600" id="totalPrice">${toRupiah(product.price)}</span>
-            </div>
-          </div>
-          
-          <div class="space-y-3">
-            <button onclick="confirmPurchase('${productId}')" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition">
-              <i class="fas fa-check mr-2"></i>Konfirmasi Pembelian
-            </button>
-            <button onclick="closeModal()" class="w-full bg-gray-200 text-gray-800 py-3 rounded-xl font-semibold hover:bg-gray-300 transition">
-              Batal
-            </button>
-          </div>
-        </div>
-      `;
-      
-      document.getElementById('purchaseModal').classList.remove('hidden');
-      document.getElementById('purchaseModal').classList.add('flex');
-    }
-
-    // Change quantity
-    function changeQuantity(delta) {
-      const input = document.getElementById('quantity');
-      const current = parseInt(input.value) || 1;
-      const newValue = Math.max(1, Math.min(parseInt(input.max), current + delta));
-      input.value = newValue;
-      updateTotal();
-    }
-
-    // Update total price
-    function updateTotal() {
-      const quantity = parseInt(document.getElementById('quantity').value) || 1;
-      const productId = document.querySelector('[onclick^="confirmPurchase"]').getAttribute('onclick').match(/'([^']+)'/)[1];
-      const product = allProducts.find(p => p.id === productId);
-      
-      if (product) {
-        const total = product.price * quantity;
-        document.getElementById('totalPrice').textContent = toRupiah(total);
-      }
-    }
-
-    // Confirm purchase
-    async function confirmPurchase(productId) {
-      const quantity = parseInt(document.getElementById('quantity').value) || 1;
-      
-      try {
-        const response = await fetch('/api/purchase', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId, quantity })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          closeModal();
-          showSuccessModal(data);
-          loadUserData();
-          loadProducts();
-        } else {
-          showToast(data.message || 'Pembelian gagal', 'error');
+            updateTotalPrice();
+            
+            document.getElementById('purchaseModal').style.display = 'flex';
         }
-      } catch (error) {
-        console.error('Purchase error:', error);
-        showToast('Terjadi kesalahan saat pembelian', 'error');
-      }
-    }
 
-    // Show success modal
-    function showSuccessModal(data) {
-      currentReceipt = data.receiptContent;
-      
-      const detail = document.getElementById('successDetail');
-      detail.innerHTML = `
-        <div class="space-y-2 text-sm">
-          <div class="flex justify-between">
-            <span class="text-gray-600">Refid:</span>
-            <span class="font-semibold">${data.reffId}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600">Produk:</span>
-            <span class="font-semibold">${data.productName}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600">Jumlah:</span>
-            <span class="font-semibold">${data.quantity} item</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600">Total:</span>
-            <span class="font-semibold text-green-600">${toRupiah(data.totalPrice)}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-600">Saldo tersisa:</span>
-            <span class="font-semibold text-blue-600">${toRupiah(data.remainingSaldo)}</span>
-          </div>
-        </div>
-      `;
-      
-      document.getElementById('successModal').classList.remove('hidden');
-      document.getElementById('successModal').classList.add('flex');
-    }
-
-    // Copy receipt
-    async function copyReceipt() {
-      if (!currentReceipt) return;
-      
-      try {
-        await navigator.clipboard.writeText(currentReceipt);
-        showToast('Receipt berhasil dicopy!', 'success');
-      } catch (error) {
-        console.error('Copy error:', error);
-        showToast('Gagal copy receipt', 'error');
-      }
-    }
-
-    // Close modal
-    function closeModal() {
-      document.getElementById('purchaseModal').classList.add('hidden');
-      document.getElementById('purchaseModal').classList.remove('flex');
-    }
-
-    function closeSuccessModal() {
-      document.getElementById('successModal').classList.add('hidden');
-      document.getElementById('successModal').classList.remove('flex');
-      currentReceipt = null;
-    }
-
-    // Search functionality
-    document.getElementById('searchInput').addEventListener('input', function(e) {
-      const search = e.target.value.toLowerCase();
-      const filtered = allProducts.filter(p => 
-        p.name.toLowerCase().includes(search) || 
-        (p.description && p.description.toLowerCase().includes(search))
-      );
-      renderProducts(filtered);
-    });
-
-    // Category filter
-    document.querySelectorAll('.category-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        // Update active button
-        document.querySelectorAll('.category-btn').forEach(b => {
-          b.classList.remove('bg-blue-500', 'text-white');
-          b.classList.add('bg-gray-200', 'text-gray-700');
-        });
-        this.classList.remove('bg-gray-200', 'text-gray-700');
-        this.classList.add('bg-blue-500', 'text-white');
-        
-        // Filter products
-        const category = this.dataset.category;
-        selectedCategory = category;
-        
-        if (category === 'all') {
-          renderProducts(allProducts);
-        } else {
-          const filtered = allProducts.filter(p => 
-            p.name.toLowerCase().includes(category) || 
-            (p.category && p.category.toLowerCase().includes(category))
-          );
-          renderProducts(filtered);
+        function closePurchaseModal() {
+            document.getElementById('purchaseModal').style.display = 'none';
+            selectedProduct = null;
         }
-      });
-    });
 
-    // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
-      loadUserData();
-      loadProducts();
-    });
-  </script>
+        function updateTotalPrice() {
+            if (!selectedProduct) return;
 
-  <style>
-    .line-clamp-2 {
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    .scrollbar-hide::-webkit-scrollbar {
-      display: none;
-    }
-    .scrollbar-hide {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
-  </style>
+            const quantity = parseInt(document.getElementById('quantity').value) || 1;
+            const total = selectedProduct.price * quantity;
+
+            document.getElementById('summaryQty').textContent = quantity;
+            document.getElementById('totalPrice').textContent = formatRupiah(total);
+        }
+
+        function showModalAlert(message, type = 'error') {
+            const alertBox = document.getElementById('modalAlert');
+            alertBox.textContent = message;
+            alertBox.className = `alert ${type} show`;
+            
+            setTimeout(() => {
+                alertBox.classList.remove('show');
+            }, 5000);
+        }
+
+        async function confirmPurchase() {
+            if (!selectedProduct) return;
+
+            const quantity = parseInt(document.getElementById('quantity').value) || 1;
+
+            if (quantity < 1) {
+                showModalAlert('Jumlah minimal 1');
+                return;
+            }
+
+            if (quantity > selectedProduct.stock) {
+                showModalAlert('Jumlah melebihi stok tersedia');
+                return;
+            }
+
+            const btnPurchase = document.getElementById('btnPurchase');
+            btnPurchase.disabled = true;
+            btnPurchase.innerHTML = '<span class="loading"></span>Memproses...';
+
+            try {
+                const response = await fetch('/api/purchase', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        productId: selectedProduct.id,
+                        quantity: quantity
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    closePurchaseModal();
+                    showSuccessModal(data.transaction);
+                    
+                    // Reload products and balance
+                    await loadProducts();
+                    await checkAuth();
+                } else {
+                    showModalAlert(data.message || 'Pembelian gagal');
+                    btnPurchase.disabled = false;
+                    btnPurchase.textContent = 'Beli Sekarang';
+                }
+            } catch (error) {
+                console.error('Purchase error:', error);
+                showModalAlert('Terjadi kesalahan saat memproses pembelian');
+                btnPurchase.disabled = false;
+                btnPurchase.textContent = 'Beli Sekarang';
+            }
+        }
+
+        function showSuccessModal(transaction) {
+            document.getElementById('successRefId').textContent = transaction.refId;
+            document.getElementById('successBalance').textContent = formatRupiah(transaction.newBalance);
+            
+            // Store receipt content globally
+            currentReceiptText = transaction.receiptContent || null;
+            currentRefId = transaction.refId;
+
+            // Build detail text similar to WhatsApp bot format
+            let detailHTML = '<div class="purchase-details">';
+            detailHTML += `<h3>📦 ${transaction.productName}</h3>`;
+            detailHTML += `<div class="purchase-meta">`;
+            detailHTML += `<p><strong>📅 Tanggal:</strong> ${transaction.date}</p>`;
+            detailHTML += `<p><strong>⏰ Jam:</strong> ${transaction.time} WIB</p>`;
+            detailHTML += `<p><strong>Refid:</strong> ${transaction.refId}</p>`;
+            detailHTML += `</div>`;
+            detailHTML += '<h3 style="margin-top: 20px;">Detail Akun:</h3>';
+            
+            transaction.items.forEach((item) => {
+                detailHTML += `
+                    <div class="account-item">
+                        <h4>Akun ${item.index}</h4>
+                        <p><span class="label">📧 Email:</span> ${item.email}</p>
+                        <p><span class="label">🔐 Password:</span> ${item.password}</p>
+                        <p><span class="label">👤 Profil:</span> ${item.profile}</p>
+                        <p><span class="label">🔢 Pin:</span> ${item.pin}</p>
+                        <p><span class="label">🔒 2FA:</span> ${item.twofa}</p>
+                    </div>
+                `;
+            });
+            
+            // Add SNK if exists
+            if (transaction.snk) {
+                detailHTML += `
+                    <div class="snk-section">
+                        <h3>╭────「 SYARAT & KETENTUAN 」────╮</h3>
+                        <h4>📋 SNK PRODUK: ${transaction.productName}</h4>
+                        <div class="snk-content">${transaction.snk.replace(/\n/g, '<br>')}</div>
+                        <h3>╰────「 END SNK 」────╯</h3>
+                    </div>
+                `;
+            }
+            
+            detailHTML += '</div>';
+
+            document.getElementById('accountDetails').innerHTML = detailHTML;
+            document.getElementById('successModal').style.display = 'flex';
+        }
+
+        function closeSuccessModal() {
+            document.getElementById('successModal').style.display = 'none';
+            currentReceiptText = null;
+            currentRefId = null;
+        }
+
+        async function copyPurchaseReceipt() {
+            try {
+                if (!currentReceiptText) {
+                    showToast('Receipt tidak tersedia', 'error');
+                    return;
+                }
+
+                // Copy to clipboard
+                await navigator.clipboard.writeText(currentReceiptText);
+                showToast('✅ Receipt berhasil dicopy!', 'success');
+            } catch (error) {
+                console.error('Copy failed:', error);
+                
+                // Fallback method for older browsers
+                try {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = currentReceiptText;
+                    textArea.style.position = 'fixed';
+                    textArea.style.left = '-999999px';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showToast('✅ Receipt berhasil dicopy!', 'success');
+                } catch (fallbackError) {
+                    showToast('❌ Gagal copy receipt', 'error');
+                }
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show ' + type;
+            
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+
+        async function logout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Logout failed:', error);
+                window.location.href = '/';
+            }
+        }
+
+        function formatRupiah(amount) {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(amount);
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const purchaseModal = document.getElementById('purchaseModal');
+            const successModal = document.getElementById('successModal');
+            if (event.target === purchaseModal) {
+                closePurchaseModal();
+            }
+            if (event.target === successModal) {
+                closeSuccessModal();
+            }
+        }
+
+        // Initialize
+        checkAuth();
+        loadProducts();
+    </script>
 </body>
 </html>
+

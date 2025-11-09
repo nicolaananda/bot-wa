@@ -38,10 +38,68 @@ async function initDatabase() {
     if (!db.data.userPins) db.data.userPins = {}; // Store user PINs
     
     console.log('[Web POS] Database initialized successfully');
+    
+    // Migrate PINs to PostgreSQL if enabled
+    await migratePinsToPostgres();
+    
     return true;
   } catch (error) {
     console.error('[Web POS] Failed to initialize database:', error);
     return false;
+  }
+}
+
+// Migrate existing PINs from JSON to PostgreSQL
+async function migratePinsToPostgres() {
+  const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
+  
+  if (!usePg) {
+    return; // Skip if PostgreSQL is not enabled
+  }
+  
+  try {
+    const userPins = db.data.userPins || {};
+    const pinCount = Object.keys(userPins).length;
+    
+    if (pinCount === 0) {
+      console.log('[Web POS] No PINs to migrate');
+      return;
+    }
+    
+    console.log(`[Web POS] Migrating ${pinCount} PINs to PostgreSQL...`);
+    
+    const pg = require('./config/postgres');
+    let migratedCount = 0;
+    let skippedCount = 0;
+    
+    for (const [userId, pin] of Object.entries(userPins)) {
+      try {
+        // Check if PIN already exists in PostgreSQL
+        const existing = await pg.query(
+          'SELECT user_id FROM web_pos_pin WHERE user_id = $1',
+          [userId]
+        );
+        
+        if (existing.rows.length > 0) {
+          skippedCount++;
+          continue; // Skip if already migrated
+        }
+        
+        // Insert PIN to PostgreSQL
+        await pg.query(
+          'INSERT INTO web_pos_pin (user_id, pin) VALUES ($1, $2)',
+          [userId, pin]
+        );
+        
+        migratedCount++;
+      } catch (error) {
+        console.error(`[Web POS] Error migrating PIN for user ${userId}:`, error.message);
+      }
+    }
+    
+    console.log(`✅ [Web POS] PIN migration complete: ${migratedCount} migrated, ${skippedCount} skipped`);
+  } catch (error) {
+    console.error('[Web POS] Error during PIN migration:', error.message);
   }
 }
 
@@ -81,36 +139,34 @@ function formatPhoneForDb(phone) {
   return normalizePhoneNumber(phone) + '@s.whatsapp.net';
 }
 
-// Admin/Owner phone numbers
-const ADMIN_NUMBERS = ['6281389592985', '6285235540944', '6287887842985', '62877776579444'];
-
-function isAdmin(phone) {
-  const normalized = normalizePhoneNumber(phone);
-  return ADMIN_NUMBERS.includes(normalized);
-}
-
 async function getUserPin(userId) {
   const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
   
   if (usePg) {
     try {
       const pg = require('./config/postgres');
-      const result = await pg.query('SELECT web_pos_pin FROM users WHERE user_id = $1', [userId]);
-      if (result.rows.length > 0 && result.rows[0].web_pos_pin) {
-        return result.rows[0].web_pos_pin;
+      const result = await pg.query(
+        'SELECT pin FROM web_pos_pin WHERE user_id = $1',
+        [userId]
+      );
+      
+      if (result.rows.length > 0) {
+        return result.rows[0].pin;
       }
+      
+      // If no PIN found in PostgreSQL, return default
+      return '1234';
     } catch (error) {
       console.error('[Web POS] Error getting PIN from PostgreSQL:', error.message);
+      // Fallback to JSON file
+      if (!db.data.userPins) db.data.userPins = {};
+      return db.data.userPins[userId] || '1234';
     }
   } else {
-    // File-based database
+    // Use JSON file
     if (!db.data.userPins) db.data.userPins = {};
-    if (db.data.userPins[userId]) {
-      return db.data.userPins[userId];
-    }
+    return db.data.userPins[userId] || '1234';
   }
-  
-  return '1234'; // Default PIN
 }
 
 async function setUserPin(userId, newPin) {
@@ -119,17 +175,29 @@ async function setUserPin(userId, newPin) {
   if (usePg) {
     try {
       const pg = require('./config/postgres');
-      await pg.query('UPDATE users SET web_pos_pin = $1 WHERE user_id = $2', [newPin, userId]);
+      
+      // Insert or update PIN in PostgreSQL
+      await pg.query(
+        `INSERT INTO web_pos_pin (user_id, pin) 
+         VALUES ($1, $2) 
+         ON CONFLICT (user_id) 
+         DO UPDATE SET pin = $2, updated_at = now()`,
+        [userId, newPin]
+      );
+      
       console.log(`✅ [Web POS] PIN updated in PostgreSQL for user: ${userId}`);
     } catch (error) {
-      console.error('[Web POS] Error saving PIN to PostgreSQL:', error.message);
-      throw error;
+      console.error('[Web POS] Error setting PIN in PostgreSQL:', error.message);
+      // Fallback to JSON file
+      if (!db.data.userPins) db.data.userPins = {};
+      db.data.userPins[userId] = newPin;
+      db.save();
     }
   } else {
-    // File-based database
+    // Use JSON file
     if (!db.data.userPins) db.data.userPins = {};
     db.data.userPins[userId] = newPin;
-    await db.save();
+    db.save();
   }
 }
 
@@ -245,8 +313,7 @@ app.get('/api/user', requireAuth, async (req, res) => {
       user: {
         phone: cleanPhone,
         saldo: user.saldo || 0,
-        role: user.role || 'bronze',
-        isAdmin: isAdmin(cleanPhone)
+        role: user.role || 'bronze'
       }
     });
   } catch (error) {
@@ -661,10 +728,10 @@ app.post('/api/change-pin', requireAuth, async (req, res) => {
       });
     }
     
-    if (newPin.length < 4 || newPin.length > 6 || !/^\d+$/.test(newPin)) {
+    if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
       return res.status(400).json({ 
         success: false, 
-        message: 'PIN baru harus 4-6 digit angka' 
+        message: 'PIN baru harus 4 digit angka' 
       });
     }
     

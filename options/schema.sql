@@ -4,20 +4,9 @@ CREATE TABLE IF NOT EXISTS users (
   saldo NUMERIC(18,2) NOT NULL DEFAULT 0,
   role TEXT NOT NULL DEFAULT 'bronze',
   data JSONB NOT NULL DEFAULT '{}'::jsonb,
-  web_pos_pin TEXT DEFAULT '1234',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
--- Add web_pos_pin column to existing users table if not exists
-DO $$ BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'users' AND column_name = 'web_pos_pin'
-  ) THEN
-    ALTER TABLE users ADD COLUMN web_pos_pin TEXT DEFAULT '1234';
-  END IF;
-END $$;
 
 CREATE TABLE IF NOT EXISTS transaksi (
   id SERIAL PRIMARY KEY,
@@ -74,6 +63,18 @@ FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
 
 DROP TRIGGER IF EXISTS produk_updated_at ON produk;
 CREATE TRIGGER produk_updated_at BEFORE UPDATE ON produk
+FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
+-- Web POS PIN table
+CREATE TABLE IF NOT EXISTS web_pos_pin (
+  user_id TEXT PRIMARY KEY,
+  pin TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+DROP TRIGGER IF EXISTS web_pos_pin_updated_at ON web_pos_pin;
+CREATE TRIGGER web_pos_pin_updated_at BEFORE UPDATE ON web_pos_pin
 FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
 
 
