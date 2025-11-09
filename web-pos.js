@@ -471,6 +471,7 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
     
     db.data.transaksi.push(transaction);
     console.log(`✅ [Web POS] Transaction added to array. Total transactions: ${db.data.transaksi.length}`);
+    console.log(`✅ [Web POS] Transaction details:`, JSON.stringify(transaction, null, 2));
     
     // For PostgreSQL: Insert transaction directly to avoid looping all transactions
     const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
@@ -549,6 +550,8 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
     
     // Save database
     try {
+      console.log(`[Web POS] Saving database... Total transactions in memory: ${db.data.transaksi.length}`);
+      
       // Call save and wait a bit for queue to process
       db.save();
       
@@ -556,9 +559,21 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
       if (typeof db._save === 'function') {
         await db._save();
         console.log(`✅ [Web POS] Database saved successfully (direct _save). RefId: ${reffId}`);
+        console.log(`✅ [Web POS] Database path: ${db.file || 'unknown'}`);
       } else {
         await db.save();
         console.log(`✅ [Web POS] Database saved successfully (PG). RefId: ${reffId}`);
+      }
+      
+      // Verify save by reading back
+      if (typeof db.load === 'function') {
+        await db.load();
+        const savedTransaction = db.data.transaksi.find(t => t.reffId === reffId);
+        if (savedTransaction) {
+          console.log(`✅ [Web POS] Transaction verified in database after save`);
+        } else {
+          console.error(`❌ [Web POS] WARNING: Transaction NOT found after save!`);
+        }
       }
     } catch (saveError) {
       console.error(`❌ [Web POS] Error saving database:`, saveError);
