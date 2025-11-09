@@ -350,6 +350,29 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
     db.data.transaksi.push(transaction);
     console.log(`✅ [Web POS] Transaction added to array. Total transactions: ${db.data.transaksi.length}`);
     
+    // For PostgreSQL: Insert transaction directly to avoid looping all transactions
+    if (typeof db.save === 'function' && !db._save) {
+      // This is PostgreSQL mode
+      try {
+        const pg = require('./config/postgres');
+        // Check if transaction already exists
+        const existing = await pg.query('SELECT id FROM transaksi WHERE ref_id = $1 LIMIT 1', [reffId]);
+        if (existing.rows.length === 0) {
+          // Insert only if not exists
+          await pg.query(
+            'INSERT INTO transaksi(ref_id, user_id, amount, status, meta) VALUES ($1,$2,$3,$4,$5)',
+            [reffId, userId, totalPrice, 'completed', JSON.stringify(transaction)]
+          );
+          console.log(`✅ [Web POS] Transaction saved to PostgreSQL directly. RefId: ${reffId}`);
+        } else {
+          console.log(`⚠️ [Web POS] Transaction already exists in PostgreSQL. RefId: ${reffId}`);
+        }
+      } catch (pgError) {
+        console.error(`⚠️ [Web POS] Failed to save transaction to PostgreSQL:`, pgError.message);
+        // Don't throw, will be saved on next db.save() batch
+      }
+    }
+    
     // Build detail message (same format as WhatsApp bot)
     const detailParts = [
       `*📦 Produk:* ${product.name || product.nama}`,

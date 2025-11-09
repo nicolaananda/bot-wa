@@ -118,11 +118,17 @@ if (!usePg) {
 						await query(sql, params)
 					}
 				}
-				// Persist transaksi (one by one to avoid conflict issues)
+				// Persist transaksi (optimized: only sync last 100 transactions)
 				if (this._data && this._data.transaksi && Array.isArray(this._data.transaksi)) {
+					const totalTransactions = this._data.transaksi.length
+					// Only process last 100 transactions to avoid looping through thousands
+					const startIndex = Math.max(0, totalTransactions - 100)
+					const transactionsToSync = this._data.transaksi.slice(startIndex)
+					
 					let totalSaved = 0
 					let totalSkipped = 0
-					for (const t of this._data.transaksi) {
+					
+					for (const t of transactionsToSync) {
 						try {
 							const refId = t && (t.ref_id || t.reffId || t.order_id) || null
 							if (!refId) continue // Skip if no ref_id
@@ -147,7 +153,11 @@ if (!usePg) {
 							try { console.error('[DBPG] Failed to save transaction:', e.message) } catch {}
 						}
 					}
-					try { console.log(`[DBPG] Transaksi sync: saved ${totalSaved}, skipped ${totalSkipped} (already exist)`) } catch {}
+					try { 
+						if (totalSaved > 0 || totalSkipped > 0) {
+							console.log(`[DBPG] Transaksi sync: saved ${totalSaved}, skipped ${totalSkipped} (checked last ${transactionsToSync.length} of ${totalTransactions})`) 
+						}
+					} catch {}
 				}
             } catch (e) {
                 try { console.error('[DBPG] save sync failed:', e.message) } catch {}
