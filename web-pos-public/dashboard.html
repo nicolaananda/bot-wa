@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - GiHa Smart Bot POS</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🤖 GiHa Smart Bot</div>
+        <div class="nav-links">
+            <a href="/dashboard" class="active">Dashboard</a>
+            <a href="/products">Produk</a>
+            <a href="/settings">Pengaturan</a>
+            <button class="btn-logout" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="dashboard-header">
+            <h1>Dashboard</h1>
+            <p>Selamat datang di Web POS GiHa Smart Bot</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">💰</div>
+                <div class="stat-info">
+                    <div class="stat-label">Saldo Anda</div>
+                    <div class="stat-value" id="userBalance">Rp 0</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon">👤</div>
+                <div class="stat-info">
+                    <div class="stat-label">Role</div>
+                    <div class="stat-value" id="userRole">-</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon">📱</div>
+                <div class="stat-info">
+                    <div class="stat-label">Nomor WhatsApp</div>
+                    <div class="stat-value" id="userPhone">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="action-cards">
+            <div class="action-card" onclick="window.location.href='/products'">
+                <div class="action-icon">🛍️</div>
+                <h3>Beli Produk</h3>
+                <p>Lihat dan beli produk yang tersedia</p>
+            </div>
+
+            <div class="action-card" onclick="loadTransactions()">
+                <div class="action-icon">📊</div>
+                <h3>Riwayat Transaksi</h3>
+                <p>Lihat riwayat pembelian Anda</p>
+            </div>
+
+            <div class="action-card" onclick="window.location.href='/settings'">
+                <div class="action-icon">⚙️</div>
+                <h3>Pengaturan</h3>
+                <p>Ubah PIN dan pengaturan akun</p>
+            </div>
+        </div>
+
+        <div id="transactionSection" class="transaction-section" style="display: none;">
+            <h2>Riwayat Transaksi</h2>
+            <div id="transactionList" class="transaction-list"></div>
+        </div>
+    </div>
+
+    <!-- Transaction Detail Modal -->
+    <div id="transactionModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeTransactionModal()">&times;</span>
+            <h2>Detail Transaksi</h2>
+            
+            <div id="transactionDetail" class="transaction-detail"></div>
+            <div id="accountDetailsSection" class="account-details-section"></div>
+            
+            <div class="modal-actions">
+                <button class="btn-copy" onclick="copyReceiptToClipboard()">
+                    📋 Copy Receipt
+                </button>
+                <button class="btn-secondary" onclick="closeTransactionModal()">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // Global variable to store current receipt content
+        let currentReceiptContent = null;
+        let currentReffId = null;
+
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/user');
+                const data = await response.json();
+
+                if (!data.success) {
+                    window.location.href = '/';
+                    return;
+                }
+
+                // Update UI with user data
+                document.getElementById('userBalance').textContent = formatRupiah(data.user.saldo);
+                document.getElementById('userRole').textContent = data.user.role.toUpperCase();
+                document.getElementById('userPhone').textContent = formatPhone(data.user.phone);
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                window.location.href = '/';
+            }
+        }
+
+        async function loadTransactions() {
+            try {
+                const response = await fetch('/api/transactions');
+                const data = await response.json();
+
+                if (!data.success) {
+                    alert('Gagal memuat riwayat transaksi');
+                    return;
+                }
+
+                const transactionSection = document.getElementById('transactionSection');
+                const transactionList = document.getElementById('transactionList');
+
+                if (data.transactions.length === 0) {
+                    transactionList.innerHTML = '<p class="empty-state">Belum ada transaksi</p>';
+                } else {
+                    transactionList.innerHTML = data.transactions.map(t => `
+                        <div class="transaction-item">
+                            <div class="transaction-info">
+                                <div class="transaction-name">${t.productName}</div>
+                                <div class="transaction-meta">
+                                    <span>Refid: ${t.refId}</span> • 
+                                    <span>Qty: ${t.quantity}</span> • 
+                                    <span>Metode: ${t.metode}</span> •
+                                    <span>${t.date}</span>
+                                </div>
+                            </div>
+                            <div class="transaction-actions">
+                                <div class="transaction-amount">
+                                    ${formatRupiah(t.totalPrice)}
+                                </div>
+                                <button class="btn-view-account" onclick="viewTransactionDetail('${t.refId}')">
+                                    Lihat Akun
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                transactionSection.style.display = 'block';
+                transactionSection.scrollIntoView({ behavior: 'smooth' });
+            } catch (error) {
+                console.error('Load transactions failed:', error);
+                alert('Gagal memuat riwayat transaksi');
+            }
+        }
+
+        async function viewTransactionDetail(reffId) {
+            try {
+                const response = await fetch(`/api/transactions/${reffId}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    alert('Gagal memuat detail transaksi');
+                    return;
+                }
+
+                const transaction = data.transaction;
+                const accountDetails = data.accountDetails;
+                
+                // Store receipt content and reffId globally
+                currentReceiptContent = data.receiptContent;
+                currentReffId = reffId;
+
+                // Parse tanggal dan jam
+                const dateTime = transaction.date ? transaction.date.split(' ') : ['', ''];
+                const tanggal = dateTime[0] || 'N/A';
+                const jam = dateTime[1] || 'N/A';
+
+                // Build account info header (seperti di bot WA)
+                let detailHTML = '<div class="account-info-header">';
+                detailHTML += `<h3>Account Information</h3>`;
+                detailHTML += `<div class="info-item">📦 <strong>Produk:★</strong> ${transaction.productName}</div>`;
+                detailHTML += `<div class="info-item">📅 <strong>Tanggal:★</strong> ${tanggal}</div>`;
+                detailHTML += `<div class="info-item">⏱️ <strong>Jam:★</strong> ${jam} WIB</div>`;
+                detailHTML += `<div class="info-item">🆔 <strong>Refid:★</strong> ${transaction.refId}</div>`;
+                detailHTML += `</div>`;
+
+                document.getElementById('transactionDetail').innerHTML = detailHTML;
+
+                // Build account details (format seperti bot WA)
+                let accountHTML = '';
+                if (accountDetails && accountDetails.length > 0) {
+                    accountHTML = '<div class="account-details-list">';
+                    accountDetails.forEach((account, index) => {
+                        if (index > 0) accountHTML += '<hr style="margin: 1.5rem 0; border: none; border-top: 1px dashed #ccc;">';
+                        accountHTML += `
+                            <div class="account-detail-item">
+                                <div class="detail-line">📧 <strong>Email:</strong> ${account.email}</div>
+                                <div class="detail-line">🔐 <strong>Password:</strong> ${account.password}</div>
+                                <div class="detail-line">👤 <strong>Profil:</strong> ${account.profile}</div>
+                                <div class="detail-line">🔢 <strong>Pin:</strong> ${account.pin}</div>
+                                <div class="detail-line">🔒 <strong>2FA:</strong> ${account.twofa}</div>
+                            </div>
+                        `;
+                    });
+                    accountHTML += '</div>';
+                    
+                    // Tambah info pembayaran di bawah
+                    accountHTML += `<div class="payment-info">`;
+                    accountHTML += `<div class="payment-row"><span>💰 <strong>Metode:</strong></span> <span>${transaction.metode}</span></div>`;
+                    accountHTML += `<div class="payment-row"><span>💵 <strong>Total:</strong></span> <span>${formatRupiah(transaction.totalPrice)}</span></div>`;
+                    accountHTML += `</div>`;
+                } else {
+                    accountHTML = '<p class="empty-state">Detail akun tidak tersedia</p>';
+                }
+
+                document.getElementById('accountDetailsSection').innerHTML = accountHTML;
+                document.getElementById('transactionModal').style.display = 'flex';
+            } catch (error) {
+                console.error('View transaction detail failed:', error);
+                alert('Gagal memuat detail transaksi');
+            }
+        }
+
+        function closeTransactionModal() {
+            document.getElementById('transactionModal').style.display = 'none';
+            currentReceiptContent = null;
+            currentReffId = null;
+        }
+
+        async function copyReceiptToClipboard() {
+            try {
+                if (!currentReceiptContent) {
+                    showToast('Receipt tidak tersedia', 'error');
+                    return;
+                }
+
+                // Copy to clipboard
+                await navigator.clipboard.writeText(currentReceiptContent);
+                showToast('✅ Receipt berhasil dicopy!', 'success');
+            } catch (error) {
+                console.error('Copy failed:', error);
+                
+                // Fallback method for older browsers
+                try {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = currentReceiptContent;
+                    textArea.style.position = 'fixed';
+                    textArea.style.left = '-999999px';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showToast('✅ Receipt berhasil dicopy!', 'success');
+                } catch (fallbackError) {
+                    showToast('❌ Gagal copy receipt', 'error');
+                }
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show ' + type;
+            
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+
+        async function logout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Logout failed:', error);
+                window.location.href = '/';
+            }
+        }
+
+        function formatRupiah(amount) {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(amount);
+        }
+
+        function formatPhone(phone) {
+            if (!phone) return '-';
+            if (phone.startsWith('62')) {
+                return '0' + phone.substring(2);
+            }
+            return phone;
+        }
+
+        // Check authentication on page load
+        checkAuth();
+    </script>
+</body>
+</html>
+
