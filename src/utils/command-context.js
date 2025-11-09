@@ -63,7 +63,7 @@ class CommandContext {
      * Download and save media
      */
     async downloadMedia(type, filename) {
-        const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+        const { downloadContentFromMessage } = require('@dappaoffc/baileys');
         const fs = require('fs');
         
         let stream;

@@ -6,6 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node nicola",
+    "webpos": "node web-pos.js",
+    "webpos:dev": "nodemon web-pos.js",
     "dashboard": "node options/dashboard-api.js",
     "dashboard:dev": "nodemon options/dashboard-api.js",
     "backup": "node auto-backup.js backup",
@@ -24,7 +26,7 @@
   "author": "Ronzz YT",
   "license": "ISC",
   "dependencies": {
-    "@whiskeysockets/baileys": "npm:@rexxhayanasi/elaina-bail",
+    "@dappaoffc/baileys": "^2.0.6",
     "awesome-phonenumber": "^2.69.0",
     "canvas": "^3.0.0",
     "chalk": "^4.1.2",
@@ -33,6 +35,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^4.18.1",
+    "express-session": "^1.18.2",
     "fetch": "^1.1.0",
     "figlet": "^1.5.2",
     "file-type": "^16.5.3",

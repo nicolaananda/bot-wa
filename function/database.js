@@ -118,6 +118,37 @@ if (!usePg) {
 						await query(sql, params)
 					}
 				}
+				// Persist transaksi (one by one to avoid conflict issues)
+				if (this._data && this._data.transaksi && Array.isArray(this._data.transaksi)) {
+					let totalSaved = 0
+					let totalSkipped = 0
+					for (const t of this._data.transaksi) {
+						try {
+							const refId = t && (t.ref_id || t.reffId || t.order_id) || null
+							if (!refId) continue // Skip if no ref_id
+							
+							const uid = t && (t.user_id || t.userId || t.user) || null
+							const amt = Number(t && (t.totalBayar || t.amount || (t.price * (t.jumlah || 1)))) || 0
+							const status = (t && t.status) || 'completed'
+							
+							// Check if exists first
+							const existing = await query('SELECT id FROM transaksi WHERE ref_id = $1 LIMIT 1', [refId])
+							if (existing.rows.length === 0) {
+								// Insert only if not exists
+								await query(
+									'INSERT INTO transaksi(ref_id, user_id, amount, status, meta) VALUES ($1,$2,$3,$4,$5)',
+									[refId, uid, amt, status, JSON.stringify(t)]
+								)
+								totalSaved++
+							} else {
+								totalSkipped++
+							}
+						} catch (e) {
+							try { console.error('[DBPG] Failed to save transaction:', e.message) } catch {}
+						}
+					}
+					try { console.log(`[DBPG] Transaksi sync: saved ${totalSaved}, skipped ${totalSkipped} (already exist)`) } catch {}
+				}
             } catch (e) {
                 try { console.error('[DBPG] save sync failed:', e.message) } catch {}
             }

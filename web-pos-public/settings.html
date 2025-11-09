@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pengaturan - GiHa Smart Bot POS</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🤖 GiHa Smart Bot</div>
+        <div class="nav-links">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/products">Produk</a>
+            <a href="/settings" class="active">Pengaturan</a>
+            <button class="btn-logout" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>Pengaturan Akun</h1>
+            <p>Kelola akun dan keamanan Anda</p>
+        </div>
+
+        <div class="settings-container">
+            <div class="settings-card">
+                <h2>Informasi Akun</h2>
+                <div class="info-row">
+                    <span class="info-label">Nomor WhatsApp:</span>
+                    <span class="info-value" id="userPhone">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Saldo:</span>
+                    <span class="info-value" id="userBalance">Rp 0</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Role:</span>
+                    <span class="info-value" id="userRole">-</span>
+                </div>
+            </div>
+
+            <div class="settings-card">
+                <h2>Ubah PIN</h2>
+                <p class="card-description">PIN digunakan untuk login ke Web POS</p>
+
+                <div id="alertBox" class="alert"></div>
+
+                <form id="changePinForm">
+                    <div class="form-group">
+                        <label for="oldPin">PIN Lama</label>
+                        <input 
+                            type="password" 
+                            id="oldPin" 
+                            maxlength="4"
+                            pattern="[0-9]{4}"
+                            placeholder="Masukkan PIN lama"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newPin">PIN Baru</label>
+                        <input 
+                            type="password" 
+                            id="newPin" 
+                            maxlength="4"
+                            pattern="[0-9]{4}"
+                            placeholder="Masukkan PIN baru (4 digit)"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmPin">Konfirmasi PIN Baru</label>
+                        <input 
+                            type="password" 
+                            id="confirmPin" 
+                            maxlength="4"
+                            pattern="[0-9]{4}"
+                            placeholder="Masukkan PIN baru lagi"
+                            required
+                        >
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="btnChangePin">
+                        Ubah PIN
+                    </button>
+                </form>
+            </div>
+
+            <div class="settings-card">
+                <h2>Informasi Sistem</h2>
+                <div class="info-row">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value" id="systemStatus">
+                        <span class="status-badge">🟢 Online</span>
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Versi:</span>
+                    <span class="info-value">1.0.0</span>
+                </div>
+                <p class="card-description" style="margin-top: 15px;">
+                    Web POS ini terhubung langsung dengan database bot WhatsApp. 
+                    Saldo dan riwayat transaksi akan tersinkronisasi.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/user');
+                const data = await response.json();
+
+                if (!data.success) {
+                    window.location.href = '/';
+                    return;
+                }
+
+                // Update UI with user data
+                document.getElementById('userPhone').textContent = formatPhone(data.user.phone);
+                document.getElementById('userBalance').textContent = formatRupiah(data.user.saldo);
+                document.getElementById('userRole').textContent = data.user.role.toUpperCase();
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                window.location.href = '/';
+            }
+        }
+
+        function showAlert(message, type = 'error') {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.textContent = message;
+            alertBox.className = `alert ${type} show`;
+            
+            setTimeout(() => {
+                alertBox.classList.remove('show');
+            }, 5000);
+        }
+
+        document.getElementById('changePinForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const oldPin = document.getElementById('oldPin').value.trim();
+            const newPin = document.getElementById('newPin').value.trim();
+            const confirmPin = document.getElementById('confirmPin').value.trim();
+
+            if (!oldPin || !newPin || !confirmPin) {
+                showAlert('Semua field harus diisi');
+                return;
+            }
+
+            if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+                showAlert('PIN baru harus 4 digit angka');
+                return;
+            }
+
+            if (newPin !== confirmPin) {
+                showAlert('PIN baru dan konfirmasi tidak sama');
+                return;
+            }
+
+            if (oldPin === newPin) {
+                showAlert('PIN baru harus berbeda dengan PIN lama');
+                return;
+            }
+
+            const btnChangePin = document.getElementById('btnChangePin');
+            btnChangePin.disabled = true;
+            btnChangePin.innerHTML = '<span class="loading"></span>Memproses...';
+
+            try {
+                const response = await fetch('/api/change-pin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        oldPin: oldPin,
+                        newPin: newPin
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('PIN berhasil diubah!', 'success');
+                    document.getElementById('changePinForm').reset();
+                } else {
+                    showAlert(data.message || 'Gagal mengubah PIN');
+                }
+            } catch (error) {
+                console.error('Change PIN error:', error);
+                showAlert('Terjadi kesalahan saat mengubah PIN');
+            } finally {
+                btnChangePin.disabled = false;
+                btnChangePin.textContent = 'Ubah PIN';
+            }
+        });
+
+        async function logout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Logout failed:', error);
+                window.location.href = '/';
+            }
+        }
+
+        function formatRupiah(amount) {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(amount);
+        }
+
+        function formatPhone(phone) {
+            if (!phone) return '-';
+            if (phone.startsWith('62')) {
+                return '0' + phone.substring(2);
+            }
+            return phone;
+        }
+
+        // Auto-format PIN inputs
+        ['oldPin', 'newPin', 'confirmPin'].forEach(id => {
+            document.getElementById(id).addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/[^\d]/g, '').slice(0, 4);
+            });
+        });
+
+        // Initialize
+        checkAuth();
+    </script>
+</body>
+</html>
+
