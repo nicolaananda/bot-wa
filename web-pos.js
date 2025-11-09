@@ -142,10 +142,17 @@ function formatPhoneForDb(phone) {
 function isOwner(phone) {
   const cleanPhone = normalizePhoneNumber(phone);
   const ownerNumbers = require('./setting.js').owner || [];
-  return ownerNumbers.some(owner => {
+  
+  console.log('[Web POS] Checking admin access:', { cleanPhone, ownerNumbers });
+  
+  const isAdmin = ownerNumbers.some(owner => {
     const cleanOwner = normalizePhoneNumber(owner);
+    console.log('[Web POS] Comparing:', { cleanPhone, cleanOwner, match: cleanOwner === cleanPhone });
     return cleanOwner === cleanPhone;
   });
+  
+  console.log('[Web POS] Admin check result:', isAdmin);
+  return isAdmin;
 }
 
 async function getUserPin(userId) {
