@@ -153,11 +153,6 @@ if (!usePg) {
 							try { console.error('[DBPG] Failed to save transaction:', e.message) } catch {}
 						}
 					}
-					try { 
-						if (totalSaved > 0 || totalSkipped > 0) {
-							console.log(`[DBPG] Transaksi sync: saved ${totalSaved}, skipped ${totalSkipped} (checked last ${transactionsToSync.length} of ${totalTransactions})`) 
-						}
-					} catch {}
 				}
             } catch (e) {
                 try { console.error('[DBPG] save sync failed:', e.message) } catch {}
