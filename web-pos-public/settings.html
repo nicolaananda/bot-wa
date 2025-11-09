@@ -16,6 +16,7 @@
         <div class="nav-links">
             <a href="/dashboard">Dashboard</a>
             <a href="/products">Produk</a>
+            <a href="/admin">Admin</a>
             <a href="/settings" class="active">Pengaturan</a>
             <button class="btn-logout" onclick="logout()">Logout</button>
         </div>
@@ -128,6 +129,12 @@
                 document.getElementById('userPhone').textContent = formatPhone(data.user.phone);
                 document.getElementById('userBalance').textContent = formatRupiah(data.user.saldo);
                 document.getElementById('userRole').textContent = data.user.role.toUpperCase();
+
+                // Show Admin tab if user is admin
+                if (data.user.isAdmin) {
+                    const adminLink = document.querySelector('a[href="/admin"]');
+                    if (adminLink) adminLink.classList.add('show-admin');
+                }
             } catch (error) {
                 console.error('Auth check failed:', error);
                 window.location.href = '/';

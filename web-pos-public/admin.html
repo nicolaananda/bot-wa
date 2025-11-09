@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Admin Panel - GiHa Smart Bot POS</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🤖 GiHa Smart Bot</div>
+        <div class="nav-links">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/products">Produk</a>
+            <a href="/admin" class="active">Admin</a>
+            <a href="/settings">Pengaturan</a>
+            <button class="btn-logout" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <div>
+                <h1>🛠️ Admin Panel</h1>
+                <p>Kelola stok produk</p>
+            </div>
+        </div>
+
+        <!-- Add Stock Section -->
+        <div class="admin-section">
+            <div class="admin-card">
+                <h2>📦 Tambah Stok Produk</h2>
+                <p class="card-description">Tambahkan akun baru ke produk yang sudah ada</p>
+
+                <div id="alertBox" class="alert"></div>
+
+                <form id="addStockForm">
+                    <div class="form-group">
+                        <label for="productId">Kode Produk / Product ID</label>
+                        <div class="input-with-button">
+                            <select id="productId" required>
+                                <option value="">Pilih Produk...</option>
+                            </select>
+                            <button type="button" class="btn-refresh" onclick="loadProducts()">🔄</button>
+                        </div>
+                        <small class="form-hint">Pilih produk yang akan ditambah stok</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="accounts">Akun (Multiple)</label>
+                        <textarea 
+                            id="accounts" 
+                            rows="10"
+                            placeholder="Masukkan akun, satu baris per akun dengan format:&#10;email|password|profil|pin|2fa&#10;&#10;Contoh:&#10;user1@gmail.com|pass123|Profil1|1234|ABC123&#10;user2@gmail.com|pass456|Profil2|5678|-&#10;user3@gmail.com|pass789|-|-|-"
+                            required
+                        ></textarea>
+                        <small class="form-hint">
+                            <strong>Format:</strong> email|password|profil|pin|2fa<br>
+                            <strong>Minimal:</strong> email|password (fields lain bisa dikosongkan dengan tanda - atau dikosongkan)<br>
+                            <strong>Pisahkan:</strong> Setiap akun dengan Enter (baris baru)
+                        </small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="clearForm()">
+                            Clear
+                        </button>
+                        <button type="submit" class="btn-primary" id="btnSubmit">
+                            Tambah Stok
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Product List -->
+            <div class="admin-card">
+                <h2>📋 Daftar Produk</h2>
+                <p class="card-description">Semua produk dengan jumlah stok</p>
+
+                <div class="search-box" style="margin-bottom: 1.5rem;">
+                    <input type="text" id="searchProduct" placeholder="🔍 Cari produk..." onkeyup="filterProductList()">
+                </div>
+
+                <div id="productList" class="product-list-admin">
+                    <div class="loading-state">Memuat produk...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeSuccessModal()">&times;</span>
+            <div class="success-icon">✅</div>
+            <h2>Stok Berhasil Ditambahkan!</h2>
+            
+            <div class="success-info">
+                <p><strong>Produk:</strong> <span id="successProduct"></span></p>
+                <p><strong>Jumlah akun:</strong> <span id="successCount"></span></p>
+                <p><strong>Total stok sekarang:</strong> <span id="successTotal"></span></p>
+            </div>
+
+            <button class="btn-primary" onclick="closeSuccessModal()">OK</button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        let allProducts = [];
+
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/user');
+                const data = await response.json();
+
+                if (!data.success) {
+                    window.location.href = '/';
+                    return;
+                }
+
+                // Check if user is admin
+                if (!data.user.isAdmin) {
+                    showToast('Akses ditolak. Anda bukan admin.', 'error');
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 2000);
+                    return;
+                }
+
+                console.log('Admin access granted');
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                window.location.href = '/';
+            }
+        }
+
+        async function loadProducts() {
+            try {
+                const response = await fetch('/api/admin/products');
+                const data = await response.json();
+
+                if (!data.success) {
+                    showToast('Gagal memuat produk', 'error');
+                    return;
+                }
+
+                allProducts = data.products;
+                
+                // Update dropdown
+                const select = document.getElementById('productId');
+                select.innerHTML = '<option value="">Pilih Produk...</option>' +
+                    allProducts.map(p => 
+                        `<option value="${p.id}">${p.name} (ID: ${p.id}) - Stok: ${p.stock}</option>`
+                    ).join('');
+
+                // Update product list
+                displayProductList(allProducts);
+            } catch (error) {
+                console.error('Load products failed:', error);
+                showToast('Gagal memuat produk', 'error');
+            }
+        }
+
+        function displayProductList(products) {
+            const listContainer = document.getElementById('productList');
+
+            if (products.length === 0) {
+                listContainer.innerHTML = '<p class="empty-state">Tidak ada produk</p>';
+                return;
+            }
+
+            listContainer.innerHTML = products.map(product => `
+                <div class="product-item-admin">
+                    <div class="product-info-admin">
+                        <div class="product-name-admin">${product.name}</div>
+                        <div class="product-meta-admin">
+                            <span class="product-id">ID: ${product.id}</span>
+                            <span class="product-category">${product.category}</span>
+                        </div>
+                    </div>
+                    <div class="product-stats-admin">
+                        <div class="stat-item">
+                            <span class="stat-label">Stok</span>
+                            <span class="stat-value ${product.stock === 0 ? 'stock-empty' : 'stock-available'}">
+                                ${product.stock}
+                            </span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Terjual</span>
+                            <span class="stat-value">${product.sold || 0}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterProductList() {
+            const searchTerm = document.getElementById('searchProduct').value.toLowerCase();
+            const filtered = allProducts.filter(p => 
+                p.name.toLowerCase().includes(searchTerm) ||
+                p.id.toLowerCase().includes(searchTerm) ||
+                (p.category && p.category.toLowerCase().includes(searchTerm))
+            );
+            displayProductList(filtered);
+        }
+
+        function showAlert(message, type = 'error') {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.textContent = message;
+            alertBox.className = `alert ${type} show`;
+            
+            setTimeout(() => {
+                alertBox.classList.remove('show');
+            }, 5000);
+        }
+
+        document.getElementById('addStockForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const productId = document.getElementById('productId').value.trim();
+            const accounts = document.getElementById('accounts').value.trim();
+
+            if (!productId) {
+                showAlert('Pilih produk terlebih dahulu');
+                return;
+            }
+
+            if (!accounts) {
+                showAlert('Masukkan akun yang akan ditambahkan');
+                return;
+            }
+
+            // Validate format
+            const lines = accounts.split('\n').filter(l => l.trim().length > 0);
+            const invalidLines = lines.filter(line => {
+                const parts = line.split('|');
+                return parts.length < 2;
+            });
+
+            if (invalidLines.length > 0) {
+                showAlert(`Format tidak valid pada ${invalidLines.length} baris. Minimal: email|password`, 'error');
+                return;
+            }
+
+            const btnSubmit = document.getElementById('btnSubmit');
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<span class="loading"></span>Memproses...';
+
+            try {
+                const response = await fetch('/api/admin/addstock', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        productId: productId,
+                        accounts: accounts
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Show success modal
+                    const product = allProducts.find(p => p.id === productId);
+                    document.getElementById('successProduct').textContent = product ? product.name : productId;
+                    document.getElementById('successCount').textContent = data.added;
+                    document.getElementById('successTotal').textContent = data.newStockCount;
+                    document.getElementById('successModal').style.display = 'flex';
+
+                    // Clear form
+                    clearForm();
+
+                    // Reload products
+                    await loadProducts();
+                } else {
+                    showAlert(data.message || 'Gagal menambahkan stok', 'error');
+                }
+            } catch (error) {
+                console.error('Add stock error:', error);
+                showAlert('Terjadi kesalahan saat menambahkan stok', 'error');
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.textContent = 'Tambah Stok';
+            }
+        });
+
+        function clearForm() {
+            document.getElementById('productId').value = '';
+            document.getElementById('accounts').value = '';
+            document.getElementById('alertBox').classList.remove('show');
+        }
+
+        function closeSuccessModal() {
+            document.getElementById('successModal').style.display = 'none';
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show ' + type;
+            
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+
+        async function logout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Logout failed:', error);
+                window.location.href = '/';
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('successModal');
+            if (event.target === modal) {
+                closeSuccessModal();
+            }
+        }
+
+        // Initialize
+        checkAuth();
+        loadProducts();
+    </script>
+</body>
+</html>
+

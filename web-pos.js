@@ -139,6 +139,15 @@ function formatPhoneForDb(phone) {
   return normalizePhoneNumber(phone) + '@s.whatsapp.net';
 }
 
+function isOwner(phone) {
+  const cleanPhone = normalizePhoneNumber(phone);
+  const ownerNumbers = require('./setting.js').owner || [];
+  return ownerNumbers.some(owner => {
+    const cleanOwner = normalizePhoneNumber(owner);
+    return cleanOwner === cleanPhone;
+  });
+}
+
 async function getUserPin(userId) {
   const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
   
@@ -307,13 +316,15 @@ app.get('/api/user', requireAuth, async (req, res) => {
     const cleanPhone = req.session.cleanPhone;
     
     const user = db.data.users[userId] || db.data.users[cleanPhone] || {};
+    const isAdmin = isOwner(cleanPhone);
     
     res.json({
       success: true,
       user: {
         phone: cleanPhone,
         saldo: user.saldo || 0,
-        role: user.role || 'bronze'
+        role: user.role || 'bronze',
+        isAdmin: isAdmin
       }
     });
   } catch (error) {
@@ -715,6 +726,125 @@ app.get('/api/transactions/:reffId', requireAuth, (req, res) => {
   }
 });
 
+// Admin: Get all products (including stock count)
+app.get('/api/admin/products', requireAuth, async (req, res) => {
+  try {
+    const cleanPhone = req.session.cleanPhone;
+    
+    if (!isOwner(cleanPhone)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Akses ditolak. Hanya admin yang bisa mengakses.'
+      });
+    }
+    
+    const products = Object.entries(db.data.produk || {})
+      .map(([id, product]) => ({
+        id,
+        name: product.name || product.nama,
+        description: product.deskripsi || product.description || '',
+        stock: Array.isArray(product.stok) ? product.stok.length : 0,
+        basePrice: Number(product.harga || product.price || product.priceB || 0),
+        category: product.kategori || product.category || 'Lainnya',
+        sold: product.terjual || 0
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    
+    res.json({
+      success: true,
+      products
+    });
+  } catch (error) {
+    console.error('[Web POS] Admin get products error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Gagal mengambil data produk'
+    });
+  }
+});
+
+// Admin: Add stock to product
+app.post('/api/admin/addstock', requireAuth, async (req, res) => {
+  try {
+    const cleanPhone = req.session.cleanPhone;
+    
+    if (!isOwner(cleanPhone)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Akses ditolak. Hanya admin yang bisa menambah stock.'
+      });
+    }
+    
+    const { productId, accounts } = req.body;
+    
+    if (!productId || !accounts) {
+      return res.status(400).json({
+        success: false,
+        message: 'Product ID dan accounts harus diisi'
+      });
+    }
+    
+    // Check if product exists
+    if (!db.data.produk[productId]) {
+      return res.status(404).json({
+        success: false,
+        message: `Produk dengan ID "${productId}" tidak ditemukan`
+      });
+    }
+    
+    // Parse accounts (split by newline, trim each line)
+    const accountLines = accounts
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+    
+    if (accountLines.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tidak ada akun yang valid untuk ditambahkan'
+      });
+    }
+    
+    // Validate format (email|password|profil|pin|2fa)
+    const invalidLines = accountLines.filter(line => {
+      const parts = line.split('|');
+      return parts.length < 2; // Minimal email|password
+    });
+    
+    if (invalidLines.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Format tidak valid. Pastikan setiap baris memiliki format: email|password|profil|pin|2fa\n\nBaris yang error:\n${invalidLines.slice(0, 3).join('\n')}`
+      });
+    }
+    
+    // Add to stock
+    if (!Array.isArray(db.data.produk[productId].stok)) {
+      db.data.produk[productId].stok = [];
+    }
+    
+    db.data.produk[productId].stok.push(...accountLines);
+    
+    // Save database
+    await db.save();
+    
+    console.log(`✅ [Web POS Admin] Stock added - Product: ${productId}, Count: ${accountLines.length}, By: ${cleanPhone}`);
+    
+    res.json({
+      success: true,
+      message: `Berhasil menambahkan ${accountLines.length} akun ke produk ${db.data.produk[productId].name || productId}`,
+      added: accountLines.length,
+      newStockCount: db.data.produk[productId].stok.length
+    });
+  } catch (error) {
+    console.error('[Web POS] Admin add stock error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Gagal menambahkan stock: ' + error.message
+    });
+  }
+});
+
 // Change PIN
 app.post('/api/change-pin', requireAuth, async (req, res) => {
   try {
@@ -784,6 +914,10 @@ app.get('/products', (req, res) => {
 
 app.get('/settings', (req, res) => {
   res.sendFile(path.join(__dirname, 'web-pos-public', 'settings.html'));
+});
+
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'web-pos-public', 'admin.html'));
 });
 
 // Start server
