@@ -34,13 +34,6 @@
             <input type="text" id="searchInput" placeholder="🔍 Cari produk..." onkeyup="filterProducts()">
         </div>
 
-        <!-- Category Tabs -->
-        <div class="category-tabs" id="categoryTabs">
-            <button class="category-tab active" data-category="all" onclick="filterByCategory('all')">
-                📦 Semua Produk
-            </button>
-        </div>
-
         <div id="productGrid" class="product-grid">
             <div class="loading-state">Memuat produk...</div>
         </div>
@@ -117,8 +110,6 @@
         let currentUserData = null;
         let currentReceiptText = null;
         let currentRefId = null;
-        let currentCategory = 'all';
-        let categories = [];
 
         async function checkAuth() {
             try {
@@ -156,101 +147,12 @@
                 }
 
                 allProducts = data.products;
-                
-                // Extract unique categories
-                categories = ['all', ...new Set(allProducts.map(p => p.category).filter(c => c))];
-                
-                // Render category tabs
-                renderCategoryTabs();
-                
-                // Display products
-                displayProducts(getFilteredProducts());
+                displayProducts(allProducts);
             } catch (error) {
                 console.error('Load products failed:', error);
                 document.getElementById('productGrid').innerHTML = 
                     '<p class="empty-state">Terjadi kesalahan saat memuat produk</p>';
             }
-        }
-
-        function renderCategoryTabs() {
-            const categoryIcons = {
-                'all': '📦',
-                'netflix': '🎬',
-                'capcut': '✂️',
-                'canva': '🎨',
-                'spotify': '🎵',
-                'youtube': '📺',
-                'disney': '🏰',
-                'viu': '📱',
-                'wetv': '📺',
-                'iqiyi': '🎭',
-                'vidio': '📹',
-                'apple': '🍎',
-                'amazon': '📦',
-                'steam': '🎮',
-                'xbox': '🎮',
-                'playstation': '🎮',
-                'mobile legends': '⚔️',
-                'pubg': '🔫',
-                'free fire': '🔥',
-                'genshin': '⚔️',
-                'valorant': '🎯',
-                'chatgpt': '🤖',
-                'midjourney': '🎨',
-                'default': '📦'
-            };
-
-            const tabsContainer = document.getElementById('categoryTabs');
-            tabsContainer.innerHTML = categories.map(cat => {
-                const categoryName = cat === 'all' ? 'Semua Produk' : cat;
-                const icon = categoryIcons[cat.toLowerCase()] || categoryIcons['default'];
-                const count = cat === 'all' ? allProducts.length : allProducts.filter(p => p.category === cat).length;
-                
-                return `
-                    <button class="category-tab ${cat === currentCategory ? 'active' : ''}" 
-                            data-category="${cat}" 
-                            onclick="filterByCategory('${cat}')">
-                        ${icon} ${categoryName} <span class="category-count">${count}</span>
-                    </button>
-                `;
-            }).join('');
-        }
-
-        function filterByCategory(category) {
-            currentCategory = category;
-            
-            // Update active tab
-            document.querySelectorAll('.category-tab').forEach(tab => {
-                tab.classList.remove('active');
-                if (tab.dataset.category === category) {
-                    tab.classList.add('active');
-                }
-            });
-            
-            // Display filtered products
-            displayProducts(getFilteredProducts());
-        }
-
-        function getFilteredProducts() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            
-            let filtered = allProducts;
-            
-            // Filter by category
-            if (currentCategory !== 'all') {
-                filtered = filtered.filter(p => p.category === currentCategory);
-            }
-            
-            // Filter by search
-            if (searchTerm) {
-                filtered = filtered.filter(p => 
-                    p.name.toLowerCase().includes(searchTerm) ||
-                    (p.description && p.description.toLowerCase().includes(searchTerm)) ||
-                    (p.category && p.category.toLowerCase().includes(searchTerm))
-                );
-            }
-            
-            return filtered;
         }
 
         function displayProducts(products) {
@@ -279,7 +181,12 @@
         }
 
         function filterProducts() {
-            displayProducts(getFilteredProducts());
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allProducts.filter(p => 
+                p.name.toLowerCase().includes(searchTerm) ||
+                (p.description && p.description.toLowerCase().includes(searchTerm))
+            );
+            displayProducts(filtered);
         }
 
         function openPurchaseModal(productId) {
