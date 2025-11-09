@@ -81,6 +81,14 @@ function formatPhoneForDb(phone) {
   return normalizePhoneNumber(phone) + '@s.whatsapp.net';
 }
 
+// Admin/Owner phone numbers
+const ADMIN_NUMBERS = ['6281389592985', '6285235540944', '6287887842985', '62877776579444'];
+
+function isAdmin(phone) {
+  const normalized = normalizePhoneNumber(phone);
+  return ADMIN_NUMBERS.includes(normalized);
+}
+
 function getUserPin(userId) {
   if (!db.data.userPins) db.data.userPins = {};
   return db.data.userPins[userId] || '1234'; // Default PIN
@@ -204,7 +212,8 @@ app.get('/api/user', requireAuth, async (req, res) => {
       user: {
         phone: cleanPhone,
         saldo: user.saldo || 0,
-        role: user.role || 'bronze'
+        role: user.role || 'bronze',
+        isAdmin: isAdmin(cleanPhone)
       }
     });
   } catch (error) {

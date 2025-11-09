@@ -1,316 +1,453 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - GiHa Smart Bot POS</title>
-    <link rel="stylesheet" href="/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Web POS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .animate-slide-in {
+      animation: slideIn 0.3s ease-out;
+    }
+    .tab-active {
+      @apply border-b-2 border-blue-500 text-blue-600;
+    }
+  </style>
 </head>
-<body>
-    <nav class="navbar">
-        <div class="nav-brand">🤖 GiHa Smart Bot</div>
-        <div class="nav-links">
-            <a href="/dashboard" class="active">Dashboard</a>
-            <a href="/products">Produk</a>
-            <a href="/settings">Pengaturan</a>
-            <button class="btn-logout" onclick="logout()">Logout</button>
+<body class="bg-gray-50">
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed top-4 right-4 z-50 transform translate-x-full transition-all duration-300"></div>
+
+  <!-- Mobile Header -->
+  <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+    <div class="container mx-auto px-4 py-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-xl font-bold">Web POS</h1>
+          <p class="text-sm opacity-90" id="userPhone">Loading...</p>
         </div>
-    </nav>
-
-    <div class="container">
-        <div class="dashboard-header">
-            <h1>Dashboard</h1>
-            <p>Selamat datang di Web POS GiHa Smart Bot</p>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon">💰</div>
-                <div class="stat-info">
-                    <div class="stat-label">Saldo Anda</div>
-                    <div class="stat-value" id="userBalance">Rp 0</div>
-                </div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-icon">👤</div>
-                <div class="stat-info">
-                    <div class="stat-label">Role</div>
-                    <div class="stat-value" id="userRole">-</div>
-                </div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-icon">📱</div>
-                <div class="stat-info">
-                    <div class="stat-label">Nomor WhatsApp</div>
-                    <div class="stat-value" id="userPhone">-</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="action-cards">
-            <div class="action-card" onclick="window.location.href='/products'">
-                <div class="action-icon">🛍️</div>
-                <h3>Beli Produk</h3>
-                <p>Lihat dan beli produk yang tersedia</p>
-            </div>
-
-            <div class="action-card" onclick="loadTransactions()">
-                <div class="action-icon">📊</div>
-                <h3>Riwayat Transaksi</h3>
-                <p>Lihat riwayat pembelian Anda</p>
-            </div>
-
-            <div class="action-card" onclick="window.location.href='/settings'">
-                <div class="action-icon">⚙️</div>
-                <h3>Pengaturan</h3>
-                <p>Ubah PIN dan pengaturan akun</p>
-            </div>
-        </div>
-
-        <div id="transactionSection" class="transaction-section" style="display: none;">
-            <h2>Riwayat Transaksi</h2>
-            <div id="transactionList" class="transaction-list"></div>
-        </div>
+        <button onclick="logout()" class="p-2 hover:bg-white/20 rounded-lg transition">
+          <i class="fas fa-sign-out-alt"></i>
+        </button>
+      </div>
     </div>
+  </div>
 
-    <!-- Transaction Detail Modal -->
-    <div id="transactionModal" class="modal">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closeTransactionModal()">&times;</span>
-            <h2>Detail Transaksi</h2>
-            
-            <div id="transactionDetail" class="transaction-detail"></div>
-            <div id="accountDetailsSection" class="account-details-section"></div>
-            
-            <div class="modal-actions">
-                <button class="btn-copy" onclick="copyReceiptToClipboard()">
-                    📋 Copy Receipt
+  <!-- Balance Card -->
+  <div class="container mx-auto px-4 -mt-6">
+    <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm text-gray-600 mb-1">Saldo Tersedia</p>
+          <h2 class="text-3xl font-bold text-gray-800" id="saldoAmount">Rp 0</h2>
+          <p class="text-xs text-gray-500 mt-1">
+            Role: <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold" id="userRole">Bronze</span>
+          </p>
+        </div>
+        <div class="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-2xl flex items-center justify-center">
+          <i class="fas fa-wallet text-white text-2xl"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="container mx-auto px-4 mb-6">
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+      <div class="flex border-b">
+        <button class="tab-btn flex-1 py-4 font-semibold transition-all tab-active" data-tab="home">
+          <i class="fas fa-home mr-2"></i>Home
+        </button>
+        <button class="tab-btn flex-1 py-4 font-semibold transition-all" data-tab="transactions">
+          <i class="fas fa-receipt mr-2"></i>Transaksi
+        </button>
+        <button id="adminTab" class="tab-btn flex-1 py-4 font-semibold transition-all hidden" data-tab="admin">
+          <i class="fas fa-crown mr-2"></i>Admin
+        </button>
+      </div>
+
+      <!-- Tab Contents -->
+      <div class="p-4">
+        <!-- Home Tab -->
+        <div id="home-content" class="tab-content">
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            <!-- Menu Cards -->
+            <a href="/products.html" class="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-6 hover:shadow-lg transform hover:-translate-y-1 transition-all">
+              <div class="text-center">
+                <i class="fas fa-shopping-cart text-3xl mb-3"></i>
+                <p class="font-semibold">Belanja</p>
+              </div>
+            </a>
+
+            <a href="/settings.html" class="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-6 hover:shadow-lg transform hover:-translate-y-1 transition-all">
+              <div class="text-center">
+                <i class="fas fa-cog text-3xl mb-3"></i>
+                <p class="font-semibold">Pengaturan</p>
+              </div>
+            </a>
+          </div>
+
+          <!-- Quick Stats -->
+          <div class="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-4 mb-4">
+            <h3 class="font-semibold text-gray-800 mb-3 flex items-center">
+              <i class="fas fa-chart-line mr-2 text-orange-500"></i>
+              Statistik Singkat
+            </h3>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-600">Total Transaksi:</span>
+                <span class="font-semibold" id="totalTransactions">0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Total Pembelian:</span>
+                <span class="font-semibold text-green-600" id="totalSpent">Rp 0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Info Card -->
+          <div class="bg-blue-50 rounded-xl p-4">
+            <p class="text-sm text-blue-800">
+              <i class="fas fa-info-circle mr-2"></i>
+              <strong>Tips:</strong> Gunakan menu Belanja untuk membeli produk, dan Pengaturan untuk mengubah PIN Anda.
+            </p>
+          </div>
+        </div>
+
+        <!-- Transactions Tab -->
+        <div id="transactions-content" class="tab-content hidden">
+          <div class="mb-4">
+            <h3 class="font-semibold text-gray-800 mb-2">Riwayat Transaksi</h3>
+            <p class="text-sm text-gray-600">Transaksi terbaru Anda</p>
+          </div>
+          
+          <div id="transactionsList" class="space-y-3">
+            <!-- Transactions will be loaded here -->
+            <div class="text-center py-8 text-gray-400">
+              <i class="fas fa-receipt text-4xl mb-2"></i>
+              <p>Memuat transaksi...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin Tab -->
+        <div id="admin-content" class="tab-content hidden">
+          <div class="mb-4">
+            <h3 class="font-semibold text-gray-800 mb-2 flex items-center">
+              <i class="fas fa-crown mr-2 text-yellow-500"></i>
+              Panel Admin
+            </h3>
+            <p class="text-sm text-gray-600">Fitur khusus untuk owner/admin</p>
+          </div>
+
+          <!-- Admin Stats Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm text-gray-600 mb-1">Total Users</p>
+                  <h4 class="text-2xl font-bold text-gray-800" id="adminTotalUsers">-</h4>
+                </div>
+                <div class="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+                  <i class="fas fa-users text-white text-xl"></i>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm text-gray-600 mb-1">Total Produk</p>
+                  <h4 class="text-2xl font-bold text-gray-800" id="adminTotalProducts">-</h4>
+                </div>
+                <div class="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
+                  <i class="fas fa-box text-white text-xl"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Coming Soon -->
+          <div class="bg-yellow-50 border-l-4 border-yellow-400 rounded-xl p-4">
+            <p class="text-sm text-yellow-800">
+              <i class="fas fa-construction mr-2"></i>
+              <strong>Coming Soon:</strong> Fitur manajemen user, produk, dan laporan lengkap akan segera ditambahkan.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden">
+    <div class="flex">
+      <a href="/dashboard.html" class="flex-1 py-4 text-center text-blue-500">
+        <i class="fas fa-home text-xl mb-1"></i>
+        <p class="text-xs">Dashboard</p>
+      </a>
+      <a href="/products.html" class="flex-1 py-4 text-center text-gray-400 hover:text-blue-500">
+        <i class="fas fa-shopping-cart text-xl mb-1"></i>
+        <p class="text-xs">Belanja</p>
+      </a>
+      <a href="/settings.html" class="flex-1 py-4 text-center text-gray-400 hover:text-blue-500">
+        <i class="fas fa-cog text-xl mb-1"></i>
+        <p class="text-xs">Settings</p>
+      </a>
+    </div>
+  </div>
+
+  <!-- Transaction Detail Modal -->
+  <div id="transactionModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div class="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+        <h3 class="font-bold text-lg">Detail Transaksi</h3>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+      <div id="transactionDetail" class="p-4">
+        <!-- Transaction details will be loaded here -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null;
+
+    // Toast notification
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+      
+      toast.innerHTML = `
+        <div class="${bgColor} text-white px-6 py-4 rounded-xl shadow-lg flex items-center space-x-3">
+          <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+          <span>${message}</span>
+        </div>
+      `;
+      
+      toast.classList.remove('translate-x-full');
+      setTimeout(() => toast.classList.add('translate-x-full'), 3000);
+    }
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const tab = this.dataset.tab;
+        
+        // Update active tab
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+        this.classList.add('tab-active');
+        
+        // Show content
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+        document.getElementById(`${tab}-content`).classList.remove('hidden');
+        
+        // Load data if needed
+        if (tab === 'transactions') {
+          loadTransactions();
+        }
+      });
+    });
+
+    // Load user data
+    async function loadUserData() {
+      try {
+        const response = await fetch('/api/user');
+        const data = await response.json();
+        
+        if (data.success) {
+          currentUser = data.user;
+          document.getElementById('userPhone').textContent = data.user.phone;
+          document.getElementById('saldoAmount').textContent = toRupiah(data.user.saldo);
+          document.getElementById('userRole').textContent = data.user.role.charAt(0).toUpperCase() + data.user.role.slice(1);
+          
+          // Show admin tab if user is admin
+          if (data.user.isAdmin) {
+            document.getElementById('adminTab').classList.remove('hidden');
+          }
+        } else {
+          window.location.href = '/login.html';
+        }
+      } catch (error) {
+        console.error('Load user error:', error);
+        window.location.href = '/login.html';
+      }
+    }
+
+    // Load transactions
+    async function loadTransactions() {
+      try {
+        const response = await fetch('/api/transactions');
+        const data = await response.json();
+        
+        if (data.success) {
+          const container = document.getElementById('transactionsList');
+          
+          if (data.transactions.length === 0) {
+            container.innerHTML = `
+              <div class="text-center py-8 text-gray-400">
+                <i class="fas fa-receipt text-4xl mb-2"></i>
+                <p>Belum ada transaksi</p>
+              </div>
+            `;
+            return;
+          }
+          
+          // Update stats
+          document.getElementById('totalTransactions').textContent = data.transactions.length;
+          const totalSpent = data.transactions.reduce((sum, t) => sum + (t.totalBayar || 0), 0);
+          document.getElementById('totalSpent').textContent = toRupiah(totalSpent);
+          
+          container.innerHTML = data.transactions.map(trx => `
+            <div class="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer" onclick="viewTransaction('${trx.reffId}')">
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex-1">
+                  <h4 class="font-semibold text-gray-800">${trx.productName || trx.name || 'N/A'}</h4>
+                  <p class="text-xs text-gray-500">Refid: ${trx.reffId}</p>
+                </div>
+                <span class="text-sm font-bold text-green-600">${toRupiah(trx.totalBayar)}</span>
+              </div>
+              <div class="flex items-center justify-between text-xs text-gray-500">
+                <span><i class="fas fa-calendar mr-1"></i>${trx.date || 'N/A'}</span>
+                <span class="px-2 py-1 bg-blue-100 text-blue-600 rounded-full">${trx.metode || 'Saldo'}</span>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (error) {
+        console.error('Load transactions error:', error);
+        showToast('Gagal memuat transaksi', 'error');
+      }
+    }
+
+    // View transaction detail
+    async function viewTransaction(reffId) {
+      try {
+        const response = await fetch(`/api/transactions/${reffId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          const trx = data.transaction;
+          const accounts = data.accounts || [];
+          
+          let accountsHtml = '';
+          if (accounts.length > 0) {
+            accountsHtml = `
+              <div class="mt-4 bg-gray-50 rounded-xl p-4">
+                <h4 class="font-semibold text-gray-800 mb-3">Detail Akun</h4>
+                ${accounts.map(acc => `
+                  <div class="mb-3 pb-3 border-b border-gray-200 last:border-0">
+                    ${acc.email ? `<p class="text-sm"><span class="text-gray-600">Email:</span> <span class="font-mono">${acc.email}</span></p>` : ''}
+                    ${acc.password ? `<p class="text-sm"><span class="text-gray-600">Password:</span> <span class="font-mono">${acc.password}</span></p>` : ''}
+                    ${acc.profile ? `<p class="text-sm"><span class="text-gray-600">Profile:</span> <span class="font-mono">${acc.profile}</span></p>` : ''}
+                    ${acc.pin ? `<p class="text-sm"><span class="text-gray-600">Pin:</span> <span class="font-mono">${acc.pin}</span></p>` : ''}
+                    ${acc.twofa ? `<p class="text-sm"><span class="text-gray-600">2FA:</span> <span class="font-mono">${acc.twofa}</span></p>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          }
+          
+          document.getElementById('transactionDetail').innerHTML = `
+            <div class="space-y-4">
+              <div>
+                <h4 class="font-bold text-lg text-gray-800 mb-2">${trx.name || 'N/A'}</h4>
+                <p class="text-sm text-gray-600">Refid: ${trx.reffId}</p>
+              </div>
+              
+              <div class="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p class="text-gray-600">Tanggal</p>
+                  <p class="font-semibold">${trx.date || 'N/A'}</p>
+                </div>
+                <div>
+                  <p class="text-gray-600">Jumlah</p>
+                  <p class="font-semibold">${trx.jumlah || 1} item</p>
+                </div>
+                <div>
+                  <p class="text-gray-600">Metode</p>
+                  <p class="font-semibold">${trx.metodeBayar || 'Saldo'}</p>
+                </div>
+                <div>
+                  <p class="text-gray-600">Total</p>
+                  <p class="font-semibold text-green-600">${toRupiah(trx.totalBayar)}</p>
+                </div>
+              </div>
+              
+              ${accountsHtml}
+              
+              ${data.receiptContent ? `
+                <button onclick="copyReceipt()" class="w-full bg-blue-500 text-white py-3 rounded-xl font-semibold hover:bg-blue-600 transition">
+                  <i class="fas fa-copy mr-2"></i>Copy Receipt
                 </button>
-                <button class="btn-secondary" onclick="closeTransactionModal()">Tutup</button>
+              ` : ''}
             </div>
-        </div>
-    </div>
-
-    <!-- Toast Notification -->
-    <div id="toast" class="toast"></div>
-
-    <script>
-        // Global variable to store current receipt content
-        let currentReceiptContent = null;
-        let currentReffId = null;
-
-        async function checkAuth() {
-            try {
-                const response = await fetch('/api/user');
-                const data = await response.json();
-
-                if (!data.success) {
-                    window.location.href = '/';
-                    return;
-                }
-
-                // Update UI with user data
-                document.getElementById('userBalance').textContent = formatRupiah(data.user.saldo);
-                document.getElementById('userRole').textContent = data.user.role.toUpperCase();
-                document.getElementById('userPhone').textContent = formatPhone(data.user.phone);
-            } catch (error) {
-                console.error('Auth check failed:', error);
-                window.location.href = '/';
-            }
+          `;
+          
+          // Store receipt for copying
+          window.currentReceipt = data.receiptContent;
+          
+          document.getElementById('transactionModal').classList.remove('hidden');
+          document.getElementById('transactionModal').classList.add('flex');
         }
+      } catch (error) {
+        console.error('View transaction error:', error);
+        showToast('Gagal memuat detail transaksi', 'error');
+      }
+    }
 
-        async function loadTransactions() {
-            try {
-                const response = await fetch('/api/transactions');
-                const data = await response.json();
+    // Copy receipt
+    async function copyReceipt() {
+      if (!window.currentReceipt) return;
+      
+      try {
+        await navigator.clipboard.writeText(window.currentReceipt);
+        showToast('Receipt berhasil dicopy!', 'success');
+      } catch (error) {
+        console.error('Copy error:', error);
+        showToast('Gagal copy receipt', 'error');
+      }
+    }
 
-                if (!data.success) {
-                    alert('Gagal memuat riwayat transaksi');
-                    return;
-                }
+    // Close modal
+    function closeModal() {
+      document.getElementById('transactionModal').classList.add('hidden');
+      document.getElementById('transactionModal').classList.remove('flex');
+      window.currentReceipt = null;
+    }
 
-                const transactionSection = document.getElementById('transactionSection');
-                const transactionList = document.getElementById('transactionList');
+    // Logout
+    async function logout() {
+      try {
+        await fetch('/api/logout', { method: 'POST' });
+        window.location.href = '/login.html';
+      } catch (error) {
+        console.error('Logout error:', error);
+        window.location.href = '/login.html';
+      }
+    }
 
-                if (data.transactions.length === 0) {
-                    transactionList.innerHTML = '<p class="empty-state">Belum ada transaksi</p>';
-                } else {
-                    transactionList.innerHTML = data.transactions.map(t => `
-                        <div class="transaction-item">
-                            <div class="transaction-info">
-                                <div class="transaction-name">${t.productName}</div>
-                                <div class="transaction-meta">
-                                    <span>Refid: ${t.refId}</span> • 
-                                    <span>Qty: ${t.quantity}</span> • 
-                                    <span>Metode: ${t.metode}</span> •
-                                    <span>${t.date}</span>
-                                </div>
-                            </div>
-                            <div class="transaction-actions">
-                                <div class="transaction-amount">
-                                    ${formatRupiah(t.totalPrice)}
-                                </div>
-                                <button class="btn-view-account" onclick="viewTransactionDetail('${t.refId}')">
-                                    Lihat Akun
-                                </button>
-                            </div>
-                        </div>
-                    `).join('');
-                }
+    // Format Rupiah
+    function toRupiah(amount) {
+      return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0
+      }).format(amount || 0);
+    }
 
-                transactionSection.style.display = 'block';
-                transactionSection.scrollIntoView({ behavior: 'smooth' });
-            } catch (error) {
-                console.error('Load transactions failed:', error);
-                alert('Gagal memuat riwayat transaksi');
-            }
-        }
-
-        async function viewTransactionDetail(reffId) {
-            try {
-                const response = await fetch(`/api/transactions/${reffId}`);
-                const data = await response.json();
-
-                if (!data.success) {
-                    alert('Gagal memuat detail transaksi');
-                    return;
-                }
-
-                const transaction = data.transaction;
-                const accountDetails = data.accountDetails;
-                
-                // Store receipt content and reffId globally
-                currentReceiptContent = data.receiptContent;
-                currentReffId = reffId;
-
-                // Parse tanggal dan jam
-                const dateTime = transaction.date ? transaction.date.split(' ') : ['', ''];
-                const tanggal = dateTime[0] || 'N/A';
-                const jam = dateTime[1] || 'N/A';
-
-                // Build account info header (seperti di bot WA)
-                let detailHTML = '<div class="account-info-header">';
-                detailHTML += `<h3>Account Information</h3>`;
-                detailHTML += `<div class="info-item">📦 <strong>Produk:★</strong> ${transaction.productName}</div>`;
-                detailHTML += `<div class="info-item">📅 <strong>Tanggal:★</strong> ${tanggal}</div>`;
-                detailHTML += `<div class="info-item">⏱️ <strong>Jam:★</strong> ${jam} WIB</div>`;
-                detailHTML += `<div class="info-item">🆔 <strong>Refid:★</strong> ${transaction.refId}</div>`;
-                detailHTML += `</div>`;
-
-                document.getElementById('transactionDetail').innerHTML = detailHTML;
-
-                // Build account details (format seperti bot WA)
-                let accountHTML = '';
-                if (accountDetails && accountDetails.length > 0) {
-                    accountHTML = '<div class="account-details-list">';
-                    accountDetails.forEach((account, index) => {
-                        if (index > 0) accountHTML += '<hr style="margin: 1.5rem 0; border: none; border-top: 1px dashed #ccc;">';
-                        accountHTML += `
-                            <div class="account-detail-item">
-                                <div class="detail-line">📧 <strong>Email:</strong> ${account.email}</div>
-                                <div class="detail-line">🔐 <strong>Password:</strong> ${account.password}</div>
-                                <div class="detail-line">👤 <strong>Profil:</strong> ${account.profile}</div>
-                                <div class="detail-line">🔢 <strong>Pin:</strong> ${account.pin}</div>
-                                <div class="detail-line">🔒 <strong>2FA:</strong> ${account.twofa}</div>
-                            </div>
-                        `;
-                    });
-                    accountHTML += '</div>';
-                    
-                    // Tambah info pembayaran di bawah
-                    accountHTML += `<div class="payment-info">`;
-                    accountHTML += `<div class="payment-row"><span>💰 <strong>Metode:</strong></span> <span>${transaction.metode}</span></div>`;
-                    accountHTML += `<div class="payment-row"><span>💵 <strong>Total:</strong></span> <span>${formatRupiah(transaction.totalPrice)}</span></div>`;
-                    accountHTML += `</div>`;
-                } else {
-                    accountHTML = '<p class="empty-state">Detail akun tidak tersedia</p>';
-                }
-
-                document.getElementById('accountDetailsSection').innerHTML = accountHTML;
-                document.getElementById('transactionModal').style.display = 'flex';
-            } catch (error) {
-                console.error('View transaction detail failed:', error);
-                alert('Gagal memuat detail transaksi');
-            }
-        }
-
-        function closeTransactionModal() {
-            document.getElementById('transactionModal').style.display = 'none';
-            currentReceiptContent = null;
-            currentReffId = null;
-        }
-
-        async function copyReceiptToClipboard() {
-            try {
-                if (!currentReceiptContent) {
-                    showToast('Receipt tidak tersedia', 'error');
-                    return;
-                }
-
-                // Copy to clipboard
-                await navigator.clipboard.writeText(currentReceiptContent);
-                showToast('✅ Receipt berhasil dicopy!', 'success');
-            } catch (error) {
-                console.error('Copy failed:', error);
-                
-                // Fallback method for older browsers
-                try {
-                    const textArea = document.createElement('textarea');
-                    textArea.value = currentReceiptContent;
-                    textArea.style.position = 'fixed';
-                    textArea.style.left = '-999999px';
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textArea);
-                    showToast('✅ Receipt berhasil dicopy!', 'success');
-                } catch (fallbackError) {
-                    showToast('❌ Gagal copy receipt', 'error');
-                }
-            }
-        }
-
-        function showToast(message, type = 'info') {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.className = 'toast show ' + type;
-            
-            setTimeout(() => {
-                toast.className = 'toast';
-            }, 3000);
-        }
-
-        async function logout() {
-            try {
-                await fetch('/api/logout', { method: 'POST' });
-                window.location.href = '/';
-            } catch (error) {
-                console.error('Logout failed:', error);
-                window.location.href = '/';
-            }
-        }
-
-        function formatRupiah(amount) {
-            return new Intl.NumberFormat('id-ID', {
-                style: 'currency',
-                currency: 'IDR',
-                minimumFractionDigits: 0
-            }).format(amount);
-        }
-
-        function formatPhone(phone) {
-            if (!phone) return '-';
-            if (phone.startsWith('62')) {
-                return '0' + phone.substring(2);
-            }
-            return phone;
-        }
-
-        // Check authentication on page load
-        checkAuth();
-    </script>
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      loadUserData();
+      loadTransactions();
+    });
+  </script>
 </body>
 </html>
-
