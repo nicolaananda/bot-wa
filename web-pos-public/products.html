@@ -16,6 +16,7 @@
         <div class="nav-links">
             <a href="/dashboard">Dashboard</a>
             <a href="/products" class="active">Produk</a>
+            <a href="/admin">Admin</a>
             <a href="/settings">Pengaturan</a>
             <button class="btn-logout" onclick="logout()">Logout</button>
         </div>
@@ -122,6 +123,12 @@
 
                 currentUserData = data.user;
                 document.getElementById('userBalance').textContent = formatRupiah(data.user.saldo);
+
+                // Show Admin tab if user is admin
+                if (data.user.isAdmin) {
+                    const adminLink = document.querySelector('a[href="/admin"]');
+                    if (adminLink) adminLink.classList.add('show-admin');
+                }
             } catch (error) {
                 console.error('Auth check failed:', error);
                 window.location.href = '/';
