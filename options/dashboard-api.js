@@ -1549,60 +1549,10 @@ app.get('/api/dashboard/products/stats', async (req, res) => {
   }
 });
 
-// 10. Recent Transactions (Real-time from PostgreSQL)
+// 10. Recent Transactions
 app.get('/api/dashboard/transactions/recent', async (req, res) => {
   try {
     const { limit = 20 } = req.query;
-    
-    // If using PostgreSQL, query directly for real-time data
-    if (usePg) {
-      try {
-        const result = await pg.query(
-          `SELECT meta FROM transaksi 
-           WHERE meta->>'date' IS NOT NULL
-           ORDER BY 
-             CASE
-               WHEN meta->>'date' ~ '^[0-9]{4}-' THEN to_timestamp(meta->>'date', 'YYYY-MM-DD HH24:MI:SS')
-               ELSE NULL
-             END DESC NULLS LAST
-           LIMIT $1`,
-          [parseInt(limit)]
-        );
-        
-        const recentTransactions = result.rows.map(row => {
-          const t = row.meta;
-          return {
-            id: t.id,
-            name: t.name,
-            price: parseInt(t.price) || 0,
-            date: t.date,
-            jumlah: t.jumlah || 1,
-            user: t.user || 'Anonymous User',
-            metodeBayar: t.metodeBayar || 'Not specified',
-            totalBayar: t.totalBayar || (parseInt(t.price) * (t.jumlah || 1)),
-            reffId: t.reffId || 'N/A',
-            user_name: t.user,
-            payment_method: t.metodeBayar,
-            user_id: t.user,
-            order_id: t.reffId
-          };
-        });
-        
-        return res.json({
-          success: true,
-          data: {
-            transactions: recentTransactions,
-            count: recentTransactions.length,
-            limit: parseInt(limit)
-          }
-        });
-      } catch (pgError) {
-        console.error('❌ [Dashboard] PostgreSQL query failed:', pgError.message);
-        // Fallback to cache
-      }
-    }
-    
-    // Fallback: use cache for file-based DB or if PostgreSQL fails
     const db = await getFormattedDataAsync();
     
     if (!db) {
@@ -1623,14 +1573,16 @@ app.get('/api/dashboard/transactions/recent', async (req, res) => {
         price: parseInt(t.price) || 0,
         date: t.date,
         jumlah: t.jumlah || 1,
-        user: t.user || 'Anonymous User',
-        metodeBayar: t.metodeBayar || 'Not specified',
+        // Map field baru ke field yang diharapkan frontend
+        user: t.user_name || t.user || 'Anonymous User',
+        metodeBayar: t.payment_method || t.metodeBayar || 'Not specified',
         totalBayar: t.totalBayar || (parseInt(t.price) * (t.jumlah || 1)),
-        reffId: t.reffId || 'N/A',
-        user_name: t.user,
-        payment_method: t.metodeBayar,
-        user_id: t.user,
-        order_id: t.reffId
+        reffId: t.order_id || t.reffId || 'N/A',
+        // Keep original fields for reference
+        user_name: t.user_name || t.user,
+        payment_method: t.payment_method || t.metodeBayar,
+        user_id: t.user_id || t.user,
+        order_id: t.order_id || t.reffId
       }));
     
     res.json({
