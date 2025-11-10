@@ -870,6 +870,76 @@ app.post('/api/admin/addstock', requireAuth, async (req, res) => {
   }
 });
 
+// Admin: Add saldo to user
+app.patch('/api/admin/users/:userId/saldo', requireAuth, async (req, res) => {
+  try {
+    const cleanPhone = req.session.cleanPhone;
+    
+    if (!isOwner(cleanPhone)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Akses ditolak. Hanya admin yang bisa menambah saldo.'
+      });
+    }
+    
+    const { userId } = req.params;
+    const { amount } = req.body;
+    
+    if (typeof amount !== 'number' || isNaN(amount)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Amount harus berupa number'
+      });
+    }
+    
+    // Normalize user ID
+    const nomorNya = userId.replace(/[^0-9]/g, '');
+    const userIdWith = nomorNya + '@s.whatsapp.net';
+    
+    // Auto-create user if not exists (same as index.js addsaldo)
+    if (!db.data.users[userIdWith]) {
+      db.data.users[userIdWith] = {
+        saldo: 0,
+        role: 'bronze'
+      };
+    }
+    
+    // Also check without suffix
+    if (!db.data.users[nomorNya]) {
+      db.data.users[nomorNya] = {
+        saldo: 0,
+        role: 'bronze'
+      };
+    }
+    
+    const before = parseInt(db.data.users[userIdWith].saldo) || 0;
+    const after = before + amount;
+    
+    // No limit - allow negative saldo
+    // Update saldo using dbHelper
+    await dbHelper.updateUserSaldo(userIdWith, amount, 'add');
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    console.log(`✅ [Web POS Admin] Saldo added - User: ${nomorNya}, Amount: ${amount}, Before: ${before}, After: ${after}, By: ${cleanPhone}`);
+    
+    res.json({
+      success: true,
+      data: {
+        userId: userIdWith,
+        before: before,
+        after: after,
+        delta: amount
+      }
+    });
+  } catch (error) {
+    console.error('[Web POS] Admin add saldo error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Gagal menambahkan saldo: ' + error.message
+    });
+  }
+});
+
 // Change PIN
 app.post('/api/change-pin', requireAuth, async (req, res) => {
   try {
