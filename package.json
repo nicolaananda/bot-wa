@@ -26,7 +26,7 @@
   "author": "Ronzz YT",
   "license": "ISC",
   "dependencies": {
-    "@dappaoffc/baileys": "^2.0.6",
+    "@whiskeysockets/baileys": "github:GataNina-Li/Baileys",
     "awesome-phonenumber": "^2.69.0",
     "canvas": "^3.0.0",
     "chalk": "^4.1.2",
