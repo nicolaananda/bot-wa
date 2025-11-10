@@ -672,7 +672,7 @@ app.patch('/api/admin/users/:userId/saldo', async (req, res) => {
       const beforeRes = await pg.query('SELECT saldo FROM users WHERE user_id=$1', [userId]);
       const before = beforeRes.rows[0] ? parseInt(beforeRes.rows[0].saldo) : 0;
       const after = before + amount;
-      if (after < 0) return res.status(400).json({ success: false, error: 'Invalid payload: resulting saldo would be negative' });
+      // No limit - allow negative saldo (admin can set any value)
       await pg.query('INSERT INTO users(user_id, saldo, role, data) VALUES ($1,$2,' + "'bronze'" + ', ' + "'{}'" + '::jsonb) ON CONFLICT (user_id) DO UPDATE SET saldo=$2', [userId, after]);
       const auditId = generateAuditId();
       writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'saldo.adjust', delta: amount, reason: reason || null, before, after, timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
@@ -680,14 +680,21 @@ app.patch('/api/admin/users/:userId/saldo', async (req, res) => {
     }
     const db = await loadDatabaseAsync();
     if (!db || !db.users) return res.status(500).json({ success: false, error: 'Database not available' });
-    const found = findUserRecord(db, userId);
-    if (!found) return res.status(404).json({ success: false, error: 'User not found' });
+    
+    // Auto-create user if not exists (same as index.js addsaldo)
+    let found = findUserRecord(db, userId);
+    if (!found) {
+      // Create new user
+      db.users[userId] = {
+        saldo: 0,
+        role: 'bronze'
+      };
+      found = { key: userId, record: db.users[userId] };
+    }
 
     const before = parseInt(found.record.saldo) || 0;
     const after = before + amount;
-    if (after < 0) {
-      return res.status(400).json({ success: false, error: 'Invalid payload: resulting saldo would be negative' });
-    }
+    // No limit - allow negative saldo (admin can set any value)
 
     found.record.saldo = after;
     const saved = saveDatabase(db);
