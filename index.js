@@ -7398,64 +7398,6 @@ Ada yang upgrade role!
         reply('Sukses unblock nomor.')
         break
 
-      case 'checkuser': case 'cekuser':
-        if (!isOwner) return reply(mess.owner)
-        if (!q) return reply(`❌ Contoh: ${prefix + command} 628xxx\n\n💡 Command ini untuk cek status user yang tidak bisa chat bot`)
-        
-        try {
-          const cleanNum = q.replace(/[^0-9]/g, '')
-          const userJid = cleanNum + '@s.whatsapp.net'
-          
-          let statusText = `*🔍 USER DIAGNOSTIC REPORT*\n\n`
-          statusText += `📱 *Nomor:* ${cleanNum}\n`
-          statusText += `━━━━━━━━━━━━━━━━━━━━\n\n`
-          
-          // Check if owner
-          const isOwnerNum = owner.includes(cleanNum)
-          statusText += `👑 *Status Owner:* ${isOwnerNum ? '✅ YA' : '❌ Bukan owner'}\n\n`
-          
-          // Check database
-          if (db.data.users && db.data.users[userJid]) {
-            const userData = db.data.users[userJid]
-            statusText += `💾 *Database Status:* ✅ Ditemukan\n`
-            statusText += `   • Saldo: Rp${toRupiah(userData.saldo || 0)}\n`
-            statusText += `   • Role: ${userData.role || 'Bronze'}\n`
-            statusText += `   • Limit: ${userData.limit || 0}\n`
-          } else {
-            statusText += `💾 *Database Status:* ⚠️ User belum terdaftar\n`
-            statusText += `   (User akan otomatis terdaftar saat pertama kali chat)\n`
-          }
-          
-          // Check transaction history
-          if (db.data.transaksi && Array.isArray(db.data.transaksi)) {
-            const userTrans = db.data.transaksi.filter(t => 
-              t.user === cleanNum || 
-              t.buyer === cleanNum ||
-              (t.targetNumber && t.targetNumber === cleanNum)
-            )
-            statusText += `\n📦 *Riwayat Transaksi:* ${userTrans.length} transaksi\n`
-            if (userTrans.length > 0) {
-              const lastTrans = userTrans[userTrans.length - 1]
-              statusText += `   • Terakhir: ${lastTrans.date || 'N/A'}\n`
-            }
-          }
-          
-          statusText += `\n━━━━━━━━━━━━━━━━━━━━\n`
-          statusText += `\n💡 *SOLUSI JIKA BOT TIDAK MERESPON:*\n\n`
-          statusText += `1️⃣ Unblock user:\n   \`${prefix}unblock ${cleanNum}\`\n\n`
-          statusText += `2️⃣ Test dengan command:\n   Minta user kirim: \`${prefix}ping\`\n\n`
-          statusText += `3️⃣ Restart bot jika perlu:\n   \`pm2 restart all\`\n\n`
-          statusText += `4️⃣ Cek apakah user pernah call bot (auto-blocked)\n\n`
-          statusText += `━━━━━━━━━━━━━━━━━━━━\n`
-          statusText += `\n📝 *Info:* User yang menelepon bot akan otomatis di-block oleh sistem anti-call`
-          
-          reply(statusText)
-          
-        } catch (err) {
-          reply(`❌ Error saat cek user: ${err.message}\n\n💡 Pastikan format nomor benar (contoh: 628xxx)`)
-        }
-        break
-
       case 'kirimulang': case 'resend': case 'sendagain':
         try {
           // Get user phone number
@@ -7616,15 +7558,6 @@ Ada yang upgrade role!
         await reply(`Sukses mengizinkan hanya admin yang dapat mengirim pesan ke grup ini.`)
         break
 
-      case 'tagall':
-        if (!isGroup) return reply(mess.group)
-        if (!isGroupAdmins && !isOwner) return reply(mess.admin)
-        let teks = `══✪〘 *👥 TAG ALL* 〙✪══\n\n${q ? q : 'Tidak ada pesan'}\n`
-        for (let mem of participants) {
-          teks += `➲ @${mem.id.split('@')[0]}\n`
-        }
-        ronzz.sendMessage(from, { text: teks, mentions: participants.map(a => a.id) })
-        break
 
       case 'hidetag': case 'ht': case 'h': {
         if (!isGroup) return reply(mess.group)

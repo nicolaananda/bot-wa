@@ -13,7 +13,10 @@
 <body>
     <nav class="navbar">
         <div class="nav-brand">🤖 GiHa Smart Bot</div>
-        <div class="nav-links">
+        <button class="nav-toggle" onclick="toggleMenu()" aria-label="Toggle menu">
+            <span id="menuIcon">☰</span>
+        </button>
+        <div class="nav-links" id="navLinks">
             <a href="/dashboard" class="active">Dashboard</a>
             <a href="/products">Produk</a>
             <a href="/admin">Admin</a>
@@ -23,60 +26,308 @@
     </nav>
 
     <div class="container">
-        <div class="dashboard-header">
-            <h1>Dashboard</h1>
-            <p>Selamat datang di Web POS GiHa Smart Bot</p>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon">💰</div>
-                <div class="stat-info">
-                    <div class="stat-label">Saldo Anda</div>
-                    <div class="stat-value" id="userBalance">Rp 0</div>
+        <!-- Hero Section with Liquid Glass Effect -->
+        <div class="hero-aurora liquid-glass-elastic">
+            <div class="aurora-particles"></div>
+            <div class="hero-content-new">
+                <div class="welcome-section">
+                    <span class="welcome-emoji">👋</span>
+                    <h1 class="hero-title-aurora chromatic-text" data-text="Dashboard">Dashboard</h1>
+                    <p class="hero-subtitle-aurora">Kelola bisnis Anda dengan teknologi terdepan</p>
                 </div>
             </div>
-
-            <div class="stat-card">
-                <div class="stat-icon">👤</div>
-                <div class="stat-info">
-                    <div class="stat-label">Role</div>
-                    <div class="stat-value" id="userRole">-</div>
+            <div class="stats-hero-grid">
+                <div class="stat-hero-card frosted-card glow-aurora">
+                    <div class="stat-hero-icon">💰</div>
+                    <div class="stat-hero-content">
+                        <span class="stat-hero-label">Total Saldo</span>
+                        <span class="stat-hero-value" id="userBalance">Rp 0</span>
+                    </div>
                 </div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-icon">📱</div>
-                <div class="stat-info">
-                    <div class="stat-label">Nomor WhatsApp</div>
-                    <div class="stat-value" id="userPhone">-</div>
+                <div class="stat-hero-card frosted-card glow-pink">
+                    <div class="stat-hero-icon">👤</div>
+                    <div class="stat-hero-content">
+                        <span class="stat-hero-label">Status</span>
+                        <span class="stat-hero-value" id="userRole">-</span>
+                    </div>
                 </div>
-            </div>
-        </div>
-
-        <div class="action-cards">
-            <div class="action-card" onclick="window.location.href='/products'">
-                <div class="action-icon">🛍️</div>
-                <h3>Beli Produk</h3>
-                <p>Lihat dan beli produk yang tersedia</p>
-            </div>
-
-            <div class="action-card" onclick="loadTransactions()">
-                <div class="action-icon">📊</div>
-                <h3>Riwayat Transaksi</h3>
-                <p>Lihat riwayat pembelian Anda</p>
-            </div>
-
-            <div class="action-card" onclick="window.location.href='/settings'">
-                <div class="action-icon">⚙️</div>
-                <h3>Pengaturan</h3>
-                <p>Ubah PIN dan pengaturan akun</p>
+                <div class="stat-hero-card frosted-card glow-green">
+                    <div class="stat-hero-icon">📱</div>
+                    <div class="stat-hero-content">
+                        <span class="stat-hero-label">Nomor</span>
+                        <span class="stat-hero-value" id="userPhone">-</span>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div id="transactionSection" class="transaction-section" style="display: none;">
-            <h2>Riwayat Transaksi</h2>
-            <div id="transactionList" class="transaction-list"></div>
+        <!-- Statistics Overview (Only for Admin) -->
+        <div id="statsSection" class="stats-overview-section" style="display: none;">
+            <h2 class="section-title-glass">
+                <span class="title-icon-glow">📊</span>
+                Business Statistics
+            </h2>
+            <div class="stats-grid-liquid">
+                <div class="stat-card-liquid frosted-card">
+                    <div class="stat-card-header">
+                        <span class="stat-icon">💵</span>
+                        <span class="stat-trend up">↗ +12%</span>
+                    </div>
+                    <div class="stat-card-body">
+                        <span class="stat-label">Total Revenue</span>
+                        <span class="stat-value" id="totalRevenue">Rp 0</span>
+                        <span class="stat-period">Bulan ini</span>
+                    </div>
+                </div>
+                <div class="stat-card-liquid frosted-card">
+                    <div class="stat-card-header">
+                        <span class="stat-icon">🛒</span>
+                        <span class="stat-trend up">↗ +8%</span>
+                    </div>
+                    <div class="stat-card-body">
+                        <span class="stat-label">Total Transaksi</span>
+                        <span class="stat-value" id="totalTransactions">0</span>
+                        <span class="stat-period">Bulan ini</span>
+                    </div>
+                </div>
+                <div class="stat-card-liquid frosted-card">
+                    <div class="stat-card-header">
+                        <span class="stat-icon">👥</span>
+                        <span class="stat-trend up">↗ +5%</span>
+                    </div>
+                    <div class="stat-card-body">
+                        <span class="stat-label">Active Users</span>
+                        <span class="stat-value" id="activeUsers">0</span>
+                        <span class="stat-period">30 hari terakhir</span>
+                    </div>
+                </div>
+                <div class="stat-card-liquid frosted-card">
+                    <div class="stat-card-header">
+                        <span class="stat-icon">📦</span>
+                        <span class="stat-trend down">↘ -3%</span>
+                    </div>
+                    <div class="stat-card-body">
+                        <span class="stat-label">Low Stock Items</span>
+                        <span class="stat-value" id="lowStockCount">0</span>
+                        <span class="stat-period">Perlu restock</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions with Liquid Glass -->
+        <div class="quick-actions-section">
+            <h2 class="section-title-glass">
+                <span class="title-icon-glow">⚡</span>
+                Quick Actions
+            </h2>
+            <div class="quick-actions-liquid">
+                <div class="action-card-liquid frosted-card" onclick="window.location.href='/products'">
+                    <div class="action-liquid-bg"></div>
+                    <div class="action-card-content">
+                        <div class="action-icon-large">🛍️</div>
+                        <h3>Beli Produk</h3>
+                        <p>Browse & shop produk digital premium</p>
+                        <div class="action-badge">New</div>
+                    </div>
+                </div>
+
+                <div class="action-card-liquid frosted-card" onclick="loadTransactions()">
+                    <div class="action-liquid-bg"></div>
+                    <div class="action-card-content">
+                        <div class="action-icon-large">📊</div>
+                        <h3>Riwayat Transaksi</h3>
+                        <p>Lihat detail pembelian & invoice</p>
+                        <div class="action-badge">Hot</div>
+                    </div>
+                </div>
+
+                <div class="action-card-liquid frosted-card" onclick="toggleUserManagement()">
+                    <div class="action-liquid-bg"></div>
+                    <div class="action-card-content">
+                        <div class="action-icon-large">👥</div>
+                        <h3>User Management</h3>
+                        <p>Kelola user & permissions</p>
+                        <div class="action-badge admin-only">Admin</div>
+                    </div>
+                </div>
+
+                <div class="action-card-liquid frosted-card" onclick="toggleAuditLogs()">
+                    <div class="action-liquid-bg"></div>
+                    <div class="action-card-content">
+                        <div class="action-icon-large">📋</div>
+                        <h3>Audit Logs</h3>
+                        <p>Monitor aktivitas & perubahan sistem</p>
+                        <div class="action-badge admin-only">Admin</div>
+                    </div>
+                </div>
+
+                <div class="action-card-liquid frosted-card" onclick="window.location.href='/settings'">
+                    <div class="action-liquid-bg"></div>
+                    <div class="action-card-content">
+                        <div class="action-icon-large">⚙️</div>
+                        <h3>Settings</h3>
+                        <p>Konfigurasi & keamanan akun</p>
+                        <div class="action-badge">Pro</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Personal Activity Section (All Users) -->
+        <div id="personalActivitySection" class="personal-activity-section">
+            <h2 class="section-title-glass">
+                <span class="title-icon-glow">📈</span>
+                Aktivitas Saya
+            </h2>
+            <div class="personal-stats-grid">
+                <div class="personal-stat-card frosted-card">
+                    <div class="personal-stat-icon">💸</div>
+                    <div class="personal-stat-content">
+                        <span class="personal-stat-label">Total Pembelian</span>
+                        <span class="personal-stat-value" id="userTotalSpent">Rp 0</span>
+                        <span class="personal-stat-change positive" id="userSpentChange">+0%</span>
+                    </div>
+                </div>
+                <div class="personal-stat-card frosted-card">
+                    <div class="personal-stat-icon">🛒</div>
+                    <div class="personal-stat-content">
+                        <span class="personal-stat-label">Total Transaksi</span>
+                        <span class="personal-stat-value" id="userTotalTransactions">0</span>
+                        <span class="personal-stat-change" id="userTransactionsChange">Bulan ini</span>
+                    </div>
+                </div>
+                <div class="personal-stat-card frosted-card">
+                    <div class="personal-stat-icon">⭐</div>
+                    <div class="personal-stat-content">
+                        <span class="personal-stat-label">Produk Favorit</span>
+                        <span class="personal-stat-value" id="userFavoriteProduct">-</span>
+                        <span class="personal-stat-change" id="userFavoriteCount">0x dibeli</span>
+                    </div>
+                </div>
+                <div class="personal-stat-card frosted-card">
+                    <div class="personal-stat-icon">🎯</div>
+                    <div class="personal-stat-content">
+                        <span class="personal-stat-label">Transaksi Terakhir</span>
+                        <span class="personal-stat-value" id="userLastTransaction">-</span>
+                        <span class="personal-stat-change" id="userLastTransactionTime">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Management Section (Admin Only) -->
+        <div id="userManagementSection" class="user-management-section" style="display: none;">
+            <div class="section-header-liquid">
+                <h2 class="section-title-glass">
+                    <span class="title-icon-glow">👥</span>
+                    User Management
+                </h2>
+                <button class="btn-close-liquid" onclick="toggleUserManagement()">✕</button>
+            </div>
+            
+            <div class="management-controls frosted-card">
+                <div class="search-box-liquid">
+                    <span class="search-icon-liquid">🔍</span>
+                    <input type="text" id="userSearchInput" placeholder="Search users by phone or name..." onkeyup="searchUsers()">
+                </div>
+                <div class="filter-controls">
+                    <select id="roleFilter" onchange="filterUsers()" class="select-liquid">
+                        <option value="all">All Roles</option>
+                        <option value="bronze">Bronze</option>
+                        <option value="silver">Silver</option>
+                        <option value="gold">Gold</option>
+                        <option value="platinum">Platinum</option>
+                    </select>
+                    <button class="btn-refresh-liquid" onclick="loadUsers()">
+                        <span>🔄</span> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div id="usersList" class="users-grid-liquid">
+                <div class="loading-state-liquid">
+                    <div class="loader-aurora"></div>
+                    <p>Loading users...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audit Logs Section (Admin Only) -->
+        <div id="auditLogsSection" class="audit-logs-section" style="display: none;">
+            <div class="section-header-liquid">
+                <h2 class="section-title-glass">
+                    <span class="title-icon-glow">📋</span>
+                    Audit Logs
+                </h2>
+                <button class="btn-close-liquid" onclick="toggleAuditLogs()">✕</button>
+            </div>
+            
+            <div class="audit-controls frosted-card">
+                <div class="audit-filters">
+                    <select id="auditTypeFilter" onchange="filterAuditLogs()" class="select-liquid">
+                        <option value="all">All Actions</option>
+                        <option value="saldo">Saldo Changes</option>
+                        <option value="stock">Stock Changes</option>
+                        <option value="transaction">Transactions</option>
+                        <option value="auth">Authentication</option>
+                    </select>
+                    <select id="auditUserFilter" onchange="filterAuditLogs()" class="select-liquid">
+                        <option value="all">All Users</option>
+                    </select>
+                    <button class="btn-refresh-liquid" onclick="loadAuditLogs()">
+                        <span>🔄</span> Refresh
+                    </button>
+                </div>
+                <div class="audit-summary" id="auditSummary">Loading logs...</div>
+            </div>
+
+            <div id="auditLogsList" class="audit-logs-list">
+                <div class="loading-state-liquid">
+                    <div class="loader-aurora"></div>
+                    <p>Loading audit logs...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction History Section -->
+        <div id="transactionSection" class="transaction-section-modern" style="display: none;">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="title-icon">📜</span>
+                    Riwayat Transaksi
+                </h2>
+                <button class="btn-close-section" onclick="closeTransactions()">✕</button>
+            </div>
+            
+            <!-- Transaction Filters -->
+            <div class="transaction-filters frosted-card">
+                <div class="filter-group">
+                    <div class="search-box-transaction">
+                        <span class="search-icon-transaction">🔍</span>
+                        <input type="text" id="transactionSearch" placeholder="Cari transaksi..." onkeyup="filterTransactions()">
+                    </div>
+                    <select id="statusFilter" onchange="filterTransactions()" class="select-filter">
+                        <option value="all">Semua Status</option>
+                        <option value="success">Sukses</option>
+                        <option value="pending">Pending</option>
+                        <option value="failed">Gagal</option>
+                    </select>
+                    <select id="dateFilter" onchange="filterTransactions()" class="select-filter">
+                        <option value="all">Semua Waktu</option>
+                        <option value="today">Hari Ini</option>
+                        <option value="week">7 Hari Terakhir</option>
+                        <option value="month">30 Hari Terakhir</option>
+                        <option value="3months">3 Bulan Terakhir</option>
+                    </select>
+                    <button class="btn-reset-filter" onclick="resetTransactionFilters()">
+                        <span>🔄</span> Reset
+                    </button>
+                </div>
+                <div class="filter-summary" id="filterSummary"></div>
+            </div>
+            
+            <div id="transactionList" class="transaction-list-modern"></div>
         </div>
     </div>
 
@@ -106,6 +357,11 @@
         let currentReceiptContent = null;
         let currentReffId = null;
 
+        let allUsers = [];
+        let allTransactions = [];
+        let isAdmin = false;
+        let currentUser = null;
+
         async function checkAuth() {
             try {
                 const response = await fetch('/api/user');
@@ -116,20 +372,466 @@
                     return;
                 }
 
+                currentUser = data.user;
+
                 // Update UI with user data
-                document.getElementById('userBalance').textContent = formatRupiah(data.user.saldo);
-                document.getElementById('userRole').textContent = data.user.role.toUpperCase();
+                document.getElementById('userBalance').textContent = formatRupiah(data.user.saldo || 0);
+                document.getElementById('userRole').textContent = (data.user.role || 'bronze').toUpperCase();
                 document.getElementById('userPhone').textContent = formatPhone(data.user.phone);
 
-                // Show Admin tab if user is admin
-                if (data.user.isAdmin) {
+                isAdmin = data.user.isAdmin;
+
+                // Show Admin features if user is admin
+                if (isAdmin) {
                     const adminLink = document.querySelector('a[href="/admin"]');
                     if (adminLink) adminLink.classList.add('show-admin');
+                    document.getElementById('statsSection').style.display = 'block';
+                    loadStatistics();
+                    loadUsers();
+                } else {
+                    // Hide admin-only action card
+                    document.querySelectorAll('.admin-only').forEach(el => {
+                        const card = el.closest('.action-card-liquid');
+                        if (card) card.style.display = 'none';
+                    });
                 }
+
+                // Load user's own transaction summary
+                loadUserSummary();
             } catch (error) {
                 console.error('Auth check failed:', error);
-                window.location.href = '/';
+                // Don't redirect immediately, show error
+                showToast('Failed to load user data', 'error');
             }
+        }
+
+        // Load User's Own Summary
+        async function loadUserSummary() {
+            try {
+                const response = await fetch('/api/transactions');
+                const data = await response.json();
+
+                if (data.success && data.transactions && data.transactions.length > 0) {
+                    const transactions = data.transactions;
+                    
+                    // Calculate total spent
+                    const totalSpent = transactions.reduce((sum, t) => sum + (t.totalPrice || t.amount || 0), 0);
+                    
+                    // Count transactions this month
+                    const now = new Date();
+                    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                    const thisMonthTransactions = transactions.filter(t => {
+                        const transDate = new Date(t.createdAt || t.date);
+                        return transDate >= thisMonthStart;
+                    });
+                    
+                    // Find favorite product (most purchased)
+                    const productCount = {};
+                    transactions.forEach(t => {
+                        const productName = t.productName || t.product?.name || 'Unknown';
+                        productCount[productName] = (productCount[productName] || 0) + 1;
+                    });
+                    
+                    let favoriteProduct = '-';
+                    let maxCount = 0;
+                    Object.entries(productCount).forEach(([product, count]) => {
+                        if (count > maxCount) {
+                            maxCount = count;
+                            favoriteProduct = product;
+                        }
+                    });
+                    
+                    // Get last transaction
+                    const lastTrans = transactions[0]; // Assuming sorted by date desc
+                    const lastTransDate = lastTrans ? new Date(lastTrans.createdAt || lastTrans.date) : null;
+                    const lastTransTime = lastTransDate ? getTimeAgo(lastTransDate) : '-';
+                    
+                    // Update UI
+                    document.getElementById('userTotalSpent').textContent = formatRupiah(totalSpent);
+                    document.getElementById('userTotalTransactions').textContent = transactions.length;
+                    document.getElementById('userTransactionsChange').textContent = `${thisMonthTransactions.length} bulan ini`;
+                    document.getElementById('userFavoriteProduct').textContent = favoriteProduct.length > 20 ? 
+                        favoriteProduct.substring(0, 17) + '...' : favoriteProduct;
+                    document.getElementById('userFavoriteCount').textContent = maxCount > 0 ? `${maxCount}x dibeli` : 'Belum ada';
+                    document.getElementById('userLastTransaction').textContent = lastTrans?.productName || '-';
+                    document.getElementById('userLastTransactionTime').textContent = lastTransTime;
+                    
+                    // Calculate spending change (compare with previous month)
+                    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    const lastMonthEnd = thisMonthStart;
+                    const lastMonthSpent = transactions.filter(t => {
+                        const transDate = new Date(t.createdAt || t.date);
+                        return transDate >= lastMonthStart && transDate < lastMonthEnd;
+                    }).reduce((sum, t) => sum + (t.totalPrice || t.amount || 0), 0);
+                    
+                    const thisMonthSpent = thisMonthTransactions.reduce((sum, t) => 
+                        sum + (t.totalPrice || t.amount || 0), 0);
+                    
+                    const changePercent = lastMonthSpent > 0 ? 
+                        Math.round(((thisMonthSpent - lastMonthSpent) / lastMonthSpent) * 100) : 0;
+                    
+                    const changeEl = document.getElementById('userSpentChange');
+                    if (changePercent > 0) {
+                        changeEl.textContent = `+${changePercent}%`;
+                        changeEl.className = 'personal-stat-change positive';
+                    } else if (changePercent < 0) {
+                        changeEl.textContent = `${changePercent}%`;
+                        changeEl.className = 'personal-stat-change negative';
+                    } else {
+                        changeEl.textContent = '0%';
+                        changeEl.className = 'personal-stat-change';
+                    }
+                    
+                    console.log('User Summary loaded:', {
+                        totalSpent,
+                        transactions: transactions.length,
+                        thisMonth: thisMonthTransactions.length,
+                        favorite: favoriteProduct
+                    });
+                } else {
+                    // No transactions yet
+                    document.getElementById('userTotalSpent').textContent = 'Rp 0';
+                    document.getElementById('userTotalTransactions').textContent = '0';
+                    document.getElementById('userTransactionsChange').textContent = 'Belum ada';
+                    document.getElementById('userFavoriteProduct').textContent = 'Belum ada';
+                    document.getElementById('userFavoriteCount').textContent = 'Belum ada';
+                    document.getElementById('userLastTransaction').textContent = 'Belum ada';
+                    document.getElementById('userLastTransactionTime').textContent = 'Belum ada transaksi';
+                }
+            } catch (error) {
+                console.error('Failed to load user summary:', error);
+                showToast('Gagal memuat aktivitas', 'error');
+            }
+        }
+        
+        // Helper: Get time ago string
+        function getTimeAgo(date) {
+            const now = new Date();
+            const diff = now - date;
+            const seconds = Math.floor(diff / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+            
+            if (days > 0) return `${days} hari lalu`;
+            if (hours > 0) return `${hours} jam lalu`;
+            if (minutes > 0) return `${minutes} menit lalu`;
+            return 'Baru saja';
+        }
+
+        // Load Statistics for Admin
+        async function loadStatistics() {
+            try {
+                // Try to fetch from transactions and calculate manually if API not ready
+                const transactionsRes = await fetch('/api/transactions/all').catch(() => ({ ok: false }));
+                const usersRes = await fetch('/api/dashboard/users/all').catch(() => ({ ok: false }));
+                const productsRes = await fetch('/api/products').catch(() => ({ ok: false }));
+
+                let totalRevenue = 0;
+                let totalTransactions = 0;
+                let activeUsers = 0;
+                let lowStockCount = 0;
+
+                // Calculate from transactions
+                if (transactionsRes.ok) {
+                    const transData = await transactionsRes.json();
+                    if (transData.success && transData.transactions) {
+                        totalTransactions = transData.transactions.length;
+                        totalRevenue = transData.transactions.reduce((sum, t) => {
+                            return sum + (t.totalPrice || t.amount || 0);
+                        }, 0);
+                    }
+                }
+
+                // Count users
+                if (usersRes.ok) {
+                    const userData = await usersRes.json();
+                    if (userData.success && userData.users) {
+                        // Count users active in last 30 days
+                        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+                        activeUsers = userData.users.filter(u => {
+                            const lastActive = new Date(u.lastTransaction || u.createdAt || 0).getTime();
+                            return lastActive > thirtyDaysAgo;
+                        }).length;
+                    }
+                }
+
+                // Count low stock products
+                if (productsRes.ok) {
+                    const prodData = await productsRes.json();
+                    if (prodData.success && prodData.products) {
+                        lowStockCount = prodData.products.filter(p => p.stock < 10).length;
+                    }
+                }
+
+                // Update UI
+                document.getElementById('totalRevenue').textContent = formatRupiah(totalRevenue);
+                document.getElementById('totalTransactions').textContent = totalTransactions;
+                document.getElementById('activeUsers').textContent = activeUsers;
+                document.getElementById('lowStockCount').textContent = lowStockCount;
+
+                console.log('Statistics loaded:', { totalRevenue, totalTransactions, activeUsers, lowStockCount });
+            } catch (error) {
+                console.error('Failed to load statistics:', error);
+                // Show 0 values instead of error
+                document.getElementById('totalRevenue').textContent = 'Rp 0';
+                document.getElementById('totalTransactions').textContent = '0';
+                document.getElementById('activeUsers').textContent = '0';
+                document.getElementById('lowStockCount').textContent = '0';
+            }
+        }
+
+        // Toggle User Management Section
+        function toggleUserManagement() {
+            if (!isAdmin) {
+                showToast('Access denied. Admin only.', 'error');
+                return;
+            }
+            const section = document.getElementById('userManagementSection');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+            if (section.style.display === 'block') {
+                section.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // Load Users List
+        async function loadUsers() {
+            if (!isAdmin) return;
+            
+            try {
+                const response = await fetch('/api/dashboard/users/all?limit=100');
+                const data = await response.json();
+
+                if (!data.success) {
+                    showToast('Failed to load users', 'error');
+                    return;
+                }
+
+                allUsers = data.users || [];
+                displayUsers(allUsers);
+            } catch (error) {
+                console.error('Failed to load users:', error);
+                showToast('Failed to load users', 'error');
+            }
+        }
+
+        // Display Users
+        function displayUsers(users) {
+            const container = document.getElementById('usersList');
+            
+            if (users.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state-modern">
+                        <div class="empty-icon">👥</div>
+                        <h3>No users found</h3>
+                        <p>No users match your search criteria</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = users.map((user, index) => `
+                <div class="user-card-liquid frosted-card" style="animation-delay: ${index * 0.05}s">
+                    <div class="user-card-header">
+                        <div class="user-avatar">👤</div>
+                        <div class="role-badge ${user.role}">${user.role.toUpperCase()}</div>
+                    </div>
+                    <div class="user-card-body">
+                        <h4 class="user-phone">${formatPhone(user.userId)}</h4>
+                        <div class="user-stats">
+                            <div class="user-stat">
+                                <span class="stat-icon-sm">💰</span>
+                                <span>${formatRupiah(user.saldo || 0)}</span>
+                            </div>
+                            <div class="user-stat">
+                                <span class="stat-icon-sm">🛒</span>
+                                <span>${user.totalTransaksi || 0} trx</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="user-card-footer">
+                        <button class="btn-user-action" onclick="viewUserDetail('${user.userId}')">
+                            View Details
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Search Users
+        function searchUsers() {
+            const searchTerm = document.getElementById('userSearchInput').value.toLowerCase();
+            const roleFilter = document.getElementById('roleFilter').value;
+            
+            let filtered = allUsers;
+            
+            if (searchTerm) {
+                filtered = filtered.filter(user => 
+                    user.userId.toLowerCase().includes(searchTerm) ||
+                    formatPhone(user.userId).includes(searchTerm)
+                );
+            }
+            
+            if (roleFilter !== 'all') {
+                filtered = filtered.filter(user => user.role === roleFilter);
+            }
+            
+            displayUsers(filtered);
+        }
+
+        // Filter Users by Role
+        function filterUsers() {
+            searchUsers();
+        }
+
+        // View User Detail
+        async function viewUserDetail(userId) {
+            try {
+                const response = await fetch(`/api/dashboard/users/${encodeURIComponent(userId)}/transactions`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(`User has ${data.transactions?.length || 0} transactions`, 'info');
+                    // You can expand this to show a modal with full user details
+                }
+            } catch (error) {
+                console.error('Failed to load user details:', error);
+                showToast('Failed to load user details', 'error');
+            }
+        }
+
+        // Audit Logs Management
+        let allAuditLogs = [];
+
+        function toggleAuditLogs() {
+            if (!isAdmin) {
+                showToast('Access denied. Admin only.', 'error');
+                return;
+            }
+            const section = document.getElementById('auditLogsSection');
+            const isVisible = section.style.display !== 'none';
+            section.style.display = isVisible ? 'none' : 'block';
+            if (!isVisible) {
+                loadAuditLogs();
+                section.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        async function loadAuditLogs() {
+            if (!isAdmin) return;
+            
+            try {
+                // Since audit log API might not exist yet, we'll simulate with transaction history
+                const response = await fetch('/api/transactions/all').catch(() => ({ ok: false }));
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success && data.transactions) {
+                        // Transform transactions into audit log format
+                        allAuditLogs = data.transactions.map(t => ({
+                            id: t.refId,
+                            type: 'transaction',
+                            action: `Transaksi ${t.productName}`,
+                            user: t.userId || 'Unknown',
+                            amount: t.totalPrice,
+                            timestamp: new Date(t.createdAt || t.date),
+                            details: `${t.quantity}x ${t.productName} - ${t.metode}`
+                        }));
+                        
+                        // Sort by timestamp desc
+                        allAuditLogs.sort((a, b) => b.timestamp - a.timestamp);
+                        
+                        // Populate user filter
+                        const uniqueUsers = [...new Set(allAuditLogs.map(log => log.user))];
+                        const userFilter = document.getElementById('auditUserFilter');
+                        userFilter.innerHTML = '<option value="all">All Users</option>' + 
+                            uniqueUsers.map(user => `<option value="${user}">${formatPhone(user)}</option>`).join('');
+                        
+                        displayAuditLogs(allAuditLogs);
+                        document.getElementById('auditSummary').textContent = 
+                            `Showing ${allAuditLogs.length} audit entries`;
+                    } else {
+                        // No data
+                        allAuditLogs = [];
+                        displayAuditLogs([]);
+                    }
+                } else {
+                    // API not available, show placeholder
+                    document.getElementById('auditLogsList').innerHTML = `
+                        <div class="empty-state-modern">
+                            <div class="empty-icon">📋</div>
+                            <h3>Audit API Not Available</h3>
+                            <p>Audit logging feature is coming soon</p>
+                        </div>`;
+                }
+            } catch (error) {
+                console.error('Failed to load audit logs:', error);
+                showToast('Failed to load audit logs', 'error');
+            }
+        }
+
+        function displayAuditLogs(logs) {
+            const container = document.getElementById('auditLogsList');
+            
+            if (logs.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state-modern">
+                        <div class="empty-icon">📋</div>
+                        <h3>No audit logs</h3>
+                        <p>No activity logs match your filters</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = logs.map((log, index) => `
+                <div class="audit-log-item frosted-card" style="animation-delay: ${index * 0.03}s">
+                    <div class="audit-log-icon ${log.type}">
+                        ${log.type === 'transaction' ? '🛒' : 
+                          log.type === 'saldo' ? '💰' : 
+                          log.type === 'stock' ? '📦' : '🔐'}
+                    </div>
+                    <div class="audit-log-content">
+                        <div class="audit-log-header">
+                            <h4 class="audit-log-action">${log.action}</h4>
+                            <span class="audit-log-time">${getTimeAgo(log.timestamp)}</span>
+                        </div>
+                        <p class="audit-log-details">${log.details}</p>
+                        <div class="audit-log-meta">
+                            <span class="audit-meta-item">
+                                <span class="audit-meta-label">User:</span>
+                                <span class="audit-meta-value">${formatPhone(log.user)}</span>
+                            </span>
+                            ${log.amount ? `
+                                <span class="audit-meta-item">
+                                    <span class="audit-meta-label">Amount:</span>
+                                    <span class="audit-meta-value">${formatRupiah(log.amount)}</span>
+                                </span>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterAuditLogs() {
+            const typeFilter = document.getElementById('auditTypeFilter').value;
+            const userFilter = document.getElementById('auditUserFilter').value;
+
+            let filtered = allAuditLogs;
+
+            if (typeFilter !== 'all') {
+                filtered = filtered.filter(log => log.type === typeFilter);
+            }
+
+            if (userFilter !== 'all') {
+                filtered = filtered.filter(log => log.user === userFilter);
+            }
+
+            displayAuditLogs(filtered);
+            document.getElementById('auditSummary').textContent = 
+                filtered.length === allAuditLogs.length ? 
+                `Showing ${filtered.length} audit entries` :
+                `Showing ${filtered.length} of ${allAuditLogs.length} audit entries`;
         }
 
         async function loadTransactions() {
@@ -138,45 +840,149 @@
                 const data = await response.json();
 
                 if (!data.success) {
-                    alert('Gagal memuat riwayat transaksi');
+                    showToast('Gagal memuat riwayat transaksi', 'error');
                     return;
                 }
 
+                allTransactions = data.transactions || [];
+                displayTransactions(allTransactions);
+
                 const transactionSection = document.getElementById('transactionSection');
-                const transactionList = document.getElementById('transactionList');
-
-                if (data.transactions.length === 0) {
-                    transactionList.innerHTML = '<p class="empty-state">Belum ada transaksi</p>';
-                } else {
-                    transactionList.innerHTML = data.transactions.map(t => `
-                        <div class="transaction-item">
-                            <div class="transaction-info">
-                                <div class="transaction-name">${t.productName}</div>
-                                <div class="transaction-meta">
-                                    <span>Refid: ${t.refId}</span> • 
-                                    <span>Qty: ${t.quantity}</span> • 
-                                    <span>Metode: ${t.metode}</span> •
-                                    <span>${t.date}</span>
-                                </div>
-                            </div>
-                            <div class="transaction-actions">
-                                <div class="transaction-amount">
-                                    ${formatRupiah(t.totalPrice)}
-                                </div>
-                                <button class="btn-view-account" onclick="viewTransactionDetail('${t.refId}')">
-                                    Lihat Akun
-                                </button>
-                            </div>
-                        </div>
-                    `).join('');
-                }
-
                 transactionSection.style.display = 'block';
                 transactionSection.scrollIntoView({ behavior: 'smooth' });
+                
+                // Update filter summary
+                updateFilterSummary(allTransactions.length, allTransactions.length);
             } catch (error) {
                 console.error('Load transactions failed:', error);
-                alert('Gagal memuat riwayat transaksi');
+                showToast('Gagal memuat riwayat transaksi', 'error');
             }
+        }
+
+        // Display Transactions
+        function displayTransactions(transactions) {
+            const transactionList = document.getElementById('transactionList');
+
+            if (transactions.length === 0) {
+                transactionList.innerHTML = `
+                    <div class="empty-state-modern">
+                        <div class="empty-icon">📭</div>
+                        <h3>Tidak ada transaksi</h3>
+                        <p>Tidak ada transaksi yang cocok dengan filter</p>
+                    </div>`;
+                return;
+            }
+
+            transactionList.innerHTML = transactions.map((t, index) => {
+                // Determine status badge
+                const status = t.status || 'success';
+                const statusBadge = status === 'success' ? '✓ Success' : 
+                                    status === 'pending' ? '⏳ Pending' : '✗ Failed';
+                
+                return `
+                    <div class="transaction-card-modern" style="animation-delay: ${index * 0.05}s">
+                        <div class="transaction-card-header">
+                            <div class="transaction-icon">🛒</div>
+                            <div class="transaction-badge ${status}">${statusBadge}</div>
+                        </div>
+                        <div class="transaction-card-body">
+                            <h4 class="transaction-title">${t.productName}</h4>
+                            <div class="transaction-details">
+                                <span class="detail-item">
+                                    <span class="detail-label">Ref ID:</span>
+                                    <span class="detail-value">${t.refId}</span>
+                                </span>
+                                <span class="detail-item">
+                                    <span class="detail-label">Qty:</span>
+                                    <span class="detail-value">${t.quantity}</span>
+                                </span>
+                                <span class="detail-item">
+                                    <span class="detail-label">📅</span>
+                                    <span class="detail-value">${t.date}</span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="transaction-card-footer">
+                            <div class="transaction-price">${formatRupiah(t.totalPrice)}</div>
+                            <button class="btn-view-detail" onclick="viewTransactionDetail('${t.refId}')">
+                                Lihat Detail →
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Filter Transactions
+        function filterTransactions() {
+            const searchTerm = document.getElementById('transactionSearch').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const dateFilter = document.getElementById('dateFilter').value;
+
+            let filtered = allTransactions;
+
+            // Apply search filter
+            if (searchTerm) {
+                filtered = filtered.filter(t =>
+                    t.productName.toLowerCase().includes(searchTerm) ||
+                    t.refId.toLowerCase().includes(searchTerm) ||
+                    (t.metode && t.metode.toLowerCase().includes(searchTerm))
+                );
+            }
+
+            // Apply status filter
+            if (statusFilter !== 'all') {
+                filtered = filtered.filter(t => (t.status || 'success') === statusFilter);
+            }
+
+            // Apply date filter
+            if (dateFilter !== 'all') {
+                const now = new Date();
+                filtered = filtered.filter(t => {
+                    const transDate = new Date(t.createdAt || t.date);
+                    const diffTime = now - transDate;
+                    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+                    switch (dateFilter) {
+                        case 'today':
+                            return diffDays < 1;
+                        case 'week':
+                            return diffDays < 7;
+                        case 'month':
+                            return diffDays < 30;
+                        case '3months':
+                            return diffDays < 90;
+                        default:
+                            return true;
+                    }
+                });
+            }
+
+            displayTransactions(filtered);
+            updateFilterSummary(filtered.length, allTransactions.length);
+        }
+
+        // Reset Transaction Filters
+        function resetTransactionFilters() {
+            document.getElementById('transactionSearch').value = '';
+            document.getElementById('statusFilter').value = 'all';
+            document.getElementById('dateFilter').value = 'all';
+            displayTransactions(allTransactions);
+            updateFilterSummary(allTransactions.length, allTransactions.length);
+        }
+
+        // Update Filter Summary
+        function updateFilterSummary(shown, total) {
+            const summary = document.getElementById('filterSummary');
+            if (shown === total) {
+                summary.textContent = `Menampilkan ${total} transaksi`;
+            } else {
+                summary.textContent = `Menampilkan ${shown} dari ${total} transaksi`;
+            }
+        }
+
+        function closeTransactions() {
+            document.getElementById('transactionSection').style.display = 'none';
         }
 
         async function viewTransactionDetail(reffId) {
@@ -318,6 +1124,26 @@
             }
             return phone;
         }
+
+        // Mobile menu toggle
+        function toggleMenu() {
+            const navLinks = document.getElementById('navLinks');
+            const menuIcon = document.getElementById('menuIcon');
+            navLinks.classList.toggle('active');
+            menuIcon.textContent = navLinks.classList.contains('active') ? '✕' : '☰';
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const navLinks = document.getElementById('navLinks');
+            const navToggle = document.querySelector('.nav-toggle');
+            const navbar = document.querySelector('.navbar');
+            
+            if (navLinks.classList.contains('active') && 
+                !navbar.contains(event.target)) {
+                toggleMenu();
+            }
+        });
 
         // Check authentication on page load
         checkAuth();

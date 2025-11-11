@@ -13,7 +13,10 @@
 <body>
     <nav class="navbar">
         <div class="nav-brand">🤖 GiHa Smart Bot</div>
-        <div class="nav-links">
+        <button class="nav-toggle" onclick="toggleMenu()" aria-label="Toggle menu">
+            <span id="menuIcon">☰</span>
+        </button>
+        <div class="nav-links" id="navLinks">
             <a href="/dashboard">Dashboard</a>
             <a href="/products">Produk</a>
             <a href="/admin">Admin</a>
@@ -242,6 +245,26 @@
             document.getElementById(id).addEventListener('input', (e) => {
                 e.target.value = e.target.value.replace(/[^\d]/g, '').slice(0, 4);
             });
+        });
+
+        // Mobile menu toggle
+        function toggleMenu() {
+            const navLinks = document.getElementById('navLinks');
+            const menuIcon = document.getElementById('menuIcon');
+            navLinks.classList.toggle('active');
+            menuIcon.textContent = navLinks.classList.contains('active') ? '✕' : '☰';
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const navLinks = document.getElementById('navLinks');
+            const navToggle = document.querySelector('.nav-toggle');
+            const navbar = document.querySelector('.navbar');
+            
+            if (navLinks.classList.contains('active') && 
+                !navbar.contains(event.target)) {
+                toggleMenu();
+            }
         });
 
         // Initialize

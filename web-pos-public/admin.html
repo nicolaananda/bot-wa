@@ -13,7 +13,10 @@
 <body>
     <nav class="navbar">
         <div class="nav-brand">🤖 GiHa Smart Bot</div>
-        <div class="nav-links">
+        <button class="nav-toggle" onclick="toggleMenu()" aria-label="Toggle menu">
+            <span id="menuIcon">☰</span>
+        </button>
+        <div class="nav-links" id="navLinks">
             <a href="/dashboard">Dashboard</a>
             <a href="/products">Produk</a>
             <a href="/admin" class="active">Admin</a>
@@ -30,28 +33,51 @@
             </div>
         </div>
 
-        <!-- Add Saldo Section -->
-        <div class="admin-section">
-            <div class="admin-card">
-                <h2>💰 Kelola Saldo User</h2>
+        <!-- Modern Tab Navigation -->
+        <div class="admin-tabs">
+            <button class="admin-tab active" onclick="switchTab('saldo')">
+                <span class="tab-icon">💰</span>
+                <span class="tab-text">Kelola Saldo</span>
+            </button>
+            <button class="admin-tab" onclick="switchTab('stock')">
+                <span class="tab-icon">📦</span>
+                <span class="tab-text">Kelola Stok</span>
+            </button>
+            <button class="admin-tab" onclick="switchTab('products')">
+                <span class="tab-icon">📋</span>
+                <span class="tab-text">Daftar Produk</span>
+            </button>
+        </div>
+
+        <!-- Saldo Tab Content -->
+        <div id="saldoTab" class="tab-content active">
+            <div class="admin-card-single">
+                <div class="card-header-icon">💰</div>
+                <h2>Kelola Saldo User</h2>
                 <p class="card-description">Tambah atau kurangi saldo untuk user tertentu</p>
 
                 <div id="saldoAlertBox" class="alert"></div>
 
                 <form id="addSaldoForm">
                     <div class="form-group">
-                        <label for="userNumber">Nomor User</label>
+                        <label for="userNumber">
+                            <span class="label-icon">📱</span>
+                            Nomor User
+                        </label>
                         <input 
                             type="text" 
                             id="userNumber" 
-                            placeholder="Contoh: 628123456789 atau 08123456789 atau +628123456789"
+                            placeholder="Contoh: 628123456789 atau 08123456789"
                             required
                         >
                         <small class="form-hint">Nomor bisa diawali dengan 0, 62, atau +62</small>
                     </div>
 
                     <div class="form-group">
-                        <label for="nominalSaldo">Nominal</label>
+                        <label for="nominalSaldo">
+                            <span class="label-icon">💵</span>
+                            Nominal
+                        </label>
                         <input 
                             type="number" 
                             id="nominalSaldo" 
@@ -60,16 +86,18 @@
                             required
                         >
                         <small class="form-hint">
-                            <strong>Positif (+)</strong> = Tambah saldo<br>
+                            <strong>Positif (+)</strong> = Tambah saldo &nbsp;|&nbsp;
                             <strong>Negatif (-)</strong> = Kurangi saldo
                         </small>
                     </div>
 
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" onclick="clearSaldoForm()">
+                            <span class="btn-icon">🗑️</span>
                             Clear
                         </button>
                         <button type="submit" class="btn-primary" id="btnSubmitSaldo">
+                            <span class="btn-icon">✅</span>
                             Update Saldo
                         </button>
                     </div>
@@ -77,28 +105,37 @@
             </div>
         </div>
 
-        <!-- Add Stock Section -->
-        <div class="admin-section">
-            <div class="admin-card">
-                <h2>📦 Tambah Stok Produk</h2>
+        <!-- Stock Tab Content -->
+        <div id="stockTab" class="tab-content">
+            <div class="admin-card-single">
+                <div class="card-header-icon">📦</div>
+                <h2>Tambah Stok Produk</h2>
                 <p class="card-description">Tambahkan akun baru ke produk yang sudah ada</p>
 
                 <div id="alertBox" class="alert"></div>
 
                 <form id="addStockForm">
                     <div class="form-group">
-                        <label for="productId">Kode Produk / Product ID</label>
+                        <label for="productId">
+                            <span class="label-icon">🏷️</span>
+                            Kode Produk / Product ID
+                        </label>
                         <div class="input-with-button">
                             <select id="productId" required>
                                 <option value="">Pilih Produk...</option>
                             </select>
-                            <button type="button" class="btn-refresh" onclick="loadProducts()">🔄</button>
+                            <button type="button" class="btn-refresh" onclick="loadProducts()" title="Refresh produk">
+                                🔄
+                            </button>
                         </div>
                         <small class="form-hint">Pilih produk yang akan ditambah stok</small>
                     </div>
 
                     <div class="form-group">
-                        <label for="accounts">Akun (Multiple)</label>
+                        <label for="accounts">
+                            <span class="label-icon">📝</span>
+                            Akun (Multiple)
+                        </label>
                         <textarea 
                             id="accounts" 
                             rows="10"
@@ -114,18 +151,23 @@
 
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" onclick="clearForm()">
+                            <span class="btn-icon">🗑️</span>
                             Clear
                         </button>
                         <button type="submit" class="btn-primary" id="btnSubmit">
+                            <span class="btn-icon">✅</span>
                             Tambah Stok
                         </button>
                     </div>
                 </form>
             </div>
+        </div>
 
-            <!-- Product List -->
-            <div class="admin-card">
-                <h2>📋 Daftar Produk</h2>
+        <!-- Products Tab Content -->
+        <div id="productsTab" class="tab-content">
+            <div class="admin-card-single">
+                <div class="card-header-icon">📋</div>
+                <h2>Daftar Produk</h2>
                 <p class="card-description">Semua produk dengan jumlah stok</p>
 
                 <div class="search-box" style="margin-bottom: 1.5rem;">
@@ -515,6 +557,56 @@
             }
             if (event.target === saldoModal) {
                 closeSuccessSaldoModal();
+            }
+        }
+
+        // Mobile menu toggle
+        function toggleMenu() {
+            const navLinks = document.getElementById('navLinks');
+            const menuIcon = document.getElementById('menuIcon');
+            navLinks.classList.toggle('active');
+            menuIcon.textContent = navLinks.classList.contains('active') ? '✕' : '☰';
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const navLinks = document.getElementById('navLinks');
+            const navToggle = document.querySelector('.nav-toggle');
+            const navbar = document.querySelector('.navbar');
+            
+            if (navLinks.classList.contains('active') && 
+                !navbar.contains(event.target)) {
+                toggleMenu();
+            }
+        });
+
+        // Tab switching function
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.admin-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            const tabContent = {
+                'saldo': 'saldoTab',
+                'stock': 'stockTab',
+                'products': 'productsTab'
+            };
+            
+            document.getElementById(tabContent[tabName]).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.closest('.admin-tab').classList.add('active');
+            
+            // Load products when switching to products tab
+            if (tabName === 'products') {
+                loadProducts();
             }
         }
 
