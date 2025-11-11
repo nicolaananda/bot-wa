@@ -8,7 +8,7 @@ global.jamBackup = 12 //Contoh: 12, berarti setiap 12 jam otomatis backup script
 global.memberId = "OK2596040" //Untuk cara mendapatkannya cek di file panduan.txt
 global.pin = "" //Pin order kuota
 global.pw = "" //Password order kuota
-global.codeqr = "00020101021126570011ID.DANA.WWW011893600915317777611502091777761150303UKE51440014ID.CO.QRIS.WWW0215ID10211049592540303UKE5204899953033605802ID5910gigihadiod6011Kota Kediri610564112630469F7" //Code QR lu (Livin Merchant) - Ganti dengan QRIS Livin Anda
+global.codeqr = "00020101021126690021ID.CO.BANKMANDIRI.WWW01189360000801903662320211719036623250303UMI51440014ID.CO.QRIS.WWW0215ID10254355825370303UMI5204508553033605802ID5925gh store Perlengkapan Ind6012Kediri (Kab)61056415462070703A0163044DC9" //Code QR lu (Livin Merchant) - Ganti dengan QRIS Livin Anda
 // Force app to use this static QR string for dynamic generation and display
 process.env.MIDTRANS_STATIC_QRIS = global.codeqr
 process.env.MIDTRANS_USE_STATIC_ONLY = 'true'
