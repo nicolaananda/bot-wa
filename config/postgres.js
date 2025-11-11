@@ -10,6 +10,10 @@ const PG_KEEPALIVE = String(process.env.PG_KEEPALIVE || 'true').toLowerCase() !=
 const PG_WARMUP_CONNECTIONS = Math.max(1, Number(process.env.PG_WARMUP_CONNECTIONS || 3));
 const PG_RETRIES = Number(process.env.PG_QUERY_RETRIES || 2); // retries after initial attempt
 
+// SSL configuration (required for Neon.tech and other cloud providers)
+const PG_SSL = String(process.env.PG_SSL || 'false').toLowerCase() === 'true';
+const sslConfig = PG_SSL ? { rejectUnauthorized: false } : false;
+
 const pool = new Pool({
   host: process.env.PG_HOST || 'localhost',
   port: Number(process.env.PG_PORT || 5432),
@@ -21,6 +25,7 @@ const pool = new Pool({
   connectionTimeoutMillis: PG_CONN_TIMEOUT,
   keepAlive: PG_KEEPALIVE,
   statement_timeout: PG_STATEMENT_TIMEOUT,
+  ssl: sslConfig,
 });
 
 // Capture unexpected errors on idle clients to avoid silent failures
