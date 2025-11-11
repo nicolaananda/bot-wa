@@ -29,7 +29,7 @@ const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsername
 const { qrisDinamis } = require("./function/dinamis");
 const { createPaymentLink, getPaymentLinkStatus, isPaymentCompleted, createQRISCore, createQRISPayment, getTransactionStatusByOrderId, getTransactionStatusByTransactionId } = require('./config/midtrans');
 const { acquireLock, releaseLock, checkRateLimit, getCache, setCache, invalidateCachePattern, cacheAside } = require('./function/redis-helper');
-const BASE_QRIS_DANA = "00020101021126570011id.bmri.livinmerchant.WWW011893600915317777611502091777761150303UMI51440014ID.CO.QRIS.WWW0215ID10211049592540303UMI5204899953033605802ID5910gigihadiod6011Kab. Kediri610564154630406C2";
+const BASE_QRIS_DANA = "00020101021126690021ID.CO.BANKMANDIRI.WWW01189360000801903662320211719036623250303UMI51440014ID.CO.QRIS.WWW0215ID10254355825370303UMI5204508553033605802ID5925gh store Perlengkapan Ind6012Kediri (Kab)61056415462070703A0163044DC9";
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 const { core, isProduction } = require('./config/midtrans');
 const USE_POLLING = true; // true = pakai polling status Midtrans; false = andalkan webhook saja
@@ -2022,7 +2022,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 const PG_ENDPOINT = process.env.PG_ENDPOINT || "https://api-pg.nicola.id";
 const PG_API_KEY  = process.env.PG_API_KEY  || "kodeku";
 
-// QRIS statis DANA dari kamu (JANGAN DIUBAH)
+// QRIS statis Livin Merchant dari kamu (JANGAN DIUBAH)
 
 // ====== UTIL: Rupiah (fallback kalau belum ada) ======
 function toRupiahLocal(num) {
@@ -2098,7 +2098,7 @@ function generateDynamicQrisFromStatic(baseQris, amount, reffId) {
 // ====== Validasi pembayaran via backend listener ======
 // Strategi: cari notifikasi terbaru setelah pembuatan QR, dengan:
 // - amountDetected == totalAmount (string/number sama2 dibandingkan)
-// - package_name "id.dana" atau appName "DANA" (kalau ada)
+// - package_name "id.bmri.livinmerchant" atau appName "LIVIN" (kalau ada)
 // - posted_at >= createdAt
 async function checkPaymentViaPG({ totalAmount, createdAtISO, deviceId = null }) {
   const url = `${PG_ENDPOINT}/notifications?limit=50` + (deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : "");
@@ -2114,7 +2114,7 @@ async function checkPaymentViaPG({ totalAmount, createdAtISO, deviceId = null })
       const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0;
       const amt = String(n.amountDetected || "").replace(/\D/g, "");
       const want = String(totalAmount);
-      const appOk = (n.packageName === "id.dana") || (String(n.appName || "").toUpperCase().includes("DANA"));
+      const appOk = (n.packageName === "id.bmri.livinmerchant") || (String(n.appName || "").toUpperCase().includes("LIVIN"));
       const textOk = /menerima|received/i.test(String(n.text || "")) || /masuk/i.test(String(n.text || ""));
       return appOk && textOk && postedAt >= createdAt && amt === want;
     } catch {
@@ -2277,7 +2277,7 @@ case 'qris': {
             user: sender.split("@")[0],
             userRole: db.data.users[sender]?.role,
             reffId,
-            metodeBayar: "QRIS-DANA",
+                      metodeBayar: "QRIS-LIVIN",
             totalBayar: totalAmount
           });
           await db.save();
@@ -2302,7 +2302,7 @@ case 'qris': {
       }
     }
   } catch (error) {
-    console.error(`Error creating QRIS DANA for ${sender}:`, error);
+    console.error(`Error creating QRIS LIVIN for ${sender}:`, error);
     reply("Gagal membuat QR Code pembayaran. Silakan coba lagi.");
   }
 }
@@ -2399,17 +2399,17 @@ case 'deposit': {
         const resp = await axios.get(url, { headers, timeout: 5000 })
         const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : [])
 
-        // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
-        const paid = notifs.find(n => {
-          try {
-            const pkgOk = (n.package_name === 'id.dana') || (String(n.app_name||'').toUpperCase().includes('DANA'))
-            const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''))
-            const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0
-            return pkgOk && amt === Number(totalAmount) && postedAt >= createdAtTs
-          } catch {
-            return false
-          }
-        })
+                // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
+                const paid = notifs.find(n => {
+                  try {
+                    const pkgOk = (n.package_name === 'id.bmri.livinmerchant') || (String(n.app_name||'').toUpperCase().includes('LIVIN'))
+                    const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''))
+                    const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0
+                    return pkgOk && amt === Number(totalAmount) && postedAt >= createdAtTs
+                  } catch {
+                    return false
+                  }
+                })
 
         if (paid) {
           await ronzz.sendMessage(from, { delete: message.key })
@@ -2572,7 +2572,7 @@ case 'buynow': {
                 // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
                 const paid = notifs.find(n => {
                   try {
-                    const pkgOk = (n.package_name === 'id.dana') || (String(n.app_name||'').toUpperCase().includes('DANA'))
+                    const pkgOk = (n.package_name === 'id.bmri.livinmerchant') || (String(n.app_name||'').toUpperCase().includes('LIVIN'))
                     const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''))
                     const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0
                     return pkgOk && amt === Number(totalAmount) && postedAt >= createdAtTs

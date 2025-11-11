@@ -20,14 +20,14 @@ Bot WhatsApp E-commerce yang lengkap dengan sistem pembayaran ganda, manajemen p
 
 2. **Pembayaran QRIS (`.buynow`)**
    - Generate QRIS otomatis dengan kode unik
-   - Auto-detection payment via app listener
+   - Auto-detection payment via Livin Merchant listener
    - Timeout handling (30 menit)
    - Custom QRIS dengan background design
    - Exponential backoff polling
 
 3. **Pembayaran QRIS Dinamis (`.qris`)**
    - QRIS dinamis dari QRIS statis
-   - Validasi pembayaran via backend listener
+   - Validasi pembayaran via Livin Merchant listener
    - Auto payment detection
 
 4. **Pembayaran Midtrans (`.buymidtrans`, `.midtrans`)**
