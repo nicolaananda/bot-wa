@@ -13,7 +13,10 @@
 <body>
     <nav class="navbar">
         <div class="nav-brand">🤖 GiHa Smart Bot</div>
-        <div class="nav-links">
+        <button class="nav-toggle" onclick="toggleMenu()" aria-label="Toggle menu">
+            <span id="menuIcon">☰</span>
+        </button>
+        <div class="nav-links" id="navLinks">
             <a href="/dashboard">Dashboard</a>
             <a href="/products" class="active">Produk</a>
             <a href="/admin">Admin</a>
@@ -23,19 +26,35 @@
     </nav>
 
     <div class="container">
-        <div class="page-header">
-            <h1>Produk Tersedia</h1>
-            <div class="user-balance">
-                Saldo: <strong id="userBalance">Rp 0</strong>
+        <!-- Products Hero Header -->
+        <div class="products-hero">
+            <div class="products-hero-content">
+                <div class="hero-badge">🛍️ Shop</div>
+                <h1 class="products-hero-title">Produk Digital</h1>
+                <p class="products-hero-subtitle">Pilih produk terbaik untuk kebutuhan Anda</p>
+            </div>
+            <div class="balance-widget">
+                <div class="balance-widget-icon">💰</div>
+                <div class="balance-widget-content">
+                    <span class="balance-widget-label">Saldo Anda</span>
+                    <strong class="balance-widget-value" id="userBalance">Rp 0</strong>
+                </div>
             </div>
         </div>
 
-        <div class="search-box">
-            <input type="text" id="searchInput" placeholder="🔍 Cari produk..." onkeyup="filterProducts()">
+        <!-- Modern Search Bar -->
+        <div class="search-container-modern">
+            <div class="search-icon">🔍</div>
+            <input type="text" id="searchInput" class="search-input-modern" placeholder="Cari produk yang Anda butuhkan..." onkeyup="filterProducts()">
+            <div class="search-animation"></div>
         </div>
 
-        <div id="productGrid" class="product-grid">
-            <div class="loading-state">Memuat produk...</div>
+        <!-- Products Grid with New Design -->
+        <div id="productGrid" class="product-grid-modern">
+            <div class="loading-state-modern">
+                <div class="loader-spinner"></div>
+                <p>Memuat produk...</p>
+            </div>
         </div>
     </div>
 
@@ -159,21 +178,44 @@
             const productGrid = document.getElementById('productGrid');
 
             if (products.length === 0) {
-                productGrid.innerHTML = '<p class="empty-state">Tidak ada produk tersedia</p>';
+                productGrid.innerHTML = `
+                    <div class="empty-state-modern">
+                        <div class="empty-icon">📦</div>
+                        <h3>Tidak ada produk</h3>
+                        <p>Produk akan tersedia segera</p>
+                    </div>`;
                 return;
             }
 
-            productGrid.innerHTML = products.map(product => `
-                <div class="product-card" onclick="openPurchaseModal('${product.id}')">
-                    <div class="product-header">
-                        <h3>${product.name}</h3>
-                        <span class="product-stock">Stok: ${product.stock}</span>
+            productGrid.innerHTML = products.map((product, index) => `
+                <div class="product-card-new" style="animation-delay: ${index * 0.1}s" onclick="openPurchaseModal('${product.id}')">
+                    <div class="product-card-shine"></div>
+                    <div class="product-image-placeholder">
+                        <span class="product-emoji">📦</span>
+                        ${product.stock > 0 ? 
+                            `<div class="stock-badge available">✓ Tersedia</div>` : 
+                            `<div class="stock-badge unavailable">✕ Habis</div>`
+                        }
                     </div>
-                    <p class="product-description">${product.description || 'Tidak ada deskripsi'}</p>
-                    <div class="product-footer">
-                        <div class="product-price">${formatRupiah(product.price)}</div>
-                        <button class="btn-buy" onclick="event.stopPropagation(); openPurchaseModal('${product.id}')">
-                            Beli
+                    <div class="product-content-new">
+                        <div class="product-category-badge">Digital</div>
+                        <h3 class="product-title-new">${product.name}</h3>
+                        <p class="product-desc-new">${product.description || 'Produk digital berkualitas'}</p>
+                        <div class="product-meta-new">
+                            <div class="product-stock-info">
+                                <span class="stock-icon">📊</span>
+                                <span>${product.stock} stok</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="product-footer-new">
+                        <div class="product-price-new">
+                            <span class="price-label">Harga</span>
+                            <span class="price-value">${formatRupiah(product.price)}</span>
+                        </div>
+                        <button class="btn-buy-new" onclick="event.stopPropagation(); openPurchaseModal('${product.id}')" ${product.stock === 0 ? 'disabled' : ''}>
+                            <span class="btn-icon">🛒</span>
+                            <span>Beli Sekarang</span>
                         </button>
                     </div>
                 </div>
@@ -421,6 +463,26 @@
                 closeSuccessModal();
             }
         }
+
+        // Mobile menu toggle
+        function toggleMenu() {
+            const navLinks = document.getElementById('navLinks');
+            const menuIcon = document.getElementById('menuIcon');
+            navLinks.classList.toggle('active');
+            menuIcon.textContent = navLinks.classList.contains('active') ? '✕' : '☰';
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const navLinks = document.getElementById('navLinks');
+            const navToggle = document.querySelector('.nav-toggle');
+            const navbar = document.querySelector('.navbar');
+            
+            if (navLinks.classList.contains('active') && 
+                !navbar.contains(event.target)) {
+                toggleMenu();
+            }
+        });
 
         // Initialize
         checkAuth();

@@ -206,57 +206,6 @@ async function startronzz() {
       await saveCreds()
     }
   })
-  
-  async function autoBackup() {
-    // Create backup directory if it doesn't exist
-    const backupDir = './backup';
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
-    }
-    
-    let ls = (await execSync("ls")).toString().split("\n").filter((pe) =>
-      pe != "node_modules" &&
-      pe != "session" &&
-      pe != "package-lock.json" &&
-      pe != "yarn.lock" &&
-      pe != ".npm" &&
-      pe != ".cache" &&
-      pe != "backup" &&
-      pe != ""
-    )
-    
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupFileName = `backup-bot-wa-${timestamp}.zip`;
-    const backupPath = `${backupDir}/${backupFileName}`;
-    
-    await execSync(`zip -r ${backupPath} ${ls.join(" ")}`)
-    await delay(500)
-    
-    try {
-      console.log(`✅ Backup berhasil dibuat: ${backupPath}`);
-      
-      // Hapus backup lama (lebih dari 7 hari)
-      const files = fs.readdirSync(backupDir);
-      const now = Date.now();
-      const sevenDays = 7 * 24 * 60 * 60 * 1000;
-      
-      files.forEach(file => {
-        if (file.startsWith('backup-bot-wa-') && file.endsWith('.zip')) {
-          const filePath = `${backupDir}/${file}`;
-          const stats = fs.statSync(filePath);
-          if (now - stats.mtime.getTime() > sevenDays) {
-            fs.unlinkSync(filePath);
-            console.log(`🗑️ Backup lama dihapus: ${file}`);
-          }
-        }
-      });
-      
-    } catch (err) {
-      console.log("❌ Error saat membuat backup:", err);
-    }
-  }
-  autoBackup();
-  setInterval(autoBackup, Number(jamBackup) * 60 * 60 * 1000);
 
   ronzz.ws.on('CB:call', async (json) => {
     const callerId = json.content[0].attrs['call-creator']
