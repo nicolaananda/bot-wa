@@ -260,12 +260,12 @@ flowchart LR
 
 #### **4. Payment Monitoring**
 - Save pending order to database
-- Start app listener for payment detection
+- Start Livin Merchant listener for payment detection
 - Monitor for payment with matching unique code
 - Handle timeout scenarios
 
 #### **5. Payment Processing**
-- Detect payment completion via app listener
+- Detect payment completion via Livin Merchant listener
 - Update order status to 'paid'
 - Process product delivery
 - Clean up pending orders and locks

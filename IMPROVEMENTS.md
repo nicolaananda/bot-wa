@@ -37,14 +37,14 @@ Dokumen ini berisi analisis dan rekomendasi untuk meningkatkan kualitas, keamana
 global.memberId = "OK2596040"
 global.pin = ""
 global.pw = ""
-global.codeqr = "00020101021126570011ID.DANA..."
+global.codeqr = "00020101021126570011ID.DANA..." // atau Livin Merchant QRIS
 
 // ✅ GOOD - Pindahkan ke .env
 // .env
 ORDER_KUOTA_MEMBER_ID=OK2596040
 ORDER_KUOTA_PIN=your_pin
 ORDER_KUOTA_PASSWORD=your_password
-QRIS_CODE=00020101021126570011ID.DANA...
+QRIS_CODE=00020101021126570011ID.DANA... // atau Livin Merchant QRIS
 
 // setting.js
 global.memberId = process.env.ORDER_KUOTA_MEMBER_ID || ""
