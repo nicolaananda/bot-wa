@@ -16,6 +16,7 @@ const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
 
 // Import stock helper functions
 const stockHelper = require('./stock-helper');
+const { getReceipt, receiptExists, deleteReceipt } = require('../config/r2-storage');
 
 // Contoh API endpoint untuk dashboard web
 // Pastikan install: npm install express cors
@@ -1299,14 +1300,14 @@ app.get('/api/dashboard/transactions/search/:reffId', async (req, res) => {
     // Parse delivered account if exists
     const deliveredAccount = parseDeliveredAccountFromFile(reffId);
     
-    // Get receipt content if exists
+    // Get receipt content if exists (from R2 or local)
     let receiptContent = null;
-    let receiptExists = false;
+    let receiptExistsFlag = false;
     try {
-      const receiptPath = path.join(__dirname, 'receipts', `${reffId}.txt`);
-      if (fs.existsSync(receiptPath)) {
-        receiptContent = fs.readFileSync(receiptPath, 'utf8');
-        receiptExists = true;
+      const receiptResult = await getReceipt(reffId);
+      if (receiptResult.success) {
+        receiptContent = receiptResult.content;
+        receiptExistsFlag = true;
       }
     } catch (error) {
       console.error('Error reading receipt:', error);
@@ -1328,7 +1329,7 @@ app.get('/api/dashboard/transactions/search/:reffId', async (req, res) => {
       profit: profit,
       deliveredAccount: deliveredAccount || null,
       // Receipt data
-      receiptExists: receiptExists,
+      receiptExists: receiptExistsFlag,
       receiptContent: receiptContent,
       // Keep original fields for reference
       user_name: transaction.user_name || transaction.user,
@@ -3863,27 +3864,28 @@ app.get('/api/dashboard/receipts', async (req, res) => {
 app.get('/api/dashboard/receipts/:reffId', async (req, res) => {
   try {
     const { reffId } = req.params;
-    const receiptPath = path.join(__dirname, 'receipts', `${reffId}.txt`);
     
-    if (!fs.existsSync(receiptPath)) {
+    const receiptResult = await getReceipt(reffId);
+    if (!receiptResult.success) {
       return res.status(404).json({
         success: false,
         message: 'Receipt not found'
       });
     }
 
-    const content = fs.readFileSync(receiptPath, 'utf8');
-    const stats = fs.statSync(receiptPath);
+    const content = receiptResult.content;
+    const size = Buffer.byteLength(content, 'utf8');
     
     res.json({
       success: true,
       data: {
         reffId: reffId,
         content: content,
-        createdAt: stats.birthtime,
-        modifiedAt: stats.mtime,
-        size: stats.size,
-        sizeFormatted: formatBytes(stats.size)
+        createdAt: new Date().toISOString(), // R2 doesn't provide creation time easily
+        modifiedAt: new Date().toISOString(),
+        size: size,
+        sizeFormatted: formatBytes(size),
+        storage: receiptResult.storage || 'unknown'
       }
     });
 
@@ -3901,25 +3903,19 @@ app.get('/api/dashboard/receipts/:reffId', async (req, res) => {
 app.get('/api/dashboard/receipts/:reffId/download', async (req, res) => {
   try {
     const { reffId } = req.params;
-    const receiptPath = path.join(__dirname, 'receipts', `${reffId}.txt`);
     
-    if (!fs.existsSync(receiptPath)) {
+    const receiptResult = await getReceipt(reffId);
+    if (!receiptResult.success) {
       return res.status(404).json({
         success: false,
         message: 'Receipt not found'
       });
     }
 
-    res.download(receiptPath, `${reffId}.txt`, (err) => {
-      if (err) {
-        console.error('Error downloading receipt:', err);
-        res.status(500).json({
-          success: false,
-          message: 'Error downloading file',
-          error: err.message
-        });
-      }
-    });
+    // Set headers untuk download
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${reffId}.txt"`);
+    res.send(receiptResult.content);
 
   } catch (error) {
     console.error('Error downloading receipt:', error);
@@ -3951,14 +3947,14 @@ app.get('/api/dashboard/transactions/:reffId/with-receipt', async (req, res) => 
       });
     }
 
-    // Get receipt content
-    const receiptPath = path.join(__dirname, 'receipts', `${reffId}.txt`);
+    // Get receipt content (from R2 or local)
     let receiptContent = null;
-    let receiptExists = false;
+    let receiptExistsFlag = false;
     
-    if (fs.existsSync(receiptPath)) {
-      receiptContent = fs.readFileSync(receiptPath, 'utf8');
-      receiptExists = true;
+    const receiptResult = await getReceipt(reffId);
+    if (receiptResult.success) {
+      receiptContent = receiptResult.content;
+      receiptExistsFlag = true;
     }
 
     res.json({
@@ -3966,7 +3962,7 @@ app.get('/api/dashboard/transactions/:reffId/with-receipt', async (req, res) => 
       data: {
         transaction: transaction,
         receipt: {
-          exists: receiptExists,
+          exists: receiptExistsFlag,
           content: receiptContent,
           reffId: reffId
         }
@@ -3987,16 +3983,23 @@ app.get('/api/dashboard/transactions/:reffId/with-receipt', async (req, res) => 
 app.delete('/api/dashboard/receipts/:reffId', async (req, res) => {
   try {
     const { reffId } = req.params;
-    const receiptPath = path.join(__dirname, 'receipts', `${reffId}.txt`);
     
-    if (!fs.existsSync(receiptPath)) {
+    const existsResult = await receiptExists(reffId);
+    if (!existsResult.exists) {
       return res.status(404).json({
         success: false,
         message: 'Receipt not found'
       });
     }
 
-    fs.unlinkSync(receiptPath);
+    const deleteResult = await deleteReceipt(reffId);
+    if (!deleteResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to delete receipt',
+        error: deleteResult.error
+      });
+    }
     
     res.json({
       success: true,

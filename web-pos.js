@@ -10,6 +10,7 @@ const moment = require('moment-timezone');
 // Import database
 const DatabaseClass = require('./function/database');
 const dbHelper = require('./options/db-helper');
+const { saveReceipt } = require('./config/r2-storage');
 
 const app = express();
 const PORT = process.env.WEB_POS_PORT || 3001;
@@ -532,18 +533,18 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
     
     const detailAkunCustomer = detailParts.join('\n');
     
-    // Save receipt file (same as bot)
+    // Save receipt file (R2 atau local)
     try {
-      const receiptPath = path.join(__dirname, 'options', 'receipts', `${reffId}.txt`);
-      
-      // Ensure receipts directory exists
-      const receiptsDir = path.join(__dirname, 'options', 'receipts');
-      if (!fs.existsSync(receiptsDir)) {
-        fs.mkdirSync(receiptsDir, { recursive: true });
+      const result = await saveReceipt(reffId, detailAkunCustomer);
+      if (result.success) {
+        if (result.url) {
+          console.log(`✅ [Web POS] Receipt saved to ${result.storage}: ${result.url}`);
+        } else {
+          console.log(`✅ [Web POS] Receipt saved to ${result.storage}: ${result.path || reffId}`);
+        }
+      } else {
+        console.error('❌ [Web POS] Error saving receipt:', result.error);
       }
-      
-      await fs.promises.writeFile(receiptPath, detailAkunCustomer, 'utf8');
-      console.log(`✅ [Web POS] Receipt saved: ${receiptPath}`);
     } catch (receiptError) {
       console.error('❌ [Web POS] Error saving receipt:', receiptError.message);
     }
@@ -685,9 +686,11 @@ app.get('/api/transactions/:reffId', requireAuth, (req, res) => {
     let accountDetails = [];
     
     try {
-      const receiptPath = path.join(__dirname, 'options', 'receipts', `${reffId}.txt`);
-      if (fs.existsSync(receiptPath)) {
-        receiptContent = fs.readFileSync(receiptPath, 'utf8');
+      // Get receipt from R2 or local storage
+      const { getReceipt } = require('./config/r2-storage');
+      const receiptResult = await getReceipt(reffId);
+      if (receiptResult.success) {
+        receiptContent = receiptResult.content;
         
         // Parse account details from receipt
         const lines = receiptContent.split('\n');
