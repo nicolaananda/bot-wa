@@ -52,6 +52,10 @@ async function updateUserSaldo(userId, amount, operation = 'add') {
         global.db.data.users[idWith].saldo = nv;
         global.db.data.users[idNo].saldo = nv;
       }
+      // Schedule save for PG mode (in-memory snapshot updated)
+      if (typeof global.scheduleSave === 'function') {
+        global.scheduleSave();
+      }
       return true;
     } else {
       if (!global.db || !global.db.data || !global.db.data.users) {
@@ -75,7 +79,12 @@ async function updateUserSaldo(userId, amount, operation = 'add') {
       global.db.data.users[idWith].saldo = nextSaldo;
       global.db.data.users[idNo].saldo = nextSaldo;
 
-      await global.db.save();
+      // Use debounced save if available, otherwise immediate save
+      if (typeof global.scheduleSave === 'function') {
+        global.scheduleSave();
+      } else {
+        await global.db.save();
+      }
       console.log(`User ${idWith}/${idNo} saldo updated: ${nextSaldo}`);
       return true;
     }

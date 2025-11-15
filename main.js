@@ -52,18 +52,8 @@ const { isRedisAvailable, closeRedis } = require('./config/redis')
   }
 })()
 
-// Graceful shutdown for Redis
-process.on('SIGINT', async () => {
-  console.log('\n🔌 [SHUTDOWN] Closing Redis connection...')
-  await closeRedis()
-  process.exit(0)
-})
-
-process.on('SIGTERM', async () => {
-  console.log('\n🔌 [SHUTDOWN] Closing Redis connection...')
-  await closeRedis()
-  process.exit(0)
-})
+// Graceful shutdown is now handled by options/graceful-shutdown.js
+// This ensures proper cleanup order: timeouts -> Redis -> database
 
 // Load full snapshot from PG (if enabled), then init defaults and log counts
 ;(async () => {
@@ -97,12 +87,64 @@ process.on('SIGTERM', async () => {
   // Log database status
   console.log(`📊 Database loaded: ${Object.keys(db.data.users || {}).length} users, ${(db.data.transaksi || []).length} transactions`)
 
-  let lastJSON = JSON.stringify(db.data)
-  if (!global.opts['test']) setInterval(async () => {
-    if (JSON.stringify(db.data) == lastJSON) return
-    await db.save()
-    lastJSON = JSON.stringify(db.data)
-  }, 5 * 1000) // Ubah dari 10 detik ke 5 detik
+  // Optimized debounced save system
+  // Instead of checking every 5 seconds with expensive JSON.stringify,
+  // we save only after data changes and wait for inactivity period
+  let saveTimeout = null
+  let isSaving = false
+  const SAVE_DELAY_MS = 10 * 1000 // Save after 10 seconds of inactivity
+
+  // Debounced save function - call this after any data modification
+  global.scheduleSave = function() {
+    if (global.opts['test']) return // Skip in test mode
+    
+    // Clear existing timeout
+    if (saveTimeout) {
+      clearTimeout(saveTimeout)
+    }
+
+    // Schedule new save
+    saveTimeout = setTimeout(async () => {
+      if (isSaving) return // Prevent concurrent saves
+      
+      isSaving = true
+      try {
+        await db.save()
+        // console.log('[DB] Auto-saved after inactivity period')
+      } catch (error) {
+        console.error('[DB] Save failed:', error.message)
+      } finally {
+        isSaving = false
+      }
+    }, SAVE_DELAY_MS)
+  }
+
+  // Force save on shutdown
+  process.on('SIGINT', async () => {
+    if (saveTimeout) clearTimeout(saveTimeout)
+    if (!isSaving) {
+      try {
+        await db.save()
+        console.log('[DB] Saved on shutdown')
+      } catch (error) {
+        console.error('[DB] Save failed on shutdown:', error.message)
+      }
+    }
+  })
+
+  process.on('SIGTERM', async () => {
+    if (saveTimeout) clearTimeout(saveTimeout)
+    if (!isSaving) {
+      try {
+        await db.save()
+        console.log('[DB] Saved on shutdown')
+      } catch (error) {
+        console.error('[DB] Save failed on shutdown:', error.message)
+      }
+    }
+  })
+
+  console.log('✅ [DB] Debounced save system initialized (10s inactivity delay)')
 })()
 
 async function startronzz() {
