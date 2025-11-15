@@ -2551,24 +2551,56 @@ case 'buy': {
     if (!db.data.order) db.data.order = {}
     if (!db.data.orderDeposit) db.data.orderDeposit = {}
 
-    if (db.data.order[sender] !== undefined) {
-      await ronzz.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
-      delete db.data.order[sender]
-      cancelled = true
-    }
+    // Jika admin/owner quote pesan user, batalkan pesanan user yang di-quote
+    if (m.quoted && (isOwner || isGroupAdmins)) {
+      const quotedSender = m.quoted.sender
+      if (quotedSender) {
+        // Admin membatalkan pesanan user lain
+        if (db.data.order[quotedSender] !== undefined) {
+          try {
+            await ronzz.sendMessage(db.data.order[quotedSender].from, { delete: db.data.order[quotedSender].key })
+          } catch {}
+          delete db.data.order[quotedSender]
+          cancelled = true
+        }
 
-    if (db.data.orderDeposit && db.data.orderDeposit[sender] !== undefined) {
-      try { 
-        await ronzz.sendMessage(db.data.orderDeposit[sender].from, { delete: db.data.orderDeposit[sender].key }) 
-      } catch {}
-      delete db.data.orderDeposit[sender]
-      cancelled = true
-    }
+        if (db.data.orderDeposit && db.data.orderDeposit[quotedSender] !== undefined) {
+          try { 
+            await ronzz.sendMessage(db.data.orderDeposit[quotedSender].from, { delete: db.data.orderDeposit[quotedSender].key }) 
+          } catch {}
+          delete db.data.orderDeposit[quotedSender]
+          cancelled = true
+        }
 
-    if (cancelled) {
-      reply("Berhasil membatalkan pembayaran")
+        if (cancelled) {
+          reply(`✅ Berhasil membatalkan pembayaran user @${quotedSender.split('@')[0]}`, { mentions: [quotedSender] })
+        } else {
+          reply(`❌ Tidak ada pembayaran yang sedang berlangsung untuk user @${quotedSender.split('@')[0]}`, { mentions: [quotedSender] })
+        }
+      } else {
+        reply("❌ Tidak dapat menemukan informasi user dari pesan yang di-quote")
+      }
     } else {
-      reply("Tidak ada pembayaran yang sedang berlangsung untuk dibatalkan")
+      // Logika lama: user membatalkan pesanan sendiri
+      if (db.data.order[sender] !== undefined) {
+        await ronzz.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
+        delete db.data.order[sender]
+        cancelled = true
+      }
+
+      if (db.data.orderDeposit && db.data.orderDeposit[sender] !== undefined) {
+        try { 
+          await ronzz.sendMessage(db.data.orderDeposit[sender].from, { delete: db.data.orderDeposit[sender].key }) 
+        } catch {}
+        delete db.data.orderDeposit[sender]
+        cancelled = true
+      }
+
+      if (cancelled) {
+        reply("Berhasil membatalkan pembayaran")
+      } else {
+        reply("Tidak ada pembayaran yang sedang berlangsung untuk dibatalkan")
+      }
     }
   }
   break
