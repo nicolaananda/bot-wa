@@ -93,6 +93,96 @@ try {
   });
 } catch {}
 
+// Timeout tracking system for memory leak prevention
+const activeTimeouts = new Map();
+
+/**
+ * Schedule auto-delete for a message with proper cleanup tracking
+ * @param {Object} messageKey - Message key object from sendMessage response
+ * @param {String} chatId - Chat ID (jid)
+ * @param {Number} delayMs - Delay in milliseconds (default: 5 minutes)
+ * @param {String} description - Optional description for logging
+ * @returns {Number} Timeout ID
+ */
+function scheduleAutoDelete(messageKey, chatId, delayMs = 300000, description = 'message') {
+  if (!messageKey || !chatId) {
+    console.warn('[Timeout] Invalid parameters for scheduleAutoDelete');
+    return null;
+  }
+
+  const timeoutId = setTimeout(async () => {
+    try {
+      // Get ronzz from global or pass as parameter
+      // For now, we'll need to handle this in the calling code
+      // This is a placeholder - actual implementation will be in the calling code
+      activeTimeouts.delete(messageKey.id || JSON.stringify(messageKey));
+    } catch (error) {
+      console.error(`[Timeout] Failed to cleanup timeout for ${description}:`, error.message);
+      activeTimeouts.delete(messageKey.id || JSON.stringify(messageKey));
+    }
+  }, delayMs);
+
+  // Store timeout with message key for tracking
+  const key = messageKey.id || JSON.stringify(messageKey);
+  activeTimeouts.set(key, {
+    timeoutId,
+    chatId,
+    scheduledAt: Date.now(),
+    expiresAt: Date.now() + delayMs,
+    description
+  });
+
+  return timeoutId;
+}
+
+/**
+ * Cancel a scheduled auto-delete
+ * @param {Object|String} messageKey - Message key or key ID
+ */
+function cancelAutoDelete(messageKey) {
+  const key = typeof messageKey === 'string' ? messageKey : (messageKey.id || JSON.stringify(messageKey));
+  const timeout = activeTimeouts.get(key);
+  if (timeout) {
+    clearTimeout(timeout.timeoutId);
+    activeTimeouts.delete(key);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Cleanup all active timeouts (for shutdown)
+ */
+function cleanupAllTimeouts() {
+  let cleaned = 0;
+  activeTimeouts.forEach((timeout, key) => {
+    clearTimeout(timeout.timeoutId);
+    activeTimeouts.delete(key);
+    cleaned++;
+  });
+  return cleaned;
+}
+
+// Cleanup on shutdown
+process.on('SIGINT', () => {
+  const cleaned = cleanupAllTimeouts();
+  if (cleaned > 0) {
+    console.log(`[Timeout] Cleaned up ${cleaned} active timeouts on shutdown`);
+  }
+});
+
+process.on('SIGTERM', () => {
+  const cleaned = cleanupAllTimeouts();
+  if (cleaned > 0) {
+    console.log(`[Timeout] Cleaned up ${cleaned} active timeouts on shutdown`);
+  }
+});
+
+// Export for use in other modules if needed
+global.scheduleAutoDelete = scheduleAutoDelete;
+global.cancelAutoDelete = cancelAutoDelete;
+global.cleanupAllTimeouts = cleanupAllTimeouts;
+
 // Watch for external changes to the database file (bot-tele/posweb updates) only in JSON mode
 if (!usePg) {
   try {
@@ -1274,17 +1364,36 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             mentions: [ownerNomer + "@s.whatsapp.net"] 
           }, { quoted: m })
 
-          // Auto delete setelah 5 menit (300000 ms)
-          setTimeout(async () => {
+          // Auto delete setelah 5 menit (300000 ms) - dengan proper cleanup tracking
+          const deleteTimeoutId = setTimeout(async () => {
             try {
               await ronzz.sendMessage(from, {
                 delete: sentMessage.key
               })
               console.log(`🗑️ Auto-deleted stok list message after 5 minutes`)
+              // Cleanup from tracking
+              if (sentMessage.key && sentMessage.key.id) {
+                activeTimeouts.delete(sentMessage.key.id);
+              }
             } catch (deleteError) {
               console.error(`❌ Failed to auto-delete stok message:`, deleteError.message)
+              // Cleanup from tracking even on error
+              if (sentMessage.key && sentMessage.key.id) {
+                activeTimeouts.delete(sentMessage.key.id);
+              }
             }
           }, 300000) // 5 menit = 300000 ms
+          
+          // Track timeout for cleanup
+          if (sentMessage.key && sentMessage.key.id) {
+            activeTimeouts.set(sentMessage.key.id, {
+              timeoutId: deleteTimeoutId,
+              chatId: from,
+              scheduledAt: Date.now(),
+              expiresAt: Date.now() + 300000,
+              description: 'stok list message'
+            });
+          }
           
         } catch (error) {
           console.error('❌ Error in stok command:', error)
@@ -1312,6 +1421,11 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           stok: []
         }
 
+        // Schedule save after product added
+        if (typeof global.scheduleSave === 'function') {
+          global.scheduleSave();
+        }
+
         reply(`Berhasil menambahkan produk *${data[1]}*`)
       }
         break
@@ -1322,6 +1436,11 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         if (!db.data.produk[q]) return reply(`Produk dengan ID *${q}* tidak ada di database`)
 
         delete db.data.produk[q]
+
+        // Schedule save after product deleted
+        if (typeof global.scheduleSave === 'function') {
+          global.scheduleSave();
+        }
 
         reply(`Berhasil delete produk *${q}*`)
       }
@@ -1345,6 +1464,11 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         } else {
           reply("Role tersedia\n- bronze\n- silver\n- gold")
         }
+        
+        // Schedule save after product price updated
+        if (typeof global.scheduleSave === 'function') {
+          global.scheduleSave();
+        }
       }
         break
         
@@ -1355,6 +1479,12 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada di database`)
         
         db.data.produk[data[0]].name = data[1]
+        
+        // Schedule save after product name updated
+        if (typeof global.scheduleSave === 'function') {
+          global.scheduleSave();
+        }
+        
         reply(`Berhasil set judul produk dengan ID *${data[0]}* menjadi *${data[1]}*`)
       }
         break
@@ -1366,6 +1496,12 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada di database`)
         
         db.data.produk[data[0]].desc = data[1]
+        
+        // Schedule save after product description updated
+        if (typeof global.scheduleSave === 'function') {
+          global.scheduleSave();
+        }
+        
         reply(`Berhasil set deskripsi produk dengan ID *${data[0]}*`)
       }
         break
@@ -1377,6 +1513,12 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada di database`)
         
         db.data.produk[data[0]].snk = data[1]
+        
+        // Schedule save after product SNK updated
+        if (typeof global.scheduleSave === 'function') {
+          global.scheduleSave();
+        }
+        
         reply(`Berhasil set SNK produk dengan ID *${data[0]}*`)
       }
         break
@@ -2013,6 +2155,11 @@ case 'buynow': {
                       metodeBayar: "QRIS",
                       totalBayar: totalAmount
                     });
+                    
+                    // Schedule save after transaction
+                    if (typeof global.scheduleSave === 'function') {
+                      global.scheduleSave();
+                    }
 
                     // Skip stock-empty admin notifications
 
@@ -2325,7 +2472,12 @@ case 'buy': {
       ownerNumber: isOwnerBuy ? sender.split("@")[0] : null
     })
 
-    await db.save()
+    // Schedule save after transaction (debounced)
+    if (typeof global.scheduleSave === 'function') {
+      global.scheduleSave();
+    } else {
+      await db.save();
+    }
     
     // Cek apakah stok habis dan kirim notifikasi ke admin
     if (db.data.produk[data[0]].stok.length === 0) {
@@ -2494,17 +2646,36 @@ case 'buy': {
         mentions: [ownerNomer + "@s.whatsapp.net"]
       }, { quoted: m })
 
-      // Auto delete setelah 5 menit (300000 ms)
-      setTimeout(async () => {
+      // Auto delete setelah 5 menit (300000 ms) - dengan proper cleanup tracking
+      const deleteTimeoutId = setTimeout(async () => {
         try {
           await ronzz.sendMessage(from, {
             delete: sentMessage.key
           })
           console.log(`🗑️ Auto-deleted ${command} product list message after 5 minutes`)
+          // Cleanup from tracking
+          if (sentMessage.key && sentMessage.key.id) {
+            activeTimeouts.delete(sentMessage.key.id);
+          }
         } catch (deleteError) {
           console.error(`❌ Failed to auto-delete ${command} message:`, deleteError.message)
+          // Cleanup from tracking even on error
+          if (sentMessage.key && sentMessage.key.id) {
+            activeTimeouts.delete(sentMessage.key.id);
+          }
         }
       }, 300000) // 5 menit = 300000 ms
+      
+      // Track timeout for cleanup
+      if (sentMessage.key && sentMessage.key.id) {
+        activeTimeouts.set(sentMessage.key.id, {
+          timeoutId: deleteTimeoutId,
+          chatId: from,
+          scheduledAt: Date.now(),
+          expiresAt: Date.now() + 300000,
+          description: `${command} product list message`
+        });
+      }
   
     } catch (e) {
       console.error(`❌ Error in ${command} command:`, e)

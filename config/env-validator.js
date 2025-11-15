@@ -44,6 +44,65 @@ class EnvValidator {
       MIDTRANS_BASE_URL: {
         description: 'Midtrans API base URL',
         default: 'https://api.midtrans.com'
+      },
+      MIDTRANS_STATIC_QRIS: {
+        description: 'Static QRIS Code (Livin Merchant)',
+        default: '',
+        sensitive: false
+      },
+      // Bot Configuration
+      BOT_NAME: {
+        description: 'Bot name',
+        default: 'GiHa Smart Bot',
+        sensitive: false
+      },
+      BOT_PAIRING_CODE: {
+        description: 'Enable pairing code mode (true/false)',
+        default: 'true',
+        pattern: /^(true|false)$/
+      },
+      OWNER_NUMBERS: {
+        description: 'Owner phone numbers (comma-separated)',
+        default: '',
+        sensitive: false
+      },
+      OWNER_NUMBER: {
+        description: 'Primary owner phone number',
+        default: '',
+        sensitive: false
+      },
+      // Order Kuota (optional but recommended)
+      ORDER_KUOTA_MEMBER_ID: {
+        description: 'Order Kuota Member ID',
+        default: '',
+        sensitive: false
+      },
+      ORDER_KUOTA_PIN: {
+        description: 'Order Kuota PIN',
+        default: '',
+        sensitive: true
+      },
+      ORDER_KUOTA_PASSWORD: {
+        description: 'Order Kuota Password',
+        default: '',
+        sensitive: true
+      },
+      // Payment Configuration
+      PAYMENT_QRIS_NAME: {
+        description: 'QRIS payment name',
+        default: 'GIGIHADIOD',
+        sensitive: false
+      },
+      // Listener Configuration
+      LISTENER_BASE_URL: {
+        description: 'Listener backend base URL',
+        default: 'https://api-pg.nicola.id',
+        sensitive: false
+      },
+      LISTENER_API_KEY: {
+        description: 'Listener API key',
+        default: '',
+        sensitive: true
       }
     };
   }
@@ -162,7 +221,11 @@ class EnvValidator {
       console.log('💡 Solutions:');
       console.log('1. Create a .env file in your project root');
       console.log('2. Copy values from env.example');
-      console.log('3. Update with your actual Midtrans credentials');
+      console.log('3. Update with your actual credentials:');
+      console.log('   - Midtrans credentials (MIDTRANS_SERVER_KEY, MIDTRANS_CLIENT_KEY, MIDTRANS_MERCHANT_ID)');
+      console.log('   - Bot configuration (OWNER_NUMBERS, OWNER_NUMBER, BOT_NAME)');
+      console.log('   - Order Kuota credentials (ORDER_KUOTA_MEMBER_ID, ORDER_KUOTA_PIN, ORDER_KUOTA_PASSWORD)');
+      console.log('   - Payment configuration (PAYMENT_QRIS_NAME, etc.)');
       console.log('4. Restart the application\n');
       
       process.exit(1);

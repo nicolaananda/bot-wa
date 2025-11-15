@@ -1,47 +1,56 @@
+// Load environment variables
+require('dotenv').config();
+
 //Pairing Code
-global.pairingCode = true //true = gausah scan qr cukup 1 hp || false = harus scan qr dan 2 hp
+global.pairingCode = String(process.env.BOT_PAIRING_CODE || 'true').toLowerCase() === 'true' //true = gausah scan qr cukup 1 hp || false = harus scan qr dan 2 hp
 
 //Backup otomatis 
-global.jamBackup = 12 //Contoh: 12, berarti setiap 12 jam otomatis backup script
+global.jamBackup = Number(process.env.BOT_BACKUP_HOURS || 12) //Contoh: 12, berarti setiap 12 jam otomatis backup script
 
 //Setting order kuota
-global.memberId = "OK2596040" //Untuk cara mendapatkannya cek di file panduan.txt
-global.pin = "" //Pin order kuota
-global.pw = "" //Password order kuota
-global.codeqr = "00020101021126690021ID.CO.BANKMANDIRI.WWW01189360000801903662320211719036623250303UMI51440014ID.CO.QRIS.WWW0215ID10254355825370303UMI5204508553033605802ID5925gh store Perlengkapan Ind6012Kediri (Kab)61056415462070703A0163044DC9" //Code QR lu (Livin Merchant) - Ganti dengan QRIS Livin Anda
+global.memberId = process.env.ORDER_KUOTA_MEMBER_ID || "" //Untuk cara mendapatkannya cek di file panduan.txt
+global.pin = process.env.ORDER_KUOTA_PIN || "" //Pin order kuota
+global.pw = process.env.ORDER_KUOTA_PASSWORD || "" //Password order kuota
+global.codeqr = process.env.MIDTRANS_STATIC_QRIS || "" //Code QR lu (Livin Merchant) - Ganti dengan QRIS Livin Anda
 // Force app to use this static QR string for dynamic generation and display
-process.env.MIDTRANS_STATIC_QRIS = global.codeqr
-process.env.MIDTRANS_USE_STATIC_ONLY = 'true'
+if (global.codeqr) {
+  process.env.MIDTRANS_STATIC_QRIS = global.codeqr
+  process.env.MIDTRANS_USE_STATIC_ONLY = process.env.MIDTRANS_USE_STATIC_ONLY || 'true'
+}
 
 //Persentase fee deposit
-global.feeDepo = 2
+global.feeDepo = Number(process.env.FEE_DEPO || 2)
 
 //Type profit
-global.type = "persen" //persen = profit menggunakan persentase || nominal = profit menggunakan nominal
+global.type = process.env.PROFIT_TYPE || "persen" //persen = profit menggunakan persentase || nominal = profit menggunakan nominal
 
 //Persentase default || Jika type profit menggunakan persentase
-global.bronze = 2 //Persentase keuntungan Bronze
-global.silver = 1,5 //Persentase keuntungan Silver
-global.gold = 1 //Persentase keuntungan Gold
+global.bronze = Number(process.env.PROFIT_BRONZE_PERCENT || 2) //Persentase keuntungan Bronze
+global.silver = Number(process.env.PROFIT_SILVER_PERCENT || 1.5) //Persentase keuntungan Silver
+global.gold = Number(process.env.PROFIT_GOLD_PERCENT || 1) //Persentase keuntungan Gold
 
 //Profit nominal default || Jika type profit menggunakan nominal
-global.nBronze = 1000 //Nominal keuntungan Bronze
-global.nSilver = 500 //Nominal keuntungan Silver
-global.nGold = 200 //Nominal keuntungan Gold
+global.nBronze = Number(process.env.PROFIT_BRONZE_NOMINAL || 1000) //Nominal keuntungan Bronze
+global.nSilver = Number(process.env.PROFIT_SILVER_NOMINAL || 500) //Nominal keuntungan Silver
+global.nGold = Number(process.env.PROFIT_GOLD_NOMINAL || 200) //Nominal keuntungan Gold
 
 //Harga upgrade role
-global.uSilver = 100000
-global.uGold = 200000
+global.uSilver = Number(process.env.UPGRADE_SILVER_PRICE || 100000)
+global.uGold = Number(process.env.UPGRADE_GOLD_PRICE || 200000)
 
 //Other
-global.botName = "GiHa Smart Bot" //Nama bot
-global.owner = ["6287777657944","6281389592985","6287887842985"] //Ganti agar fitur owner bisa digunakan
-global.ownerNomer = "6287777657944" //Nomor lu
-global.ownerName = "Owner" //Nama lu
-global.packname = "" //Seterah
-global.author = "Owner" //Seterah
-global.sessionName = "session" //Ngga usah di ganti
-global.linkGroup = ["https://chat.whatsapp.com/L0LR1HBOFKJAiQv5Busd9t?mode=ems_copy_t","https://chat.whatsapp.com/KwBA0yxcwl0JGpL6uN7L9i?mode=ems_copy_t","https://chat.whatsapp.com/GO2a2ty2n5JAz5b6E9HpEs?mode=ems_copy_c"] //Link gc lu
+global.botName = process.env.BOT_NAME || "GiHa Smart Bot" //Nama bot
+// Owner numbers - parse from comma-separated string
+const ownerNumbersStr = process.env.OWNER_NUMBERS || "6287777657944,6281389592985,6287887842985"
+global.owner = ownerNumbersStr.split(',').map(num => num.trim()).filter(num => num) //Ganti agar fitur owner bisa digunakan
+global.ownerNomer = process.env.OWNER_NUMBER || "6287777657944" //Nomor lu
+global.ownerName = process.env.OWNER_NAME || "Owner" //Nama lu
+global.packname = process.env.BOT_PACKNAME || "" //Seterah
+global.author = process.env.BOT_AUTHOR || "Owner" //Seterah
+global.sessionName = process.env.BOT_SESSION_NAME || "session" //Ngga usah di ganti
+// Group links - parse from comma-separated string
+const groupLinksStr = process.env.BOT_GROUP_LINKS || "https://chat.whatsapp.com/L0LR1HBOFKJAiQv5Busd9t?mode=ems_copy_t,https://chat.whatsapp.com/KwBA0yxcwl0JGpL6uN7L9i?mode=ems_copy_t,https://chat.whatsapp.com/GO2a2ty2n5JAz5b6E9HpEs?mode=ems_copy_c"
+global.linkGroup = groupLinksStr.split(',').map(link => link.trim()).filter(link => link) //Link gc lu
 
 //Image
 global.thumbnail = "./options/image/payment.jpg"
@@ -65,26 +74,26 @@ global.mess = {
 //Payment
 global.payment = {
   qris: {
-    an: "GIGIHADIOD" //Atas nama qris
+    an: process.env.PAYMENT_QRIS_NAME || "GIGIHADIOD" //Atas nama qris
   },
   dana: {
-    nope: "085235540944",
-    an: "BRI****"
+    nope: process.env.PAYMENT_DANA_NUMBER || "085235540944",
+    an: process.env.PAYMENT_DANA_NAME || "BRI****"
   },
   gopay: {
-    nope: "085235540944",
-    an: "BRI****"
+    nope: process.env.PAYMENT_GOPAY_NUMBER || "085235540944",
+    an: process.env.PAYMENT_GOPAY_NAME || "BRI****"
   },
   ovo: {
-    nope: "085235540944",
-    an: "BRI****"
+    nope: process.env.PAYMENT_OVO_NUMBER || "085235540944",
+    an: process.env.PAYMENT_OVO_NAME || "BRI****"
   }
 }
 
 // Listener backend for notification-based payment detection
 global.listener = {
-  baseUrl: "https://api-pg.nicola.id",
-  apiKey: "kodeku"
+  baseUrl: process.env.LISTENER_BASE_URL || "https://api-pg.nicola.id",
+  apiKey: process.env.LISTENER_API_KEY || "kodeku"
 }
 
 //Function buat menu
