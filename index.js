@@ -2392,6 +2392,34 @@ case 'buy': {
 }
   break
 
+  case 'batal': {
+    let cancelled = false
+
+    // Initialize if not exists
+    if (!db.data.order) db.data.order = {}
+    if (!db.data.orderDeposit) db.data.orderDeposit = {}
+
+    if (db.data.order[sender] !== undefined) {
+      await ronzz.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
+      delete db.data.order[sender]
+      cancelled = true
+    }
+
+    if (db.data.orderDeposit && db.data.orderDeposit[sender] !== undefined) {
+      try { 
+        await ronzz.sendMessage(db.data.orderDeposit[sender].from, { delete: db.data.orderDeposit[sender].key }) 
+      } catch {}
+      delete db.data.orderDeposit[sender]
+      cancelled = true
+    }
+
+    if (cancelled) {
+      reply("Berhasil membatalkan pembayaran")
+    } else {
+      reply("Tidak ada pembayaran yang sedang berlangsung untuk dibatalkan")
+    }
+  }
+  break
 
       // Handler umum: user bisa ketik "netflix", "canva", "viu", dll
   case 'netflix':
