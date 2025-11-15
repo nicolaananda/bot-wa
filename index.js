@@ -2551,10 +2551,10 @@ case 'buy': {
     if (!db.data.order) db.data.order = {}
     if (!db.data.orderDeposit) db.data.orderDeposit = {}
 
-    // Jika admin/owner quote pesan user, batalkan pesanan user yang di-quote
+    // Jika admin/owner quote pesan user LAIN, batalkan pesanan user yang di-quote
     if (m.quoted && (isOwner || isGroupAdmins)) {
       const quotedSender = m.quoted.sender
-      if (quotedSender) {
+      if (quotedSender && quotedSender !== sender) {
         // Admin membatalkan pesanan user lain
         if (db.data.order[quotedSender] !== undefined) {
           try {
@@ -2577,30 +2577,29 @@ case 'buy': {
         } else {
           reply(`❌ Tidak ada pembayaran yang sedang berlangsung untuk user @${quotedSender.split('@')[0]}`, { mentions: [quotedSender] })
         }
-      } else {
-        reply("❌ Tidak dapat menemukan informasi user dari pesan yang di-quote")
+        break
       }
+    }
+
+    // Logika: user membatalkan pesanan sendiri (dengan atau tanpa quote)
+    if (db.data.order[sender] !== undefined) {
+      await ronzz.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
+      delete db.data.order[sender]
+      cancelled = true
+    }
+
+    if (db.data.orderDeposit && db.data.orderDeposit[sender] !== undefined) {
+      try { 
+        await ronzz.sendMessage(db.data.orderDeposit[sender].from, { delete: db.data.orderDeposit[sender].key }) 
+      } catch {}
+      delete db.data.orderDeposit[sender]
+      cancelled = true
+    }
+
+    if (cancelled) {
+      reply("Berhasil membatalkan pembayaran")
     } else {
-      // Logika lama: user membatalkan pesanan sendiri
-      if (db.data.order[sender] !== undefined) {
-        await ronzz.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
-        delete db.data.order[sender]
-        cancelled = true
-      }
-
-      if (db.data.orderDeposit && db.data.orderDeposit[sender] !== undefined) {
-        try { 
-          await ronzz.sendMessage(db.data.orderDeposit[sender].from, { delete: db.data.orderDeposit[sender].key }) 
-        } catch {}
-        delete db.data.orderDeposit[sender]
-        cancelled = true
-      }
-
-      if (cancelled) {
-        reply("Berhasil membatalkan pembayaran")
-      } else {
-        reply("Tidak ada pembayaran yang sedang berlangsung untuk dibatalkan")
-      }
+      reply("Tidak ada pembayaran yang sedang berlangsung untuk dibatalkan")
     }
   }
   break
