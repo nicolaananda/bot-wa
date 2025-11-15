@@ -17,30 +17,24 @@ if (!usePg) {
         set data(value) { this._data = value }
 
         async load() {
-            // Assemble a snapshot similar to JSON db for backward compatibility
             const snapshot = {}
 
-            // Kick off queries in parallel to reduce cold start latency
             const usersPromise = query('SELECT user_id, saldo, role, data FROM users')
             const transaksiPromise = query('SELECT meta FROM transaksi ORDER BY id ASC')
             const produkPromise = query('SELECT id, data FROM produk')
             const settingsPromise = query('SELECT key, value FROM settings')
 
-            // users
             const users = await usersPromise
             snapshot.users = {}
             for (const row of users.rows) {
                 const merged = (row.data && typeof row.data === 'object') ? { ...row.data } : {}
-                // Always prefer authoritative columns for saldo and role
                 merged.saldo = Number(row.saldo || 0)
                 merged.role = row.role || merged.role || 'bronze'
                 snapshot.users[row.user_id] = merged
             }
 
-            // transaksi
             const tr = await transaksiPromise
             const transaksiArray = tr.rows.map(r => r.meta)
-            // Intercept pushes to persist to Postgres transparently
             const originalPush = transaksiArray.push
             transaksiArray.push = function(...items) {
                 try {
