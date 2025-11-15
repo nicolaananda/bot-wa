@@ -29,6 +29,7 @@ const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsername
 const { qrisDinamis } = require("./function/dinamis");
 const { createPaymentLink, getPaymentLinkStatus, isPaymentCompleted, createQRISCore, createQRISPayment, getTransactionStatusByOrderId, getTransactionStatusByTransactionId } = require('./config/midtrans');
 const { acquireLock, releaseLock, checkRateLimit, getCache, setCache, invalidateCachePattern, cacheAside } = require('./function/redis-helper');
+const { saveReceipt } = require('./config/r2-storage');
 const BASE_QRIS_DANA = "00020101021126690021ID.CO.BANKMANDIRI.WWW01189360000801903662320211719036623250303UMI51440014ID.CO.QRIS.WWW0215ID10254355825370303UMI5204508553033605802ID5925gh store Perlengkapan Ind6012Kediri (Kab)61056415462070703A0163044DC9";
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 const { core, isProduction } = require('./config/midtrans');
@@ -1981,17 +1982,19 @@ case 'buynow': {
                     // Skip sending alert to admin about failed delivery
                     }
 
-                    // Improvement #3: Async file write untuk receipt
+                    // Improvement #3: Async file write untuk receipt (R2 atau local)
                     try {
-                      const receiptPath = `./options/receipts/${reffId}.txt`;
-                      
-                      // Pastikan folder receipts ada
-                      if (!fs.existsSync('./options/receipts')) {
-                        fs.mkdirSync('./options/receipts', { recursive: true });
+                      const { saveReceipt } = require('./config/r2-storage');
+                      const result = await saveReceipt(reffId, detailAkunCustomer);
+                      if (result.success) {
+                        if (result.url) {
+                          console.log(`✅ Receipt saved to ${result.storage}: ${result.url}`);
+                        } else {
+                          console.log(`✅ Receipt saved to ${result.storage}: ${result.path || reffId}`);
+                        }
+                      } else {
+                        console.error('❌ Error saving receipt:', result.error);
                       }
-                      
-                      await fs.promises.writeFile(receiptPath, detailAkunCustomer, 'utf8');
-                      console.log(`✅ Receipt saved: ${receiptPath}`);
                     } catch (receiptError) {
                       console.error('❌ Error saving receipt:', receiptError.message);
                     }
@@ -2288,17 +2291,18 @@ case 'buy': {
       console.log(`   - Delivery: ${customerMessageSent ? 'SUCCESS' : 'FAILED'}`);
     }
 
-    // Improvement: Async file write untuk receipt
+    // Improvement: Async file write untuk receipt (R2 atau local)
     try {
-      const receiptPath = `./options/receipts/${reffId}.txt`;
-      
-      // Pastikan folder receipts ada
-      if (!fs.existsSync('./options/receipts')) {
-        fs.mkdirSync('./options/receipts', { recursive: true });
+      const result = await saveReceipt(reffId, detailAkunCustomer);
+      if (result.success) {
+        if (result.url) {
+          console.log(`✅ Receipt saved to ${result.storage}: ${result.url}`);
+        } else {
+          console.log(`✅ Receipt saved to ${result.storage}: ${result.path || reffId}`);
+        }
+      } else {
+        console.error('❌ Error saving receipt:', result.error);
       }
-      
-      await fs.promises.writeFile(receiptPath, detailAkunCustomer, 'utf8');
-      console.log(`✅ Receipt saved: ${receiptPath}`);
     } catch (receiptError) {
       console.error('❌ Error saving receipt:', receiptError.message);
     }
@@ -2848,27 +2852,13 @@ case 'buy': {
             return reply(`❌ Transaksi terakhir tidak memiliki Reference ID.\n\n📦 *Detail Transaksi:*\n• Produk: ${lastTransaksi.name || 'N/A'}\n• Tanggal: ${lastTransaksi.date || 'N/A'}\n\n💡 Silakan hubungi admin untuk bantuan.`)
           }
           
-          // Try to read receipt file (check multiple possible locations)
-          const possiblePaths = [
-            `./options/receipts/${lastTransaksi.reffId}.txt`,
-            `./options/receipts/receipt_${lastTransaksi.reffId}.txt`,
-            `./options/${lastTransaksi.reffId}.txt`,
-            `./options/receipt_${lastTransaksi.reffId}.txt`
-          ]
+          // Get receipt from R2 or local storage
+          const { getReceipt } = require('./config/r2-storage');
+          const receiptResult = await getReceipt(lastTransaksi.reffId);
           
-          let receiptPath = null
-          for (const path of possiblePaths) {
-            if (fs.existsSync(path)) {
-              receiptPath = path
-              console.log(`✅ [RESEND] Receipt found at: ${path}`)
-              break
-            }
-          }
-          
-          if (!receiptPath) {
-            // Receipt file doesn't exist in any location, send basic info
-            console.log(`⚠️ [RESEND] Receipt not found for ${lastTransaksi.reffId}. Checked paths:`)
-            possiblePaths.forEach(p => console.log(`   - ${p}`))
+          if (!receiptResult.success) {
+            // Receipt not found in R2 or local, send basic info
+            console.log(`⚠️ [RESEND] Receipt not found for ${lastTransaksi.reffId} (checked R2 and local)`)
             let basicInfo = `*🔁 KIRIM ULANG TRANSAKSI TERAKHIR*\n\n`
             basicInfo += `⚠️ File receipt tidak ditemukan, mengirim informasi dasar:\n\n`
             basicInfo += `*╭────「 TRANSAKSI INFO 」────╮*\n`
@@ -2890,8 +2880,9 @@ case 'buy': {
             }, { quoted: m })
           }
           
-          // Read receipt file
-          const receiptContent = fs.readFileSync(receiptPath, 'utf8')
+          // Receipt found (from R2 or local)
+          const receiptContent = receiptResult.content
+          console.log(`✅ [RESEND] Receipt found from ${receiptResult.storage || 'storage'} for ${lastTransaksi.reffId}`)
           
           // Send receipt to private chat first
           await ronzz.sendMessage(sender, { text: receiptContent }, { quoted: m })
