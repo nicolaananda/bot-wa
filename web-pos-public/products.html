@@ -658,18 +658,53 @@
 
         // Generate consistent color based on product name
         function getProductColor(productName) {
-            // Simple hash function to convert string to number
+            // Better hash function for better distribution
             let hash = 0;
             for (let i = 0; i < productName.length; i++) {
-                hash = productName.charCodeAt(i) + ((hash << 5) - hash);
+                const char = productName.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32bit integer
             }
             
-            // Generate HSL color with good saturation and lightness
-            const hue = Math.abs(hash % 360);
-            const saturation = 65 + (Math.abs(hash) % 20); // 65-85%
-            const lightness = 45 + (Math.abs(hash) % 15); // 45-60%
+            // Use predefined vibrant color palette for better variety
+            const colors = [
+                // Blues & Purples
+                'hsl(240, 70%, 55%)',  // Deep Blue
+                'hsl(260, 70%, 60%)',  // Purple
+                'hsl(280, 65%, 55%)',  // Violet
+                'hsl(220, 75%, 60%)',  // Sky Blue
+                
+                // Greens & Teals
+                'hsl(150, 70%, 50%)',  // Teal
+                'hsl(160, 75%, 45%)',  // Turquoise
+                'hsl(140, 70%, 50%)',  // Green
+                'hsl(180, 70%, 50%)',  // Cyan
+                
+                // Oranges & Reds
+                'hsl(15, 85%, 55%)',   // Orange Red
+                'hsl(25, 80%, 55%)',   // Orange
+                'hsl(0, 75%, 55%)',    // Red
+                'hsl(350, 75%, 55%)',  // Pink Red
+                
+                // Yellows & Golds
+                'hsl(45, 85%, 55%)',   // Gold
+                'hsl(35, 80%, 55%)',   // Amber
+                'hsl(50, 85%, 60%)',   // Yellow
+                
+                // Pinks & Magentas
+                'hsl(320, 70%, 60%)',  // Magenta
+                'hsl(330, 70%, 60%)',  // Pink
+                'hsl(300, 65%, 60%)',  // Fuchsia
+                
+                // Additional vibrant colors
+                'hsl(200, 75%, 55%)',  // Light Blue
+                'hsl(190, 75%, 50%)',  // Aqua
+                'hsl(170, 70%, 50%)',  // Mint
+            ];
             
-            return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+            // Select color based on hash
+            const colorIndex = Math.abs(hash) % colors.length;
+            return colors[colorIndex];
         }
         
         function displayProducts(products) {
@@ -693,10 +728,20 @@
                 // Get consistent color for this product
                 const productColor = getProductColor(product.name);
                 
+                // Create darker variant for gradient end
+                const colorMatch = productColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+                let darkerColor = productColor;
+                if (colorMatch) {
+                    const hue = colorMatch[1];
+                    const sat = colorMatch[2];
+                    const light = Math.max(35, parseInt(colorMatch[3]) - 15); // Darker by 15%
+                    darkerColor = `hsl(${hue}, ${sat}%, ${light}%)`;
+                }
+                
                 return `
                 <div class="product-card-new" style="animation-delay: ${index * 0.1}s" onclick="openPurchaseModal('${product.id}')">
                     <div class="product-card-shine"></div>
-                    <div class="product-image-placeholder" style="background: linear-gradient(135deg, ${productColor} 0%, ${productColor}dd 100%);">
+                    <div class="product-image-placeholder" style="background: linear-gradient(135deg, ${productColor} 0%, ${darkerColor} 100%); box-shadow: 0 4px 20px ${productColor}40;">
                         <span class="product-emoji" style="font-size: 3rem;">📦</span>
                         ${product.stock > 0 ? 
                             `<div class="stock-badge available">✓ Tersedia</div>` : 
@@ -704,7 +749,7 @@
                         }
                     </div>
                     <div class="product-content-new">
-                        <div class="product-category-badge" style="background: ${productColor}22; color: ${productColor};">Digital</div>
+                        <div class="product-category-badge" style="background: ${productColor}25; color: ${productColor}; border: 1px solid ${productColor}40;">Digital</div>
                         <h3 class="product-title-new">${product.name}</h3>
                         <p class="product-desc-new">${product.description || 'Produk digital berkualitas'}</p>
                         <div class="product-meta-new">
