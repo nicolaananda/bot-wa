@@ -1,5 +1,5 @@
 require("./setting.js")
-const { default: makeWASocket, useMultiFileAuthState, makeInMemoryStore, jidDecode, delay } = require("@whiskeysockets/baileys")
+const { default: makeWASocket, useMultiFileAuthState, makeInMemoryStore, jidDecode, delay } = require("@dappaoffc/baileys")
 const chalk = require('chalk')
 const readline = require('readline')
 const pino = require('pino')
