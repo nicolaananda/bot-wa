@@ -398,6 +398,15 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
       });
     }
     
+    // Check if user already has pending order
+    if (!db.data.order) db.data.order = {};
+    if (db.data.order[userId]) {
+      return res.status(400).json({
+        success: false,
+        message: 'Anda sedang memiliki order yang belum selesai. Silakan selesaikan atau batalkan terlebih dahulu.'
+      });
+    }
+    
     // Check if product exists
     const product = db.data.produk[productId];
     if (!product) {
@@ -1640,6 +1649,82 @@ app.get('/api/order/:orderId', requireAuth, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Terjadi kesalahan saat mengambil data order' 
+    });
+  }
+});
+
+// API endpoint to get pending order for current user (untuk restore setelah reload)
+app.get('/api/pending-order', requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    
+    if (!db.data.order) db.data.order = {};
+    
+    const order = db.data.order[userId];
+    
+    if (!order) {
+      return res.json({
+        success: true,
+        hasPendingOrder: false,
+        order: null
+      });
+    }
+    
+    // Check if order is expired
+    const expirationTime = order.createdAt + (30 * 60 * 1000); // 30 minutes
+    if (Date.now() > expirationTime) {
+      // Order expired, clean it up
+      delete db.data.order[userId];
+      try {
+        if (typeof db._save === 'function') {
+          await db._save();
+        } else {
+          await db.save();
+        }
+      } catch (saveError) {
+        console.error(`❌ [Web POS] Error saving after cleanup:`, saveError);
+      }
+      
+      return res.json({
+        success: true,
+        hasPendingOrder: false,
+        order: null
+      });
+    }
+    
+    // Get QR image base64 if available
+    let qrisImageBase64 = null;
+    if (order.qrisImagePath) {
+      try {
+        const qrBuffer = fs.readFileSync(order.qrisImagePath);
+        qrisImageBase64 = qrBuffer.toString('base64');
+      } catch (qrError) {
+        console.error('[Web POS] Error reading QR image:', qrError.message);
+      }
+    }
+    
+    // Return order data
+    res.json({
+      success: true,
+      hasPendingOrder: true,
+      order: {
+        orderId: order.orderId,
+        reffId: order.reffId,
+        productName: order.productName || 'Unknown Product',
+        jumlah: order.jumlah,
+        totalAmount: order.totalAmount,
+        totalHarga: order.totalHarga,
+        uniqueCode: order.uniqueCode,
+        createdAt: order.createdAt,
+        status: order.status || 'pending_payment',
+        qrisImageBase64: qrisImageBase64
+      }
+    });
+  } catch (error) {
+    console.error('[Web POS] Get pending order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan saat mengambil data order'
     });
   }
 });
