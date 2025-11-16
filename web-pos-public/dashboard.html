@@ -61,60 +61,6 @@
             </div>
         </div>
 
-        <!-- Statistics Overview (Only for Admin) -->
-        <div id="statsSection" class="stats-overview-section" style="display: none;">
-            <h2 class="section-title-glass">
-                <span class="title-icon-glow">📊</span>
-                Business Statistics
-            </h2>
-            <div class="stats-grid-liquid">
-                <div class="stat-card-liquid frosted-card">
-                    <div class="stat-card-header">
-                        <span class="stat-icon">💵</span>
-                        <span class="stat-trend up">↗ +12%</span>
-                    </div>
-                    <div class="stat-card-body">
-                        <span class="stat-label">Total Revenue</span>
-                        <span class="stat-value" id="totalRevenue">Rp 0</span>
-                        <span class="stat-period">Bulan ini</span>
-                    </div>
-                </div>
-                <div class="stat-card-liquid frosted-card">
-                    <div class="stat-card-header">
-                        <span class="stat-icon">🛒</span>
-                        <span class="stat-trend up">↗ +8%</span>
-                    </div>
-                    <div class="stat-card-body">
-                        <span class="stat-label">Total Transaksi</span>
-                        <span class="stat-value" id="totalTransactions">0</span>
-                        <span class="stat-period">Bulan ini</span>
-                    </div>
-                </div>
-                <div class="stat-card-liquid frosted-card">
-                    <div class="stat-card-header">
-                        <span class="stat-icon">👥</span>
-                        <span class="stat-trend up">↗ +5%</span>
-                    </div>
-                    <div class="stat-card-body">
-                        <span class="stat-label">Active Users</span>
-                        <span class="stat-value" id="activeUsers">0</span>
-                        <span class="stat-period">30 hari terakhir</span>
-                    </div>
-                </div>
-                <div class="stat-card-liquid frosted-card">
-                    <div class="stat-card-header">
-                        <span class="stat-icon">📦</span>
-                        <span class="stat-trend down">↘ -3%</span>
-                    </div>
-                    <div class="stat-card-body">
-                        <span class="stat-label">Low Stock Items</span>
-                        <span class="stat-value" id="lowStockCount">0</span>
-                        <span class="stat-period">Perlu restock</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Quick Actions with Liquid Glass -->
         <div class="quick-actions-section">
             <h2 class="section-title-glass">
@@ -139,16 +85,6 @@
                         <h3>Riwayat Transaksi</h3>
                         <p>Lihat detail pembelian & invoice</p>
                         <div class="action-badge">Hot</div>
-                    </div>
-                </div>
-
-                <div class="action-card-liquid frosted-card" onclick="toggleUserManagement()">
-                    <div class="action-liquid-bg"></div>
-                    <div class="action-card-content">
-                        <div class="action-icon-large">👥</div>
-                        <h3>User Management</h3>
-                        <p>Kelola user & permissions</p>
-                        <div class="action-badge admin-only">Admin</div>
                     </div>
                 </div>
 
@@ -212,43 +148,6 @@
                         <span class="personal-stat-value" id="userLastTransaction">-</span>
                         <span class="personal-stat-change" id="userLastTransactionTime">-</span>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- User Management Section (Admin Only) -->
-        <div id="userManagementSection" class="user-management-section" style="display: none;">
-            <div class="section-header-liquid">
-                <h2 class="section-title-glass">
-                    <span class="title-icon-glow">👥</span>
-                    User Management
-                </h2>
-                <button class="btn-close-liquid" onclick="toggleUserManagement()">✕</button>
-            </div>
-            
-            <div class="management-controls frosted-card">
-                <div class="search-box-liquid">
-                    <span class="search-icon-liquid">🔍</span>
-                    <input type="text" id="userSearchInput" placeholder="Search users by phone or name..." onkeyup="searchUsers()">
-                </div>
-                <div class="filter-controls">
-                    <select id="roleFilter" onchange="filterUsers()" class="select-liquid">
-                        <option value="all">All Roles</option>
-                        <option value="bronze">Bronze</option>
-                        <option value="silver">Silver</option>
-                        <option value="gold">Gold</option>
-                        <option value="platinum">Platinum</option>
-                    </select>
-                    <button class="btn-refresh-liquid" onclick="loadUsers()">
-                        <span>🔄</span> Refresh
-                    </button>
-                </div>
-            </div>
-
-            <div id="usersList" class="users-grid-liquid">
-                <div class="loading-state-liquid">
-                    <div class="loader-aurora"></div>
-                    <p>Loading users...</p>
                 </div>
             </div>
         </div>
@@ -333,17 +232,24 @@
 
     <!-- Transaction Detail Modal -->
     <div id="transactionModal" class="modal">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closeTransactionModal()">&times;</span>
-            <h2>Detail Transaksi</h2>
+        <div class="modal-content transaction-modal-content">
+            <div class="modal-header">
+                <h2>Detail Transaksi</h2>
+                <div class="modal-header-actions">
+                    <button class="btn-copy btn-copy-header" onclick="copyReceiptToClipboard()">
+                        📋 Copy Receipt
+                    </button>
+                    <span class="modal-close" onclick="closeTransactionModal()">&times;</span>
+                </div>
+            </div>
             
-            <div id="transactionDetail" class="transaction-detail"></div>
-            <div id="accountDetailsSection" class="account-details-section"></div>
+            <div class="modal-body">
+                <div id="transactionDetail" class="transaction-detail"></div>
+                <div id="accountDetailsSection" class="account-details-section"></div>
+                <div id="snkSection" class="snk-section"></div>
+            </div>
             
-            <div class="modal-actions">
-                <button class="btn-copy" onclick="copyReceiptToClipboard()">
-                    📋 Copy Receipt
-                </button>
+            <div class="modal-actions-bottom">
                 <button class="btn-secondary" onclick="closeTransactionModal()">Tutup</button>
             </div>
         </div>
@@ -357,7 +263,6 @@
         let currentReceiptContent = null;
         let currentReffId = null;
 
-        let allUsers = [];
         let allTransactions = [];
         let isAdmin = false;
         let currentUser = null;
@@ -385,9 +290,6 @@
                 if (isAdmin) {
                     const adminLink = document.querySelector('a[href="/admin"]');
                     if (adminLink) adminLink.classList.add('show-admin');
-                    document.getElementById('statsSection').style.display = 'block';
-                    loadStatistics();
-                    loadUsers();
                 } else {
                     // Hide admin-only action card
                     document.querySelectorAll('.admin-only').forEach(el => {
@@ -517,186 +419,6 @@
             if (hours > 0) return `${hours} jam lalu`;
             if (minutes > 0) return `${minutes} menit lalu`;
             return 'Baru saja';
-        }
-
-        // Load Statistics for Admin
-        async function loadStatistics() {
-            try {
-                // Try to fetch from transactions and calculate manually if API not ready
-                const transactionsRes = await fetch('/api/transactions/all').catch(() => ({ ok: false }));
-                const usersRes = await fetch('/api/dashboard/users/all').catch(() => ({ ok: false }));
-                const productsRes = await fetch('/api/products').catch(() => ({ ok: false }));
-
-                let totalRevenue = 0;
-                let totalTransactions = 0;
-                let activeUsers = 0;
-                let lowStockCount = 0;
-
-                // Calculate from transactions
-                if (transactionsRes.ok) {
-                    const transData = await transactionsRes.json();
-                    if (transData.success && transData.transactions) {
-                        totalTransactions = transData.transactions.length;
-                        totalRevenue = transData.transactions.reduce((sum, t) => {
-                            return sum + (t.totalPrice || t.amount || 0);
-                        }, 0);
-                    }
-                }
-
-                // Count users
-                if (usersRes.ok) {
-                    const userData = await usersRes.json();
-                    if (userData.success && userData.users) {
-                        // Count users active in last 30 days
-                        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-                        activeUsers = userData.users.filter(u => {
-                            const lastActive = new Date(u.lastTransaction || u.createdAt || 0).getTime();
-                            return lastActive > thirtyDaysAgo;
-                        }).length;
-                    }
-                }
-
-                // Count low stock products
-                if (productsRes.ok) {
-                    const prodData = await productsRes.json();
-                    if (prodData.success && prodData.products) {
-                        lowStockCount = prodData.products.filter(p => p.stock < 10).length;
-                    }
-                }
-
-                // Update UI
-                document.getElementById('totalRevenue').textContent = formatRupiah(totalRevenue);
-                document.getElementById('totalTransactions').textContent = totalTransactions;
-                document.getElementById('activeUsers').textContent = activeUsers;
-                document.getElementById('lowStockCount').textContent = lowStockCount;
-
-                console.log('Statistics loaded:', { totalRevenue, totalTransactions, activeUsers, lowStockCount });
-            } catch (error) {
-                console.error('Failed to load statistics:', error);
-                // Show 0 values instead of error
-                document.getElementById('totalRevenue').textContent = 'Rp 0';
-                document.getElementById('totalTransactions').textContent = '0';
-                document.getElementById('activeUsers').textContent = '0';
-                document.getElementById('lowStockCount').textContent = '0';
-            }
-        }
-
-        // Toggle User Management Section
-        function toggleUserManagement() {
-            if (!isAdmin) {
-                showToast('Access denied. Admin only.', 'error');
-                return;
-            }
-            const section = document.getElementById('userManagementSection');
-            section.style.display = section.style.display === 'none' ? 'block' : 'none';
-            if (section.style.display === 'block') {
-                section.scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-
-        // Load Users List
-        async function loadUsers() {
-            if (!isAdmin) return;
-            
-            try {
-                const response = await fetch('/api/dashboard/users/all?limit=100');
-                const data = await response.json();
-
-                if (!data.success) {
-                    showToast('Failed to load users', 'error');
-                    return;
-                }
-
-                allUsers = data.users || [];
-                displayUsers(allUsers);
-            } catch (error) {
-                console.error('Failed to load users:', error);
-                showToast('Failed to load users', 'error');
-            }
-        }
-
-        // Display Users
-        function displayUsers(users) {
-            const container = document.getElementById('usersList');
-            
-            if (users.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state-modern">
-                        <div class="empty-icon">👥</div>
-                        <h3>No users found</h3>
-                        <p>No users match your search criteria</p>
-                    </div>`;
-                return;
-            }
-
-            container.innerHTML = users.map((user, index) => `
-                <div class="user-card-liquid frosted-card" style="animation-delay: ${index * 0.05}s">
-                    <div class="user-card-header">
-                        <div class="user-avatar">👤</div>
-                        <div class="role-badge ${user.role}">${user.role.toUpperCase()}</div>
-                    </div>
-                    <div class="user-card-body">
-                        <h4 class="user-phone">${formatPhone(user.userId)}</h4>
-                        <div class="user-stats">
-                            <div class="user-stat">
-                                <span class="stat-icon-sm">💰</span>
-                                <span>${formatRupiah(user.saldo || 0)}</span>
-                            </div>
-                            <div class="user-stat">
-                                <span class="stat-icon-sm">🛒</span>
-                                <span>${user.totalTransaksi || 0} trx</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="user-card-footer">
-                        <button class="btn-user-action" onclick="viewUserDetail('${user.userId}')">
-                            View Details
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Search Users
-        function searchUsers() {
-            const searchTerm = document.getElementById('userSearchInput').value.toLowerCase();
-            const roleFilter = document.getElementById('roleFilter').value;
-            
-            let filtered = allUsers;
-            
-            if (searchTerm) {
-                filtered = filtered.filter(user => 
-                    user.userId.toLowerCase().includes(searchTerm) ||
-                    formatPhone(user.userId).includes(searchTerm)
-                );
-            }
-            
-            if (roleFilter !== 'all') {
-                filtered = filtered.filter(user => user.role === roleFilter);
-            }
-            
-            displayUsers(filtered);
-        }
-
-        // Filter Users by Role
-        function filterUsers() {
-            searchUsers();
-        }
-
-        // View User Detail
-        async function viewUserDetail(userId) {
-            try {
-                const response = await fetch(`/api/dashboard/users/${encodeURIComponent(userId)}/transactions`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    showToast(`User has ${data.transactions?.length || 0} transactions`, 'info');
-                    // You can expand this to show a modal with full user details
-                }
-            } catch (error) {
-                console.error('Failed to load user details:', error);
-                showToast('Failed to load user details', 'error');
-            }
         }
 
         // Audit Logs Management
@@ -874,8 +596,19 @@
             }
 
             transactionList.innerHTML = transactions.map((t, index) => {
-                // Determine status badge
-                const status = t.status || 'success';
+                // Determine status badge (normalize status values)
+                let status = (t.status || 'completed').toLowerCase();
+                // Map 'completed' to 'success' for display
+                if (status === 'completed' || status === 'success') {
+                    status = 'success';
+                } else if (status === 'pending' || status === 'waiting') {
+                    status = 'pending';
+                } else if (status === 'failed' || status === 'gagal' || status === 'error') {
+                    status = 'failed';
+                } else {
+                    // Default to success if status is unknown but transaction exists
+                    status = 'success';
+                }
                 const statusBadge = status === 'success' ? '✓ Success' : 
                                     status === 'pending' ? '⏳ Pending' : '✗ Failed';
                 
@@ -932,7 +665,20 @@
 
             // Apply status filter
             if (statusFilter !== 'all') {
-                filtered = filtered.filter(t => (t.status || 'success') === statusFilter);
+                filtered = filtered.filter(t => {
+                    let status = (t.status || 'completed').toLowerCase();
+                    // Normalize status for filtering
+                    if (status === 'completed' || status === 'success') {
+                        status = 'success';
+                    } else if (status === 'pending' || status === 'waiting') {
+                        status = 'pending';
+                    } else if (status === 'failed' || status === 'gagal' || status === 'error') {
+                        status = 'failed';
+                    } else {
+                        status = 'success';
+                    }
+                    return status === statusFilter;
+                });
             }
 
             // Apply date filter
@@ -1023,14 +769,14 @@
                 if (accountDetails && accountDetails.length > 0) {
                     accountHTML = '<div class="account-details-list">';
                     accountDetails.forEach((account, index) => {
-                        if (index > 0) accountHTML += '<hr style="margin: 1.5rem 0; border: none; border-top: 1px dashed #ccc;">';
+                        if (index > 0) accountHTML += '<hr class="account-divider">';
                         accountHTML += `
                             <div class="account-detail-item">
-                                <div class="detail-line">📧 <strong>Email:</strong> ${account.email}</div>
-                                <div class="detail-line">🔐 <strong>Password:</strong> ${account.password}</div>
-                                <div class="detail-line">👤 <strong>Profil:</strong> ${account.profile}</div>
-                                <div class="detail-line">🔢 <strong>Pin:</strong> ${account.pin}</div>
-                                <div class="detail-line">🔒 <strong>2FA:</strong> ${account.twofa}</div>
+                                <div class="detail-line"><span class="detail-icon">📧</span><span class="detail-label">Email:</span><span class="detail-value">${account.email}</span></div>
+                                <div class="detail-line"><span class="detail-icon">🔐</span><span class="detail-label">Password:</span><span class="detail-value">${account.password}</span></div>
+                                <div class="detail-line"><span class="detail-icon">👤</span><span class="detail-label">Profil:</span><span class="detail-value">${account.profile}</span></div>
+                                <div class="detail-line"><span class="detail-icon">🔢</span><span class="detail-label">Pin:</span><span class="detail-value">${account.pin}</span></div>
+                                <div class="detail-line"><span class="detail-icon">🔒</span><span class="detail-label">2FA:</span><span class="detail-value">${account.twofa}</span></div>
                             </div>
                         `;
                     });
@@ -1046,6 +792,56 @@
                 }
 
                 document.getElementById('accountDetailsSection').innerHTML = accountHTML;
+                
+                // Parse and display SNK from receipt content
+                let snkHTML = '';
+                if (currentReceiptContent) {
+                    const lines = currentReceiptContent.split('\n');
+                    let inSnkSection = false;
+                    let snkLines = [];
+                    let snkTitle = '';
+                    
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (line.includes('SNK PRODUK:') || line.includes('📋 SNK PRODUK:')) {
+                            inSnkSection = true;
+                            snkTitle = line.replace(/[*📋]/g, '').replace('SNK PRODUK:', '').trim();
+                            continue;
+                        }
+                        if (line.includes('END SNK') || line.includes('╰────')) {
+                            inSnkSection = false;
+                            break;
+                        }
+                        if (inSnkSection && line && !line.includes('SYARAT & KETENTUAN') && !line.includes('╭────')) {
+                            snkLines.push(line.replace(/[*]/g, ''));
+                        }
+                    }
+                    
+                    if (snkLines.length > 0) {
+                        snkHTML = '<div class="snk-container">';
+                        snkHTML += `<h3 class="snk-title">📋 SNK PRODUK: ${snkTitle || transaction.productName}</h3>`;
+                        snkHTML += '<div class="snk-content">';
+                        snkLines.forEach(line => {
+                            if (line.trim()) {
+                                // Format line dengan emoji dan styling
+                                let formattedLine = line;
+                                if (line.includes('✅')) {
+                                    formattedLine = `<div class="snk-item snk-allowed">${line}</div>`;
+                                } else if (line.includes('🚫') || line.includes('dilarang')) {
+                                    formattedLine = `<div class="snk-item snk-prohibited">${line}</div>`;
+                                } else if (line.startsWith('*') || line.match(/^[•\-\*]/)) {
+                                    formattedLine = `<div class="snk-item">${line.replace(/^[•\-\*]\s*/, '')}</div>`;
+                                } else {
+                                    formattedLine = `<div class="snk-item">${line}</div>`;
+                                }
+                                snkHTML += formattedLine;
+                            }
+                        });
+                        snkHTML += '</div></div>';
+                    }
+                }
+                
+                document.getElementById('snkSection').innerHTML = snkHTML;
                 document.getElementById('transactionModal').style.display = 'flex';
             } catch (error) {
                 console.error('View transaction detail failed:', error);
