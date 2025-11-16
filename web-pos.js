@@ -622,6 +622,445 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
   }
 });
 
+// Buynow - Purchase with Payment Gateway (QRIS/Transfer)
+// Sesuai dengan case 'buynow' di index.js (WhatsApp bot)
+app.post('/api/buynow', requireAuth, async (req, res) => {
+  try {
+    const { productId, quantity } = req.body;
+    const userId = req.session.userId;
+    const cleanPhone = req.session.cleanPhone;
+    
+    if (!productId || !quantity || quantity < 1) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Data tidak valid' 
+      });
+    }
+    
+    // Check if user already has pending order
+    if (!db.data.order) db.data.order = {};
+    if (db.data.order[userId]) {
+      return res.status(400).json({
+        success: false,
+        message: 'Anda sedang memiliki order yang belum selesai. Silakan selesaikan atau batalkan terlebih dahulu.'
+      });
+    }
+    
+    // Check if product exists
+    const product = db.data.produk[productId];
+    if (!product) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Produk tidak ditemukan' 
+      });
+    }
+    
+    // Check stock
+    if (!Array.isArray(product.stok) || product.stok.length < quantity) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Stok tidak mencukupi' 
+      });
+    }
+    
+    if (product.stok.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Stok habis, silahkan hubungi Owner untuk restok'
+      });
+    }
+    
+    // Get user data
+    const user = db.data.users[userId] || db.data.users[cleanPhone];
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User tidak ditemukan' 
+      });
+    }
+    
+    const userRole = user.role || 'bronze';
+    const pricePerItem = hargaProduk(productId, userRole);
+    const totalHarga = pricePerItem * quantity;
+    
+    // Generate unique code (sama seperti di index.js)
+    const uniqueCode = Math.floor(1 + Math.random() * 99);
+    const totalAmount = totalHarga + uniqueCode;
+    
+    // Generate reffId (sama seperti di index.js)
+    const crypto = require('crypto');
+    const reffId = crypto.randomBytes(5).toString("hex").toUpperCase();
+    
+    // Generate orderId (sama format dengan index.js)
+    const orderId = `TRX-${reffId}-${Date.now()}`;
+    
+    // Get current date/time in Jakarta timezone
+    const tanggal = moment.tz('Asia/Jakarta').format('DD MMMM YYYY');
+    const jamwib = moment.tz('Asia/Jakarta').format('HH:mm:ss');
+    const createdAtTs = Date.now();
+    
+    // Create order in database (sama structure dengan index.js)
+    db.data.order[userId] = {
+      id: productId,
+      jumlah: quantity,
+      orderId: orderId,
+      reffId: reffId,
+      totalAmount: totalAmount,
+      totalHarga: totalHarga,
+      uniqueCode: uniqueCode,
+      createdAt: createdAtTs,
+      status: 'pending_payment',
+      metode: 'QRIS',
+      userId: userId,
+      cleanPhone: cleanPhone,
+      productName: product.name || product.nama,
+      userRole: userRole,
+      qrisImagePath: null // Will be set after QRIS generation
+    };
+    
+    // Save database
+    try {
+      if (typeof db._save === 'function') {
+        await db._save();
+      } else {
+        await db.save();
+      }
+      console.log(`✅ [Web POS] Buynow order created - OrderID: ${orderId}, RefID: ${reffId}`);
+    } catch (saveError) {
+      console.error(`❌ [Web POS] Error saving order:`, saveError);
+    }
+    
+    // Generate QRIS image (sama seperti di index.js)
+    let qrisImagePath = null;
+    let qrisImageBase64 = null;
+    try {
+      const { qrisDinamis } = require('./function/dinamis');
+      qrisImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
+      console.log(`✅ [Web POS] QRIS generated: ${qrisImagePath}`);
+      
+      // Update order with qrisImagePath
+      if (db.data.order[userId]) {
+        db.data.order[userId].qrisImagePath = qrisImagePath;
+      }
+      
+      // Read QR image as base64 for frontend
+      try {
+        const qrImageBuffer = fs.readFileSync(qrisImagePath);
+        qrisImageBase64 = qrImageBuffer.toString('base64');
+      } catch (readError) {
+        console.error(`❌ [Web POS] Error reading QRIS image:`, readError);
+      }
+    } catch (qrisError) {
+      console.error(`❌ [Web POS] Error generating QRIS:`, qrisError);
+    }
+    
+    // Calculate expiration (30 minutes, sama seperti index.js)
+    const toMs = require('ms');
+    const expirationTime = Date.now() + toMs("30m");
+    const expireDate = new Date(expirationTime);
+    const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000));
+    const currentTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+    const expireTimeJakarta = new Date(new Date(currentTime).getTime() + timeLeft * 60000);
+    const formattedTime = `${expireTimeJakarta.getHours().toString().padStart(2, '0')}:${expireTimeJakarta.getMinutes().toString().padStart(2, '0')}`;
+    
+    const paymentData = {
+      orderId: orderId,
+      reffId: reffId,
+      amount: totalAmount,
+      totalHarga: totalHarga,
+      uniqueCode: uniqueCode,
+      productName: product.name || product.nama,
+      quantity: quantity,
+      qrisImageBase64: qrisImageBase64, // Base64 image for frontend
+      qrisImagePath: qrisImagePath,
+      qrisUrl: qrisImagePath ? `/qris/${path.basename(qrisImagePath)}` : null,
+      paymentUrl: `/payment/${orderId}`,
+      expiresAt: moment.tz('Asia/Jakarta').add(30, 'minutes').format('YYYY-MM-DD HH:mm:ss'),
+      expirationTime: expirationTime,
+      formattedExpireTime: formattedTime,
+      timeLeft: timeLeft,
+      instructions: `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.`
+    };
+    
+    console.log(`✅ [Web POS] Buynow order created - OrderID: ${orderId}, User: ${cleanPhone}, Product: ${productId}, Amount: ${toRupiah(totalAmount)}`);
+    
+    res.json({
+      success: true,
+      message: 'Order berhasil dibuat! Silakan lakukan pembayaran.',
+      order: db.data.order[userId],
+      payment: paymentData,
+      paymentUrl: `/payment/${orderId}`
+    });
+    
+    // Start polling for payment in background (sama seperti di index.js)
+    setImmediate(async () => {
+      try {
+        const { sleep } = require('./function/myfunc');
+        
+        // Define listener config
+        const listener = {
+          baseUrl: process.env.LISTENER_URL || 'http://localhost:3001',
+          apiKey: process.env.LISTENER_API_KEY || ''
+        };
+        
+        let pollInterval = 3000; // Mulai dari 3 detik
+        const maxInterval = 15000; // Maksimal 15 detik
+        let pollCount = 0;
+        let paymentCompleted = false;
+        
+        console.log(`🔍 [Web POS] Starting payment polling for order ${orderId}`);
+        
+        while (!paymentCompleted && db.data.order[userId] && Date.now() < expirationTime) {
+          await sleep(pollInterval);
+          
+          // Tingkatkan interval secara bertahap (exponential backoff)
+          if (pollCount < 10) {
+            pollInterval = Math.min(Math.floor(pollInterval * 1.2), maxInterval);
+          }
+          pollCount++;
+          
+          try {
+            const axios = require('axios');
+            const url = `${listener.baseUrl}/notifications?limit=50`;
+            const headers = listener.apiKey ? { 'X-API-Key': listener.apiKey } : {};
+            const resp = await axios.get(url, { headers, timeout: 5000 });
+            const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : []);
+            
+            // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
+            const paid = notifs.find(n => {
+              try {
+                const pkgOk = (n.package_name === 'id.bmri.livinmerchant') || (String(n.app_name||'').toUpperCase().includes('LIVIN'));
+                const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''));
+                const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0;
+                return pkgOk && amt === Number(totalAmount) && postedAt >= createdAtTs;
+              } catch {
+                return false;
+              }
+            });
+            
+            if (paid) {
+              paymentCompleted = true;
+              console.log(`✅ [Web POS] Payment detected for order ${orderId}, reffId: ${reffId}`);
+              
+              // Process purchase (sama seperti di index.js)
+              db.data.produk[productId].terjual += quantity;
+              let dataStok = [];
+              for (let i = 0; i < quantity; i++) {
+                dataStok.push(db.data.produk[productId].stok.shift());
+              }
+              
+              // Build account details
+              const detailParts = [
+                `*📦 Produk:* ${product.name || product.nama}`,
+                `*📅 Tanggal:* ${tanggal}`,
+                `*⏰ Jam:* ${jamwib} WIB`,
+                `*Refid:* ${reffId}`,
+                ''
+              ];
+              
+              dataStok.forEach((i, index) => {
+                const dataAkun = i.split("|");
+                detailParts.push(
+                  `*═══ AKUN ${index + 1} ═══*`,
+                  `📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
+                  `🔐 Password: ${dataAkun[1] || 'Tidak ada'}`
+                );
+                if (dataAkun[2]) detailParts.push(`👤 Profil: ${dataAkun[2]}`);
+                if (dataAkun[3]) detailParts.push(`🔢 Pin: ${dataAkun[3]}`);
+                if (dataAkun[4]) detailParts.push(`🔒 2FA: ${dataAkun[4]}`);
+                detailParts.push('');
+              });
+              
+              // Tambahkan SNK
+              detailParts.push(
+                `*╭────「 SYARAT & KETENTUAN 」────╮*`,
+                '',
+                `*📋 SNK PRODUK: ${product.name || product.nama}*`,
+                '',
+                product.snk || 'Tidak ada SNK',
+                '',
+                `*⚠️ PENTING:*`,
+                `• Baca dan pahami SNK sebelum menggunakan akun`,
+                `• Akun yang sudah dibeli tidak dapat dikembalikan`,
+                `• Hubungi admin jika ada masalah dengan akun`,
+                '',
+                `*╰────「 END SNK 」────╯*`
+              );
+              
+              const detailAkunCustomer = detailParts.join('\n');
+              
+              // Parse account data for frontend
+              const accountArray = dataStok.map(item => {
+                const dataAkun = item.split("|");
+                return {
+                  email: dataAkun[0] || 'Tidak ada',
+                  password: dataAkun[1] || 'Tidak ada',
+                  profile: dataAkun[2] || 'Tidak ada',
+                  pin: dataAkun[3] || 'Tidak ada',
+                  twofa: dataAkun[4] || 'Tidak ada'
+                };
+              });
+              
+              // Save receipt (sama seperti di index.js)
+              try {
+                const { saveReceipt } = require('./config/r2-storage');
+                const result = await saveReceipt(reffId, detailAkunCustomer);
+                if (result.success) {
+                  if (result.url) {
+                    console.log(`✅ [Web POS] Receipt saved to ${result.storage}: ${result.url}`);
+                  } else {
+                    console.log(`✅ [Web POS] Receipt saved to ${result.storage}: ${result.path || reffId}`);
+                  }
+                }
+              } catch (receiptError) {
+                console.error('❌ [Web POS] Error saving receipt:', receiptError.message);
+              }
+              
+              // Add to transaction database (sama seperti di index.js)
+              db.data.transaksi.push({
+                id: productId,
+                name: product.name || product.nama,
+                price: pricePerItem,
+                date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+                profit: product.profit || 0,
+                jumlah: quantity,
+                user: cleanPhone || userId.split("@")[0],
+                userRole: userRole,
+                reffId: reffId,
+                metodeBayar: "QRIS",
+                totalBayar: totalAmount,
+                receiptText: detailAkunCustomer,
+                account: accountArray,
+                snk: product.snk || ''
+              });
+              
+              // Save database
+              try {
+                if (typeof db._save === 'function') {
+                  await db._save();
+                } else {
+                  await db.save();
+                }
+              } catch (saveError) {
+                console.error('❌ [Web POS] Error saving database:', saveError);
+              }
+              
+              // Clean up order
+              delete db.data.order[userId];
+              
+              console.log(`✅ [Web POS] Transaction completed: ${orderId} - ${reffId}`);
+            }
+          } catch (error) {
+            if (!error.message?.includes("timeout")) {
+              console.error(`❌ [Web POS] Error checking payment for ${orderId}:`, error.message);
+            }
+          }
+        }
+        
+        if (!paymentCompleted) {
+          console.log(`⏰ [Web POS] Payment timeout for order ${orderId}`);
+          // Clean up expired order
+          if (db.data.order[userId]) {
+            delete db.data.order[userId];
+            try {
+              if (typeof db._save === 'function') {
+                await db._save();
+              } else {
+                await db.save();
+              }
+            } catch {}
+          }
+        }
+      } catch (error) {
+        console.error(`❌ [Web POS] Error in payment polling for ${orderId}:`, error);
+      }
+    });
+    
+  } catch (error) {
+    console.error('[Web POS] Buynow error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Terjadi kesalahan saat membuat order' 
+    });
+  }
+});
+
+// Webhook handler for payment confirmation (from payment gateway)
+app.post('/api/payment/webhook', async (req, res) => {
+  try {
+    // TODO: Implement webhook verification based on your payment gateway
+    // Example for Tripay/Midtrans webhook
+    
+    const { orderId, status, signature } = req.body;
+    
+    // Verify webhook signature (implement based on your payment gateway)
+    // ...
+    
+    if (status === 'paid' || status === 'settlement') {
+      // Find pending order
+      const pendingOrder = db.data.pendingOrders?.find(o => o.orderId === orderId);
+      
+      if (!pendingOrder) {
+        return res.status(404).json({ success: false, message: 'Order not found' });
+      }
+      
+      // Process the order (same as regular purchase)
+      const product = db.data.produk[pendingOrder.productId];
+      if (!product || product.stok.length < pendingOrder.quantity) {
+        return res.status(400).json({ success: false, message: 'Product no longer available' });
+      }
+      
+      // Get stock items
+      const purchasedItems = [];
+      for (let i = 0; i < pendingOrder.quantity; i++) {
+        purchasedItems.push(product.stok.shift());
+      }
+      
+      // Update sold count
+      product.terjual = (product.terjual || 0) + pendingOrder.quantity;
+      
+      // Save transaction
+      const transaction = {
+        id: pendingOrder.productId,
+        name: pendingOrder.productName,
+        price: String(pendingOrder.pricePerItem),
+        date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
+        profit: product.profit || 0,
+        jumlah: pendingOrder.quantity,
+        user: pendingOrder.cleanPhone,
+        userRole: pendingOrder.userRole || 'bronze',
+        reffId: pendingOrder.reffId,
+        metodeBayar: 'Buynow',
+        totalBayar: pendingOrder.totalPrice
+      };
+      
+      db.data.transaksi.push(transaction);
+      
+      // Remove from pending orders
+      db.data.pendingOrders = db.data.pendingOrders.filter(o => o.orderId !== orderId);
+      
+      // Save database
+      if (typeof db._save === 'function') {
+        await db._save();
+      } else {
+        await db.save();
+      }
+      
+      console.log(`✅ [Web POS] Payment confirmed - OrderID: ${orderId}, RefID: ${pendingOrder.reffId}`);
+      
+      // TODO: Send notification to user via WhatsApp
+      // You can use your bot to send the receipt
+      
+      res.json({ success: true, message: 'Payment processed' });
+    } else {
+      res.json({ success: true, message: 'Payment status updated' });
+    }
+  } catch (error) {
+    console.error('[Web POS] Webhook error:', error);
+    res.status(500).json({ success: false, message: 'Webhook processing failed' });
+  }
+});
+
 // Get transaction history
 app.get('/api/transactions', requireAuth, (req, res) => {
   try {
@@ -1122,6 +1561,325 @@ app.get('/settings', (req, res) => {
 
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'web-pos-public', 'admin.html'));
+});
+
+// Payment page
+app.get('/payment/:orderId', (req, res) => {
+  res.sendFile(path.join(__dirname, 'web-pos-public', 'payment.html'));
+});
+
+// API endpoint to get order details (untuk payment.html cek status)
+app.get('/api/order/:orderId', requireAuth, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req.session.userId;
+    
+    // Find order from db.data.order[userId]
+    const order = db.data.order?.[userId];
+    
+    if (!order || order.orderId !== orderId) {
+      // Check if already completed in transaction history
+      const transaction = (db.data.transaksi || []).find(t => 
+        t.reffId && orderId.includes(t.reffId)
+      );
+      
+      if (transaction) {
+        return res.json({
+          success: true,
+          order: {
+            orderId: orderId,
+            reffId: transaction.reffId,
+            productName: transaction.name,
+            quantity: transaction.jumlah,
+            totalAmount: transaction.totalBayar,
+            status: 'completed',
+            expiresAt: null,
+            receipt: transaction.receipt || null,
+            receiptText: transaction.receiptText || null,
+            account: transaction.account || [],
+            snk: transaction.snk || ''
+          }
+        });
+      }
+      
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Order tidak ditemukan atau sudah expired' 
+      });
+    }
+    
+    // Get QR image base64 if available
+    let qrisImageBase64 = null;
+    if (order.qrisImagePath) {
+      try {
+        const qrBuffer = fs.readFileSync(order.qrisImagePath);
+        qrisImageBase64 = qrBuffer.toString('base64');
+      } catch (qrError) {
+        console.error('[Web POS] Error reading QR image:', qrError.message);
+      }
+    }
+    
+    // Return order data dengan status
+    res.json({
+      success: true,
+      order: {
+        orderId: order.orderId,
+        reffId: order.reffId,
+        productName: order.productName || 'Unknown Product',
+        quantity: order.jumlah,
+        totalAmount: order.totalAmount,
+        totalHarga: order.totalHarga,
+        uniqueCode: order.uniqueCode,
+        status: order.status || 'pending_payment',
+        expiresAt: moment(order.createdAt + (30 * 60 * 1000)).tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
+        qrisImageBase64: qrisImageBase64
+      }
+    });
+  } catch (error) {
+    console.error('[Web POS] Get order error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Terjadi kesalahan saat mengambil data order' 
+    });
+  }
+});
+
+// API endpoint to cancel order (sama seperti case 'batal' di index.js)
+app.post('/api/cancel-order', requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    
+    if (!db.data.order) db.data.order = {};
+    
+    if (!db.data.order[userId]) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tidak ada order yang sedang berlangsung'
+      });
+    }
+    
+    // Delete order
+    const orderId = db.data.order[userId].orderId;
+    delete db.data.order[userId];
+    
+    // Save database
+    try {
+      if (typeof db._save === 'function') {
+        await db._save();
+      } else {
+        await db.save();
+      }
+      console.log(`✅ [Web POS] Order cancelled - OrderID: ${orderId}, User: ${userId}`);
+    } catch (saveError) {
+      console.error(`❌ [Web POS] Error saving after cancel:`, saveError);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Order berhasil dibatalkan'
+    });
+  } catch (error) {
+    console.error('[Web POS] Cancel order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan saat membatalkan order'
+    });
+  }
+});
+
+// API endpoint to check payment status (polling, sama seperti di index.js)
+app.get('/api/payment/check/:orderId', requireAuth, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req.session.userId;
+    const cleanPhone = req.session.cleanPhone;
+    
+    // Check if order exists
+    const order = db.data.order?.[userId];
+    if (!order || order.orderId !== orderId) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order tidak ditemukan'
+      });
+    }
+    
+    // Check if expired
+    const expirationTime = order.createdAt + (30 * 60 * 1000); // 30 minutes
+    if (Date.now() >= expirationTime) {
+      // Delete expired order
+      delete db.data.order[userId];
+      await db.save();
+      
+      return res.json({
+        success: false,
+        expired: true,
+        message: 'Order telah expired'
+      });
+    }
+    
+    // Check payment status from listener (sama seperti di index.js)
+    try {
+      const axios = require('axios');
+      const listener = {
+        baseUrl: process.env.LISTENER_URL || 'http://localhost:3001',
+        apiKey: process.env.LISTENER_API_KEY || ''
+      };
+      
+      const url = `${listener.baseUrl}/notifications?limit=50`;
+      const headers = listener.apiKey ? { 'X-API-Key': listener.apiKey } : {};
+      const resp = await axios.get(url, { headers, timeout: 5000 });
+      const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : []);
+      
+      // Check if payment found (sama logic dengan index.js)
+      const paid = notifs.find(n => {
+        try {
+          const pkgOk = (n.package_name === 'id.bmri.livinmerchant') || (String(n.app_name||'').toUpperCase().includes('LIVIN'));
+          const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''));
+          const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0;
+          return pkgOk && amt === Number(order.totalAmount) && postedAt >= order.createdAt;
+        } catch {
+          return false;
+        }
+      });
+      
+      if (paid) {
+        // Payment confirmed! Process order
+        const product = db.data.produk[order.id];
+        if (!product || product.stok.length < order.jumlah) {
+          return res.json({
+            success: false,
+            message: 'Produk tidak tersedia'
+          });
+        }
+        
+        // Process pembelian (sama seperti di index.js)
+        product.terjual += order.jumlah;
+        const dataStok = [];
+        for (let i = 0; i < order.jumlah; i++) {
+          dataStok.push(product.stok.shift());
+        }
+        
+        // Format detail akun
+        const detailParts = [
+          `*📦 Produk:* ${product.name}`,
+          `*📅 Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
+          `*⏰ Jam:* ${moment.tz('Asia/Jakarta').format('HH:mm:ss')} WIB`,
+          `*Refid:* ${order.reffId}`,
+          ''
+        ];
+        
+        dataStok.forEach((i) => {
+          const dataAkun = i.split("|");
+          detailParts.push(
+            `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
+            `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}`,
+            `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}`,
+            `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}`,
+            `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}`,
+            ''
+          );
+        });
+        
+        detailParts.push(
+          `*╭────「 SYARAT & KETENTUAN 」────╮*`,
+          '',
+          `*📋 SNK PRODUK: ${product.name}*`,
+          '',
+          product.snk,
+          '',
+          `*⚠️ PENTING:*`,
+          `• Baca dan pahami SNK sebelum menggunakan akun`,
+          `• Akun yang sudah dibeli tidak dapat dikembalikan`,
+          `• Hubungi admin jika ada masalah dengan akun`,
+          '',
+          `*╰────「 END SNK 」────╯*`
+        );
+        
+        const detailAkunCustomer = detailParts.join('\n');
+        
+        // Save receipt
+        try {
+          const { saveReceipt } = require('./config/r2-storage');
+          const result = await saveReceipt(order.reffId, detailAkunCustomer);
+          if (result.success) {
+            console.log(`✅ Receipt saved to ${result.storage}: ${result.url || result.path || order.reffId}`);
+          }
+        } catch (receiptError) {
+          console.error('❌ Error saving receipt:', receiptError.message);
+        }
+        
+        // Add to transaction database
+        db.data.transaksi.push({
+          id: order.id,
+          name: product.name,
+          price: order.totalHarga / order.jumlah,
+          date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+          profit: product.profit,
+          jumlah: order.jumlah,
+          user: cleanPhone,
+          userRole: order.userRole,
+          reffId: order.reffId,
+          metodeBayar: "QRIS",
+          totalBayar: order.totalAmount
+        });
+        
+        // Delete order
+        delete db.data.order[userId];
+        
+        // Save database
+        await db.save();
+        
+        console.log(`✅ [Web POS] Payment confirmed and processed - OrderID: ${orderId}, RefID: ${order.reffId}`);
+        
+        return res.json({
+          success: true,
+          paid: true,
+          message: 'Pembayaran berhasil!',
+          transaction: {
+            refId: order.reffId,
+            productName: product.name,
+            quantity: order.jumlah,
+            totalPrice: order.totalAmount,
+            receiptContent: detailAkunCustomer
+          }
+        });
+      }
+      
+      // Payment not found yet
+      return res.json({
+        success: true,
+        paid: false,
+        message: 'Menunggu pembayaran...'
+      });
+      
+    } catch (listenerError) {
+      console.error('[Web POS] Listener check error:', listenerError);
+      return res.json({
+        success: true,
+        paid: false,
+        message: 'Menunggu pembayaran...'
+      });
+    }
+    
+  } catch (error) {
+    console.error('[Web POS] Check payment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan saat mengecek status pembayaran'
+    });
+  }
+});
+
+// Serve QRIS image
+app.get('/qris/:filename', (req, res) => {
+  const { filename } = req.params;
+  const qrisPath = path.join(__dirname, 'options', 'sticker', filename);
+  
+  if (fs.existsSync(qrisPath)) {
+    res.sendFile(qrisPath);
+  } else {
+    res.status(404).json({ success: false, message: 'QRIS image not found' });
+  }
 });
 
 // Start server

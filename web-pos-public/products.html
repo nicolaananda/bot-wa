@@ -9,10 +9,308 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>Produk - GiHa Smart Bot POS</title>
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+        /* Payment Countdown in Navbar */
+        .payment-countdown-indicator {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+            margin: 0 auto;
+            max-width: 280px;
+        }
+        
+        .payment-countdown-indicator:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+        }
+        
+        .countdown-icon {
+            font-size: 1.5rem;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .countdown-content {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .countdown-label {
+            font-size: 0.75rem;
+            opacity: 0.9;
+            font-weight: 500;
+        }
+        
+        .countdown-timer {
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        
+        /* Payment Modal Content */
+        .payment-modal-content {
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .payment-info-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .payment-countdown-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+        }
+        
+        .countdown-display {
+            font-size: 3rem;
+            font-weight: 700;
+            letter-spacing: 4px;
+            margin: 12px 0;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .countdown-warning {
+            font-size: 0.9rem;
+            font-weight: 600;
+            min-height: 20px;
+        }
+        
+        .order-info-box {
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            padding: 20px;
+            border-radius: 16px;
+        }
+        
+        .order-info-box h3 {
+            margin: 0 0 16px 0;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+        }
+        
+        .order-detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .order-detail-row:last-child {
+            border-bottom: none;
+        }
+        
+        .order-detail-row.total-row {
+            background: rgba(99, 102, 241, 0.1);
+            padding: 16px;
+            margin: 12px -20px -20px -20px;
+            border-radius: 0 0 14px 14px;
+            border-bottom: none;
+        }
+        
+        .order-detail-row.total-row strong {
+            font-size: 1.3rem;
+            color: var(--primary);
+        }
+        
+        .unique-code-info {
+            margin-top: 12px;
+            padding: 12px;
+            background: rgba(99, 102, 241, 0.05);
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .qris-image-container {
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+        }
+        
+        .qris-label {
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+        }
+        
+        .qris-image-wrapper {
+            width: 100%;
+            max-width: 350px;
+            height: 350px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+        
+        .loading-spinner {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+        
+        .error-message {
+            color: #ef4444;
+            font-weight: 600;
+        }
+        
+        .payment-instructions {
+            background: rgba(99, 102, 241, 0.05);
+            padding: 20px;
+            border-radius: 16px;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .payment-instructions h4 {
+            margin: 0 0 16px 0;
+            color: var(--text-primary);
+        }
+        
+        .payment-instructions ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .payment-instructions li {
+            margin-bottom: 12px;
+            line-height: 1.6;
+            color: var(--text-primary);
+        }
+        
+        .payment-status-box {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+        }
+        
+        .status-icon {
+            font-size: 2rem;
+        }
+        
+        .status-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .payment-countdown-indicator {
+                padding: 6px 12px;
+                gap: 8px;
+                max-width: 220px;
+            }
+            
+            .countdown-icon {
+                font-size: 1.2rem;
+            }
+            
+            .countdown-label {
+                font-size: 0.7rem;
+            }
+            
+            .countdown-timer {
+                font-size: 0.9rem;
+            }
+            
+            .countdown-display {
+                font-size: 2rem;
+                letter-spacing: 2px;
+            }
+            
+            .qris-image-wrapper {
+                height: 280px;
+                max-width: 280px;
+            }
+            
+            .payment-modal-content {
+                max-width: 95%;
+                padding: 16px;
+            }
+        }
+        
+        /* Product Card Pricing */
+        .product-price-new {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .price-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        .price-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .product-footer-new {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-top: 1px solid var(--border-color);
+            gap: 12px;
+        }
+        
+        @media (max-width: 768px) {
+            .price-value {
+                font-size: 1.1rem;
+            }
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar" id="mainNavbar" style="display: none;">
         <div class="nav-brand">🤖 GiHa Smart Bot</div>
+        
+        <!-- Payment Countdown Indicator -->
+        <div id="paymentCountdown" class="payment-countdown-indicator" style="display: none;" onclick="reopenPaymentModal()">
+            <span class="countdown-icon">⏰</span>
+            <div class="countdown-content">
+                <div class="countdown-label">Menunggu Pembayaran</div>
+                <div class="countdown-timer" id="navCountdownTimer">--:--</div>
+            </div>
+        </div>
+        
         <button class="nav-toggle" onclick="toggleMenu()" aria-label="Toggle menu">
             <span id="menuIcon">☰</span>
         </button>
@@ -88,12 +386,80 @@
                     <span id="totalPrice">Rp 0</span>
                 </div>
             </div>
+            
+            <!-- User Balance Info -->
+            <div class="user-balance-info" style="background: rgba(99, 102, 241, 0.1); padding: 12px; border-radius: 12px; margin: 16px 0; text-align: center;">
+                <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 4px;">Saldo Anda</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);" id="modalUserBalance">Rp 0</div>
+            </div>
 
             <div id="modalAlert" class="alert"></div>
 
-            <button class="btn-primary" id="btnPurchase" onclick="confirmPurchase()">
-                Beli Sekarang
-            </button>
+            <!-- Payment Method Buttons (1-Step Direct Purchase) -->
+            <div class="payment-buttons-container" style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;">
+                <button class="btn-payment-saldo" onclick="confirmPurchase('saldo')">
+                    <span style="font-size: 1.5rem;">💰</span>
+                    <div style="text-align: left;">
+                        <div style="font-size: 1.1rem;">Bayar Pakai Saldo</div>
+                        <div style="font-size: 0.85rem; opacity: 0.9;">Langsung dari saldo akun Anda</div>
+                    </div>
+                </button>
+                
+                <button class="btn-payment-qris" onclick="confirmPurchase('buynow')">
+                    <span style="font-size: 1.5rem;">💳</span>
+                    <div style="text-align: left;">
+                        <div style="font-size: 1.1rem;">Bayar via QRIS</div>
+                        <div style="font-size: 0.85rem; opacity: 0.9;">Otomatis & Instant</div>
+                    </div>
+                </button>
+            </div>
+            
+            <style>
+                .btn-payment-saldo,
+                .btn-payment-qris {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border: none;
+                    padding: 16px 24px;
+                    border-radius: 12px;
+                    font-size: 1rem;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 12px;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+                    width: 100%;
+                }
+                
+                .btn-payment-qris {
+                    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                    box-shadow: 0 4px 16px rgba(245, 87, 108, 0.3);
+                }
+                
+                .btn-payment-saldo:hover:not(:disabled) {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+                }
+                
+                .btn-payment-qris:hover:not(:disabled) {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 24px rgba(245, 87, 108, 0.4);
+                }
+                
+                .btn-payment-saldo:active:not(:disabled),
+                .btn-payment-qris:active:not(:disabled) {
+                    transform: translateY(0);
+                }
+                
+                .btn-payment-saldo:disabled,
+                .btn-payment-qris:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                }
+            </style>
         </div>
     </div>
 
@@ -122,6 +488,77 @@
         </div>
     </div>
 
+    <!-- Payment Modal (QRIS) -->
+    <div id="qrisPaymentModal" class="modal">
+        <div class="modal-content payment-modal-content">
+            <span class="modal-close" onclick="closeQrisPaymentModal()">&times;</span>
+            <h2>Pembayaran QRIS</h2>
+            
+            <div class="payment-info-container">
+                <!-- Countdown Timer -->
+                <div class="payment-countdown-box">
+                    <div class="countdown-label">⏰ Waktu tersisa</div>
+                    <div class="countdown-display" id="qrisCountdown">30:00</div>
+                    <div class="countdown-warning" id="countdownWarning"></div>
+                </div>
+                
+                <!-- Order Info -->
+                <div class="order-info-box">
+                    <h3>Detail Pesanan</h3>
+                    <div class="order-detail-row">
+                        <span>Order ID:</span>
+                        <strong id="qrisOrderId">-</strong>
+                    </div>
+                    <div class="order-detail-row">
+                        <span>Produk:</span>
+                        <strong id="qrisProductName">-</strong>
+                    </div>
+                    <div class="order-detail-row">
+                        <span>Jumlah:</span>
+                        <strong id="qrisQuantity">-</strong>
+                    </div>
+                    <div class="order-detail-row total-row">
+                        <span>Total Bayar:</span>
+                        <strong id="qrisTotalAmount">Rp 0</strong>
+                    </div>
+                    <div class="unique-code-info">
+                        <small>💡 Termasuk kode unik: <span id="qrisUniqueCode">0</span></small>
+                    </div>
+                </div>
+                
+                <!-- QRIS Image -->
+                <div class="qris-image-container">
+                    <div class="qris-label">Scan QRIS di bawah ini:</div>
+                    <div class="qris-image-wrapper" id="qrisImageWrapper">
+                        <div class="loading-spinner">Memuat QR...</div>
+                    </div>
+                </div>
+                
+                <!-- Instructions -->
+                <div class="payment-instructions">
+                    <h4>📱 Cara Pembayaran:</h4>
+                    <ol>
+                        <li>Buka aplikasi mobile banking atau e-wallet Anda</li>
+                        <li>Pilih menu <strong>Scan QR / QRIS</strong></li>
+                        <li>Scan kode QR di atas</li>
+                        <li>Konfirmasi pembayaran sejumlah <strong id="qrisTotalAmount2">Rp 0</strong></li>
+                        <li>Tunggu notifikasi pembayaran berhasil</li>
+                    </ol>
+                </div>
+                
+                <!-- Payment Status -->
+                <div class="payment-status-box" id="paymentStatusBox">
+                    <div class="status-icon">🔄</div>
+                    <div class="status-text">Menunggu pembayaran...</div>
+                </div>
+            </div>
+            
+            <button class="btn-secondary" onclick="closeQrisPaymentModal()" style="width: 100%; margin-top: 16px;">
+                Tutup (Lanjutkan Nanti)
+            </button>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
 
@@ -129,6 +566,9 @@
         let allProducts = [];
         let selectedProduct = null;
         let currentUserData = null;
+        let pendingPaymentOrder = null;
+        let countdownInterval = null;
+        let paymentCheckInterval = null;
         let currentReceiptText = null;
         let currentRefId = null;
 
@@ -196,6 +636,13 @@
                 }
 
                 allProducts = data.products;
+                
+                // Debug: log product data to check prices
+                console.log('Loaded products:', allProducts);
+                if (allProducts.length > 0) {
+                    console.log('First product:', allProducts[0]);
+                }
+                
                 displayProducts(allProducts);
             } catch (error) {
                 console.error('Load products failed:', error);
@@ -217,7 +664,12 @@
                 return;
             }
 
-            productGrid.innerHTML = products.map((product, index) => `
+            productGrid.innerHTML = products.map((product, index) => {
+                // Ensure price is valid
+                const productPrice = product.price || product.basePrice || 0;
+                const formattedPrice = productPrice > 0 ? formatRupiah(productPrice) : 'Hubungi Admin';
+                
+                return `
                 <div class="product-card-new" style="animation-delay: ${index * 0.1}s" onclick="openPurchaseModal('${product.id}')">
                     <div class="product-card-shine"></div>
                     <div class="product-image-placeholder">
@@ -241,7 +693,7 @@
                     <div class="product-footer-new">
                         <div class="product-price-new">
                             <span class="price-label">Harga</span>
-                            <span class="price-value">${formatRupiah(product.price)}</span>
+                            <span class="price-value">${formattedPrice}</span>
                         </div>
                         <button class="btn-buy-new" onclick="event.stopPropagation(); openPurchaseModal('${product.id}')" ${product.stock === 0 ? 'disabled' : ''}>
                             <span class="btn-icon">🛒</span>
@@ -249,7 +701,8 @@
                         </button>
                     </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function filterProducts() {
@@ -274,22 +727,21 @@
                 return;
             }
 
-            // Reset modal state
-            const btnPurchase = document.getElementById('btnPurchase');
-            btnPurchase.disabled = false;
-            btnPurchase.textContent = 'Beli Sekarang';
-            
             // Clear any previous alerts
             const alertBox = document.getElementById('modalAlert');
             alertBox.className = 'alert';
             alertBox.textContent = '';
 
+            // Update modal content
             document.getElementById('modalProductName').textContent = selectedProduct.name;
             document.getElementById('modalProductDesc').textContent = 
                 selectedProduct.description || 'Tidak ada deskripsi';
             document.getElementById('pricePerItem').textContent = formatRupiah(selectedProduct.price);
             document.getElementById('quantity').value = 1;
             document.getElementById('quantity').max = selectedProduct.stock;
+            
+            // Show user balance in modal
+            document.getElementById('modalUserBalance').textContent = formatRupiah(currentUserData.saldo || 0);
             
             updateTotalPrice();
             
@@ -321,7 +773,7 @@
             }, 5000);
         }
 
-        async function confirmPurchase() {
+        async function confirmPurchase(paymentMethod) {
             // Check if user is logged in
             if (!currentUserData) {
                 showModalAlert('Anda harus login terlebih dahulu untuk melakukan pembelian');
@@ -345,12 +797,25 @@
                 return;
             }
 
-            const btnPurchase = document.getElementById('btnPurchase');
-            btnPurchase.disabled = true;
-            btnPurchase.innerHTML = '<span class="loading"></span>Memproses...';
+            // Disable both buttons during processing
+            const btnSaldo = document.querySelector('.btn-payment-saldo');
+            const btnQris = document.querySelector('.btn-payment-qris');
+            const activeButton = paymentMethod === 'saldo' ? btnSaldo : btnQris;
+            const originalHTML = activeButton.innerHTML;
+            
+            btnSaldo.disabled = true;
+            btnSaldo.style.opacity = '0.6';
+            btnSaldo.style.cursor = 'not-allowed';
+            btnQris.disabled = true;
+            btnQris.style.opacity = '0.6';
+            btnQris.style.cursor = 'not-allowed';
+            activeButton.innerHTML = '<span class="loading"></span> Memproses...';
 
             try {
-                const response = await fetch('/api/purchase', {
+                // Choose endpoint based on payment method
+                const endpoint = paymentMethod === 'saldo' ? '/api/purchase' : '/api/buynow';
+                
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -364,27 +829,51 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    // Reset button state first
-                    btnPurchase.disabled = false;
-                    btnPurchase.textContent = 'Beli Sekarang';
-                    
                     closePurchaseModal();
-                    showSuccessModal(data.transaction);
+                    
+                    // Handle different responses for saldo vs buynow
+                    if (paymentMethod === 'saldo') {
+                        // Show success modal with receipt
+                        showSuccessModal(data.transaction);
+                    } else {
+                        // Show QRIS payment modal (no redirect!)
+                        showToast('✅ Order berhasil dibuat!', 'success');
+                        showQrisPaymentModal(data);
+                    }
                     
                     // Reload products and balance
                     await loadProducts();
                     await checkAuth();
                 } else {
                     showModalAlert(data.message || 'Pembelian gagal');
-                    btnPurchase.disabled = false;
-                    btnPurchase.textContent = 'Beli Sekarang';
+                    // Reset buttons
+                    activeButton.innerHTML = originalHTML;
+                    btnSaldo.disabled = false;
+                    btnSaldo.style.opacity = '1';
+                    btnSaldo.style.cursor = 'pointer';
+                    btnQris.disabled = false;
+                    btnQris.style.opacity = '1';
+                    btnQris.style.cursor = 'pointer';
                 }
             } catch (error) {
                 console.error('Purchase error:', error);
                 showModalAlert('Terjadi kesalahan saat memproses pembelian');
-                btnPurchase.disabled = false;
-                btnPurchase.textContent = 'Beli Sekarang';
+                // Reset buttons
+                activeButton.innerHTML = originalHTML;
+                btnSaldo.disabled = false;
+                btnSaldo.style.opacity = '1';
+                btnSaldo.style.cursor = 'pointer';
+                btnQris.disabled = false;
+                btnQris.style.opacity = '1';
+                btnQris.style.cursor = 'pointer';
             }
+        }
+        
+        function showPaymentModal(data) {
+            // Placeholder for payment modal (QRIS/Transfer)
+            // You can implement this based on your payment gateway
+            showToast('Fitur payment gateway akan segera ditambahkan', 'info');
+            console.log('Payment data:', data);
         }
 
         function showSuccessModal(transaction) {
@@ -606,6 +1095,237 @@
             }
         });
 
+        // ===== QRIS PAYMENT MODAL FUNCTIONS =====
+        
+        function showQrisPaymentModal(data) {
+            // Store order data
+            pendingPaymentOrder = data.order;
+            
+            // Clear any existing intervals
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (paymentCheckInterval) clearInterval(paymentCheckInterval);
+            
+            // Populate modal with order data
+            document.getElementById('qrisOrderId').textContent = data.order.orderId || '-';
+            document.getElementById('qrisProductName').textContent = data.order.productName || '-';
+            document.getElementById('qrisQuantity').textContent = data.order.jumlah || '1';
+            document.getElementById('qrisTotalAmount').textContent = formatRupiah(data.order.totalAmount || 0);
+            document.getElementById('qrisTotalAmount2').textContent = formatRupiah(data.order.totalAmount || 0);
+            document.getElementById('qrisUniqueCode').textContent = formatRupiah(data.order.uniqueCode || 0);
+            
+            // Load QRIS image
+            const qrisWrapper = document.getElementById('qrisImageWrapper');
+            if (data.payment && data.payment.qrisImageBase64) {
+                qrisWrapper.innerHTML = `
+                    <img src="data:image/png;base64,${data.payment.qrisImageBase64}" 
+                         alt="QRIS Code" 
+                         style="width: 100%; height: 100%; object-fit: contain; border-radius: 12px; background: white; padding: 10px;">
+                `;
+            } else {
+                qrisWrapper.innerHTML = '<div class="error-message">⚠️ Gagal memuat QR Code</div>';
+            }
+            
+            // Show modal
+            document.getElementById('qrisPaymentModal').style.display = 'flex';
+            
+            // Start countdown and payment checking
+            startPaymentCountdown();
+            startPaymentStatusCheck();
+        }
+        
+        function closeQrisPaymentModal() {
+            document.getElementById('qrisPaymentModal').style.display = 'none';
+            
+            // Keep countdown running in navbar if there's pending payment
+            if (pendingPaymentOrder) {
+                showNavbarCountdown();
+            }
+        }
+        
+        function reopenPaymentModal() {
+            if (!pendingPaymentOrder) return;
+            
+            // Re-populate modal with existing order data
+            document.getElementById('qrisOrderId').textContent = pendingPaymentOrder.orderId || '-';
+            document.getElementById('qrisProductName').textContent = pendingPaymentOrder.productName || '-';
+            document.getElementById('qrisQuantity').textContent = pendingPaymentOrder.jumlah || '1';
+            document.getElementById('qrisTotalAmount').textContent = formatRupiah(pendingPaymentOrder.totalAmount || 0);
+            document.getElementById('qrisTotalAmount2').textContent = formatRupiah(pendingPaymentOrder.totalAmount || 0);
+            document.getElementById('qrisUniqueCode').textContent = formatRupiah(pendingPaymentOrder.uniqueCode || 0);
+            
+            // Reload QR image
+            loadQrisImage();
+            
+            // Hide navbar countdown
+            document.getElementById('paymentCountdown').style.display = 'none';
+            
+            // Show modal
+            document.getElementById('qrisPaymentModal').style.display = 'flex';
+        }
+        
+        async function loadQrisImage() {
+            if (!pendingPaymentOrder || !pendingPaymentOrder.orderId) return;
+            
+            try {
+                const response = await fetch(`/api/order/${pendingPaymentOrder.orderId}`);
+                const data = await response.json();
+                
+                if (data.success && data.order.qrisImageBase64) {
+                    const qrisWrapper = document.getElementById('qrisImageWrapper');
+                    qrisWrapper.innerHTML = `
+                        <img src="data:image/png;base64,${data.order.qrisImageBase64}" 
+                             alt="QRIS Code" 
+                             style="width: 100%; height: 100%; object-fit: contain; border-radius: 12px; background: white; padding: 10px;">
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading QRIS image:', error);
+            }
+        }
+        
+        function startPaymentCountdown() {
+            if (!pendingPaymentOrder || !pendingPaymentOrder.createdAt) return;
+            
+            const expirationTime = pendingPaymentOrder.createdAt + (30 * 60 * 1000); // 30 minutes
+            
+            countdownInterval = setInterval(() => {
+                const now = Date.now();
+                const timeLeft = expirationTime - now;
+                
+                if (timeLeft <= 0) {
+                    // Expired
+                    clearInterval(countdownInterval);
+                    clearInterval(paymentCheckInterval);
+                    document.getElementById('qrisCountdown').textContent = '00:00';
+                    document.getElementById('navCountdownTimer').textContent = '00:00';
+                    document.getElementById('countdownWarning').innerHTML = '<span style="color: #ef4444;">⚠️ Waktu habis!</span>';
+                    document.getElementById('paymentStatusBox').innerHTML = `
+                        <div class="status-icon">⏰</div>
+                        <div class="status-text">Pembayaran expired. Silakan buat order baru.</div>
+                    `;
+                    pendingPaymentOrder = null;
+                    document.getElementById('paymentCountdown').style.display = 'none';
+                    return;
+                }
+                
+                const minutes = Math.floor(timeLeft / 60000);
+                const seconds = Math.floor((timeLeft % 60000) / 1000);
+                const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                
+                document.getElementById('qrisCountdown').textContent = timeString;
+                document.getElementById('navCountdownTimer').textContent = timeString;
+                
+                // Show warning if less than 5 minutes
+                if (minutes < 5) {
+                    document.getElementById('countdownWarning').innerHTML = '<span style="color: #f59e0b;">⚠️ Segera lakukan pembayaran</span>';
+                } else {
+                    document.getElementById('countdownWarning').innerHTML = '';
+                }
+            }, 1000);
+        }
+        
+        function showNavbarCountdown() {
+            document.getElementById('paymentCountdown').style.display = 'flex';
+        }
+        
+        function startPaymentStatusCheck() {
+            if (!pendingPaymentOrder || !pendingPaymentOrder.orderId) return;
+            
+            // Check immediately
+            checkPaymentStatus();
+            
+            // Then check every 5 seconds
+            paymentCheckInterval = setInterval(() => {
+                checkPaymentStatus();
+            }, 5000);
+        }
+        
+        async function checkPaymentStatus() {
+            if (!pendingPaymentOrder || !pendingPaymentOrder.orderId) return;
+            
+            try {
+                const response = await fetch(`/api/order/${pendingPaymentOrder.orderId}`);
+                const data = await response.json();
+                
+                if (data.success && data.order.status === 'completed') {
+                    // Payment successful!
+                    clearInterval(countdownInterval);
+                    clearInterval(paymentCheckInterval);
+                    
+                    // Reset payment buttons to enabled state
+                    const btnSaldo = document.querySelector('.btn-payment-saldo');
+                    const btnQris = document.querySelector('.btn-payment-qris');
+                    if (btnSaldo) {
+                        btnSaldo.disabled = false;
+                        btnSaldo.style.opacity = '1';
+                        btnSaldo.style.cursor = 'pointer';
+                        btnSaldo.innerHTML = `
+                            <span style="font-size: 1.5rem;">💰</span>
+                            <div style="text-align: left;">
+                                <div style="font-size: 1.1rem;">Bayar Pakai Saldo</div>
+                                <div style="font-size: 0.85rem; opacity: 0.9;">Langsung dari saldo akun Anda</div>
+                            </div>
+                        `;
+                    }
+                    if (btnQris) {
+                        btnQris.disabled = false;
+                        btnQris.style.opacity = '1';
+                        btnQris.style.cursor = 'pointer';
+                        btnQris.innerHTML = `
+                            <span style="font-size: 1.5rem;">💳</span>
+                            <div style="text-align: left;">
+                                <div style="font-size: 1.1rem;">Bayar via QRIS</div>
+                                <div style="font-size: 0.85rem; opacity: 0.9;">Otomatis & Instant</div>
+                            </div>
+                        `;
+                    }
+                    
+                    document.getElementById('paymentStatusBox').innerHTML = `
+                        <div class="status-icon">✅</div>
+                        <div class="status-text" style="color: #10b981; font-weight: 700;">Pembayaran Berhasil!</div>
+                    `;
+                    
+                    document.getElementById('qrisPaymentModal').style.display = 'none';
+                    document.getElementById('paymentCountdown').style.display = 'none';
+                    
+                    showToast('🎉 Pembayaran berhasil! Produk sedang diproses...', 'success');
+                    
+                    // Transform data for showSuccessModal
+                    if (data.order.receipt || data.order.receiptText) {
+                        // Reload user data for newBalance
+                        await checkAuth();
+                        
+                        const transformedData = {
+                            receiptContent: data.order.receiptText || data.order.receipt,
+                            refId: data.order.reffId,
+                            productName: data.order.productName,
+                            date: new Date().toLocaleDateString('id-ID') + ' ' + new Date().toLocaleTimeString('id-ID'),
+                            metode: 'QRIS',
+                            totalPrice: data.order.totalAmount,
+                            newBalance: currentUserData?.saldo || 0,
+                            items: data.order.account || [],
+                            snk: data.order.snk || ''
+                        };
+                        
+                        setTimeout(() => {
+                            showSuccessModal(transformedData);
+                        }, 1000);
+                    } else {
+                        // No receipt, just show toast and reload
+                        showToast('✅ Transaksi berhasil! Detail akan segera tersedia.', 'success');
+                    }
+                    
+                    pendingPaymentOrder = null;
+                    
+                    // Reload products and balance
+                    await loadProducts();
+                    await checkAuth();
+                }
+            } catch (error) {
+                console.error('Error checking payment status:', error);
+            }
+        }
+        
         // Initialize
         checkAuth();
         loadProducts();
