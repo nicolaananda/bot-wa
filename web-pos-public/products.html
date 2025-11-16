@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <nav class="navbar">
+    <nav class="navbar" id="mainNavbar" style="display: none;">
         <div class="nav-brand">🤖 GiHa Smart Bot</div>
         <button class="nav-toggle" onclick="toggleMenu()" aria-label="Toggle menu">
             <span id="menuIcon">☰</span>
@@ -138,8 +138,11 @@
                 const data = await response.json();
 
                 if (!data.success) {
-                    // Guest mode - show login button instead of balance
+                    // Guest mode - hide navbar and show login button instead of balance
                     currentUserData = null;
+                    const navbar = document.getElementById('mainNavbar');
+                    if (navbar) navbar.style.display = 'none';
+                    
                     const balanceElement = document.getElementById('userBalance');
                     if (balanceElement) {
                         balanceElement.parentElement.innerHTML = `
@@ -151,7 +154,11 @@
                     return;
                 }
 
+                // User is logged in - show navbar
                 currentUserData = data.user;
+                const navbar = document.getElementById('mainNavbar');
+                if (navbar) navbar.style.display = 'flex';
+                
                 document.getElementById('userBalance').textContent = formatRupiah(data.user.saldo);
 
                 // Show Admin tab if user is admin
@@ -161,8 +168,11 @@
                 }
             } catch (error) {
                 console.error('Auth check failed:', error);
-                // Guest mode - don't redirect, just show login button
+                // Guest mode - hide navbar and show login button
                 currentUserData = null;
+                const navbar = document.getElementById('mainNavbar');
+                if (navbar) navbar.style.display = 'none';
+                
                 const balanceElement = document.getElementById('userBalance');
                 if (balanceElement) {
                     balanceElement.parentElement.innerHTML = `
