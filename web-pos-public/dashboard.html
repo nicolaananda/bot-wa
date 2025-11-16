@@ -13,6 +13,13 @@
 <body>
     <nav class="navbar">
         <div class="nav-brand">🤖 GiHa Smart Bot</div>
+        
+        <!-- User Balance in Navbar -->
+        <div class="navbar-balance">
+            <span class="balance-label">Saldo:</span>
+            <span class="balance-value" id="navbarBalance">Rp 0</span>
+        </div>
+        
         <button class="nav-toggle" onclick="toggleMenu()" aria-label="Toggle menu">
             <span id="menuIcon">☰</span>
         </button>
@@ -26,207 +33,160 @@
     </nav>
 
     <div class="container">
-        <!-- Hero Section with Liquid Glass Effect -->
-        <div class="hero-aurora liquid-glass-elastic">
-            <div class="aurora-particles"></div>
-            <div class="hero-content-new">
-                <div class="welcome-section">
-                    <span class="welcome-emoji">👋</span>
-                    <h1 class="hero-title-aurora chromatic-text" data-text="Dashboard">Dashboard</h1>
-                    <p class="hero-subtitle-aurora">Kelola bisnis Anda dengan teknologi terdepan</p>
+        <!-- Simple Header -->
+        <div class="dashboard-header">
+            <h1>Dashboard</h1>
+            <p>Selamat datang! Kelola aktivitas dan transaksi Anda di sini</p>
+        </div>
+
+        <!-- Running Text Promo -->
+        <div class="running-text-container">
+            <div class="running-text">
+                <span>🎉 Promo Deposit 50.000 Bonus 5.000 🎉</span>
+                <span>🎉 Promo Deposit 50.000 Bonus 5.000 🎉</span>
+                <span>🎉 Promo Deposit 50.000 Bonus 5.000 🎉</span>
+            </div>
+        </div>
+
+        <!-- User Stats - Simple Cards -->
+        <div class="stats-grid-simple">
+            <div class="stat-card-simple">
+                <div class="stat-icon">👤</div>
+                <div class="stat-info">
+                    <span class="stat-label">Status Akun</span>
+                    <span class="stat-value" id="userRole">-</span>
                 </div>
             </div>
-            <div class="stats-hero-grid">
-                <div class="stat-hero-card frosted-card glow-aurora">
-                    <div class="stat-hero-icon">💰</div>
-                    <div class="stat-hero-content">
-                        <span class="stat-hero-label">Total Saldo</span>
-                        <span class="stat-hero-value" id="userBalance">Rp 0</span>
-                    </div>
+            <div class="stat-card-simple">
+                <div class="stat-icon">📱</div>
+                <div class="stat-info">
+                    <span class="stat-label">Nomor Telepon</span>
+                    <span class="stat-value" id="userPhone">-</span>
                 </div>
-                <div class="stat-hero-card frosted-card glow-pink">
-                    <div class="stat-hero-icon">👤</div>
-                    <div class="stat-hero-content">
-                        <span class="stat-hero-label">Status</span>
-                        <span class="stat-hero-value" id="userRole">-</span>
-                    </div>
-                </div>
-                <div class="stat-hero-card frosted-card glow-green">
-                    <div class="stat-hero-icon">📱</div>
-                    <div class="stat-hero-content">
-                        <span class="stat-hero-label">Nomor</span>
-                        <span class="stat-hero-value" id="userPhone">-</span>
-                    </div>
+            </div>
+            <div class="stat-card-simple">
+                <div class="stat-icon">📊</div>
+                <div class="stat-info">
+                    <span class="stat-label">Total Transaksi</span>
+                    <span class="stat-value" id="userTotalTransactions">0</span>
                 </div>
             </div>
         </div>
 
-        <!-- Quick Actions with Liquid Glass -->
-        <div class="quick-actions-section">
-            <h2 class="section-title-glass">
-                <span class="title-icon-glow">⚡</span>
-                Quick Actions
-            </h2>
-            <div class="quick-actions-liquid">
-                <div class="action-card-liquid frosted-card" onclick="window.location.href='/products'">
-                    <div class="action-liquid-bg"></div>
-                    <div class="action-card-content">
-                        <div class="action-icon-large">🛍️</div>
-                        <h3>Beli Produk</h3>
-                        <p>Browse & shop produk digital premium</p>
-                        <div class="action-badge">New</div>
-                    </div>
-                </div>
-
-                <div class="action-card-liquid frosted-card" onclick="loadTransactions()">
-                    <div class="action-liquid-bg"></div>
-                    <div class="action-card-content">
-                        <div class="action-icon-large">📊</div>
-                        <h3>Riwayat Transaksi</h3>
-                        <p>Lihat detail pembelian & invoice</p>
-                        <div class="action-badge">Hot</div>
-                    </div>
-                </div>
-
-                <div class="action-card-liquid frosted-card" onclick="toggleAuditLogs()">
-                    <div class="action-liquid-bg"></div>
-                    <div class="action-card-content">
-                        <div class="action-icon-large">📋</div>
-                        <h3>Audit Logs</h3>
-                        <p>Monitor aktivitas & perubahan sistem</p>
-                        <div class="action-badge admin-only">Admin</div>
-                    </div>
-                </div>
-
-                <div class="action-card-liquid frosted-card" onclick="window.location.href='/settings'">
-                    <div class="action-liquid-bg"></div>
-                    <div class="action-card-content">
-                        <div class="action-icon-large">⚙️</div>
-                        <h3>Settings</h3>
-                        <p>Konfigurasi & keamanan akun</p>
-                        <div class="action-badge">Pro</div>
-                    </div>
-                </div>
+        <!-- Quick Actions - Simple Grid -->
+        <div class="section-simple">
+            <h2 class="section-title-simple">⚡ Akses Cepat</h2>
+            <div class="actions-grid-simple">
+                <button class="action-btn-simple" onclick="window.location.href='/products'">
+                    <span class="action-icon">🛍️</span>
+                    <span class="action-text">Beli Produk</span>
+                </button>
+                <button class="action-btn-simple" onclick="loadTransactions()">
+                    <span class="action-icon">📊</span>
+                    <span class="action-text">Riwayat Transaksi</span>
+                </button>
+                <button class="action-btn-simple admin-only" onclick="toggleAuditLogs()" style="display: none;">
+                    <span class="action-icon">📋</span>
+                    <span class="action-text">Log Aktivitas</span>
+                </button>
+                <button class="action-btn-simple" onclick="window.location.href='/settings'">
+                    <span class="action-icon">⚙️</span>
+                    <span class="action-text">Pengaturan</span>
+                </button>
             </div>
         </div>
 
-        <!-- Personal Activity Section (All Users) -->
-        <div id="personalActivitySection" class="personal-activity-section">
-            <h2 class="section-title-glass">
-                <span class="title-icon-glow">📈</span>
-                Aktivitas Saya
-            </h2>
-            <div class="personal-stats-grid">
-                <div class="personal-stat-card frosted-card">
-                    <div class="personal-stat-icon">💸</div>
-                    <div class="personal-stat-content">
-                        <span class="personal-stat-label">Total Pembelian</span>
-                        <span class="personal-stat-value" id="userTotalSpent">Rp 0</span>
-                        <span class="personal-stat-change positive" id="userSpentChange">+0%</span>
+        <!-- Personal Activity - Simple Cards -->
+        <div id="personalActivitySection" class="section-simple">
+            <h2 class="section-title-simple">📈 Ringkasan Aktivitas</h2>
+            <div class="activity-grid-simple">
+                <div class="activity-card-simple">
+                    <div class="activity-icon">💸</div>
+                    <div class="activity-content">
+                        <span class="activity-label">Total Pengeluaran</span>
+                        <span class="activity-value" id="userTotalSpent">Rp 0</span>
+                        <span class="activity-change positive" id="userSpentChange">+0%</span>
                     </div>
                 </div>
-                <div class="personal-stat-card frosted-card">
-                    <div class="personal-stat-icon">🛒</div>
-                    <div class="personal-stat-content">
-                        <span class="personal-stat-label">Total Transaksi</span>
-                        <span class="personal-stat-value" id="userTotalTransactions">0</span>
-                        <span class="personal-stat-change" id="userTransactionsChange">Bulan ini</span>
+                <div class="activity-card-simple">
+                    <div class="activity-icon">🛒</div>
+                    <div class="activity-content">
+                        <span class="activity-label">Jumlah Transaksi</span>
+                        <span class="activity-value" id="userTotalTransactions">0</span>
+                        <span class="activity-change" id="userTransactionsChange">Bulan ini</span>
                     </div>
                 </div>
-                <div class="personal-stat-card frosted-card">
-                    <div class="personal-stat-icon">⭐</div>
-                    <div class="personal-stat-content">
-                        <span class="personal-stat-label">Produk Favorit</span>
-                        <span class="personal-stat-value" id="userFavoriteProduct">-</span>
-                        <span class="personal-stat-change" id="userFavoriteCount">0x dibeli</span>
+                <div class="activity-card-simple">
+                    <div class="activity-icon">⭐</div>
+                    <div class="activity-content">
+                        <span class="activity-label">Produk Favorit</span>
+                        <span class="activity-value" id="userFavoriteProduct">-</span>
+                        <span class="activity-change" id="userFavoriteCount">0x dibeli</span>
                     </div>
                 </div>
-                <div class="personal-stat-card frosted-card">
-                    <div class="personal-stat-icon">🎯</div>
-                    <div class="personal-stat-content">
-                        <span class="personal-stat-label">Transaksi Terakhir</span>
-                        <span class="personal-stat-value" id="userLastTransaction">-</span>
-                        <span class="personal-stat-change" id="userLastTransactionTime">-</span>
+                <div class="activity-card-simple">
+                    <div class="activity-icon">🎯</div>
+                    <div class="activity-content">
+                        <span class="activity-label">Transaksi Terakhir</span>
+                        <span class="activity-value" id="userLastTransaction">-</span>
+                        <span class="activity-change" id="userLastTransactionTime">-</span>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Audit Logs Section (Admin Only) -->
-        <div id="auditLogsSection" class="audit-logs-section" style="display: none;">
-            <div class="section-header-liquid">
-                <h2 class="section-title-glass">
-                    <span class="title-icon-glow">📋</span>
-                    Audit Logs
-                </h2>
-                <button class="btn-close-liquid" onclick="toggleAuditLogs()">✕</button>
+        <div id="auditLogsSection" class="section-simple" style="display: none;">
+            <div class="section-header-simple">
+                <h2 class="section-title-simple">📋 Log Aktivitas Sistem</h2>
+                <button class="btn-close-simple" onclick="toggleAuditLogs()">✕</button>
             </div>
             
-            <div class="audit-controls frosted-card">
-                <div class="audit-filters">
-                    <select id="auditTypeFilter" onchange="filterAuditLogs()" class="select-liquid">
-                        <option value="all">All Actions</option>
-                        <option value="saldo">Saldo Changes</option>
-                        <option value="stock">Stock Changes</option>
-                        <option value="transaction">Transactions</option>
-                        <option value="auth">Authentication</option>
-                    </select>
-                    <select id="auditUserFilter" onchange="filterAuditLogs()" class="select-liquid">
-                        <option value="all">All Users</option>
-                    </select>
-                    <button class="btn-refresh-liquid" onclick="loadAuditLogs()">
-                        <span>🔄</span> Refresh
-                    </button>
-                </div>
-                <div class="audit-summary" id="auditSummary">Loading logs...</div>
+            <div class="filters-simple">
+                <select id="auditTypeFilter" onchange="filterAuditLogs()" class="select-simple">
+                    <option value="all">Semua Aktivitas</option>
+                    <option value="saldo">Perubahan Saldo</option>
+                    <option value="stock">Perubahan Stok</option>
+                    <option value="transaction">Transaksi</option>
+                    <option value="auth">Autentikasi</option>
+                </select>
+                <select id="auditUserFilter" onchange="filterAuditLogs()" class="select-simple">
+                    <option value="all">Semua Pengguna</option>
+                </select>
+                <button class="btn-simple" onclick="loadAuditLogs()">🔄 Muat Ulang</button>
             </div>
+            <div class="summary-text" id="auditSummary">Memuat log aktivitas...</div>
 
-            <div id="auditLogsList" class="audit-logs-list">
-                <div class="loading-state-liquid">
-                    <div class="loader-aurora"></div>
-                    <p>Loading audit logs...</p>
-                </div>
-            </div>
+            <div id="auditLogsList" class="logs-list-simple"></div>
         </div>
 
         <!-- Transaction History Section -->
-        <div id="transactionSection" class="transaction-section-modern" style="display: none;">
-            <div class="section-header">
-                <h2 class="section-title">
-                    <span class="title-icon">📜</span>
-                    Riwayat Transaksi
-                </h2>
-                <button class="btn-close-section" onclick="closeTransactions()">✕</button>
+        <div id="transactionSection" class="section-simple" style="display: none;">
+            <div class="section-header-simple">
+                <h2 class="section-title-simple">📜 Riwayat Transaksi</h2>
+                <button class="btn-close-simple" onclick="closeTransactions()">✕</button>
             </div>
             
-            <!-- Transaction Filters -->
-            <div class="transaction-filters frosted-card">
-                <div class="filter-group">
-                    <div class="search-box-transaction">
-                        <span class="search-icon-transaction">🔍</span>
-                        <input type="text" id="transactionSearch" placeholder="Cari transaksi..." onkeyup="filterTransactions()">
-                    </div>
-                    <select id="statusFilter" onchange="filterTransactions()" class="select-filter">
-                        <option value="all">Semua Status</option>
-                        <option value="success">Sukses</option>
-                        <option value="pending">Pending</option>
-                        <option value="failed">Gagal</option>
-                    </select>
-                    <select id="dateFilter" onchange="filterTransactions()" class="select-filter">
-                        <option value="all">Semua Waktu</option>
-                        <option value="today">Hari Ini</option>
-                        <option value="week">7 Hari Terakhir</option>
-                        <option value="month">30 Hari Terakhir</option>
-                        <option value="3months">3 Bulan Terakhir</option>
-                    </select>
-                    <button class="btn-reset-filter" onclick="resetTransactionFilters()">
-                        <span>🔄</span> Reset
-                    </button>
-                </div>
-                <div class="filter-summary" id="filterSummary"></div>
+            <div class="filters-simple">
+                <input type="text" id="transactionSearch" placeholder="🔍 Cari transaksi..." class="input-simple" onkeyup="filterTransactions()">
+                <select id="statusFilter" onchange="filterTransactions()" class="select-simple">
+                    <option value="all">Semua Status</option>
+                    <option value="success">Berhasil</option>
+                    <option value="pending">Menunggu</option>
+                    <option value="failed">Gagal</option>
+                </select>
+                <select id="dateFilter" onchange="filterTransactions()" class="select-simple">
+                    <option value="all">Semua Waktu</option>
+                    <option value="today">Hari Ini</option>
+                    <option value="week">7 Hari Terakhir</option>
+                    <option value="month">30 Hari Terakhir</option>
+                    <option value="3months">3 Bulan Terakhir</option>
+                </select>
+                <button class="btn-simple" onclick="resetTransactionFilters()">🔄 Reset Filter</button>
             </div>
+            <div class="summary-text" id="filterSummary"></div>
             
-            <div id="transactionList" class="transaction-list-modern"></div>
+            <div id="transactionList" class="transaction-list-simple"></div>
         </div>
     </div>
 
@@ -246,7 +206,6 @@
             <div class="modal-body">
                 <div id="transactionDetail" class="transaction-detail"></div>
                 <div id="accountDetailsSection" class="account-details-section"></div>
-                <div id="snkSection" class="snk-section"></div>
             </div>
             
             <div class="modal-actions-bottom">
@@ -280,7 +239,10 @@
                 currentUser = data.user;
 
                 // Update UI with user data
-                document.getElementById('userBalance').textContent = formatRupiah(data.user.saldo || 0);
+                const navbarBalance = document.getElementById('navbarBalance');
+                if (navbarBalance) {
+                    navbarBalance.textContent = formatRupiah(data.user.saldo || 0);
+                }
                 document.getElementById('userRole').textContent = (data.user.role || 'bronze').toUpperCase();
                 document.getElementById('userPhone').textContent = formatPhone(data.user.phone);
 
@@ -290,12 +252,13 @@
                 if (isAdmin) {
                     const adminLink = document.querySelector('a[href="/admin"]');
                     if (adminLink) adminLink.classList.add('show-admin');
+                    // Show admin-only action button
+                    const adminBtn = document.querySelector('.action-btn-simple.admin-only');
+                    if (adminBtn) adminBtn.style.display = 'flex';
                 } else {
-                    // Hide admin-only action card
-                    document.querySelectorAll('.admin-only').forEach(el => {
-                        const card = el.closest('.action-card-liquid');
-                        if (card) card.style.display = 'none';
-                    });
+                    // Hide admin-only action button
+                    const adminBtn = document.querySelector('.action-btn-simple.admin-only');
+                    if (adminBtn) adminBtn.style.display = 'none';
                 }
 
                 // Load user's own transaction summary
@@ -466,12 +429,12 @@
                         // Populate user filter
                         const uniqueUsers = [...new Set(allAuditLogs.map(log => log.user))];
                         const userFilter = document.getElementById('auditUserFilter');
-                        userFilter.innerHTML = '<option value="all">All Users</option>' + 
+                        userFilter.innerHTML = '<option value="all">Semua Pengguna</option>' + 
                             uniqueUsers.map(user => `<option value="${user}">${formatPhone(user)}</option>`).join('');
                         
                         displayAuditLogs(allAuditLogs);
                         document.getElementById('auditSummary').textContent = 
-                            `Showing ${allAuditLogs.length} audit entries`;
+                            `Menampilkan ${allAuditLogs.length} log aktivitas`;
                     } else {
                         // No data
                         allAuditLogs = [];
@@ -480,15 +443,14 @@
                 } else {
                     // API not available, show placeholder
                     document.getElementById('auditLogsList').innerHTML = `
-                        <div class="empty-state-modern">
-                            <div class="empty-icon">📋</div>
-                            <h3>Audit API Not Available</h3>
-                            <p>Audit logging feature is coming soon</p>
+                        <div class="empty-state-simple">
+                            <div class="empty-icon-simple">📋</div>
+                            <p>Audit API tidak tersedia</p>
                         </div>`;
                 }
             } catch (error) {
                 console.error('Failed to load audit logs:', error);
-                showToast('Failed to load audit logs', 'error');
+                showToast('Gagal memuat log aktivitas', 'error');
             }
         }
 
@@ -497,38 +459,29 @@
             
             if (logs.length === 0) {
                 container.innerHTML = `
-                    <div class="empty-state-modern">
-                        <div class="empty-icon">📋</div>
-                        <h3>No audit logs</h3>
-                        <p>No activity logs match your filters</p>
+                    <div class="empty-state-simple">
+                        <div class="empty-icon-simple">📋</div>
+                        <p>Tidak ada audit logs</p>
                     </div>`;
                 return;
             }
 
-            container.innerHTML = logs.map((log, index) => `
-                <div class="audit-log-item frosted-card" style="animation-delay: ${index * 0.03}s">
-                    <div class="audit-log-icon ${log.type}">
+            container.innerHTML = logs.map((log) => `
+                <div class="log-item-simple">
+                    <div class="log-icon-simple">
                         ${log.type === 'transaction' ? '🛒' : 
                           log.type === 'saldo' ? '💰' : 
                           log.type === 'stock' ? '📦' : '🔐'}
                     </div>
-                    <div class="audit-log-content">
-                        <div class="audit-log-header">
-                            <h4 class="audit-log-action">${log.action}</h4>
-                            <span class="audit-log-time">${getTimeAgo(log.timestamp)}</span>
+                    <div class="log-content-simple">
+                        <div class="log-header-simple">
+                            <strong>${log.action}</strong>
+                            <span class="log-time-simple">${getTimeAgo(log.timestamp)}</span>
                         </div>
-                        <p class="audit-log-details">${log.details}</p>
-                        <div class="audit-log-meta">
-                            <span class="audit-meta-item">
-                                <span class="audit-meta-label">User:</span>
-                                <span class="audit-meta-value">${formatPhone(log.user)}</span>
-                            </span>
-                            ${log.amount ? `
-                                <span class="audit-meta-item">
-                                    <span class="audit-meta-label">Amount:</span>
-                                    <span class="audit-meta-value">${formatRupiah(log.amount)}</span>
-                                </span>
-                            ` : ''}
+                        <p class="log-details-simple">${log.details}</p>
+                        <div class="log-meta-simple">
+                            <span>User: ${formatPhone(log.user)}</span>
+                            ${log.amount ? `<span>• ${formatRupiah(log.amount)}</span>` : ''}
                         </div>
                     </div>
                 </div>
@@ -552,8 +505,8 @@
             displayAuditLogs(filtered);
             document.getElementById('auditSummary').textContent = 
                 filtered.length === allAuditLogs.length ? 
-                `Showing ${filtered.length} audit entries` :
-                `Showing ${filtered.length} of ${allAuditLogs.length} audit entries`;
+                `Menampilkan ${filtered.length} log aktivitas` :
+                `Menampilkan ${filtered.length} dari ${allAuditLogs.length} log aktivitas`;
         }
 
         async function loadTransactions() {
@@ -587,18 +540,16 @@
 
             if (transactions.length === 0) {
                 transactionList.innerHTML = `
-                    <div class="empty-state-modern">
-                        <div class="empty-icon">📭</div>
-                        <h3>Tidak ada transaksi</h3>
-                        <p>Tidak ada transaksi yang cocok dengan filter</p>
+                    <div class="empty-state-simple">
+                        <div class="empty-icon-simple">📭</div>
+                        <p>Tidak ada transaksi</p>
                     </div>`;
                 return;
             }
 
-            transactionList.innerHTML = transactions.map((t, index) => {
+            transactionList.innerHTML = transactions.map((t) => {
                 // Determine status badge (normalize status values)
                 let status = (t.status || 'completed').toLowerCase();
-                // Map 'completed' to 'success' for display
                 if (status === 'completed' || status === 'success') {
                     status = 'success';
                 } else if (status === 'pending' || status === 'waiting') {
@@ -606,39 +557,30 @@
                 } else if (status === 'failed' || status === 'gagal' || status === 'error') {
                     status = 'failed';
                 } else {
-                    // Default to success if status is unknown but transaction exists
                     status = 'success';
                 }
-                const statusBadge = status === 'success' ? '✓ Success' : 
-                                    status === 'pending' ? '⏳ Pending' : '✗ Failed';
+                const statusBadge = status === 'success' ? '✓' : status === 'pending' ? '⏳' : '✗';
                 
                 return `
-                    <div class="transaction-card-modern" style="animation-delay: ${index * 0.05}s">
-                        <div class="transaction-card-header">
-                            <div class="transaction-icon">🛒</div>
-                            <div class="transaction-badge ${status}">${statusBadge}</div>
+                    <div class="transaction-card-simple">
+                        <div class="transaction-header-simple">
+                            <div class="transaction-icon-simple">🛒</div>
+                            <div class="transaction-badge-simple ${status}">${statusBadge}</div>
                         </div>
-                        <div class="transaction-card-body">
-                            <h4 class="transaction-title">${t.productName}</h4>
-                            <div class="transaction-details">
-                                <span class="detail-item">
-                                    <span class="detail-label">Ref ID:</span>
-                                    <span class="detail-value">${t.refId}</span>
-                                </span>
-                                <span class="detail-item">
-                                    <span class="detail-label">Qty:</span>
-                                    <span class="detail-value">${t.quantity}</span>
-                                </span>
-                                <span class="detail-item">
-                                    <span class="detail-label">📅</span>
-                                    <span class="detail-value">${t.date}</span>
-                                </span>
+                        <div class="transaction-body-simple">
+                            <h4 class="transaction-title-simple">${t.productName}</h4>
+                            <div class="transaction-details-simple">
+                                <span>Ref: ${t.refId}</span>
+                                <span>•</span>
+                                <span>Qty: ${t.quantity}</span>
+                                <span>•</span>
+                                <span>${t.date}</span>
                             </div>
                         </div>
-                        <div class="transaction-card-footer">
-                            <div class="transaction-price">${formatRupiah(t.totalPrice)}</div>
-                            <button class="btn-view-detail" onclick="viewTransactionDetail('${t.refId}')">
-                                Lihat Detail →
+                        <div class="transaction-footer-simple">
+                            <div class="transaction-price-simple">${formatRupiah(t.totalPrice)}</div>
+                            <button class="btn-view-simple" onclick="viewTransactionDetail('${t.refId}')">
+                                Detail →
                             </button>
                         </div>
                     </div>
@@ -793,55 +735,6 @@
 
                 document.getElementById('accountDetailsSection').innerHTML = accountHTML;
                 
-                // Parse and display SNK from receipt content
-                let snkHTML = '';
-                if (currentReceiptContent) {
-                    const lines = currentReceiptContent.split('\n');
-                    let inSnkSection = false;
-                    let snkLines = [];
-                    let snkTitle = '';
-                    
-                    for (let i = 0; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        if (line.includes('SNK PRODUK:') || line.includes('📋 SNK PRODUK:')) {
-                            inSnkSection = true;
-                            snkTitle = line.replace(/[*📋]/g, '').replace('SNK PRODUK:', '').trim();
-                            continue;
-                        }
-                        if (line.includes('END SNK') || line.includes('╰────')) {
-                            inSnkSection = false;
-                            break;
-                        }
-                        if (inSnkSection && line && !line.includes('SYARAT & KETENTUAN') && !line.includes('╭────')) {
-                            snkLines.push(line.replace(/[*]/g, ''));
-                        }
-                    }
-                    
-                    if (snkLines.length > 0) {
-                        snkHTML = '<div class="snk-container">';
-                        snkHTML += `<h3 class="snk-title">📋 SNK PRODUK: ${snkTitle || transaction.productName}</h3>`;
-                        snkHTML += '<div class="snk-content">';
-                        snkLines.forEach(line => {
-                            if (line.trim()) {
-                                // Format line dengan emoji dan styling
-                                let formattedLine = line;
-                                if (line.includes('✅')) {
-                                    formattedLine = `<div class="snk-item snk-allowed">${line}</div>`;
-                                } else if (line.includes('🚫') || line.includes('dilarang')) {
-                                    formattedLine = `<div class="snk-item snk-prohibited">${line}</div>`;
-                                } else if (line.startsWith('*') || line.match(/^[•\-\*]/)) {
-                                    formattedLine = `<div class="snk-item">${line.replace(/^[•\-\*]\s*/, '')}</div>`;
-                                } else {
-                                    formattedLine = `<div class="snk-item">${line}</div>`;
-                                }
-                                snkHTML += formattedLine;
-                            }
-                        });
-                        snkHTML += '</div></div>';
-                    }
-                }
-                
-                document.getElementById('snkSection').innerHTML = snkHTML;
                 document.getElementById('transactionModal').style.display = 'flex';
             } catch (error) {
                 console.error('View transaction detail failed:', error);
