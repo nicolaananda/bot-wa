@@ -1687,6 +1687,57 @@ app.post('/api/cancel-order', requireAuth, async (req, res) => {
   }
 });
 
+// API endpoint to cancel specific order by orderId
+app.post('/api/cancel-order/:orderId', requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { orderId } = req.params;
+    
+    if (!db.data.order) db.data.order = {};
+    
+    // Check if order exists and matches
+    if (!db.data.order[userId]) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tidak ada order yang sedang berlangsung'
+      });
+    }
+    
+    if (db.data.order[userId].orderId !== orderId) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order tidak ditemukan atau sudah tidak valid'
+      });
+    }
+    
+    // Delete order
+    delete db.data.order[userId];
+    
+    // Save database
+    try {
+      if (typeof db._save === 'function') {
+        await db._save();
+      } else {
+        await db.save();
+      }
+      console.log(`✅ [Web POS] Order cancelled - OrderID: ${orderId}, User: ${userId}`);
+    } catch (saveError) {
+      console.error(`❌ [Web POS] Error saving after cancel:`, saveError);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Order berhasil dibatalkan'
+    });
+  } catch (error) {
+    console.error('[Web POS] Cancel order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan saat membatalkan order'
+    });
+  }
+});
+
 // API endpoint to check payment status (polling, sama seperti di index.js)
 app.get('/api/payment/check/:orderId', requireAuth, async (req, res) => {
   try {
