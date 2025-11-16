@@ -553,9 +553,14 @@
                 </div>
             </div>
             
-            <button class="btn-secondary" onclick="closeQrisPaymentModal()" style="width: 100%; margin-top: 16px;">
-                Tutup (Lanjutkan Nanti)
-            </button>
+            <div style="display: flex; gap: 12px; margin-top: 16px;">
+                <button class="btn-secondary" onclick="closeQrisPaymentModal()" style="flex: 1;">
+                    Tutup (Lanjutkan Nanti)
+                </button>
+                <button class="btn-danger" onclick="cancelPayment()" style="flex: 1; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.3s ease;">
+                    ❌ Batalkan Pesanan
+                </button>
+            </div>
         </div>
     </div>
 
@@ -651,6 +656,22 @@
             }
         }
 
+        // Generate consistent color based on product name
+        function getProductColor(productName) {
+            // Simple hash function to convert string to number
+            let hash = 0;
+            for (let i = 0; i < productName.length; i++) {
+                hash = productName.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            
+            // Generate HSL color with good saturation and lightness
+            const hue = Math.abs(hash % 360);
+            const saturation = 65 + (Math.abs(hash) % 20); // 65-85%
+            const lightness = 45 + (Math.abs(hash) % 15); // 45-60%
+            
+            return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+        }
+        
         function displayProducts(products) {
             const productGrid = document.getElementById('productGrid');
 
@@ -669,18 +690,21 @@
                 const productPrice = product.price || product.basePrice || 0;
                 const formattedPrice = productPrice > 0 ? formatRupiah(productPrice) : 'Hubungi Admin';
                 
+                // Get consistent color for this product
+                const productColor = getProductColor(product.name);
+                
                 return `
                 <div class="product-card-new" style="animation-delay: ${index * 0.1}s" onclick="openPurchaseModal('${product.id}')">
                     <div class="product-card-shine"></div>
-                    <div class="product-image-placeholder">
-                        <span class="product-emoji">📦</span>
+                    <div class="product-image-placeholder" style="background: linear-gradient(135deg, ${productColor} 0%, ${productColor}dd 100%);">
+                        <span class="product-emoji" style="font-size: 3rem;">📦</span>
                         ${product.stock > 0 ? 
                             `<div class="stock-badge available">✓ Tersedia</div>` : 
                             `<div class="stock-badge unavailable">✕ Habis</div>`
                         }
                     </div>
                     <div class="product-content-new">
-                        <div class="product-category-badge">Digital</div>
+                        <div class="product-category-badge" style="background: ${productColor}22; color: ${productColor};">Digital</div>
                         <h3 class="product-title-new">${product.name}</h3>
                         <p class="product-desc-new">${product.description || 'Produk digital berkualitas'}</p>
                         <div class="product-meta-new">
@@ -1226,6 +1250,75 @@
         
         function showNavbarCountdown() {
             document.getElementById('paymentCountdown').style.display = 'flex';
+        }
+        
+        async function cancelPayment() {
+            if (!pendingPaymentOrder) return;
+            
+            // Confirm cancellation
+            if (!confirm('Apakah Anda yakin ingin membatalkan pesanan ini?')) {
+                return;
+            }
+            
+            try {
+                // Call backend to cancel order
+                const response = await fetch(`/api/cancel-order/${pendingPaymentOrder.orderId}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Stop all intervals
+                    clearInterval(countdownInterval);
+                    clearInterval(paymentCheckInterval);
+                    
+                    // Reset pending order
+                    pendingPaymentOrder = null;
+                    
+                    // Close modal and hide navbar countdown
+                    document.getElementById('qrisPaymentModal').style.display = 'none';
+                    document.getElementById('paymentCountdown').style.display = 'none';
+                    
+                    // Reset payment buttons
+                    const btnSaldo = document.querySelector('.btn-payment-saldo');
+                    const btnQris = document.querySelector('.btn-payment-qris');
+                    if (btnSaldo) {
+                        btnSaldo.disabled = false;
+                        btnSaldo.style.opacity = '1';
+                        btnSaldo.style.cursor = 'pointer';
+                        btnSaldo.innerHTML = `
+                            <span style="font-size: 1.5rem;">💰</span>
+                            <div style="text-align: left;">
+                                <div style="font-size: 1.1rem;">Bayar Pakai Saldo</div>
+                                <div style="font-size: 0.85rem; opacity: 0.9;">Langsung dari saldo akun Anda</div>
+                            </div>
+                        `;
+                    }
+                    if (btnQris) {
+                        btnQris.disabled = false;
+                        btnQris.style.opacity = '1';
+                        btnQris.style.cursor = 'pointer';
+                        btnQris.innerHTML = `
+                            <span style="font-size: 1.5rem;">💳</span>
+                            <div style="text-align: left;">
+                                <div style="font-size: 1.1rem;">Bayar via QRIS</div>
+                                <div style="font-size: 0.85rem; opacity: 0.9;">Otomatis & Instant</div>
+                            </div>
+                        `;
+                    }
+                    
+                    showToast('✅ Pesanan berhasil dibatalkan', 'success');
+                    
+                    // Reload products
+                    await loadProducts();
+                } else {
+                    showToast('❌ Gagal membatalkan pesanan: ' + (data.message || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                console.error('Error canceling payment:', error);
+                showToast('❌ Terjadi kesalahan saat membatalkan pesanan', 'error');
+            }
         }
         
         function startPaymentStatusCheck() {
