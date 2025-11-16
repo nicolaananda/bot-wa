@@ -611,6 +611,9 @@
                     const adminLink = document.querySelector('a[href="/admin"]');
                     if (adminLink) adminLink.classList.add('show-admin');
                 }
+
+                // Load pending order if exists (untuk restore setelah reload)
+                await loadPendingOrder();
             } catch (error) {
                 console.error('Auth check failed:', error);
                 // Guest mode - hide navbar and show login button
@@ -626,6 +629,48 @@
                         </a>
                     `;
                 }
+            }
+        }
+
+        async function loadPendingOrder() {
+            try {
+                const response = await fetch('/api/pending-order');
+                const data = await response.json();
+
+                if (data.success && data.hasPendingOrder && data.order) {
+                    // Set pending order
+                    pendingPaymentOrder = data.order;
+                    
+                    // Load QR image if available
+                    if (data.order.qrisImageBase64) {
+                        const qrisWrapper = document.getElementById('qrisImageWrapper');
+                        if (qrisWrapper) {
+                            qrisWrapper.innerHTML = `
+                                <img src="data:image/png;base64,${data.order.qrisImageBase64}" 
+                                     alt="QRIS Code" 
+                                     style="width: 100%; height: 100%; object-fit: contain; border-radius: 12px; background: white; padding: 10px;">
+                            `;
+                        }
+                    }
+                    
+                    // Start countdown and payment checking
+                    startPaymentCountdown();
+                    startPaymentStatusCheck();
+                    
+                    // Show navbar countdown
+                    showNavbarCountdown();
+                    
+                    console.log('✅ Pending order restored from database');
+                } else {
+                    // No pending order, clear any existing intervals
+                    if (countdownInterval) clearInterval(countdownInterval);
+                    if (paymentCheckInterval) clearInterval(paymentCheckInterval);
+                    pendingPaymentOrder = null;
+                    document.getElementById('paymentCountdown').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Load pending order failed:', error);
+                // Don't show error to user, just silently fail
             }
         }
 
@@ -796,10 +841,20 @@
                 return;
             }
 
-            // Clear any previous alerts
-            const alertBox = document.getElementById('modalAlert');
-            alertBox.className = 'alert';
-            alertBox.textContent = '';
+            // Check if there's pending order
+            const hasPendingOrder = pendingPaymentOrder !== null;
+            
+            if (hasPendingOrder) {
+                showModalAlert('Anda sedang memiliki order yang belum selesai. Silakan selesaikan atau batalkan terlebih dahulu.', 'error');
+                // Still show modal but disable buttons
+            }
+
+            // Clear any previous alerts (unless we just set one)
+            if (!hasPendingOrder) {
+                const alertBox = document.getElementById('modalAlert');
+                alertBox.className = 'alert';
+                alertBox.textContent = '';
+            }
 
             // Update modal content
             document.getElementById('modalProductName').textContent = selectedProduct.name;
@@ -812,6 +867,40 @@
             // Show user balance in modal
             document.getElementById('modalUserBalance').textContent = formatRupiah(currentUserData.saldo || 0);
             
+            // Disable/enable payment buttons based on pending order
+            const btnSaldo = document.querySelector('.btn-payment-saldo');
+            const btnQris = document.querySelector('.btn-payment-qris');
+            
+            if (hasPendingOrder) {
+                // Disable both buttons
+                if (btnSaldo) {
+                    btnSaldo.disabled = true;
+                    btnSaldo.style.opacity = '0.6';
+                    btnSaldo.style.cursor = 'not-allowed';
+                    btnSaldo.title = 'Selesaikan atau batalkan order yang sedang berlangsung terlebih dahulu';
+                }
+                if (btnQris) {
+                    btnQris.disabled = true;
+                    btnQris.style.opacity = '0.6';
+                    btnQris.style.cursor = 'not-allowed';
+                    btnQris.title = 'Selesaikan atau batalkan order yang sedang berlangsung terlebih dahulu';
+                }
+            } else {
+                // Enable both buttons
+                if (btnSaldo) {
+                    btnSaldo.disabled = false;
+                    btnSaldo.style.opacity = '1';
+                    btnSaldo.style.cursor = 'pointer';
+                    btnSaldo.title = '';
+                }
+                if (btnQris) {
+                    btnQris.disabled = false;
+                    btnQris.style.opacity = '1';
+                    btnQris.style.cursor = 'pointer';
+                    btnQris.title = '';
+                }
+            }
+            
             updateTotalPrice();
             
             document.getElementById('purchaseModal').style.display = 'flex';
@@ -820,6 +909,31 @@
         function closePurchaseModal() {
             document.getElementById('purchaseModal').style.display = 'none';
             selectedProduct = null;
+            
+            // Clear alert
+            const alertBox = document.getElementById('modalAlert');
+            if (alertBox) {
+                alertBox.className = 'alert';
+                alertBox.textContent = '';
+            }
+            
+            // Enable buttons if no pending order (untuk next purchase)
+            if (!pendingPaymentOrder) {
+                const btnSaldo = document.querySelector('.btn-payment-saldo');
+                const btnQris = document.querySelector('.btn-payment-qris');
+                if (btnSaldo) {
+                    btnSaldo.disabled = false;
+                    btnSaldo.style.opacity = '1';
+                    btnSaldo.style.cursor = 'pointer';
+                    btnSaldo.title = '';
+                }
+                if (btnQris) {
+                    btnQris.disabled = false;
+                    btnQris.style.opacity = '1';
+                    btnQris.style.cursor = 'pointer';
+                    btnQris.title = '';
+                }
+            }
         }
 
         function updateTotalPrice() {
@@ -902,6 +1016,18 @@
                     
                     // Handle different responses for saldo vs buynow
                     if (paymentMethod === 'saldo') {
+                        // Pembelian dengan saldo langsung selesai, tidak ada pending order
+                        // Pastikan pendingPaymentOrder tetap null
+                        pendingPaymentOrder = null;
+                        
+                        // Enable payment buttons (untuk next purchase)
+                        btnSaldo.disabled = false;
+                        btnSaldo.style.opacity = '1';
+                        btnSaldo.style.cursor = 'pointer';
+                        btnQris.disabled = false;
+                        btnQris.style.opacity = '1';
+                        btnQris.style.cursor = 'pointer';
+                        
                         // Show success modal with receipt
                         showSuccessModal(data.transaction);
                     } else {
@@ -1222,8 +1348,19 @@
             document.getElementById('qrisTotalAmount2').textContent = formatRupiah(pendingPaymentOrder.totalAmount || 0);
             document.getElementById('qrisUniqueCode').textContent = formatRupiah(pendingPaymentOrder.uniqueCode || 0);
             
-            // Reload QR image
-            loadQrisImage();
+            // Load QR image if not already loaded, or reload it
+            const qrisWrapper = document.getElementById('qrisImageWrapper');
+            if (pendingPaymentOrder.qrisImageBase64) {
+                // Use cached QR image if available
+                qrisWrapper.innerHTML = `
+                    <img src="data:image/png;base64,${pendingPaymentOrder.qrisImageBase64}" 
+                         alt="QRIS Code" 
+                         style="width: 100%; height: 100%; object-fit: contain; border-radius: 12px; background: white; padding: 10px;">
+                `;
+            } else {
+                // Reload QR image from API
+                loadQrisImage();
+            }
             
             // Hide navbar countdown
             document.getElementById('paymentCountdown').style.display = 'none';
@@ -1240,6 +1377,9 @@
                 const data = await response.json();
                 
                 if (data.success && data.order.qrisImageBase64) {
+                    // Store QR image in pendingPaymentOrder for future use
+                    pendingPaymentOrder.qrisImageBase64 = data.order.qrisImageBase64;
+                    
                     const qrisWrapper = document.getElementById('qrisImageWrapper');
                     qrisWrapper.innerHTML = `
                         <img src="data:image/png;base64,${data.order.qrisImageBase64}" 
@@ -1274,6 +1414,23 @@
                     `;
                     pendingPaymentOrder = null;
                     document.getElementById('paymentCountdown').style.display = 'none';
+                    
+                    // Enable payment buttons
+                    const btnSaldo = document.querySelector('.btn-payment-saldo');
+                    const btnQris = document.querySelector('.btn-payment-qris');
+                    if (btnSaldo) {
+                        btnSaldo.disabled = false;
+                        btnSaldo.style.opacity = '1';
+                        btnSaldo.style.cursor = 'pointer';
+                        btnSaldo.title = '';
+                    }
+                    if (btnQris) {
+                        btnQris.disabled = false;
+                        btnQris.style.opacity = '1';
+                        btnQris.style.cursor = 'pointer';
+                        btnQris.title = '';
+                    }
+                    
                     return;
                 }
                 
