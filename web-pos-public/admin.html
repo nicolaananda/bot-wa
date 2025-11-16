@@ -47,6 +47,10 @@
                 <span class="tab-icon">📋</span>
                 <span class="tab-text">Daftar Produk</span>
             </button>
+            <button class="admin-tab" onclick="switchTab('pin')">
+                <span class="tab-icon">🔐</span>
+                <span class="tab-text">Kelola PIN</span>
+            </button>
         </div>
 
         <!-- Saldo Tab Content -->
@@ -179,6 +183,60 @@
                 </div>
             </div>
         </div>
+
+        <!-- PIN Tab Content -->
+        <div id="pinTab" class="tab-content">
+            <div class="admin-card-single">
+                <div class="card-header-icon">🔐</div>
+                <h2>Kelola PIN User</h2>
+                <p class="card-description">Ubah PIN untuk user tertentu</p>
+
+                <div id="pinAlertBox" class="alert"></div>
+
+                <form id="changePinForm">
+                    <div class="form-group">
+                        <label for="userNumberPin">
+                            <span class="label-icon">📱</span>
+                            Nomor User
+                        </label>
+                        <input 
+                            type="text" 
+                            id="userNumberPin" 
+                            placeholder="Contoh: 628123456789 atau 08123456789"
+                            required
+                        >
+                        <small class="form-hint">Nomor bisa diawali dengan 0, 62, atau +62</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newPin">
+                            <span class="label-icon">🔑</span>
+                            PIN Baru
+                        </label>
+                        <input 
+                            type="text" 
+                            id="newPin" 
+                            placeholder="Contoh: 1234"
+                            maxlength="6"
+                            pattern="[0-9]{4,6}"
+                            required
+                        >
+                        <small class="form-hint">PIN harus berupa 4-6 digit angka</small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="clearPinForm()">
+                            <span class="btn-icon">🗑️</span>
+                            Clear
+                        </button>
+                        <button type="submit" class="btn-primary" id="btnSubmitPin">
+                            <span class="btn-icon">✅</span>
+                            Ubah PIN
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- Success Modal for Saldo -->
@@ -197,6 +255,23 @@
             </div>
 
             <button class="btn-primary" onclick="closeSuccessSaldoModal()">OK</button>
+        </div>
+    </div>
+
+    <!-- Success Modal for PIN -->
+    <div id="successPinModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeSuccessPinModal()">&times;</span>
+            <div class="success-icon">✅</div>
+            <h2>PIN Berhasil Diubah!</h2>
+            
+            <div class="success-info">
+                <p><strong>Nomor User:</strong> <span id="successPinUserNumber"></span></p>
+                <p><strong>PIN Baru:</strong> <span id="successPinValue"></span></p>
+                <p><strong>Waktu:</strong> <span id="successPinTime"></span></p>
+            </div>
+
+            <button class="btn-primary" onclick="closeSuccessPinModal()">OK</button>
         </div>
     </div>
 
@@ -552,11 +627,15 @@
         window.onclick = function(event) {
             const modal = document.getElementById('successModal');
             const saldoModal = document.getElementById('successSaldoModal');
+            const pinModal = document.getElementById('successPinModal');
             if (event.target === modal) {
                 closeSuccessModal();
             }
             if (event.target === saldoModal) {
                 closeSuccessSaldoModal();
+            }
+            if (event.target === pinModal) {
+                closeSuccessPinModal();
             }
         }
 
@@ -596,7 +675,8 @@
             const tabContent = {
                 'saldo': 'saldoTab',
                 'stock': 'stockTab',
-                'products': 'productsTab'
+                'products': 'productsTab',
+                'pin': 'pinTab'
             };
             
             document.getElementById(tabContent[tabName]).classList.add('active');
@@ -609,6 +689,95 @@
                 loadProducts();
             }
         }
+
+        function showPinAlert(message, type = 'error') {
+            const alertBox = document.getElementById('pinAlertBox');
+            alertBox.textContent = message;
+            alertBox.className = `alert ${type} show`;
+            
+            setTimeout(() => {
+                alertBox.classList.remove('show');
+            }, 5000);
+        }
+
+        function clearPinForm() {
+            document.getElementById('userNumberPin').value = '';
+            document.getElementById('newPin').value = '';
+            document.getElementById('pinAlertBox').classList.remove('show');
+        }
+
+        function closeSuccessPinModal() {
+            document.getElementById('successPinModal').style.display = 'none';
+        }
+
+        // Handle Change PIN Form
+        document.getElementById('changePinForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const userNumber = document.getElementById('userNumberPin').value.trim();
+            const newPin = document.getElementById('newPin').value.trim();
+
+            if (!userNumber) {
+                showPinAlert('Masukkan nomor user terlebih dahulu');
+                return;
+            }
+
+            if (!newPin) {
+                showPinAlert('Masukkan PIN baru terlebih dahulu');
+                return;
+            }
+
+            // Validate PIN format (4-6 digits)
+            if (!/^\d{4,6}$/.test(newPin)) {
+                showPinAlert('PIN harus berupa 4-6 digit angka');
+                return;
+            }
+
+            const btnSubmit = document.getElementById('btnSubmitPin');
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<span class="loading"></span>Memproses...';
+
+            try {
+                // Normalize phone number (already includes @s.whatsapp.net)
+                const userIdWith = normalizePhoneNumber(userNumber);
+                
+                // Encode URI component to handle special characters
+                const encodedNumber = encodeURIComponent(userIdWith);
+
+                const response = await fetch(`/api/admin/users/${encodedNumber}/pin`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        pin: newPin
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Show success modal
+                    document.getElementById('successPinUserNumber').textContent = userNumber;
+                    document.getElementById('successPinValue').textContent = newPin; // Show PIN for admin confirmation
+                    const now = new Date();
+                    document.getElementById('successPinTime').textContent = now.toLocaleString('id-ID');
+                    
+                    document.getElementById('successPinModal').style.display = 'flex';
+
+                    // Clear form
+                    clearPinForm();
+                } else {
+                    showPinAlert(data.error || 'Gagal mengubah PIN', 'error');
+                }
+            } catch (error) {
+                console.error('Change PIN error:', error);
+                showPinAlert(error.message || 'Terjadi kesalahan saat mengubah PIN', 'error');
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = '<span class="btn-icon">✅</span>Ubah PIN';
+            }
+        });
 
         // Initialize
         checkAuth();

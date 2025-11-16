@@ -147,15 +147,11 @@ function isOwner(phone) {
   require('./setting.js');
   const ownerNumbers = global.owner || [];
   
-  console.log('[Web POS] Checking admin access:', { cleanPhone, ownerNumbers });
-  
   const isAdmin = ownerNumbers.some(owner => {
     const cleanOwner = normalizePhoneNumber(owner);
-    console.log('[Web POS] Comparing:', { cleanPhone, cleanOwner, match: cleanOwner === cleanPhone });
     return cleanOwner === cleanPhone;
   });
   
-  console.log('[Web POS] Admin check result:', isAdmin);
   return isAdmin;
 }
 
@@ -347,13 +343,17 @@ app.get('/api/user', requireAuth, async (req, res) => {
   }
 });
 
-// Get products
-app.get('/api/products', requireAuth, (req, res) => {
+// Get products (accessible without auth for guest mode)
+app.get('/api/products', (req, res) => {
   try {
-    const userId = req.session.userId;
-    const cleanPhone = req.session.cleanPhone;
-    const user = db.data.users[userId] || db.data.users[cleanPhone] || {};
-    const userRole = user.role || 'bronze';
+    // Check if user is logged in
+    let userRole = 'bronze'; // Default role for guests
+    if (req.session.userId) {
+      const userId = req.session.userId;
+      const cleanPhone = req.session.cleanPhone;
+      const user = db.data.users[userId] || db.data.users[cleanPhone] || {};
+      userRole = user.role || 'bronze';
+    }
     
     const products = Object.entries(db.data.produk || {})
       .map(([id, product]) => {
@@ -372,7 +372,8 @@ app.get('/api/products', requireAuth, (req, res) => {
     
     res.json({
       success: true,
-      products
+      products,
+      isGuest: !req.session.userId
     });
   } catch (error) {
     console.error('[Web POS] Get products error:', error);
@@ -662,7 +663,7 @@ app.get('/api/transactions', requireAuth, (req, res) => {
 });
 
 // Get transaction detail with account info
-app.get('/api/transactions/:reffId', requireAuth, (req, res) => {
+app.get('/api/transactions/:reffId', requireAuth, async (req, res) => {
   try {
     const { reffId } = req.params;
     const userId = req.session.userId;
@@ -681,6 +682,9 @@ app.get('/api/transactions/:reffId', requireAuth, (req, res) => {
       });
     }
     
+    // Get the actual reffId from transaction (could be reffId or ref_id)
+    const actualReffId = transaction.reffId || transaction.ref_id || reffId;
+    
     // Try to get receipt content
     let receiptContent = null;
     let accountDetails = [];
@@ -688,9 +692,12 @@ app.get('/api/transactions/:reffId', requireAuth, (req, res) => {
     try {
       // Get receipt from R2 or local storage
       const { getReceipt } = require('./config/r2-storage');
-      const receiptResult = await getReceipt(reffId);
+      console.log(`[Web POS] Attempting to get receipt for reffId: ${actualReffId}`);
+      const receiptResult = await getReceipt(actualReffId);
+      
       if (receiptResult.success) {
         receiptContent = receiptResult.content;
+        console.log(`[Web POS] ✅ Receipt retrieved from ${receiptResult.storage || 'storage'}: ${actualReffId}`);
         
         // Parse account details from receipt
         const lines = receiptContent.split('\n');
@@ -699,40 +706,61 @@ app.get('/api/transactions/:reffId', requireAuth, (req, res) => {
         lines.forEach(line => {
           const trimmed = line.trim();
           
-          // Check for account details markers
-          if (trimmed.includes('📧 Email:')) {
+          // Check for account details markers (support both with and without │ character)
+          if (trimmed.includes('📧 Email:') || trimmed.includes('│ 📧 Email:')) {
             if (currentAccount) accountDetails.push(currentAccount);
+            
+            // Extract email value (handle both formats: "│ 📧 Email: value" and "📧 Email: value")
+            const emailMatch = trimmed.match(/(?:│\s*)?📧\s*Email:\s*(.+)/);
+            const emailValue = emailMatch ? emailMatch[1].trim() : (trimmed.split('Email:')[1]?.trim() || 'Tidak ada');
+            
             currentAccount = {
-              email: trimmed.split('Email:')[1]?.trim() || 'Tidak ada',
+              email: emailValue,
               password: '',
               profile: '',
               pin: '',
               twofa: ''
             };
           } else if (currentAccount) {
-            if (trimmed.includes('🔐 Password:')) {
-              currentAccount.password = trimmed.split('Password:')[1]?.trim() || 'Tidak ada';
-            } else if (trimmed.includes('👤 Profil:')) {
-              currentAccount.profile = trimmed.split('Profil:')[1]?.trim() || 'Tidak ada';
-            } else if (trimmed.includes('🔢 Pin:')) {
-              currentAccount.pin = trimmed.split('Pin:')[1]?.trim() || 'Tidak ada';
-            } else if (trimmed.includes('🔒 2FA:')) {
-              currentAccount.twofa = trimmed.split('2FA:')[1]?.trim() || 'Tidak ada';
+            // Parse password
+            if (trimmed.includes('🔐 Password:') || trimmed.includes('│ 🔐 Password:')) {
+              const passwordMatch = trimmed.match(/(?:│\s*)?🔐\s*Password:\s*(.+)/);
+              currentAccount.password = passwordMatch ? passwordMatch[1].trim() : (trimmed.split('Password:')[1]?.trim() || 'Tidak ada');
+            }
+            // Parse profile
+            else if (trimmed.includes('👤 Profil:') || trimmed.includes('│ 👤 Profil:')) {
+              const profileMatch = trimmed.match(/(?:│\s*)?👤\s*Profil:\s*(.+)/);
+              currentAccount.profile = profileMatch ? profileMatch[1].trim() : (trimmed.split('Profil:')[1]?.trim() || 'Tidak ada');
+            }
+            // Parse pin
+            else if (trimmed.includes('🔢 Pin:') || trimmed.includes('│ 🔢 Pin:')) {
+              const pinMatch = trimmed.match(/(?:│\s*)?🔢\s*Pin:\s*(.+)/);
+              currentAccount.pin = pinMatch ? pinMatch[1].trim() : (trimmed.split('Pin:')[1]?.trim() || 'Tidak ada');
+            }
+            // Parse 2FA
+            else if (trimmed.includes('🔒 2FA:') || trimmed.includes('│ 🔒 2FA:')) {
+              const twofaMatch = trimmed.match(/(?:│\s*)?🔒\s*2FA:\s*(.+)/);
+              currentAccount.twofa = twofaMatch ? twofaMatch[1].trim() : (trimmed.split('2FA:')[1]?.trim() || 'Tidak ada');
             }
           }
         });
         
         // Add last account if exists
         if (currentAccount) accountDetails.push(currentAccount);
+        
+        console.log(`[Web POS] ✅ Parsed ${accountDetails.length} account(s) from receipt: ${actualReffId}`);
+      } else {
+        console.error(`[Web POS] ❌ Failed to get receipt for ${actualReffId}:`, receiptResult.error);
       }
     } catch (error) {
-      console.error('[Web POS] Error reading receipt:', error);
+      console.error('[Web POS] ❌ Error reading receipt:', error);
+      console.error('[Web POS] Error stack:', error.stack);
     }
     
     res.json({
       success: true,
       transaction: {
-        refId: reffId,
+        refId: actualReffId,
         productId: transaction.id,
         productName: transaction.name || transaction.productName || 'Unknown Product',
         quantity: transaction.jumlah || transaction.quantity || 1,
@@ -939,6 +967,84 @@ app.patch('/api/admin/users/:userId/saldo', requireAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Gagal menambahkan saldo: ' + error.message
+    });
+  }
+});
+
+// Admin: Change user PIN
+app.patch('/api/admin/users/:userId/pin', requireAuth, async (req, res) => {
+  try {
+    const cleanPhone = req.session.cleanPhone;
+    
+    if (!isOwner(cleanPhone)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Akses ditolak. Hanya admin yang bisa mengubah PIN.'
+      });
+    }
+    
+    const { userId } = req.params;
+    const { pin } = req.body;
+    
+    if (!pin || typeof pin !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'PIN harus diisi'
+      });
+    }
+    
+    // Validate PIN format (4-6 digits)
+    if (!/^\d{4,6}$/.test(pin)) {
+      return res.status(400).json({
+        success: false,
+        error: 'PIN harus berupa 4-6 digit angka'
+      });
+    }
+    
+    // Normalize user ID - handle both formats
+    let normalizedUserId = userId;
+    
+    // If it's a phone number format, normalize it
+    if (!userId.includes('@')) {
+      const nomorNya = normalizePhoneNumber(userId);
+      normalizedUserId = nomorNya + '@s.whatsapp.net';
+    } else {
+      // Extract phone number from format like "628123456789@s.whatsapp.net"
+      const phonePart = userId.split('@')[0];
+      const nomorNya = normalizePhoneNumber(phonePart);
+      normalizedUserId = nomorNya + '@s.whatsapp.net';
+    }
+    
+    // Check if user exists
+    const userExists = db.data.users[normalizedUserId] || db.data.users[normalizedUserId.replace('@s.whatsapp.net', '')];
+    
+    if (!userExists) {
+      return res.status(404).json({
+        success: false,
+        error: 'User tidak ditemukan'
+      });
+    }
+    
+    // Get old PIN for logging
+    const oldPin = await getUserPin(normalizedUserId);
+    
+    // Update PIN
+    await setUserPin(normalizedUserId, pin);
+    
+    console.log(`✅ [Web POS Admin] PIN changed - User: ${normalizedUserId}, By: ${cleanPhone}`);
+    
+    res.json({
+      success: true,
+      data: {
+        userId: normalizedUserId,
+        updatedAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('[Web POS] Admin change PIN error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Gagal mengubah PIN: ' + error.message
     });
   }
 });

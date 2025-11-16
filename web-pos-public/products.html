@@ -99,22 +99,24 @@
 
     <!-- Success Modal -->
     <div id="successModal" class="modal">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closeSuccessModal()">&times;</span>
-            <div class="success-icon">✅</div>
-            <h2>Pembelian Berhasil!</h2>
-            
-            <div class="purchase-info">
-                <p><strong>Refid:</strong> <span id="successRefId"></span></p>
-                <p><strong>Saldo Baru:</strong> <span id="successBalance"></span></p>
+        <div class="modal-content transaction-modal-content">
+            <div class="modal-header">
+                <h2>Pembelian Berhasil!</h2>
+                <div class="modal-header-actions">
+                    <button class="btn-copy btn-copy-header" onclick="copyPurchaseReceipt()">
+                        📋 Copy Receipt
+                    </button>
+                    <span class="modal-close" onclick="closeSuccessModal()">&times;</span>
+                </div>
             </div>
-
-            <div id="accountDetails" class="account-details"></div>
-
-            <div class="modal-actions">
-                <button class="btn-copy" onclick="copyPurchaseReceipt()">
-                    📋 Copy Receipt
-                </button>
+            
+            <div class="modal-body">
+                <div id="transactionDetail" class="transaction-detail"></div>
+                <div id="accountDetailsSection" class="account-details-section"></div>
+                <div id="snkSection" class="snk-section"></div>
+            </div>
+            
+            <div class="modal-actions-bottom">
                 <button class="btn-secondary" onclick="closeSuccessModal()">Tutup</button>
             </div>
         </div>
@@ -136,7 +138,16 @@
                 const data = await response.json();
 
                 if (!data.success) {
-                    window.location.href = '/';
+                    // Guest mode - show login button instead of balance
+                    currentUserData = null;
+                    const balanceElement = document.getElementById('userBalance');
+                    if (balanceElement) {
+                        balanceElement.parentElement.innerHTML = `
+                            <a href="/" class="btn-primary" style="text-decoration: none; display: inline-block; padding: 0.5rem 1rem;">
+                                🔐 Login
+                            </a>
+                        `;
+                    }
                     return;
                 }
 
@@ -150,7 +161,16 @@
                 }
             } catch (error) {
                 console.error('Auth check failed:', error);
-                window.location.href = '/';
+                // Guest mode - don't redirect, just show login button
+                currentUserData = null;
+                const balanceElement = document.getElementById('userBalance');
+                if (balanceElement) {
+                    balanceElement.parentElement.innerHTML = `
+                        <a href="/" class="btn-primary" style="text-decoration: none; display: inline-block; padding: 0.5rem 1rem;">
+                            🔐 Login
+                        </a>
+                    `;
+                }
             }
         }
 
@@ -235,6 +255,15 @@
             selectedProduct = allProducts.find(p => p.id === productId);
             if (!selectedProduct) return;
 
+            // Check if user is logged in
+            if (!currentUserData) {
+                // Guest mode - redirect to login
+                if (confirm('Anda harus login terlebih dahulu untuk melakukan pembelian. Ingin login sekarang?')) {
+                    window.location.href = '/';
+                }
+                return;
+            }
+
             // Reset modal state
             const btnPurchase = document.getElementById('btnPurchase');
             btnPurchase.disabled = false;
@@ -283,6 +312,15 @@
         }
 
         async function confirmPurchase() {
+            // Check if user is logged in
+            if (!currentUserData) {
+                showModalAlert('Anda harus login terlebih dahulu untuk melakukan pembelian');
+                if (confirm('Ingin login sekarang?')) {
+                    window.location.href = '/';
+                }
+                return;
+            }
+
             if (!selectedProduct) return;
 
             const quantity = parseInt(document.getElementById('quantity').value) || 1;
@@ -340,51 +378,125 @@
         }
 
         function showSuccessModal(transaction) {
-            document.getElementById('successRefId').textContent = transaction.refId;
-            document.getElementById('successBalance').textContent = formatRupiah(transaction.newBalance);
-            
             // Store receipt content globally
             currentReceiptText = transaction.receiptContent || null;
             currentRefId = transaction.refId;
 
-            // Build detail text similar to WhatsApp bot format
-            let detailHTML = '<div class="purchase-details">';
-            detailHTML += `<h3>📦 ${transaction.productName}</h3>`;
-            detailHTML += `<div class="purchase-meta">`;
-            detailHTML += `<p><strong>📅 Tanggal:</strong> ${transaction.date}</p>`;
-            detailHTML += `<p><strong>⏰ Jam:</strong> ${transaction.time} WIB</p>`;
-            detailHTML += `<p><strong>Refid:</strong> ${transaction.refId}</p>`;
+            // Parse tanggal dan jam
+            const dateTime = transaction.date ? transaction.date.split(' ') : ['', ''];
+            const tanggal = dateTime[0] || 'N/A';
+            const jam = dateTime[1] || transaction.time || 'N/A';
+
+            // Build account info header (same format as transaction detail)
+            let detailHTML = '<div class="account-info-header">';
+            detailHTML += `<h3>Account Information</h3>`;
+            detailHTML += `<div class="info-item">📦 <strong>Produk:★</strong> ${transaction.productName}</div>`;
+            detailHTML += `<div class="info-item">📅 <strong>Tanggal:★</strong> ${tanggal}</div>`;
+            detailHTML += `<div class="info-item">⏱️ <strong>Jam:★</strong> ${jam} WIB</div>`;
+            detailHTML += `<div class="info-item">🆔 <strong>Refid:★</strong> ${transaction.refId}</div>`;
+            detailHTML += `<div class="info-item">💰 <strong>Saldo Baru:★</strong> ${formatRupiah(transaction.newBalance)}</div>`;
             detailHTML += `</div>`;
-            detailHTML += '<h3 style="margin-top: 20px;">Detail Akun:</h3>';
+
+            document.getElementById('transactionDetail').innerHTML = detailHTML;
+
+            // Build account details (same format as transaction detail)
+            let accountHTML = '';
+            if (transaction.items && transaction.items.length > 0) {
+                accountHTML = '<div class="account-details-list">';
+                transaction.items.forEach((account, index) => {
+                    if (index > 0) accountHTML += '<hr class="account-divider">';
+                    accountHTML += `
+                        <div class="account-detail-item">
+                            <div class="detail-line"><span class="detail-icon">📧</span><span class="detail-label">Email:</span><span class="detail-value">${account.email || 'Tidak ada'}</span></div>
+                            <div class="detail-line"><span class="detail-icon">🔐</span><span class="detail-label">Password:</span><span class="detail-value">${account.password || 'Tidak ada'}</span></div>
+                            <div class="detail-line"><span class="detail-icon">👤</span><span class="detail-label">Profil:</span><span class="detail-value">${account.profile || 'Tidak ada'}</span></div>
+                            <div class="detail-line"><span class="detail-icon">🔢</span><span class="detail-label">Pin:</span><span class="detail-value">${account.pin || 'Tidak ada'}</span></div>
+                            <div class="detail-line"><span class="detail-icon">🔒</span><span class="detail-label">2FA:</span><span class="detail-value">${account.twofa || 'Tidak ada'}</span></div>
+                        </div>
+                    `;
+                });
+                accountHTML += '</div>';
+                
+                // Tambah info pembayaran di bawah
+                accountHTML += `<div class="payment-info">`;
+                accountHTML += `<div class="payment-row"><span>💰 <strong>Metode:</strong></span> <span>${transaction.metode || 'Saldo'}</span></div>`;
+                accountHTML += `<div class="payment-row"><span>💵 <strong>Total:</strong></span> <span>${formatRupiah(transaction.totalPrice || 0)}</span></div>`;
+                accountHTML += `</div>`;
+            } else {
+                accountHTML = '<p class="empty-state">Detail akun tidak tersedia</p>';
+            }
+
+            document.getElementById('accountDetailsSection').innerHTML = accountHTML;
             
-            transaction.items.forEach((item) => {
-                detailHTML += `
-                    <div class="account-item">
-                        <h4>Akun ${item.index}</h4>
-                        <p><span class="label">📧 Email:</span> ${item.email}</p>
-                        <p><span class="label">🔐 Password:</span> ${item.password}</p>
-                        <p><span class="label">👤 Profil:</span> ${item.profile}</p>
-                        <p><span class="label">🔢 Pin:</span> ${item.pin}</p>
-                        <p><span class="label">🔒 2FA:</span> ${item.twofa}</p>
-                    </div>
-                `;
-            });
-            
-            // Add SNK if exists
-            if (transaction.snk) {
-                detailHTML += `
-                    <div class="snk-section">
-                        <h3>╭────「 SYARAT & KETENTUAN 」────╮</h3>
-                        <h4>📋 SNK PRODUK: ${transaction.productName}</h4>
-                        <div class="snk-content">${transaction.snk.replace(/\n/g, '<br>')}</div>
-                        <h3>╰────「 END SNK 」────╯</h3>
-                    </div>
-                `;
+            // Parse and display SNK from receipt content
+            let snkHTML = '';
+            if (currentReceiptText) {
+                const lines = currentReceiptText.split('\n');
+                let inSnkSection = false;
+                let snkLines = [];
+                let snkTitle = '';
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (line.includes('SNK PRODUK:') || line.includes('📋 SNK PRODUK:')) {
+                        inSnkSection = true;
+                        snkTitle = line.replace(/[*📋]/g, '').replace('SNK PRODUK:', '').trim();
+                        continue;
+                    }
+                    if (line.includes('END SNK') || line.includes('╰────')) {
+                        inSnkSection = false;
+                        break;
+                    }
+                    if (inSnkSection && line && !line.includes('SYARAT & KETENTUAN') && !line.includes('╭────')) {
+                        snkLines.push(line.replace(/[*]/g, ''));
+                    }
+                }
+                
+                if (snkLines.length > 0) {
+                    snkHTML = '<div class="snk-container">';
+                    snkHTML += `<h3 class="snk-title">📋 SNK PRODUK: ${snkTitle || transaction.productName}</h3>`;
+                    snkHTML += '<div class="snk-content">';
+                    snkLines.forEach(line => {
+                        if (line.trim()) {
+                            // Format line dengan emoji dan styling
+                            let formattedLine = line;
+                            if (line.includes('✅')) {
+                                formattedLine = `<div class="snk-item snk-allowed">${line}</div>`;
+                            } else if (line.includes('🚫') || line.includes('dilarang')) {
+                                formattedLine = `<div class="snk-item snk-prohibited">${line}</div>`;
+                            } else if (line.startsWith('*') || line.match(/^[•\-\*]/)) {
+                                formattedLine = `<div class="snk-item">${line.replace(/^[•\-\*]\s*/, '')}</div>`;
+                            } else {
+                                formattedLine = `<div class="snk-item">${line}</div>`;
+                            }
+                            snkHTML += formattedLine;
+                        }
+                    });
+                    snkHTML += '</div></div>';
+                }
+            } else if (transaction.snk) {
+                // Fallback to transaction.snk if receipt content not available
+                snkHTML = '<div class="snk-container">';
+                snkHTML += `<h3 class="snk-title">📋 SNK PRODUK: ${transaction.productName}</h3>`;
+                snkHTML += '<div class="snk-content">';
+                const snkLines = transaction.snk.split('\n');
+                snkLines.forEach(line => {
+                    if (line.trim()) {
+                        let formattedLine = line;
+                        if (line.includes('✅')) {
+                            formattedLine = `<div class="snk-item snk-allowed">${line}</div>`;
+                        } else if (line.includes('🚫') || line.includes('dilarang')) {
+                            formattedLine = `<div class="snk-item snk-prohibited">${line}</div>`;
+                        } else {
+                            formattedLine = `<div class="snk-item">${line}</div>`;
+                        }
+                        snkHTML += formattedLine;
+                    }
+                });
+                snkHTML += '</div></div>';
             }
             
-            detailHTML += '</div>';
-
-            document.getElementById('accountDetails').innerHTML = detailHTML;
+            document.getElementById('snkSection').innerHTML = snkHTML;
             document.getElementById('successModal').style.display = 'flex';
         }
 
