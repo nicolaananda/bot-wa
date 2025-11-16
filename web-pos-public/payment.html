@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Pembayaran - GiHa Smart Bot POS</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .payment-container {
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+
+        .payment-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-xl);
+            padding: 2rem;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+        }
+
+        .payment-status {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .payment-status-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .payment-status h2 {
+            color: var(--text-primary);
+            font-size: 1.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .payment-status p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .order-info {
+            background: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .order-info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .order-info-row:last-child {
+            border-bottom: none;
+        }
+
+        .order-info-label {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .order-info-value {
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+
+        .order-info-value.total {
+            font-size: 1.5rem;
+            background: var(--aurora-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .payment-method-info {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+            border: 2px solid #6366f1;
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .payment-method-info h3 {
+            color: var(--text-primary);
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .qris-placeholder {
+            width: 280px;
+            height: 280px;
+            margin: 1.5rem auto;
+            background: white;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .qris-placeholder img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .payment-instructions {
+            background: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .payment-instructions h4 {
+            color: var(--text-primary);
+            font-size: 1.125rem;
+            margin-bottom: 1rem;
+        }
+
+        .payment-instructions ol {
+            margin-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        .payment-instructions li {
+            margin-bottom: 0.75rem;
+            line-height: 1.6;
+        }
+
+        .timer-container {
+            text-align: center;
+            padding: 1.5rem;
+            background: rgba(255, 0, 102, 0.1);
+            border: 2px solid rgba(255, 0, 102, 0.3);
+            border-radius: var(--radius-lg);
+            margin-bottom: 2rem;
+        }
+
+        .timer-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .timer-value {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #ff0066;
+            font-family: monospace;
+        }
+
+        .payment-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .payment-actions button {
+            flex: 1;
+        }
+
+        @media (max-width: 768px) {
+            .payment-container {
+                padding: 1rem;
+                margin: 1rem auto;
+            }
+
+            .payment-card {
+                padding: 1.5rem;
+            }
+
+            .payment-status-icon {
+                font-size: 3rem;
+            }
+
+            .payment-status h2 {
+                font-size: 1.5rem;
+            }
+
+            .qris-placeholder {
+                width: 240px;
+                height: 240px;
+            }
+
+            .timer-value {
+                font-size: 2rem;
+            }
+
+            .payment-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🤖 GiHa Smart Bot</div>
+        <a href="/products" class="btn-secondary" style="text-decoration: none; padding: 0.625rem 1.25rem;">
+            ← Kembali
+        </a>
+    </nav>
+
+    <div class="payment-container">
+        <div class="payment-card">
+            <div class="payment-status">
+                <div class="payment-status-icon">⏳</div>
+                <h2>Menunggu Pembayaran</h2>
+                <p>Silakan selesaikan pembayaran Anda</p>
+            </div>
+
+            <div class="timer-container">
+                <div class="timer-label">Batas Waktu Pembayaran</div>
+                <div class="timer-value" id="countdownTimer">29:59</div>
+            </div>
+
+            <div class="order-info">
+                <div class="order-info-row">
+                    <span class="order-info-label">Order ID</span>
+                    <span class="order-info-value" id="orderId">-</span>
+                </div>
+                <div class="order-info-row">
+                    <span class="order-info-label">Produk</span>
+                    <span class="order-info-value" id="productName">-</span>
+                </div>
+                <div class="order-info-row">
+                    <span class="order-info-label">Jumlah</span>
+                    <span class="order-info-value" id="quantity">-</span>
+                </div>
+                <div class="order-info-row">
+                    <span class="order-info-label">Total Pembayaran</span>
+                    <span class="order-info-value total" id="totalAmount">Rp 0</span>
+                </div>
+            </div>
+
+            <div class="payment-method-info">
+                <h3>💳 Scan QRIS untuk Bayar</h3>
+                <div class="qris-placeholder">
+                    <div style="text-align: center; color: #666;">
+                        <p>🔄 Loading QRIS...</p>
+                        <small>Integrasi payment gateway<br>akan segera ditambahkan</small>
+                    </div>
+                </div>
+                <p style="color: var(--text-secondary); margin-top: 1rem;">
+                    Atau transfer ke rekening bank yang tersedia
+                </p>
+            </div>
+
+            <div class="payment-instructions">
+                <h4>📝 Cara Pembayaran:</h4>
+                <ol>
+                    <li>Scan QRIS menggunakan aplikasi mobile banking atau e-wallet Anda</li>
+                    <li>Pastikan jumlah pembayaran sudah sesuai</li>
+                    <li>Konfirmasi pembayaran</li>
+                    <li>Tunggu konfirmasi otomatis (max 5 menit)</li>
+                    <li>Produk akan dikirim otomatis setelah pembayaran terkonfirmasi</li>
+                </ol>
+            </div>
+
+            <div class="payment-actions">
+                <button class="btn-secondary" onclick="checkPaymentStatus()">
+                    🔄 Cek Status
+                </button>
+                <button class="btn-primary" onclick="window.location.href='/products'">
+                    ← Kembali ke Produk
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        let countdownInterval;
+        let expiresAt;
+
+        async function loadPaymentInfo() {
+            // Get order ID from URL
+            const pathParts = window.location.pathname.split('/');
+            const orderId = pathParts[pathParts.length - 1];
+
+            if (!orderId) {
+                showToast('Order ID tidak valid', 'error');
+                setTimeout(() => window.location.href = '/products', 2000);
+                return;
+            }
+
+            try {
+                // Fetch order details from API
+                const response = await fetch(`/api/order/${orderId}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showToast('Order tidak ditemukan', 'error');
+                    setTimeout(() => window.location.href = '/products', 2000);
+                    return;
+                }
+
+                const order = data.order;
+
+                // Update UI with order data
+                document.getElementById('orderId').textContent = order.orderId;
+                document.getElementById('productName').textContent = order.productName;
+                document.getElementById('quantity').textContent = `${order.quantity}x`;
+                document.getElementById('totalAmount').textContent = formatRupiah(order.totalAmount);
+
+                // Display QR Code if available
+                if (order.qrisImageBase64) {
+                    const qrisContainer = document.querySelector('.qris-placeholder');
+                    qrisContainer.innerHTML = `<img src="data:image/png;base64,${order.qrisImageBase64}" 
+                        alt="QRIS" 
+                        style="width: 100%; height: 100%; object-fit: contain; border-radius: 12px; background: white; padding: 10px;">`;
+                }
+
+                // Set expiration time from order
+                expiresAt = new Date(order.expiresAt);
+                startCountdown();
+
+                // Auto-check payment status every 10 seconds
+                setInterval(checkPaymentStatus, 10000);
+            } catch (error) {
+                console.error('Error loading order:', error);
+                showToast('Gagal memuat data order', 'error');
+                
+                // Fallback: set default expiration time
+                document.getElementById('orderId').textContent = orderId;
+                expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+                startCountdown();
+            }
+        }
+
+        function startCountdown() {
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            countdownInterval = setInterval(() => {
+                const now = new Date().getTime();
+                const distance = expiresAt - now;
+
+                if (distance < 0) {
+                    clearInterval(countdownInterval);
+                    document.getElementById('countdownTimer').textContent = '00:00';
+                    showToast('Waktu pembayaran habis', 'error');
+                    setTimeout(() => window.location.href = '/products', 3000);
+                    return;
+                }
+
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+                document.getElementById('countdownTimer').textContent = 
+                    `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        async function checkPaymentStatus() {
+            const pathParts = window.location.pathname.split('/');
+            const orderId = pathParts[pathParts.length - 1];
+
+            try {
+                const response = await fetch(`/api/order/${orderId}`);
+                const data = await response.json();
+
+                if (data.success && data.order.status === 'completed') {
+                    clearInterval(countdownInterval);
+                    
+                    // Update UI to show success
+                    document.querySelector('.payment-status-icon').textContent = '✅';
+                    document.querySelector('.payment-status h2').textContent = 'Pembayaran Berhasil!';
+                    document.querySelector('.payment-status p').textContent = 'Detail akun akan segera dikirim';
+                    document.querySelector('.timer-container').style.display = 'none';
+                    
+                    showToast('✅ Pembayaran berhasil! Mengalihkan ke halaman produk...', 'success');
+                    
+                    // Redirect to products page after 3 seconds
+                    setTimeout(() => window.location.href = '/products', 3000);
+                }
+            } catch (error) {
+                console.error('Error checking payment status:', error);
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show ' + type;
+            
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+
+        function formatRupiah(amount) {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(amount);
+        }
+
+        // Initialize
+        loadPaymentInfo();
+    </script>
+</body>
+</html>
+
