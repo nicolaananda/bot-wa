@@ -16,6 +16,20 @@ const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
 
 // Import stock helper functions
 const stockHelper = require('./stock-helper');
+const DatabaseClass = require('../function/database');
+
+let dbInstance = null;
+async function getDbInstance() {
+  if (dbInstance) return dbInstance;
+  dbInstance = global.db || new DatabaseClass();
+  if (typeof dbInstance.load === 'function') {
+    await dbInstance.load();
+  }
+  if (!global.db) {
+    global.db = dbInstance;
+  }
+  return dbInstance;
+}
 const { getReceipt, receiptExists, deleteReceipt } = require('../config/r2-storage');
 
 // Contoh API endpoint untuk dashboard web
@@ -42,52 +56,16 @@ app.use(express.json({ limit: '2mb' })); // ganti yang sebelumnya app.use(expres
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
 let pg; if (usePg) { pg = require('../config/postgres'); }
 
-// Function untuk membaca database (JSON file atau Postgres)
+// Function untuk membaca database snapshot dari Postgres
 async function loadDatabaseAsync() {
-  if (usePg) {
-    const result = { users: {}, transaksi: [], produk: {}, setting: {}, profit: {}, persentase: {} };
-    // users (merge saldo & role columns into data for POS Web consistency)
-    const users = await pg.query('SELECT user_id, saldo, role, data FROM users');
-    for (const row of users.rows) {
-      const payload = Object.assign({}, row.data || {});
-      payload.saldo = typeof row.saldo === 'number' ? row.saldo : (payload.saldo || 0);
-      if (row.role) payload.role = row.role;
-      result.users[row.user_id] = payload;
-    }
-    // transaksi
-    const trx = await pg.query('SELECT meta FROM transaksi ORDER BY id ASC');
-    result.transaksi = trx.rows.map(r => r.meta);
-    // produk
-    const pr = await pg.query('SELECT id, data FROM produk');
-    for (const row of pr.rows) result.produk[row.id] = row.data || {};
-    // settings
-    const st = await pg.query('SELECT key, value FROM settings');
-    for (const row of st.rows) result.setting[row.key] = row.value;
-    // optional keys if exist in kv tables created by migration
-    try { const prf = await pg.query('SELECT v FROM "profit"'); if (prf.rows.length) result.profit = Object.fromEntries(prf.rows.map((r,i)=>[String(i), r.v])); } catch {}
-    try { const per = await pg.query('SELECT v FROM "persentase"'); if (per.rows.length) result.persentase = Object.fromEntries(per.rows.map((r,i)=>[String(i), r.v])); } catch {}
-    return result;
-  }
   try {
-    const dbPath = path.join(__dirname, 'database.json');
-    console.log('Loading database from:', dbPath);
-    console.log('Current directory:', __dirname);
-    console.log('File exists:', fs.existsSync(dbPath));
-    
-    if (!fs.existsSync(dbPath)) {
-      console.error('Database file not found at:', dbPath);
-      return null;
+    const instance = await getDbInstance();
+    if (typeof instance.load === 'function') {
+      await instance.load();
     }
-    
-    const dbContent = fs.readFileSync(dbPath, 'utf8');
-    console.log('File size:', dbContent.length, 'characters');
-    
-    const parsed = JSON.parse(dbContent);
-    console.log('Database loaded successfully with keys:', Object.keys(parsed));
-    return parsed;
+    return instance.data || {};
   } catch (error) {
-    console.error('Error loading database:', error);
-    console.error('Error stack:', error.stack);
+    console.error('Error loading database snapshot:', error);
     return null;
   }
 }
@@ -220,17 +198,6 @@ function parseDeliveredAccountFromFile(reffId) {
   }
 }
 
-// Role Management Functions
-function saveDatabase(db) {
-  try {
-    const dbPath = path.join(__dirname, 'database.json');
-    fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), 'utf8');
-    return true;
-  } catch (error) {
-    console.error('Error saving database:', error);
-    return false;
-  }
-}
     // ===== POS WEB INTEGRATION ENDPOINTS (BEGIN) =====
 
 // Token opsional untuk write-protect endpoint POS
@@ -257,7 +224,7 @@ function posNoStore(res) {
 
 /**
  * GET /api/pos/database
- * Bacakan langsung options/database.json agar POS Web bisa read tanpa Nginx alias.
+ * Return the latest in-memory snapshot for Web POS consumers.
  * Menggunakan loadDatabase() yang sudah ada di file ini.
  */
 app.get('/api/pos/database', async (req, res) => {
@@ -302,20 +269,6 @@ app.post('/api/pos/transactions', async (req, res) => {
         }
       }
       return res.json({ success: true, saved, mode: 'postgres' });
-    } else {
-      // Save to JSON
-      const db = await loadDatabaseAsync();
-      if (!db) {
-        return res.status(500).json({ success: false, error: 'Database not available' });
-      }
-      
-      if (!db.transaksi) db.transaksi = [];
-      db.transaksi.push(...transactions);
-      
-      if (saveDatabase(db)) {
-        return res.json({ success: true, saved: transactions.length, mode: 'json' });
-      }
-      return res.status(500).json({ success: false, error: 'Failed to save database' });
     }
   } catch (e) {
     console.error('[POS] Transaction save error:', e);
@@ -326,8 +279,7 @@ app.post('/api/pos/transactions', async (req, res) => {
 /**
  * POST /api/pos/save-database
  * Body: { database: <obj db penuh> }
- * Simpan perubahan dari POS Web (saldo, stok, terjual, dll) ke options/database.json
- * Menggunakan saveDatabase() yang sudah ada di file ini.
+ * Simpan perubahan dari POS Web (saldo, stok, terjual, dll) langsung ke Postgres.
  */
 app.post('/api/pos/save-database', async (req, res) => {
   if (!posAuth(req, res)) return;
@@ -399,12 +351,6 @@ app.post('/api/pos/save-database', async (req, res) => {
         return res.status(500).json({ success: false, error: 'Failed to apply to Postgres: ' + e.message });
       }
     }
-
-    // File mode
-    if (saveDatabase(database)) {
-      return res.json({ success: true, updatedAt: new Date().toISOString() });
-    }
-    return res.status(500).json({ success: false, error: 'Failed to save database' });
   } catch (e) {
     console.error('[POS save-database] Error:', e);
     return res.status(500).json({ success: false, error: 'Internal server error' });
@@ -417,20 +363,21 @@ app.post('/api/pos/save-database', async (req, res) => {
  * Update PIN user tanpa kirim seluruh database.
  */
 app.get('/api/pos/debug', async (req, res) => {
-  if (usePg) {
-    try {
-      const counters = await Promise.all([
-        pg.query('SELECT COUNT(*)::int AS c FROM users'),
-        pg.query('SELECT COUNT(*)::int AS c FROM transaksi'),
-        pg.query('SELECT COUNT(*)::int AS c FROM produk')
-      ]);
-      return res.json({ mode: 'postgres', users: counters[0].rows[0].c, transaksi: counters[1].rows[0].c, produk: counters[2].rows[0].c });
-    } catch (e) {
-      return res.status(500).json({ success: false, error: e.message });
-    }
+  try {
+    const counters = await Promise.all([
+      pg.query('SELECT COUNT(*)::int AS c FROM users'),
+      pg.query('SELECT COUNT(*)::int AS c FROM transaksi'),
+      pg.query('SELECT COUNT(*)::int AS c FROM produk')
+    ]);
+    return res.json({
+      mode: 'postgres',
+      users: counters[0].rows[0].c,
+      transaksi: counters[1].rows[0].c,
+      produk: counters[2].rows[0].c
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
   }
-  const filePath = path.join(__dirname, 'database.json');
-  res.json({ mode: 'file', __dirname, filePath, exists: fs.existsSync(filePath) });
 });
 
 app.post('/api/pos/update-pin', async (req, res) => {
@@ -448,20 +395,7 @@ app.post('/api/pos/update-pin', async (req, res) => {
       );
       return res.json({ success: true, phone, updatedAt: new Date().toISOString() });
     }
-    const db = await loadDatabaseAsync();
-    if (!db || !db.users) {
-      return res.status(500).json({ success: false, error: 'Database not available' });
-    }
-    if (!db.users[phone]) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-
-    db.users[phone].pin = pin;
-
-    if (saveDatabase(db)) {
-      return res.json({ success: true, phone, updatedAt: new Date().toISOString() });
-    }
-    return res.status(500).json({ success: false, error: 'Failed to save database' });
+    return res.status(500).json({ success: false, error: 'PostgreSQL mode is required' });
   } catch (e) {
     console.error('[POS update-pin] Error:', e);
     return res.status(500).json({ success: false, error: 'Internal server error' });
@@ -679,43 +613,7 @@ app.patch('/api/admin/users/:userId/saldo', async (req, res) => {
       writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'saldo.adjust', delta: amount, reason: reason || null, before, after, timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
       return res.json({ success: true, data: { userId, before, after, delta: amount, auditId } });
     }
-    const db = await loadDatabaseAsync();
-    if (!db || !db.users) return res.status(500).json({ success: false, error: 'Database not available' });
-    
-    // Auto-create user if not exists (same as index.js addsaldo)
-    let found = findUserRecord(db, userId);
-    if (!found) {
-      // Create new user
-      db.users[userId] = {
-        saldo: 0,
-        role: 'bronze'
-      };
-      found = { key: userId, record: db.users[userId] };
-    }
-
-    const before = parseInt(found.record.saldo) || 0;
-    const after = before + amount;
-    // No limit - allow negative saldo (admin can set any value)
-
-    found.record.saldo = after;
-    const saved = saveDatabase(db);
-    if (!saved) return res.status(500).json({ success: false, error: 'Failed to save database' });
-
-    const auditId = generateAuditId();
-    writeAudit({
-      id: auditId,
-      admin: req.adminUser,
-      userId: found.key,
-      action: 'saldo.adjust',
-      delta: amount,
-      reason: reason || null,
-      before,
-      after,
-      timestamp: new Date().toISOString(),
-      ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null
-    });
-
-    return res.json({ success: true, data: { userId: found.key, before, after, delta: amount, auditId } });
+    return res.status(500).json({ success: false, error: 'PostgreSQL mode is required' });
   } catch (e) {
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
@@ -740,27 +638,7 @@ app.post('/api/admin/users/:userId/pin', async (req, res) => {
       writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'pin.update', masked: '******', timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
       return res.json({ success: true, data: { userId, updatedAt: new Date().toISOString() } });
     }
-    const db = await loadDatabaseAsync();
-    if (!db || !db.users) return res.status(500).json({ success: false, error: 'Database not available' });
-    const found = findUserRecord(db, userId);
-    if (!found) return res.status(404).json({ success: false, error: 'User not found' });
-
-    found.record.pin = pin;
-    const saved = saveDatabase(db);
-    if (!saved) return res.status(500).json({ success: false, error: 'Failed to save database' });
-
-    const auditId = generateAuditId();
-    writeAudit({
-      id: auditId,
-      admin: req.adminUser,
-      userId: found.key,
-      action: 'pin.update',
-      masked: '******',
-      timestamp: new Date().toISOString(),
-      ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null
-    });
-
-    return res.json({ success: true, data: { userId: found.key, updatedAt: new Date().toISOString() } });
+    return res.status(500).json({ success: false, error: 'PostgreSQL mode is required' });
   } catch (e) {
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
@@ -792,29 +670,7 @@ app.patch('/api/admin/users/:userId/role', async (req, res) => {
       writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'role.update', oldRole, newRole: role, timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
       return res.json({ success: true, data: { userId, oldRole, newRole: role } });
     }
-    const db = await loadDatabaseAsync();
-    if (!db || !db.users) return res.status(500).json({ success: false, error: 'Database not available' });
-    const found = findUserRecord(db, userId);
-    if (!found) return res.status(404).json({ success: false, error: 'User not found' });
-
-    const oldRole = found.record.role || 'bronze';
-    found.record.role = role;
-    const saved = saveDatabase(db);
-    if (!saved) return res.status(500).json({ success: false, error: 'Failed to save database' });
-
-    const auditId = generateAuditId();
-    writeAudit({
-      id: auditId,
-      admin: req.adminUser,
-      userId: found.key,
-      action: 'role.update',
-      oldRole,
-      newRole: role,
-      timestamp: new Date().toISOString(),
-      ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null
-    });
-
-    return res.json({ success: true, data: { userId: found.key, oldRole, newRole: role } });
+    return res.status(500).json({ success: false, error: 'PostgreSQL mode is required' });
   } catch (e) {
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
@@ -1764,14 +1620,7 @@ app.post('/api/dashboard/products', async (req, res) => {
       await pg.query('INSERT INTO produk(id, name, price, stock, data) VALUES ($1,$2,$3,$4,$5)', [id, name, parseInt(priceB)||0, 0, JSON.stringify(data)]);
       return res.json({ success: true, data });
     }
-
-    const db = await loadDatabaseAsync();
-    if (!db) return res.status(500).json({ success: false, message: 'Database not available' });
-    if (!db.produk) db.produk = {};
-    if (db.produk[id]) return res.status(409).json({ success: false, message: 'Product already exists' });
-    db.produk[id] = { id, name, desc, priceB, priceS, priceG, snk, minStock, stok: [], terjual: 0 };
-    if (!saveDatabase(db)) return res.status(500).json({ success: false, message: 'Failed to save database' });
-    return res.json({ success: true, data: db.produk[id] });
+    return res.status(500).json({ success: false, message: 'PostgreSQL mode is required' });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });
   }
@@ -1805,12 +1654,7 @@ app.patch('/api/dashboard/products/:productId', async (req, res) => {
       await pg.query('UPDATE produk SET name=$2, price=$3, stock=$4, data=$5 WHERE id=$1', [productId, updated.name || data.name || null, price, stockCount, JSON.stringify(updated)]);
       return res.json({ success: true, data: updated });
     }
-
-    const db = await loadDatabaseAsync();
-    if (!db || !db.produk || !db.produk[productId]) return res.status(404).json({ success: false, message: 'Product not found' });
-    db.produk[productId] = { ...(db.produk[productId] || {}), ...payload };
-    if (!saveDatabase(db)) return res.status(500).json({ success: false, message: 'Failed to save database' });
-    return res.json({ success: true, data: db.produk[productId] });
+    return res.status(500).json({ success: false, message: 'PostgreSQL mode is required' });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });
   }
@@ -1826,11 +1670,7 @@ app.delete('/api/dashboard/products/:productId', async (req, res) => {
       await pg.query('DELETE FROM produk WHERE id=$1', [productId]);
       return res.json({ success: true });
     }
-    const db = await loadDatabaseAsync();
-    if (!db || !db.produk || !db.produk[productId]) return res.status(404).json({ success: false, message: 'Product not found' });
-    delete db.produk[productId];
-    if (!saveDatabase(db)) return res.status(500).json({ success: false, message: 'Failed to save database' });
-    return res.json({ success: true });
+    return res.status(500).json({ success: false, message: 'PostgreSQL mode is required' });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });
   }
@@ -1895,87 +1735,7 @@ app.put('/api/dashboard/products/:productId/stock', async (req, res) => {
         }
       });
     }
-    const db = loadDatabaseAsync ? await loadDatabaseAsync() : null;
-    if (!db || !db.produk) {
-      return res.status(404).json({
-        success: false,
-        message: 'Database or products not found'
-      });
-    }
-
-    if (!db.produk[productId]) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
-
-    const product = db.produk[productId];
-    const previousStockCount = product.stok ? product.stok.length : 0;
-    let newStockCount = previousStockCount;
-
-    if (action === 'add') {
-      // Add new stock items
-      if (!product.stok) {
-        product.stok = [];
-      }
-      
-      // Validate stock items format
-      const validStockItems = stockItems.filter(item => {
-        if (typeof item === 'string') {
-          return item.includes('|') && item.split('|').length >= 4;
-        }
-        return false;
-      });
-
-      if (validStockItems.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid stock item format. Expected: "email|password|profile|pin|notes"'
-        });
-      }
-
-      product.stok.push(...validStockItems);
-      newStockCount = product.stok.length;
-      
-      // Update last restock timestamp
-      product.lastRestock = new Date().toISOString();
-
-    } else if (action === 'remove') {
-      // Remove stock items
-      if (!product.stok || product.stok.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'No stock available to remove'
-        });
-      }
-
-      // Remove items from the beginning of the array (FIFO)
-      const itemsToRemove = Math.min(stockItems.length, product.stok.length);
-      product.stok.splice(0, itemsToRemove);
-      newStockCount = product.stok.length;
-    }
-
-    // Save updated database
-    if (saveDatabase(db)) {
-      res.json({
-        success: true,
-        data: {
-          productId: productId,
-          previousStockCount: previousStockCount,
-          newStockCount: newStockCount,
-          addedItems: action === 'add' ? stockItems.length : 0,
-          removedItems: action === 'remove' ? Math.min(stockItems.length, previousStockCount) : 0,
-          updatedAt: new Date().toISOString(),
-          notes: notes || null
-        }
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to save database'
-      });
-    }
+    return res.status(500).json({ success: false, message: 'PostgreSQL mode is required' });
 
   } catch (error) {
     console.error('Error updating product stock:', error);
@@ -2006,16 +1766,7 @@ app.post('/api/dashboard/products/:productId/stock/item', async (req, res) => {
       if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Failed to update' });
       return res.json({ success: true, data: { newStockCount: r.newCount } });
     }
-
-    const db = await loadDatabaseAsync();
-    if (!db || !db.produk || !db.produk[productId]) return res.status(404).json({ success: false, message: 'Product not found' });
-    const prod = db.produk[productId];
-    if (!Array.isArray(prod.stok)) prod.stok = [];
-    const idx = Number.isInteger(position) ? Math.max(0, Math.min(position, prod.stok.length)) : prod.stok.length;
-    prod.stok.splice(idx, 0, value);
-    prod.lastRestock = new Date().toISOString();
-    if (!saveDatabase(db)) return res.status(500).json({ success: false, message: 'Failed to save database' });
-    return res.json({ success: true, data: { newStockCount: prod.stok.length } });
+    return res.status(500).json({ success: false, message: 'PostgreSQL mode is required' });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });
   }
@@ -2043,12 +1794,7 @@ app.patch('/api/dashboard/products/:productId/stock/item', async (req, res) => {
       if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Failed to update' });
       return res.json({ success: true });
     }
-
-    const db = await loadDatabaseAsync();
-    if (!db || !db.produk || !db.produk[productId]) return res.status(404).json({ success: false, message: 'Product not found' });
-    try { mutate(db.produk[productId]); } catch (e) { return res.status(404).json({ success: false, message: e.message }); }
-    if (!saveDatabase(db)) return res.status(500).json({ success: false, message: 'Failed to save database' });
-    return res.json({ success: true });
+    return res.status(500).json({ success: false, message: 'PostgreSQL mode is required' });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });
   }
@@ -2074,12 +1820,7 @@ app.delete('/api/dashboard/products/:productId/stock/item', async (req, res) => 
       if (!r.ok) return res.status(400).json({ success: false, message: r.error || 'Failed to update' });
       return res.json({ success: true });
     }
-
-    const db = await loadDatabaseAsync();
-    if (!db || !db.produk || !db.produk[productId]) return res.status(404).json({ success: false, message: 'Product not found' });
-    try { removeOne(db.produk[productId]); } catch (e) { return res.status(404).json({ success: false, message: e.message }); }
-    if (!saveDatabase(db)) return res.status(500).json({ success: false, message: 'Failed to save database' });
-    return res.json({ success: true });
+    return res.status(500).json({ success: false, message: 'PostgreSQL mode is required' });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });
   }
@@ -2315,87 +2056,6 @@ app.post('/api/dashboard/products/stock/bulk-update', async (req, res) => {
       }
       return res.json({ success: true, data: { totalUpdates: updates.length, successfulUpdates: successCount, failedUpdates: errorCount, results } });
     }
-    const db = stockHelper.loadDatabase ? stockHelper.loadDatabase() : null;
-    if (!db || !db.produk) {
-      return res.status(404).json({
-        success: false,
-        message: 'Database or products not found'
-      });
-    }
-
-    const results = [];
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const update of updates) {
-      const { productId, action, stockItems, notes } = update;
-      
-      try {
-        if (!db.produk[productId]) {
-          results.push({
-            productId,
-            success: false,
-            error: 'Product not found'
-          });
-          errorCount++;
-          continue;
-        }
-
-        const product = db.produk[productId];
-        const previousStockCount = product.stok ? product.stok.length : 0;
-        let newStockCount = previousStockCount;
-
-        if (action === 'add') {
-          if (!product.stok) product.stok = [];
-          
-          const validItems = stockItems.filter(item => stockHelper.validateStockItem(item));
-          product.stok.push(...validItems);
-          newStockCount = product.stok.length;
-          product.lastRestock = new Date().toISOString();
-          
-        } else if (action === 'remove') {
-          if (product.stok && product.stok.length > 0) {
-            const itemsToRemove = Math.min(stockItems.length, product.stok.length);
-            product.stok.splice(0, itemsToRemove);
-            newStockCount = product.stok.length;
-          }
-        }
-
-        results.push({
-          productId,
-          success: true,
-          previousStockCount,
-          newStockCount,
-          action,
-          itemsProcessed: stockItems.length
-        });
-        successCount++;
-
-      } catch (error) {
-        results.push({
-          productId,
-          success: false,
-          error: error.message
-        });
-        errorCount++;
-      }
-    }
-
-    // Save database if any updates were successful
-    if (successCount > 0) {
-      stockHelper.saveDatabase(db);
-    }
-
-    res.json({
-      success: true,
-      data: {
-        totalUpdates: updates.length,
-        successfulUpdates: successCount,
-        failedUpdates: errorCount,
-        results: results
-      }
-    });
-
   } catch (error) {
     console.error('Error in bulk stock update:', error);
     res.status(500).json({

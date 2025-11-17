@@ -1,6 +1,3 @@
-const fs = require('fs');
-const path = require('path');
-
 // Fungsi untuk mendapatkan data dashboard
 function getDashboardData(db) {
   try {
@@ -229,8 +226,11 @@ function exportDashboardData(db, format = 'json') {
     switch (format.toLowerCase()) {
       case 'json':
         let jsonData = JSON.stringify(dashboardData, null, 2);
-        fs.writeFileSync(`./options/${filename}.json`, jsonData, 'utf8');
-        return `${filename}.json`;
+        return {
+          filename: `${filename}.json`,
+          mime: 'application/json',
+          content: jsonData
+        };
         
       case 'csv':
         let csvData = 'Metric,Value\n';
@@ -248,8 +248,11 @@ function exportDashboardData(db, format = 'json') {
           csvData += `${user.user},${user.transaksi},${user.totalSpent}\n`;
         });
         
-        fs.writeFileSync(`./options/${filename}.csv`, csvData, 'utf8');
-        return `${filename}.csv`;
+        return {
+          filename: `${filename}.csv`,
+          mime: 'text/csv',
+          content: csvData
+        };
         
       default:
         throw new Error('Format tidak valid. Gunakan: json atau csv');

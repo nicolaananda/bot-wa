@@ -183,54 +183,7 @@ global.scheduleAutoDelete = scheduleAutoDelete;
 global.cancelAutoDelete = cancelAutoDelete;
 global.cleanupAllTimeouts = cleanupAllTimeouts;
 
-// Watch for external changes to the database file (bot-tele/posweb updates) only in JSON mode
-if (!usePg) {
-  try {
-    const dbFilePath = path.join(__dirname, 'options', 'database.json');
-    if (fs.existsSync(dbFilePath)) {
-      fs.watchFile(dbFilePath, { interval: 1000 }, () => {
-        try {
-          const raw = fs.readFileSync(dbFilePath, 'utf8');
-          if (!raw || raw.trim().length < 2) return; // skip empty/partial writes
-          const parsed = JSON.parse(raw);
-          if (global.db && global.db.data) {
-            global.db.data = parsed;
-          } else {
-            global.db = {
-              data: parsed,
-              save: async () => fs.writeFileSync(dbFilePath, JSON.stringify(global.db.data, null, 2))
-            };
-          }
-          process.emit('database:reloaded');
-          console.log('[DB] Reloaded from external change');
-        } catch (e) {
-          // Retry once after a short delay to handle atomic writes
-          setTimeout(() => {
-            try {
-              const raw2 = fs.readFileSync(dbFilePath, 'utf8');
-              if (!raw2 || raw2.trim().length < 2) return;
-              const parsed2 = JSON.parse(raw2);
-              if (global.db && global.db.data) {
-                global.db.data = parsed2;
-              } else {
-                global.db = {
-                  data: parsed2,
-                  save: async () => fs.writeFileSync(dbFilePath, JSON.stringify(global.db.data, null, 2))
-                };
-              }
-              process.emit('database:reloaded');
-              console.log('[DB] Reloaded from external change');
-            } catch (ee) {
-              console.error('[DB] Failed to reload external change:', ee.message);
-            }
-          }, 300);
-        }
-      });
-    }
-  } catch (e) {
-    console.error('[DB] Watch setup failed:', e.message);
-  }
-}
+// Filesystem database mode removed; external reload watcher not required
 
 // Cache management functions
 function getCachedSaldo(userId) {
