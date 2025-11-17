@@ -29,10 +29,7 @@ const question = (text) => {
 
 //DATABASE
 global.opts = new Object(yargs(process.argv.slice(2)).exitProcess(false).parse())
-global.db = new (require('./function/database'))(`${opts._[0] ? opts._[0] + '_' : ''}options/database.json`, null, 2)
-
-// Load backup system
-require('./options/backup')
+global.db = new (require('./function/database'))()
 
 // Load graceful shutdown handler
 require('./options/graceful-shutdown')

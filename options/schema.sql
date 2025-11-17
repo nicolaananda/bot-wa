@@ -1,4 +1,4 @@
--- Core tables derived from options/database.json structure
+-- Core tables derived from the legacy JSON schema structure
 CREATE TABLE IF NOT EXISTS users (
   user_id TEXT PRIMARY KEY,
   saldo NUMERIC(18,2) NOT NULL DEFAULT 0,

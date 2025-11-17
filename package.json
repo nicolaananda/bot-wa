@@ -16,7 +16,6 @@
     "backup-health": "node auto-backup.js health",
     "start-safe": "npm run backup && npm run start",
     "pg:schema": "node -e \"require('dotenv').config(); const fs=require('fs'); const sql=fs.readFileSync('./options/schema.sql','utf8'); require('./config/postgres').query(sql).then(()=>{console.log('Schema applied')}).catch(e=>{console.error(e);process.exit(1)})\"",
-    "pg:migrate": "node ./options/migrate-to-postgres.js",
     "pg:dedup": "node ./options/dedup-transaksi.js",
     "neon:setup": "node setup-neon.js",
     "neon:test": "node config/neon-test.js",

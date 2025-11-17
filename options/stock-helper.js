@@ -1,40 +1,4 @@
-const fs = require('fs');
-const path = require('path');
-
 // Stock Management Helper Functions
-
-/**
- * Load database from file
- */
-function loadDatabase() {
-  try {
-    const dbPath = path.join(__dirname, 'database.json');
-    if (!fs.existsSync(dbPath)) {
-      console.error('Database file not found at:', dbPath);
-      return null;
-    }
-    
-    const dbContent = fs.readFileSync(dbPath, 'utf8');
-    return JSON.parse(dbContent);
-  } catch (error) {
-    console.error('Error loading database:', error);
-    return null;
-  }
-}
-
-/**
- * Save database to file
- */
-function saveDatabase(db) {
-  try {
-    const dbPath = path.join(__dirname, 'database.json');
-    fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), 'utf8');
-    return true;
-  } catch (error) {
-    console.error('Error saving database:', error);
-    return false;
-  }
-}
 
 /**
  * Determine stock status based on count
@@ -336,8 +300,6 @@ function exportStockToCSV() {
 }
 
 module.exports = {
-  loadDatabase,
-  saveDatabase,
   getStockStatus,
   getProductCategory,
   parseStockItem,

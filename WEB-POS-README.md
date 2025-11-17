@@ -85,10 +85,7 @@ WEB_POS_SECRET=your-secret-key-here
 
 ## 💾 Integrasi Database
 
-Web POS terintegrasi langsung dengan database bot WhatsApp:
-
-- **Filesystem Mode**: Menggunakan `database.json`
-- **PostgreSQL Mode**: Menggunakan database PostgreSQL sesuai konfigurasi
+Web POS terintegrasi langsung dengan database bot WhatsApp melalui PostgreSQL.
 
 ### Data yang Disinkronisasi:
 - ✅ Saldo user
@@ -163,9 +160,7 @@ WEB_POS_PORT=3002
 ```
 
 ### Database tidak terbaca
-Pastikan:
-- File `database.json` ada di folder `options/`
-- Atau PostgreSQL sudah dikonfigurasi dengan benar
+Pastikan PostgreSQL sudah dikonfigurasi dengan benar dan kredensial pada `.env` sesuai dengan instance Anda.
 
 ### User tidak bisa login
 - Pastikan nomor WhatsApp sudah terdaftar di bot

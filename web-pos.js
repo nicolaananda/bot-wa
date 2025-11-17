@@ -19,14 +19,11 @@ const PORT = process.env.WEB_POS_PORT || 3001;
 let db;
 async function initDatabase() {
   try {
-    const dbPath = './options/database.json';
     const DBClass = DatabaseClass;
-    db = global.db || new DBClass(dbPath, null, 2);
+    db = global.db || new DBClass();
     
     if (typeof db.load === 'function') {
       await db.load();
-    } else if (typeof db._load === 'function') {
-      db._load();
     }
     
     global.db = db;
@@ -563,20 +560,12 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
     try {
       console.log(`[Web POS] Saving database... Total transactions in memory: ${db.data.transaksi.length}`);
       
-      // Call save and wait a bit for queue to process
-      db.save();
-      
-      // For file-based DB, directly call _save to ensure immediate write
-      if (typeof db._save === 'function') {
-        await db._save();
-        console.log(`✅ [Web POS] Database saved successfully (direct _save). RefId: ${reffId}`);
-        console.log(`✅ [Web POS] Database path: ${db.file || 'unknown'}`);
-      } else {
+      if (typeof db.save === 'function') {
         await db.save();
-        console.log(`✅ [Web POS] Database saved successfully (PG). RefId: ${reffId}`);
+        console.log(`✅ [Web POS] Database saved successfully. RefId: ${reffId}`);
       }
       
-      // Verify save by reading back
+      // Verify save by reloading snapshot (PostgreSQL)
       if (typeof db.load === 'function') {
         await db.load();
         const savedTransaction = db.data.transaksi.find(t => t.reffId === reffId);
@@ -729,9 +718,7 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
     
     // Save database
     try {
-      if (typeof db._save === 'function') {
-        await db._save();
-      } else {
+      if (typeof db.save === 'function') {
         await db.save();
       }
       console.log(`✅ [Web POS] Buynow order created - OrderID: ${orderId}, RefID: ${reffId}`);
@@ -945,9 +932,7 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
               
               // Save database
               try {
-                if (typeof db._save === 'function') {
-                  await db._save();
-                } else {
+                if (typeof db.save === 'function') {
                   await db.save();
                 }
               } catch (saveError) {
@@ -972,9 +957,7 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
           if (db.data.order[userId]) {
             delete db.data.order[userId];
             try {
-              if (typeof db._save === 'function') {
-                await db._save();
-              } else {
+              if (typeof db.save === 'function') {
                 await db.save();
               }
             } catch {}
@@ -1049,9 +1032,7 @@ app.post('/api/payment/webhook', async (req, res) => {
       db.data.pendingOrders = db.data.pendingOrders.filter(o => o.orderId !== orderId);
       
       // Save database
-      if (typeof db._save === 'function') {
-        await db._save();
-      } else {
+      if (typeof db.save === 'function') {
         await db.save();
       }
       
@@ -1329,8 +1310,10 @@ app.post('/api/admin/addstock', requireAuth, async (req, res) => {
     
     db.data.produk[productId].stok.push(...accountLines);
     
-    // Save database
-    await db.save();
+    // Persist changes to PostgreSQL
+    if (typeof db.save === 'function') {
+      await db.save();
+    }
     
     console.log(`✅ [Web POS Admin] Stock added - Product: ${productId}, Count: ${accountLines.length}, By: ${cleanPhone}`);
     
@@ -1676,9 +1659,7 @@ app.get('/api/pending-order', requireAuth, async (req, res) => {
       // Order expired, clean it up
       delete db.data.order[userId];
       try {
-        if (typeof db._save === 'function') {
-          await db._save();
-        } else {
+        if (typeof db.save === 'function') {
           await db.save();
         }
       } catch (saveError) {
@@ -1749,9 +1730,7 @@ app.post('/api/cancel-order', requireAuth, async (req, res) => {
     
     // Save database
     try {
-      if (typeof db._save === 'function') {
-        await db._save();
-      } else {
+      if (typeof db.save === 'function') {
         await db.save();
       }
       console.log(`✅ [Web POS] Order cancelled - OrderID: ${orderId}, User: ${userId}`);
@@ -1800,9 +1779,7 @@ app.post('/api/cancel-order/:orderId', requireAuth, async (req, res) => {
     
     // Save database
     try {
-      if (typeof db._save === 'function') {
-        await db._save();
-      } else {
+      if (typeof db.save === 'function') {
         await db.save();
       }
       console.log(`✅ [Web POS] Order cancelled - OrderID: ${orderId}, User: ${userId}`);
