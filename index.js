@@ -228,7 +228,18 @@ module.exports = async (ronzz, m, mek) => {
     const content = JSON.stringify(mek.message)
     const type = Object.keys(mek.message)[0];
     const from = m.chat
-    const chats = (m.mtype === 'conversation') ? m.message.conversation : (m.mtype == 'imageMessage') ? m.message.imageMessage.caption : (m.mtype == 'videoMessage') ? m.message.videoMessage.caption : (m.mtype == 'extendedTextMessage') ? m.message.extendedTextMessage.text : (m.mtype == 'buttonsResponseMessage') && m.message.buttonsResponseMessage.selectedButtonId ? m.message.buttonsResponseMessage.selectedButtonId : (m.mtype == 'listResponseMessage') && m.message.listResponseMessage.singleSelectReply.selectedRowId ? m.message.listResponseMessage.singleSelectReply.selectedRowId : (m.mtype == 'templateButtonReplyMessage') && m.message.templateButtonReplyMessage.selectedId ? m.message.templateButtonReplyMessage.selectedId : (m.mtype == 'interactiveResponseMessage') && JSON.parse(m.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id ? JSON.parse(m.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id : (m.mtype == 'messageContextInfo') ? (m.message.buttonsResponseMessage?.selectedButtonId || m.message.listResponseMessage?.singleSelectReply.selectedRowId || m.text) : ""
+    const rawChats =
+      (m.mtype === 'conversation') ? m.message.conversation :
+      (m.mtype == 'imageMessage') ? m.message.imageMessage.caption :
+      (m.mtype == 'videoMessage') ? m.message.videoMessage.caption :
+      (m.mtype == 'extendedTextMessage') ? m.message.extendedTextMessage.text :
+      (m.mtype == 'buttonsResponseMessage') && m.message.buttonsResponseMessage.selectedButtonId ? m.message.buttonsResponseMessage.selectedButtonId :
+      (m.mtype == 'listResponseMessage') && m.message.listResponseMessage.singleSelectReply.selectedRowId ? m.message.listResponseMessage.singleSelectReply.selectedRowId :
+      (m.mtype == 'templateButtonReplyMessage') && m.message.templateButtonReplyMessage.selectedId ? m.message.templateButtonReplyMessage.selectedId :
+      (m.mtype == 'interactiveResponseMessage') && JSON.parse(m.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id ? JSON.parse(m.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id :
+      (m.mtype == 'messageContextInfo') ? (m.message.buttonsResponseMessage?.selectedButtonId || m.message.listResponseMessage?.singleSelectReply.selectedRowId || m.text) :
+      ""
+    const chats = (typeof rawChats === 'string' ? rawChats : (rawChats ?? '')?.toString() ?? '').trim()
     const toJSON = j => JSON.stringify(j, null, '\t')
     const prefix = prefa ? /^[°•π÷×¶∆£¢€¥®=????+✓_=|~!?@#%^&.©^]/gi.test(chats) ? chats.match(/^[°•π÷×¶∆£¢€¥®=????+✓_=|~!?@#%^&.©^]/gi)[0] : "" : prefa ?? '#'
     const isGroup = m.isGroup
@@ -236,7 +247,7 @@ module.exports = async (ronzz, m, mek) => {
     const isOwner = [ronzz.user.id, ...owner].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(sender) ? true : false
     const pushname = m.pushName
     const budy = (typeof m.text == 'string' ? m.text : '')
-    const args = chats.trim().split(/ +/).slice(1);
+    const args = chats.split(/ +/).slice(1);
     const q = args.join(" ");
     const command = chats.replace(prefix, '').trim().split(/ +/).shift().toLowerCase()
     const botNumber = ronzz.user.id.split(':')[0] + '@s.whatsapp.net'
