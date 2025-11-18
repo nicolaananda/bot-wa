@@ -3126,6 +3126,72 @@ case 'buy': {
         reply(`Kecepatan respon _${latensi.toFixed(4)} Second_\n\n*💻 INFO SERVER*\nHOSTNAME: ${os.hostname}\nRAM: ${formatp(os.totalmem() - os.freemem())} / ${formatp(os.totalmem())}\nCPUs: ${os.cpus().length} core`)
         break
 
+      case 'server': {
+        const cpus = os.cpus() || []
+        const cpuModel = cpus[0]?.model || 'Unknown'
+        const cpuSpeed = cpus[0]?.speed ? `${cpus[0].speed} MHz` : 'N/A'
+        const cpuCount = cpus.length || 1
+        const totalMem = os.totalmem()
+        const freeMem = os.freemem()
+        const usedMem = totalMem - freeMem
+        const memPercent = ((usedMem / totalMem) * 100).toFixed(2)
+        const osUptime = runtime(os.uptime())
+
+        const info = [
+          `*🖥️ SERVER INFORMATION*`,
+          ``,
+          `*• Hostname:* ${os.hostname()}`,
+          `*• Platform:* ${os.platform()} ${os.release()} (${os.arch()})`,
+          `*• Uptime OS:* ${osUptime}`,
+          ``,
+          `*🧠 CPU*`,
+          `*• Model:* ${cpuModel}`,
+          `*• Speed:* ${cpuSpeed}`,
+          `*• Cores:* ${cpuCount}`,
+          ``,
+          `*💾 MEMORY*`,
+          `*• Total:* ${formatp(totalMem)}`,
+          `*• Used:* ${formatp(usedMem)} (${memPercent}%)`,
+          `*• Free:* ${formatp(freeMem)}`,
+          ``,
+          `*⚙️ Node.js:* ${process.version}`,
+          `*📦 Bot Uptime:* ${runtime(process.uptime())}`
+        ].join('\n')
+
+        reply(info)
+      }
+        break
+
+      case 'performa': {
+        const t1 = speed()
+        const latency = speed() - t1
+        const memUsage = process.memoryUsage()
+        const heapUsed = formatp(memUsage.heapUsed || 0)
+        const heapTotal = formatp(memUsage.heapTotal || 0)
+        const rss = formatp(memUsage.rss || 0)
+        const loadAvg = os.loadavg ? os.loadavg().map(n => n.toFixed(2)).join(', ') : 'N/A'
+        const uptimeBot = runtime(process.uptime())
+
+        const info = [
+          `*⚡ BOT PERFORMANCE REPORT*`,
+          ``,
+          `*• Latensi:* ${latency.toFixed(4)}s`,
+          `*• Uptime:* ${uptimeBot}`,
+          ``,
+          `*📊 MEMORY (process)*`,
+          `*• RSS:* ${rss}`,
+          `*• Heap:* ${heapUsed} / ${heapTotal}`,
+          ``,
+          `*⚙️ LOAD AVERAGE:* ${loadAvg}`,
+          `*• CPU cores:* ${os.cpus().length}`,
+          ``,
+          `*📝 Catatan:* Gunakan command ini saat Anda merasa bot lemot untuk melihat kondisi server.`
+        ].join('\n')
+
+        reply(info)
+      }
+        break
+
       case 'done': {
         if (!isGroup) return (mess.group)
         if (!isGroupAdmins && !isOwner) return (mess.admin)
