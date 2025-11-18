@@ -11,6 +11,7 @@ const moment = require('moment-timezone');
 const DatabaseClass = require('./function/database');
 const dbHelper = require('./options/db-helper');
 const { saveReceipt } = require('./config/r2-storage');
+const pg = require('./config/postgres');
 
 const app = express();
 const PORT = process.env.WEB_POS_PORT || 3001;
@@ -228,8 +229,22 @@ function toRupiah(amount) {
   }).format(amount);
 }
 
-function hargaProduk(productId, role = 'bronze') {
-  const product = db.data.produk[productId];
+function resolveProductData(productInput) {
+  if (!productInput) return null;
+  
+  if (typeof productInput === 'string') {
+    return db?.data?.produk?.[productInput] || null;
+  }
+  
+  if (typeof productInput === 'object') {
+    return productInput;
+  }
+  
+  return null;
+}
+
+function hargaProduk(productInput, role = 'bronze') {
+  const product = resolveProductData(productInput);
   if (!product) return 0;
   
   // Use pre-calculated prices from database (same as bot)
@@ -238,6 +253,46 @@ function hargaProduk(productId, role = 'bronze') {
   else if (role === 'gold') return Number(product.priceG || 0);
   
   return Number(product.priceB || 0); // Default to bronze
+}
+
+async function refreshProductCache(productId = null) {
+  const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
+  if (!usePg) return null;
+  
+  if (!db.data.produk) db.data.produk = {};
+  
+  try {
+    if (productId) {
+      const { rows } = await pg.query(
+        'SELECT id, name, price, stock, data FROM produk WHERE id = $1 LIMIT 1',
+        [productId]
+      );
+      
+      if (rows.length === 0) return null;
+      
+      const row = rows[0];
+      const productData = row.data && typeof row.data === 'object' ? row.data : {};
+      if (!productData.name && row.name) productData.name = row.name;
+      if (!productData.nama && row.name) productData.nama = row.name;
+      productData.stock = row.stock || (Array.isArray(productData.stok) ? productData.stok.length : 0);
+      
+      db.data.produk[row.id] = productData;
+      return row;
+    }
+    
+    const { rows } = await pg.query('SELECT id, name, price, stock, data FROM produk');
+    rows.forEach(row => {
+      const productData = row.data && typeof row.data === 'object' ? row.data : {};
+      if (!productData.name && row.name) productData.name = row.name;
+      if (!productData.nama && row.name) productData.nama = row.name;
+      productData.stock = row.stock || (Array.isArray(productData.stok) ? productData.stok.length : 0);
+      db.data.produk[row.id] = productData;
+    });
+    return rows;
+  } catch (error) {
+    console.error('[Web POS] Failed to refresh product cache:', error.message);
+    return null;
+  }
 }
 
 // Authentication middleware
@@ -341,7 +396,7 @@ app.get('/api/user', requireAuth, async (req, res) => {
 });
 
 // Get products (accessible without auth for guest mode)
-app.get('/api/products', (req, res) => {
+app.get('/api/products', async (req, res) => {
   try {
     // Check if user is logged in
     let userRole = 'bronze'; // Default role for guests
@@ -351,21 +406,40 @@ app.get('/api/products', (req, res) => {
       const user = db.data.users[userId] || db.data.users[cleanPhone] || {};
       userRole = user.role || 'bronze';
     }
+    const rows = await refreshProductCache();
     
-    const products = Object.entries(db.data.produk || {})
-      .map(([id, product]) => {
-        const price = hargaProduk(id, userRole);
+    let products = [];
+    
+    if (rows && Array.isArray(rows)) {
+      products = rows.map(row => {
+        const productData = row.data && typeof row.data === 'object'
+          ? row.data
+          : (db.data.produk[row.id] || {});
+        const stockCount = row.stock ?? (Array.isArray(productData.stok) ? productData.stok.length : 0);
+        
         return {
-          id,
-          name: product.name || product.nama,
-          description: product.deskripsi || product.description || '',
-          stock: Array.isArray(product.stok) ? product.stok.length : 0,
-          basePrice: Number(product.harga || product.price || product.priceB || 0),
-          price: price,
-          category: product.kategori || product.category || 'Lainnya'
+          id: row.id,
+          name: productData.name || productData.nama || row.name,
+          description: productData.deskripsi || productData.description || '',
+          stock: stockCount,
+          basePrice: Number(productData.harga || productData.price || productData.priceB || row.price || 0),
+          price: hargaProduk(productData, userRole) || Number(row.price || 0),
+          category: productData.kategori || productData.category || 'Lainnya'
         };
-      })
-      .filter(p => p.stock > 0); // Only show products with stock
+      });
+    } else {
+      products = Object.entries(db.data.produk || {}).map(([id, product]) => ({
+        id,
+        name: product.name || product.nama,
+        description: product.deskripsi || product.description || '',
+        stock: Array.isArray(product.stok) ? product.stok.length : 0,
+        basePrice: Number(product.harga || product.price || product.priceB || 0),
+        price: hargaProduk(product, userRole),
+        category: product.kategori || product.category || 'Lainnya'
+      }));
+    }
+    
+    products = products.filter(p => (Number(p.stock) || 0) > 0); // Only show products with stock
     
     res.json({
       success: true,
@@ -404,8 +478,10 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
       });
     }
     
+    await refreshProductCache(productId);
+    
     // Check if product exists
-    const product = db.data.produk[productId];
+    const product = resolveProductData(productId);
     if (!product) {
       return res.status(404).json({ 
         success: false, 
@@ -431,7 +507,7 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
     }
     
     const userRole = user.role || 'bronze';
-    const pricePerItem = hargaProduk(productId, userRole);
+    const pricePerItem = hargaProduk(product, userRole);
     const totalPrice = pricePerItem * quantity;
     
     // Check balance
@@ -644,8 +720,10 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
       });
     }
     
+    await refreshProductCache(productId);
+    
     // Check if product exists
-    const product = db.data.produk[productId];
+    const product = resolveProductData(productId);
     if (!product) {
       return res.status(404).json({ 
         success: false, 
@@ -678,7 +756,7 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
     }
     
     const userRole = user.role || 'bronze';
-    const pricePerItem = hargaProduk(productId, userRole);
+    const pricePerItem = hargaProduk(product, userRole);
     const totalHarga = pricePerItem * quantity;
     
     // Generate unique code (sama seperti di index.js)
