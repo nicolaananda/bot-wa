@@ -617,28 +617,41 @@ module.exports = async (ronzz, m, mek) => {
     // 🛡️ GROUP WHITELIST: Cek apakah group diizinkan (hanya untuk group, bukan private chat)
     if (isGroup && !isOwner) {
       try {
-        // Ambil group invite code
-        const groupInviteCode = await ronzz.groupInviteCode(from)
-        const groupLink = `https://chat.whatsapp.com/${groupInviteCode}`
-        
-        // Cek apakah group link ada di whitelist
-        const isAllowedGroup = global.linkGroup && global.linkGroup.length > 0 
-          ? global.linkGroup.some(link => {
-              // Normalize link untuk comparison (hapus query params dan mode)
-              const normalizedLink = link.split('?')[0].split('&')[0]
-              const normalizedGroupLink = groupLink.split('?')[0]
-              return normalizedLink === normalizedGroupLink || link.includes(groupInviteCode)
-            })
-          : true // Jika tidak ada whitelist, izinkan semua (backward compatibility)
-        
-        if (!isAllowedGroup) {
-          console.log(`🚫 [GROUP-WHITELIST] Blocked message from unauthorized group: ${groupName} (${from})`)
-          return // Jangan proses pesan dari group yang tidak diizinkan
+        // Cek apakah ada whitelist yang di-set
+        if (global.linkGroup && global.linkGroup.length > 0) {
+          // Ambil group invite code
+          const groupInviteCode = await ronzz.groupInviteCode(from)
+          const groupLink = `https://chat.whatsapp.com/${groupInviteCode}`
+          
+          // Extract invite code dari whitelist links
+          const allowedInviteCodes = global.linkGroup.map(link => {
+            // Extract invite code dari link (format: https://chat.whatsapp.com/INVITECODE?mode=...)
+            const match = link.match(/chat\.whatsapp\.com\/([A-Za-z0-9]+)/)
+            return match ? match[1] : null
+          }).filter(code => code !== null)
+          
+          // Cek apakah group invite code ada di whitelist
+          const isAllowedGroup = allowedInviteCodes.includes(groupInviteCode)
+          
+          if (!isAllowedGroup) {
+            console.log(`🚫 [GROUP-WHITELIST] Blocked message from unauthorized group:`)
+            console.log(`   Group: ${groupName} (${from})`)
+            console.log(`   Group Invite Code: ${groupInviteCode}`)
+            console.log(`   Allowed Codes: ${allowedInviteCodes.join(', ')}`)
+            return // Jangan proses pesan dari group yang tidak diizinkan
+          } else {
+            console.log(`✅ [GROUP-WHITELIST] Allowed group: ${groupName} (${groupInviteCode})`)
+          }
+        } else {
+          // Jika tidak ada whitelist, izinkan semua (backward compatibility)
+          console.log(`⚠️ [GROUP-WHITELIST] No whitelist configured, allowing all groups`)
         }
       } catch (error) {
-        // Jika error saat cek group link, log dan izinkan (untuk avoid blocking valid groups)
-        console.error(`⚠️ [GROUP-WHITELIST] Error checking group:`, error.message)
-        // Tetap izinkan untuk backward compatibility jika error
+        // Jika error saat cek group link, block untuk safety (lebih aman)
+        console.error(`❌ [GROUP-WHITELIST] Error checking group:`, error.message)
+        console.error(`   Group: ${groupName} (${from})`)
+        console.log(`🚫 [GROUP-WHITELIST] Blocking group due to error (safety measure)`)
+        return // Block jika error (lebih aman daripada allow semua)
       }
     }
 
