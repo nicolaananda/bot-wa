@@ -2542,15 +2542,18 @@ case 'buynow': {
       const orderId = `MID-${reffId}-${Date.now()}`;
       
       // Gunakan QRIS statis Midtrans (tracking via webhook)
-      const qrImagePath = "./options/sticker/qris-midtrans.jpg";
-      try {
-        await qrisStatisMidtrans(qrImagePath);
-        console.log(`✅ [MID] QRIS statis Midtrans loaded: ${orderId}`);
-      } catch (qrisError) {
-        console.error(`❌ [MID] Error loading QRIS statis:`, qrisError.message);
-        await releaseLock(sender, 'mid')
-        return reply(`❌ Gagal memuat QR Code Midtrans. Silakan hubungi admin.`)
-      }
+      // const qrImagePath = "./options/sticker/qris-midtrans.jpg";
+      // try {
+      //   await qrisStatisMidtrans(qrImagePath);
+      //   console.log(`✅ [MID] QRIS statis Midtrans loaded: ${orderId}`);
+      // } catch (qrisError) {
+      //   console.error(`❌ [MID] Error loading QRIS statis:`, qrisError.message);
+      //   await releaseLock(sender, 'mid')
+      //   return reply(`❌ Gagal memuat QR Code Midtrans. Silakan hubungi admin.`)
+      // }
+      const qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
+      console.log(`✅ [MID] QRIS dinamis generated: ${orderId}, Amount: Rp${totalAmount}`);
+
 
       const expirationTime = Date.now() + toMs("30m");
       const expireDate = new Date(expirationTime);
