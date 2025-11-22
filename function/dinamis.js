@@ -112,4 +112,24 @@ async function qrisStatis(outPath) {
   return outPath;
 }
 
-module.exports = { qrisDinamis, qrisStatis }
+/**
+ * QRIS Statis Midtrans - Menggunakan gambar QRIS statis Midtrans
+ * Tracking via webhook Midtrans berdasarkan nominal + kode unik
+ * @param {string} outPath - Path output untuk copy gambar statis
+ * @returns {Promise<string>} Path ke gambar QRIS statis Midtrans
+ */
+async function qrisStatisMidtrans(outPath) {
+  const staticQrisPath = pathModule.join(__dirname, '../options/image/qris-midtrans.png');
+  
+  // Check if static QRIS image exists
+  if (!fs.existsSync(staticQrisPath)) {
+    throw new Error(`QRIS statis Midtrans tidak ditemukan di: ${staticQrisPath}`);
+  }
+  
+  // Copy static QRIS image to output path
+  fs.copyFileSync(staticQrisPath, outPath);
+  
+  return outPath;
+}
+
+module.exports = { qrisDinamis, qrisStatis, qrisStatisMidtrans }
