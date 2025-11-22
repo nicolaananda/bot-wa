@@ -48,6 +48,7 @@ app.use(cors({
     'http://localhost:3002',
     'http://localhost:5173',
     'https://pos.nicola.id',
+    'https://api.nicola.id',
     'https://api-botwa.nicola.id'
   ],
   credentials: true
