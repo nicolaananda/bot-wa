@@ -128,8 +128,8 @@ app.post('/webhook/midtrans', (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Invalid signature' });
     }
 
-    const { order_id, transaction_status, payment_type, settlement_time } = notification;
-    console.log(`📋 [Webhook] Order: ${order_id}, Status: ${transaction_status}, Payment: ${payment_type}`);
+    const { order_id, transaction_status, payment_type, settlement_time, gross_amount } = notification;
+    console.log(`📋 [Webhook] Order: ${order_id}, Status: ${transaction_status}, Payment: ${payment_type}, Amount: ${gross_amount}`);
 
     // Clear any cached status to avoid stale reads
     try { clearCachedPaymentData(order_id); } catch {}
@@ -140,7 +140,8 @@ app.post('/webhook/midtrans', (req, res) => {
         orderId: order_id,
         transactionStatus: transaction_status,
         paymentType: payment_type,
-        settlementTime: settlement_time
+        settlementTime: settlement_time,
+        gross_amount: gross_amount || notification.gross_amount || 0
       });
     }
 
