@@ -355,12 +355,16 @@ if (!global.midtransWebhookListenerSetup) {
         if (!order) continue;
         
         // Cek metode MIDTRANS
-        if (order.metode !== 'MIDTRANS') continue;
+        const orderMetode = order.metode || '';
+        if (orderMetode !== 'MIDTRANS') {
+          console.log(`  - Skipping order ${order.orderId || 'N/A'}: metode=${orderMetode} (not MIDTRANS)`);
+          continue;
+        }
         
         const orderAmount = Number(order.totalAmount || 0);
         const amountDiff = Math.abs(webhookAmount - orderAmount);
         
-        console.log(`  - Checking order ${order.orderId || 'N/A'}: Amount Rp${orderAmount}, Diff: Rp${amountDiff}`);
+        console.log(`  - Checking order ${order.orderId || 'N/A'}: Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}`);
         
         // Match dengan tolerance kecil (untuk handle decimal)
         if (amountDiff < 1) {
@@ -373,10 +377,47 @@ if (!global.midtransWebhookListenerSetup) {
       
       if (!matchedOrder || !matchedSender) {
         console.log(`⚠️ [MID-GLOBAL] No matching order found for amount Rp${webhookAmount}`);
-        console.log(`   Available orders:`, Object.keys(orders).map(s => {
-          const o = orders[s];
-          return `${s}: ${o?.metode || 'N/A'} - Rp${o?.totalAmount || 0}`;
-        }).join(', '));
+        if (Object.keys(orders).length > 0) {
+          console.log(`   Available orders:`, Object.keys(orders).map(s => {
+            const o = orders[s];
+            return `${s}: ${o?.metode || 'N/A'} - Rp${o?.totalAmount || 0}`;
+          }).join(', '));
+        } else {
+          console.log(`   No pending orders found`);
+        }
+        
+        // Simpan webhook ke database untuk polling nanti (jika order belum dibuat)
+        try {
+          if (!db.data.midtransWebhooks) db.data.midtransWebhooks = [];
+          const oneHourAgo = Date.now() - (60 * 60 * 1000);
+          db.data.midtransWebhooks = db.data.midtransWebhooks.filter(w => w.timestamp > oneHourAgo);
+          
+          // Cek apakah webhook sudah ada
+          const existingWebhook = db.data.midtransWebhooks.find(w => 
+            w.orderId === webhookOrderId || 
+            (Math.abs(Number(w.gross_amount) - webhookAmount) < 1 && w.timestamp > Date.now() - 60000)
+          );
+          
+          if (!existingWebhook) {
+            db.data.midtransWebhooks.push({
+              orderId: webhookOrderId,
+              transactionStatus: transactionStatus,
+              paymentType: webhookData.paymentType,
+              settlementTime: webhookData.settlementTime,
+              gross_amount: webhookAmount,
+              timestamp: Date.now(),
+              processed: false
+            });
+            
+            if (typeof db.save === 'function') {
+              await db.save();
+            }
+            console.log(`💾 [MID-GLOBAL] Saved webhook to database for later processing`);
+          }
+        } catch (saveError) {
+          console.error(`❌ [MID-GLOBAL] Error saving webhook:`, saveError.message);
+        }
+        
         return;
       }
       
@@ -2555,8 +2596,11 @@ case 'mid': {
           reffId,
           totalAmount,
           uniqueCode,
+          metode: 'MIDTRANS', // Pastikan metode di-set untuk global listener
           createdAt: createdAtTs
       };
+      
+      console.log(`📝 [MID] Order created: ${orderId}, Amount: Rp${totalAmount}, Sender: ${sender}`);
 
       // Setup webhook listener untuk payment-completed event
       const paymentListener = async (webhookData) => {
@@ -2719,13 +2763,20 @@ case 'mid': {
               const webhooks = db.data.midtransWebhooks || [];
               const unprocessedWebhooks = webhooks.filter(w => !w.processed && w.gross_amount);
               
+              if (unprocessedWebhooks.length > 0) {
+                console.log(`🔍 [MID] Checking ${unprocessedWebhooks.length} unprocessed webhooks, looking for amount Rp${totalAmount}`);
+              }
+              
               for (const webhook of unprocessedWebhooks) {
                 const webhookAmount = Number(webhook.gross_amount || 0);
-                const isAmountMatch = Math.abs(webhookAmount - Number(totalAmount)) < 1;
+                const amountDiff = Math.abs(webhookAmount - Number(totalAmount));
+                const isAmountMatch = amountDiff < 1;
                 const isStatusPaid = /(settlement|capture)/i.test(String(webhook.transactionStatus));
                 
+                console.log(`  - Webhook: Amount Rp${webhookAmount}, Status: ${webhook.transactionStatus}, Diff: Rp${amountDiff}, Match: ${isAmountMatch}`);
+                
                 if (isAmountMatch && isStatusPaid) {
-                  console.log(`✅ [MID] Payment detected via database webhook: Amount Rp${webhookAmount}`);
+                  console.log(`✅ [MID] Payment detected via database webhook: Amount Rp${webhookAmount}, OrderID: ${webhook.orderId}`);
                   
                   // Mark as processed
                   webhook.processed = true;
