@@ -52,6 +52,10 @@ global.sessionName = process.env.BOT_SESSION_NAME || "session" //Ngga usah di ga
 const groupLinksStr = process.env.BOT_GROUP_LINKS || "https://chat.whatsapp.com/L0LR1HBOFKJAiQv5Busd9t?mode=ems_copy_t,https://chat.whatsapp.com/KwBA0yxcwl0JGpL6uN7L9i?mode=ems_copy_t,https://chat.whatsapp.com/GO2a2ty2n5JAz5b6E9HpEs?mode=ems_copy_c"
 global.linkGroup = groupLinksStr.split(',').map(link => link.trim()).filter(link => link) //Link gc lu
 
+// Group names - parse from comma-separated string (alternatif untuk whitelist berdasarkan nama)
+const groupNamesStr = process.env.BOT_GROUP_NAMES || ""
+global.groupNames = groupNamesStr.split(',').map(name => name.trim().toLowerCase()).filter(name => name) //Nama group yang diizinkan
+
 //Image
 global.thumbnail = "./options/image/payment.jpg"
 
