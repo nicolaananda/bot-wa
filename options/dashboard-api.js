@@ -150,30 +150,50 @@ app.post('/webhook/midtrans', async (req, res) => {
       // Emit event untuk process yang sama
       process.emit('payment-completed', webhookData);
       
-      // Juga simpan ke database sebagai flag untuk bot-wa process
+      // Simpan ke PostgreSQL database untuk bot-wa process (lebih reliable untuk multi-process)
       try {
-        const db = await getDbInstance();
-        if (db && db.data) {
-          // Simpan webhook notification ke database untuk bot-wa process
-          if (!db.data.midtransWebhooks) db.data.midtransWebhooks = [];
-          
-          // Hapus webhook lama (lebih dari 1 jam)
-          const oneHourAgo = Date.now() - (60 * 60 * 1000);
-          db.data.midtransWebhooks = db.data.midtransWebhooks.filter(w => w.timestamp > oneHourAgo);
-          
-          // Tambah webhook baru
-          db.data.midtransWebhooks.push({
-            ...webhookData,
-            timestamp: Date.now(),
-            processed: false
-          });
-          
-          // Save database
-          if (typeof db.save === 'function') {
-            await db.save();
+        if (usePg && pg) {
+          // Simpan ke PostgreSQL
+          await pg.query(
+            `INSERT INTO midtrans_webhooks 
+             (order_id, transaction_id, transaction_status, payment_type, gross_amount, settlement_time, processed, webhook_data)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             ON CONFLICT DO NOTHING`,
+            [
+              order_id,
+              notification.transaction_id || null,
+              transaction_status,
+              payment_type,
+              Number(gross_amount || 0),
+              settlement_time ? new Date(settlement_time) : null,
+              false,
+              JSON.stringify(notification)
+            ]
+          );
+          console.log(`💾 [Webhook] Saved webhook to PostgreSQL: OrderID ${order_id}, Amount Rp${gross_amount}`);
+        } else {
+          // Fallback ke JSON database jika PostgreSQL tidak tersedia
+          const db = await getDbInstance();
+          if (db && db.data) {
+            if (!db.data.midtransWebhooks) db.data.midtransWebhooks = [];
+            
+            // Hapus webhook lama (lebih dari 1 jam)
+            const oneHourAgo = Date.now() - (60 * 60 * 1000);
+            db.data.midtransWebhooks = db.data.midtransWebhooks.filter(w => w.timestamp > oneHourAgo);
+            
+            // Tambah webhook baru
+            db.data.midtransWebhooks.push({
+              ...webhookData,
+              timestamp: Date.now(),
+              processed: false
+            });
+            
+            if (typeof db.save === 'function') {
+              await db.save();
+            }
+            
+            console.log(`💾 [Webhook] Saved webhook to JSON database: OrderID ${order_id}`);
           }
-          
-          console.log(`💾 [Webhook] Saved webhook notification to database for bot-wa process`);
         }
       } catch (dbError) {
         console.error(`❌ [Webhook] Error saving to database:`, dbError.message);
