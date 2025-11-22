@@ -320,7 +320,198 @@ global.prefa = ['', '.']
 moment.tz.setDefault("Asia/Jakarta").locale("id");
 const tanggal = moment.tz('Asia/Jakarta').format('DD MMMM YYYY')
 
+// Global listener untuk webhook Midtrans (harus di luar module.exports agar bisa akses global)
+let globalRonzz = null;
+
+// Setup global payment-completed listener untuk Midtrans webhook
+if (!global.midtransWebhookListenerSetup) {
+  global.midtransWebhookListenerSetup = true;
+  
+  process.on('payment-completed', async (webhookData) => {
+    try {
+      const { orderId: webhookOrderId, transactionStatus, gross_amount } = webhookData;
+      const webhookAmount = Number(gross_amount || webhookData.gross_amount || 0);
+      const isStatusPaid = /(settlement|capture)/i.test(String(transactionStatus));
+      
+      if (!isStatusPaid || !webhookAmount) return;
+      
+      // Akses global.db langsung
+      const db = global.db;
+      if (!db || !db.data) {
+        console.log(`⚠️ [MID-GLOBAL] Database not available yet`);
+        return;
+      }
+      
+      console.log(`🔔 [MID-GLOBAL] Webhook received: Amount Rp${webhookAmount}, Status: ${transactionStatus}`);
+      
+      // Cari order yang match dengan amount
+      const orders = db.data.order || {};
+      let matchedOrder = null;
+      let matchedSender = null;
+      
+      for (const [sender, order] of Object.entries(orders)) {
+        if (!order || order.metode !== 'MIDTRANS') continue;
+        
+        const orderAmount = Number(order.totalAmount || 0);
+        // Match dengan tolerance kecil (untuk handle decimal)
+        if (Math.abs(webhookAmount - orderAmount) < 1) {
+          matchedOrder = order;
+          matchedSender = sender;
+          console.log(`✅ [MID-GLOBAL] Found matching order: ${order.orderId}, Amount: Rp${orderAmount}`);
+          break;
+        }
+      }
+      
+      if (!matchedOrder || !matchedSender) {
+        console.log(`⚠️ [MID-GLOBAL] No matching order found for amount Rp${webhookAmount}`);
+        return;
+      }
+      
+      // Process payment
+      const order = matchedOrder;
+      const sender = matchedSender;
+      const { id: productId, jumlah, from, key: messageKey, orderId, reffId, totalAmount } = order;
+      
+      if (!db.data.produk[productId]) {
+        console.error(`❌ [MID-GLOBAL] Product ${productId} not found`);
+        return;
+      }
+      
+      console.log(`✅ [MID-GLOBAL] Processing payment for order: ${orderId}, RefId: ${reffId}`);
+      
+      // Delete message
+      if (globalRonzz && messageKey) {
+        try {
+          await globalRonzz.sendMessage(from, { delete: messageKey });
+        } catch (e) {
+          console.error(`⚠️ [MID-GLOBAL] Error deleting message:`, e.message);
+        }
+      }
+      
+      // Process purchase
+      db.data.produk[productId].terjual += jumlah;
+      let dataStok = [];
+      for (let i = 0; i < jumlah; i++) {
+        if (db.data.produk[productId].stok.length > 0) {
+          dataStok.push(db.data.produk[productId].stok.shift());
+        }
+      }
+      
+      if (dataStok.length === 0) {
+        console.error(`❌ [MID-GLOBAL] No stock available for product ${productId}`);
+        return;
+      }
+      
+      const moment = require('moment-timezone');
+      const tanggal = moment.tz("Asia/Jakarta").format("DD/MM/YYYY");
+      const jamwib = moment.tz("Asia/Jakarta").format("HH:mm:ss");
+      
+      const detailParts = [
+        `*📦 Produk:* ${db.data.produk[productId].name}`,
+        `*📅 Tanggal:* ${tanggal}`,
+        `*⏰ Jam:* ${jamwib} WIB`,
+        `*Refid:* ${reffId}`,
+        ''
+      ];
+      
+      dataStok.forEach((i) => {
+        const dataAkun = i.split("|");
+        detailParts.push(
+          `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
+          `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}`,
+          `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}`,
+          `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}`,
+          `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}`,
+          ''
+        );
+      });
+      
+      if (db.data.produk[productId].snk) {
+        detailParts.push(
+          `*╭────「 SYARAT & KETENTUAN 」────╮*`,
+          '',
+          `*📋 SNK PRODUK: ${db.data.produk[productId].name}*`,
+          '',
+          db.data.produk[productId].snk,
+          '',
+          `*⚠️ PENTING:*`,
+          `• Baca dan pahami SNK sebelum menggunakan akun`,
+          `• Akun yang sudah dibeli tidak dapat dikembalikan`,
+          `• Hubungi admin jika ada masalah dengan akun`,
+          '',
+          `*╰────「 END SNK 」────╯*`
+        );
+      }
+      
+      const detailAkunCustomer = detailParts.join('\n');
+      
+      // Send to customer
+      if (globalRonzz) {
+        try {
+          await sleep(1000);
+          await globalRonzz.sendMessage(sender, { text: detailAkunCustomer });
+          console.log(`✅ [MID-GLOBAL] Account details sent to ${sender}`);
+        } catch (error) {
+          console.error(`❌ [MID-GLOBAL] Error sending account details:`, error.message);
+        }
+      }
+      
+      // Save receipt
+      try {
+        const { saveReceipt } = require('./config/r2-storage');
+        const result = await saveReceipt(reffId, detailAkunCustomer);
+        if (result.success) {
+          console.log(`✅ [MID-GLOBAL] Receipt saved: ${result.url || result.path || reffId}`);
+        }
+      } catch (receiptError) {
+        console.error(`❌ [MID-GLOBAL] Error saving receipt:`, receiptError.message);
+      }
+      
+      // Add to transaction database
+      // Import hargaProduk function
+      let hargaProduk;
+      try {
+        const hargaModule = require('./function/harga');
+        hargaProduk = hargaModule.hargaProduk || ((id, role) => 0);
+      } catch {
+        hargaProduk = (id, role) => 0;
+      }
+      
+      db.data.transaksi.push({
+        id: productId,
+        name: db.data.produk[productId].name,
+        price: hargaProduk(productId, db.data.users[sender]?.role || 'bronze'),
+        date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+        profit: db.data.produk[productId].profit || 0,
+        jumlah: jumlah,
+        user: sender.split("@")[0],
+        userRole: db.data.users[sender]?.role || 'bronze',
+        reffId: reffId,
+        metodeBayar: "MIDTRANS",
+        totalBayar: totalAmount
+      });
+      
+      if (typeof global.scheduleSave === 'function') {
+        global.scheduleSave();
+      }
+      
+      delete db.data.order[sender];
+      await db.save();
+      console.log(`✅ [MID-GLOBAL] Transaction completed: ${orderId} - ${reffId}`);
+      
+    } catch (error) {
+      console.error(`❌ [MID-GLOBAL] Error processing webhook:`, error.message);
+      console.error(error.stack);
+    }
+  });
+  
+  console.log('✅ [MID-GLOBAL] Global webhook listener registered');
+}
+
 module.exports = async (ronzz, m, mek) => {
+  // Set global reference untuk webhook listener
+  globalRonzz = ronzz;
+  
   try {
     __wrapSendMessageOnce(ronzz)
     const { isQuotedMsg, fromMe } = m

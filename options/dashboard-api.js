@@ -108,13 +108,15 @@ function verifyMidtransSignature(notification) {
   return hash === signature_key;
 }
 
-// Test endpoint untuk cek webhook accessible
+// Test endpoint untuk cek webhook accessible (harus sebelum catch-all route)
 app.get('/webhook/midtrans/test', (req, res) => {
   res.json({ 
+    success: true,
     status: 'ok', 
     message: 'Webhook endpoint is accessible',
     timestamp: new Date().toISOString(),
-    url: '/webhook/midtrans'
+    url: '/webhook/midtrans',
+    server: 'dashboard-api'
   });
 });
 
