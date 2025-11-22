@@ -65,6 +65,26 @@ DROP TRIGGER IF EXISTS produk_updated_at ON produk;
 CREATE TRIGGER produk_updated_at BEFORE UPDATE ON produk
 FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
 
+-- Midtrans Webhook Notifications table
+CREATE TABLE IF NOT EXISTS midtrans_webhooks (
+  id SERIAL PRIMARY KEY,
+  order_id TEXT NOT NULL,
+  transaction_id TEXT,
+  transaction_status TEXT NOT NULL,
+  payment_type TEXT,
+  gross_amount NUMERIC(18,2) NOT NULL,
+  settlement_time TIMESTAMPTZ,
+  processed BOOLEAN NOT NULL DEFAULT false,
+  processed_at TIMESTAMPTZ,
+  webhook_data JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Index untuk query yang cepat
+CREATE INDEX IF NOT EXISTS idx_midtrans_webhooks_processed ON midtrans_webhooks(processed, created_at);
+CREATE INDEX IF NOT EXISTS idx_midtrans_webhooks_order_id ON midtrans_webhooks(order_id);
+CREATE INDEX IF NOT EXISTS idx_midtrans_webhooks_gross_amount ON midtrans_webhooks(gross_amount);
+
 -- Web POS PIN table
 CREATE TABLE IF NOT EXISTS web_pos_pin (
   user_id TEXT PRIMARY KEY,

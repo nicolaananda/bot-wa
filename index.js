@@ -32,6 +32,7 @@ const { acquireLock, releaseLock, checkRateLimit, getCache, setCache, invalidate
 const { saveReceipt } = require('./config/r2-storage');
 const BASE_QRIS_DANA = "00020101021126610014COM.GO-JEK.WWW01189360091438860810920210G8860810920303UMI51440014ID.CO.QRIS.WWW0215ID10254568207330303UMI5204899953033605802ID5918Gigihadiod Digital6006KEDIRI61056415462070703A0163043887";
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
+let pg; if (usePg) { pg = require('./config/postgres'); }
 const { core, isProduction } = require('./config/midtrans');
 const USE_POLLING = true; // true = pakai polling status Midtrans; false = andalkan webhook saja
 
@@ -2613,10 +2614,14 @@ case 'mid': {
           if (!order) return; // Order sudah tidak ada
           
           const webhookAmount = Number(gross_amount || webhookData.gross_amount || 0);
-          const isAmountMatch = webhookAmount === Number(totalAmount);
+          const orderAmount = Number(totalAmount);
+          const amountDiff = Math.abs(webhookAmount - orderAmount);
+          const isAmountMatch = amountDiff < 1; // Tolerance untuk handle decimal (2027.00 vs 2027)
           const isStatusPaid = /(settlement|capture)/i.test(String(transactionStatus));
           
-          // Match jika amount sama dan status paid
+          console.log(`🔍 [MID-LOCAL] Checking webhook: Amount Rp${webhookAmount}, Order Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+          
+          // Match jika amount sama (dengan tolerance) dan status paid
           if (isAmountMatch && isStatusPaid) {
             console.log(`✅ [MID] Webhook payment detected: ${orderId}, Amount: ${webhookAmount}`);
             
@@ -2756,41 +2761,92 @@ case 'mid': {
               break;
           }
 
-          // Fallback: Cek webhook dari database (karena dashboard-api dan bot-wa adalah process terpisah)
+          // Fallback: Cek webhook dari PostgreSQL database (karena dashboard-api dan bot-wa adalah process terpisah)
           if (pollCount % 3 === 0) { // Cek setiap 3 polling cycle (sekitar 9-15 detik)
             try {
-              // Cek webhook notifications yang disimpan di database oleh dashboard-api
-              const webhooks = db.data.midtransWebhooks || [];
-              const unprocessedWebhooks = webhooks.filter(w => !w.processed && w.gross_amount);
-              
-              if (unprocessedWebhooks.length > 0) {
-                console.log(`🔍 [MID] Checking ${unprocessedWebhooks.length} unprocessed webhooks, looking for amount Rp${totalAmount}`);
-              }
-              
-              for (const webhook of unprocessedWebhooks) {
-                const webhookAmount = Number(webhook.gross_amount || 0);
-                const amountDiff = Math.abs(webhookAmount - Number(totalAmount));
-                const isAmountMatch = amountDiff < 1;
-                const isStatusPaid = /(settlement|capture)/i.test(String(webhook.transactionStatus));
+              if (usePg && pg) {
+                // Query dari PostgreSQL - cari webhook yang belum processed dengan amount yang match
+                const orderAmount = Number(totalAmount);
+                const tolerance = 1; // Tolerance 1 rupiah untuk handle decimal
                 
-                console.log(`  - Webhook: Amount Rp${webhookAmount}, Status: ${webhook.transactionStatus}, Diff: Rp${amountDiff}, Match: ${isAmountMatch}`);
+                const result = await pg.query(
+                  `SELECT id, order_id, transaction_id, transaction_status, payment_type, gross_amount, settlement_time, webhook_data
+                   FROM midtrans_webhooks
+                   WHERE processed = false 
+                     AND transaction_status IN ('settlement', 'capture')
+                     AND ABS(gross_amount - $1) < $2
+                   ORDER BY created_at DESC
+                   LIMIT 10`,
+                  [orderAmount, tolerance]
+                );
                 
-                if (isAmountMatch && isStatusPaid) {
-                  console.log(`✅ [MID] Payment detected via database webhook: Amount Rp${webhookAmount}, OrderID: ${webhook.orderId}`);
+                if (result.rows.length > 0) {
+                  console.log(`🔍 [MID] Found ${result.rows.length} unprocessed webhooks from PostgreSQL, looking for amount Rp${orderAmount}`);
+                }
+                
+                for (const row of result.rows) {
+                  const webhookAmount = Number(row.gross_amount || 0);
+                  const amountDiff = Math.abs(webhookAmount - orderAmount);
+                  const isAmountMatch = amountDiff < tolerance;
                   
-                  // Mark as processed
-                  webhook.processed = true;
-                  if (typeof db.save === 'function') {
-                    await db.save();
+                  console.log(`  - Webhook: Amount Rp${webhookAmount} (${typeof row.gross_amount}), Order Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+                  
+                  if (isAmountMatch) {
+                    console.log(`✅ [MID] Payment detected via PostgreSQL webhook: Amount Rp${webhookAmount}, OrderID: ${row.order_id}`);
+                    
+                    // Mark as processed di PostgreSQL
+                    await pg.query(
+                      `UPDATE midtrans_webhooks 
+                       SET processed = true, processed_at = now() 
+                       WHERE id = $1`,
+                      [row.id]
+                    );
+                    
+                    // Trigger same processing as webhook listener
+                    paymentListener({ 
+                      orderId: row.order_id || orderId, 
+                      transactionStatus: row.transaction_status,
+                      gross_amount: webhookAmount,
+                      paymentType: row.payment_type,
+                      settlementTime: row.settlement_time
+                    });
+                    break;
                   }
+                }
+              } else {
+                // Fallback ke JSON database jika PostgreSQL tidak tersedia
+                const webhooks = db.data.midtransWebhooks || [];
+                const unprocessedWebhooks = webhooks.filter(w => !w.processed && w.gross_amount);
+                
+                if (unprocessedWebhooks.length > 0) {
+                  console.log(`🔍 [MID] Checking ${unprocessedWebhooks.length} unprocessed webhooks from JSON, looking for amount Rp${totalAmount}`);
+                }
+                
+                for (const webhook of unprocessedWebhooks) {
+                  const webhookAmount = Number(webhook.gross_amount || 0);
+                  const amountDiff = Math.abs(webhookAmount - Number(totalAmount));
+                  const isAmountMatch = amountDiff < 1;
+                  const isStatusPaid = /(settlement|capture)/i.test(String(webhook.transactionStatus));
                   
-                  // Trigger same processing as webhook listener
-                  paymentListener({ 
-                    orderId: webhook.orderId || orderId, 
-                    transactionStatus: webhook.transactionStatus,
-                    gross_amount: webhook.gross_amount 
-                  });
-                  break;
+                  console.log(`  - Webhook: Amount Rp${webhookAmount}, Status: ${webhook.transactionStatus}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+                  
+                  if (isAmountMatch && isStatusPaid) {
+                    console.log(`✅ [MID] Payment detected via JSON webhook: Amount Rp${webhookAmount}, OrderID: ${webhook.orderId}`);
+                    
+                    // Mark as processed
+                    webhook.processed = true;
+                    if (typeof db.save === 'function') {
+                      await db.save();
+                    }
+                    
+                    // Trigger same processing as webhook listener
+                    paymentListener({ 
+                      orderId: webhook.orderId || orderId, 
+                      transactionStatus: webhook.transactionStatus,
+                      gross_amount: webhook.gross_amount 
+                    });
+                    break;
+                  }
                 }
               }
             } catch (dbError) {
