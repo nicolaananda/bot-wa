@@ -229,46 +229,6 @@ function toRupiah(amount) {
   }).format(amount);
 }
 
-// Helper function: Generate uniqueCode yang memastikan totalAmount tidak berakhiran 0
-function generateUniqueCodeWithNonZeroEnding(baseAmount) {
-  let uniqueCode;
-  let totalAmount;
-  let attempts = 0;
-  const maxAttempts = 100; // Maksimal 100 percobaan untuk menghindari infinite loop
-  
-  do {
-    uniqueCode = Math.floor(1 + Math.random() * 99);
-    totalAmount = baseAmount + uniqueCode;
-    attempts++;
-    
-    // Jika sudah mencoba 100 kali dan masih berakhiran 0, gunakan adjust manual
-    if (attempts >= maxAttempts) {
-      // Adjust uniqueCode agar totalAmount tidak berakhiran 0
-      const lastDigit = baseAmount % 10;
-      if (lastDigit === 0) {
-        // Jika baseAmount berakhiran 0, tambahkan 1-9 untuk memastikan tidak berakhiran 0
-        uniqueCode = Math.floor(1 + Math.random() * 9);
-      } else {
-        // Jika baseAmount tidak berakhiran 0, pastikan uniqueCode tidak membuat totalAmount berakhiran 0
-        const neededLastDigit = 10 - lastDigit;
-        uniqueCode = neededLastDigit === 0 ? Math.floor(1 + Math.random() * 8) + 1 : neededLastDigit;
-        // Jika uniqueCode > 99, generate ulang dengan range yang lebih kecil
-        if (uniqueCode > 99) {
-          uniqueCode = Math.floor(1 + Math.random() * 98) + 1;
-          // Pastikan tidak berakhiran 0
-          while ((baseAmount + uniqueCode) % 10 === 0 && uniqueCode < 99) {
-            uniqueCode++;
-          }
-        }
-      }
-      totalAmount = baseAmount + uniqueCode;
-      break;
-    }
-  } while (totalAmount % 10 === 0);
-  
-  return { uniqueCode, totalAmount };
-}
-
 function resolveProductData(productInput) {
   if (!productInput) return null;
   
@@ -799,8 +759,9 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
     const pricePerItem = hargaProduk(product, userRole);
     const totalHarga = pricePerItem * quantity;
     
-    // Generate unique code (sama seperti di index.js) - Pastikan totalAmount tidak berakhiran 0
-    const { uniqueCode, totalAmount } = generateUniqueCodeWithNonZeroEnding(totalHarga);
+    // Generate unique code (sama seperti di index.js)
+    const uniqueCode = Math.floor(1 + Math.random() * 99);
+    const totalAmount = totalHarga + uniqueCode;
     
     // Generate reffId (sama seperti di index.js)
     const crypto = require('crypto');
