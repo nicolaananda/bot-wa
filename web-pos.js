@@ -804,12 +804,12 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
       console.error(`❌ [Web POS] Error saving order:`, saveError);
     }
     
-    // Generate QRIS image (sama seperti di index.js)
+    // Generate QRIS image (sama seperti di index.js) - menggunakan QRIS statis
     let qrisImagePath = null;
     let qrisImageBase64 = null;
     try {
-      const { qrisDinamis } = require('./function/dinamis');
-      qrisImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
+      const { qrisStatis } = require('./function/dinamis');
+      qrisImagePath = await qrisStatis("./options/sticker/qris.jpg");
       console.log(`✅ [Web POS] QRIS generated: ${qrisImagePath}`);
       
       // Update order with qrisImagePath
@@ -853,7 +853,7 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
       expirationTime: expirationTime,
       formattedExpireTime: formattedTime,
       timeLeft: timeLeft,
-      instructions: `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.`
+      instructions: `📱 *Cara Bayar:*\n1. Scan QRIS di atas\n2. *⚠️ PENTING: Input nominal HARUS sesuai*\n   *Nominal: Rp${toRupiah(totalAmount)}*\n   (Rp${toRupiah(totalHarga)} + *kode unik ${uniqueCode}*)\n3. *Pembayaran akan terdeteksi otomatis jika nominal sesuai*\n\n*⚠️ PERINGATAN:*\n• Jika nominal tidak sesuai, pembayaran TIDAK akan terdeteksi\n• Pastikan total pembayaran: *Rp${toRupiah(totalAmount)}*\n• Kode unik: *${uniqueCode}* (WAJIB ditambahkan)\n\n⏰ Batas waktu: sebelum ${formattedTime}`
     };
     
     console.log(`✅ [Web POS] Buynow order created - OrderID: ${orderId}, User: ${cleanPhone}, Product: ${productId}, Amount: ${toRupiah(totalAmount)}`);
