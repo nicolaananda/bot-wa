@@ -903,7 +903,7 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
             // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
             const paid = notifs.find(n => {
               try {
-                const pkgOk = (n.package_name === 'id.bmri.livinmerchant') || (String(n.app_name||'').toUpperCase().includes('LIVIN'));
+                const pkgOk = (n.package_name === 'com.gojek.gopaymerchant') || (String(n.app_name||'').toUpperCase().includes('GOPAY')) || (String(n.app_name||'').toUpperCase().includes('GOJEK'));
                 const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''));
                 const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0;
                 return pkgOk && amt === Number(totalAmount) && postedAt >= createdAtTs;
@@ -1924,7 +1924,7 @@ app.get('/api/payment/check/:orderId', requireAuth, async (req, res) => {
       // Check if payment found (sama logic dengan index.js)
       const paid = notifs.find(n => {
         try {
-          const pkgOk = (n.package_name === 'id.bmri.livinmerchant') || (String(n.app_name||'').toUpperCase().includes('LIVIN'));
+          const pkgOk = (n.package_name === 'com.gojek.gopaymerchant') || (String(n.app_name||'').toUpperCase().includes('GOPAY')) || (String(n.app_name||'').toUpperCase().includes('GOJEK'));
           const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''));
           const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0;
           return pkgOk && amt === Number(order.totalAmount) && postedAt >= order.createdAt;

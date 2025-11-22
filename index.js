@@ -1616,7 +1616,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 const PG_ENDPOINT = process.env.PG_ENDPOINT || "https://api-pg.nicola.id";
 const PG_API_KEY  = process.env.PG_API_KEY  || "kodeku";
 
-// QRIS statis Livin Merchant dari kamu (JANGAN DIUBAH)
+// QRIS statis GoPay Merchant dari kamu (JANGAN DIUBAH)
 
 // ====== UTIL: Rupiah (fallback kalau belum ada) ======
 function toRupiahLocal(num) {
@@ -1692,7 +1692,7 @@ function generateDynamicQrisFromStatic(baseQris, amount, reffId) {
 // ====== Validasi pembayaran via backend listener ======
 // Strategi: cari notifikasi terbaru setelah pembuatan QR, dengan:
 // - amountDetected == totalAmount (string/number sama2 dibandingkan)
-// - package_name "id.bmri.livinmerchant" atau appName "LIVIN" (kalau ada)
+// - package_name "com.gojek.gopaymerchant" atau appName "GOPAY"/"GOJEK" (kalau ada)
 // - posted_at >= createdAt
 async function checkPaymentViaPG({ totalAmount, createdAtISO, deviceId = null }) {
   const url = `${PG_ENDPOINT}/notifications?limit=50` + (deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : "");
@@ -1708,7 +1708,7 @@ async function checkPaymentViaPG({ totalAmount, createdAtISO, deviceId = null })
       const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0;
       const amt = String(n.amountDetected || "").replace(/\D/g, "");
       const want = String(totalAmount);
-      const appOk = (n.packageName === "id.bmri.livinmerchant") || (String(n.appName || "").toUpperCase().includes("LIVIN"));
+      const appOk = (n.packageName === "com.gojek.gopaymerchant") || (String(n.appName || "").toUpperCase().includes("GOPAY")) || (String(n.appName || "").toUpperCase().includes("GOJEK"));
       const textOk = /menerima|received/i.test(String(n.text || "")) || /masuk/i.test(String(n.text || ""));
       return appOk && textOk && postedAt >= createdAt && amt === want;
     } catch {
@@ -1813,7 +1813,7 @@ case 'deposit': {
                 // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
                 const paid = notifs.find(n => {
                   try {
-                    const pkgOk = (n.package_name === 'id.bmri.livinmerchant') || (String(n.app_name||'').toUpperCase().includes('LIVIN'))
+                    const pkgOk = (n.package_name === 'com.gojek.gopaymerchant') || (String(n.app_name||'').toUpperCase().includes('GOPAY')) || (String(n.app_name||'').toUpperCase().includes('GOJEK'))
                     const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''))
                     const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0
                     return pkgOk && amt === Number(totalAmount) && postedAt >= createdAtTs
@@ -1983,7 +1983,7 @@ case 'buynow': {
                 // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
                 const paid = notifs.find(n => {
                   try {
-                    const pkgOk = (n.package_name === 'id.bmri.livinmerchant') || (String(n.app_name||'').toUpperCase().includes('LIVIN'))
+                    const pkgOk = (n.package_name === 'com.gojek.gopaymerchant') || (String(n.app_name||'').toUpperCase().includes('GOPAY')) || (String(n.app_name||'').toUpperCase().includes('GOJEK'))
                     const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''))
                     const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0
                     return pkgOk && amt === Number(totalAmount) && postedAt >= createdAtTs
