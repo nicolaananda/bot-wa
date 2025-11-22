@@ -118,4 +118,3 @@ async function qrisDinamis(nominalOrQris, outPath) {
 }
 
 module.exports = { qrisDinamis }
-module.exports = { qrisDinamis }
