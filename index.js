@@ -355,10 +355,10 @@ if (!global.midtransWebhookListenerSetup) {
       for (const [sender, order] of Object.entries(orders)) {
         if (!order) continue;
         
-        // Cek metode MIDTRANS
+        // Cek metode MIDTRANS atau QRIS
         const orderMetode = order.metode || '';
-        if (orderMetode !== 'MIDTRANS') {
-          console.log(`  - Skipping order ${order.orderId || 'N/A'}: metode=${orderMetode} (not MIDTRANS)`);
+        if (orderMetode !== 'MIDTRANS' && orderMetode !== 'QRIS') {
+          console.log(`  - Skipping order ${order.orderId || 'N/A'}: metode=${orderMetode} (not MIDTRANS/QRIS)`);
           continue;
         }
         
@@ -2215,277 +2215,362 @@ case 'buynow': {
         reffId,
         totalAmount,
         uniqueCode,
-        // Simpan timestamp utk validasi notifikasi pembayaran
+        metode: 'QRIS', // Pastikan metode di-set untuk global listener
         createdAt: createdAtTs
     };
+    
+    console.log(`📝 [BUYNOW] Order created: ${orderId}, Amount: Rp${totalAmount}, Sender: ${sender}`);
 
-        // Improvement #1: Exponential backoff polling
-        let pollInterval = 3000;  // Mulai dari 3 detik
-        const maxInterval = 15000; // Maksimal 15 detik
-        let pollCount = 0;
+      // Setup webhook listener untuk payment-completed event
+      const paymentListener = async (webhookData) => {
+        try {
+          const { orderId: webhookOrderId, transactionStatus, gross_amount } = webhookData;
+          
+          // Match berdasarkan totalAmount (karena QRIS statis, Midtrans akan kirim gross_amount)
+          const order = db.data.order[sender];
+          if (!order) return; // Order sudah tidak ada
+          
+          const webhookAmount = Number(gross_amount || webhookData.gross_amount || 0);
+          const orderAmount = Number(totalAmount);
+          const amountDiff = Math.abs(webhookAmount - orderAmount);
+          const isAmountMatch = amountDiff < 1; // Tolerance untuk handle decimal
+          const isStatusPaid = /(settlement|capture)/i.test(String(transactionStatus));
+          
+          console.log(`🔍 [BUYNOW-LOCAL] Checking webhook: Amount Rp${webhookAmount}, Order Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+          
+          // Match jika amount sama (dengan tolerance) dan status paid
+          if (isAmountMatch && isStatusPaid) {
+            console.log(`✅ [BUYNOW] Webhook payment detected: ${orderId}, Amount: ${webhookAmount}`);
+            
+            // Remove listener setelah payment detected
+            process.removeListener('payment-completed', paymentListener);
+            
+            await ronzz.sendMessage(from, { delete: message.key });
+            reply("Pembayaran berhasil, data akun akan segera diproses.");
 
-        while (db.data.order[sender]) {
-            await sleep(pollInterval);
-
-            // Tingkatkan interval secara bertahap
-            if (pollCount < 10) {
-                pollInterval = Math.min(Math.floor(pollInterval * 1.2), maxInterval);
+            // Proses pembelian
+            db.data.produk[data[0]].terjual += jumlah
+            let dataStok = []
+            for (let i = 0; i < jumlah; i++) {
+              dataStok.push(db.data.produk[data[0]].stok.shift())
             }
-            pollCount++;
 
-            if (Date.now() >= expirationTime) {
-                await ronzz.sendMessage(from, { delete: message.key });
-                reply("Pembayaran dibatalkan karena melewati batas waktu 30 menit.");
-                delete db.data.order[sender];
-                break;
+            // Improvement #4: Optimize string building dengan array.join()
+            const detailParts = [
+              `*📦 Produk:* ${db.data.produk[data[0]].name}`,
+              `*📅 Tanggal:* ${tanggal}`,
+              `*⏰ Jam:* ${jamwib} WIB`,
+              `*Refid:* ${reffId}`,
+              ''
+            ];
+
+            dataStok.forEach((i) => {
+              const dataAkun = i.split("|");
+              detailParts.push(
+                `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
+                `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}`,
+                `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}`,
+                `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}`,
+                `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}`,
+                ''
+              );
+            });
+
+            // Tambahkan SNK
+            if (db.data.produk[data[0]].snk) {
+              detailParts.push(
+                `*╭────「 SYARAT & KETENTUAN 」────╮*`,
+                '',
+                `*📋 SNK PRODUK: ${db.data.produk[data[0]].name}*`,
+                '',
+                db.data.produk[data[0]].snk,
+                '',
+                `*⚠️ PENTING:*`,
+                `• Baca dan pahami SNK sebelum menggunakan akun`,
+                `• Akun yang sudah dibeli tidak dapat dikembalikan`,
+                `• Hubungi admin jika ada masalah dengan akun`,
+                '',
+                `*╰────「 END SNK 」────╯*`
+              );
             }
 
+            const detailAkunCustomer = detailParts.join('\n');
+
+            // Kirim ke customer (1 pesan gabungan akun + SNK) - PRIORITAS UTAMA
+            console.log('🚀 STARTING CUSTOMER MESSAGE SEND PROCESS');
+            console.log('📞 Customer WhatsApp ID:', sender);
+            console.log('📏 Message length:', detailAkunCustomer.length);
+            
+            let customerMessageSent = false;
+            
+            // Attempt 1: Send with basic format
             try {
-                const url = `${listener.baseUrl}/notifications?limit=50`;
-                const headers = listener.apiKey ? { 'X-API-Key': listener.apiKey } : {};
-                const resp = await axios.get(url, { headers, timeout: 5000 });
-                const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : []);
-
-                // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
-                const paid = notifs.find(n => {
-                  try {
-                    const pkgOk = (n.package_name === 'com.gojek.gopaymerchant') || (String(n.app_name||'').toUpperCase().includes('GOPAY')) || (String(n.app_name||'').toUpperCase().includes('GOJEK'))
-                    const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''))
-                    const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0
-                    return pkgOk && amt === Number(totalAmount) && postedAt >= createdAtTs
-                  } catch {
-                    return false
-                  }
-                });
-
-                if (paid) {
-                    await ronzz.sendMessage(from, { delete: message.key });
-                    reply("Pembayaran berhasil, data akun akan segera diproses.");
-
-                    // Proses pembelian langsung (sama seperti case 'buy')
-                    db.data.produk[data[0]].terjual += jumlah
-                    let dataStok = []
-                    for (let i = 0; i < jumlah; i++) {
-                      dataStok.push(db.data.produk[data[0]].stok.shift())
-                    }
-
-                    // Improvement #4: Optimize string building dengan array.join()
-                    const detailParts = [
-                      `*📦 Produk:* ${db.data.produk[data[0]].name}`,
-                      `*📅 Tanggal:* ${tanggal}`,
-                      `*⏰ Jam:* ${jamwib} WIB`,
-                      `*Refid:* ${reffId}`,
-                      ''
-                    ];
-
-                    dataStok.forEach((i) => {
-                      const dataAkun = i.split("|");
-                      detailParts.push(
-                        `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
-                        `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}`,
-                        `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}`,
-                        `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}`,
-                        `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}`,
-                        ''
-                      );
-                    });
-
-                    // Tambahkan SNK
-                    detailParts.push(
-                      `*╭────「 SYARAT & KETENTUAN 」────╮*`,
-                      '',
-                      `*📋 SNK PRODUK: ${db.data.produk[data[0]].name}*`,
-                      '',
-                      db.data.produk[data[0]].snk,
-                      '',
-                      `*⚠️ PENTING:*`,
-                      `• Baca dan pahami SNK sebelum menggunakan akun`,
-                      `• Akun yang sudah dibeli tidak dapat dikembalikan`,
-                      `• Hubungi admin jika ada masalah dengan akun`,
-                      '',
-                      `*╰────「 END SNK 」────╯*`
-                    );
-
-                    const detailAkunCustomer = detailParts.join('\n');
-
-                    // Improvement #5: Remove unused detailAkunOwner variable
-
-                    // Kirim ke customer (1 pesan gabungan akun + SNK) - PRIORITAS UTAMA
-                    console.log('🚀 STARTING CUSTOMER MESSAGE SEND PROCESS');
-                    console.log('📞 Customer WhatsApp ID:', sender);
-                    console.log('📏 Message length:', detailAkunCustomer.length);
-                    
-                    let customerMessageSent = false;
-                    
-                    // Attempt 1: Send with basic format
-                    try {
-                      console.log('📤 ATTEMPT 1: Sending full account details to customer...');
-                      
-                      // Add delay before sending to avoid rate limits
-                      await sleep(1000);
-                      
-                      const messageResult = await ronzz.sendMessage(sender, { text: detailAkunCustomer });
-                      console.log('📨 Message result:', JSON.stringify(messageResult?.key || 'no key'));
-                      console.log('✅ SUCCESS: Account details sent to customer!');
-                      
-                      customerMessageSent = true;
-                      
-                    } catch (error) {
-                      console.error('❌ ATTEMPT 1 FAILED:', error.message);
-                      console.error('❌ Full error:', JSON.stringify(error, null, 2));
-                      
-                      // Attempt 2: Send in multiple smaller messages
-                      try {
-                        console.log('📤 ATTEMPT 2: Sending account details in multiple messages...');
-                        
-                        // Send header first
-                        const headerParts = [
-                          `*📦 DETAIL AKUN PEMBELIAN*`,
-                          '',
-                          `*Produk:* ${db.data.produk[data[0]].name}`,
-                          `*Tanggal:* ${tanggal}`,
-                          `*Jam:* ${jamwib} WIB`,
-                          `*Jumlah Akun:* ${dataStok.length}`,
-                          '',
-                          `📋 Detail akun akan dikirim dalam pesan terpisah...`
-                        ];
-                        
-                        await sleep(1000);
-                        const headerMsg = await ronzz.sendMessage(sender, { text: headerParts.join('\n') });
-                        console.log('✅ Header message sent:', headerMsg?.key?.id);
-                        
-                        // Send each account separately
-                        for (let index = 0; index < dataStok.length; index++) {
-                          await sleep(1500); // Delay between messages
-                          const dataAkun = dataStok[index].split("|");
-                          const accountParts = [
-                            `*═══ AKUN ${index + 1} ═══*`,
-                            `📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
-                            `🔐 Password: ${dataAkun[1] || 'Tidak ada'}`
-                          ];
-                          if (dataAkun[2]) accountParts.push(`👤 Profil: ${dataAkun[2]}`);
-                          if (dataAkun[3]) accountParts.push(`🔢 Pin: ${dataAkun[3]}`);
-                          if (dataAkun[4]) accountParts.push(`🔒 2FA: ${dataAkun[4]}`);
-                          
-                          const accMsg = await ronzz.sendMessage(sender, { text: accountParts.join('\n') });
-                          console.log(`✅ Account ${index + 1} sent:`, accMsg?.key?.id);
-                        }
-                        
-                        // Send SNK separately if it exists
-                        if (db.data.produk[data[0]].snk) {
-                          await sleep(1500);
-                          const snkParts = [
-                            `*╭────「 SYARAT & KETENTUAN 」────╮*`,
-                            '',
-                            db.data.produk[data[0]].snk,
-                            '',
-                            `*⚠️ PENTING:*`,
-                            `• Baca dan pahami SNK sebelum menggunakan akun`,
-                            `• Akun yang sudah dibeli tidak dapat dikembalikan`,
-                            `• Hubungi admin jika ada masalah dengan akun`,
-                            '',
-                            `*╰────「 END SNK 」────╯*`
-                          ];
-                          
-                          const snkMsg = await ronzz.sendMessage(sender, { text: snkParts.join('\n') });
-                          console.log('✅ SNK message sent:', snkMsg?.key?.id);
-                        }
-                        
-                        console.log('✅ SUCCESS: All account details sent in separate messages!');
-                        customerMessageSent = true;
-                        
-                      } catch (fallbackError) {
-                        console.error('❌ ATTEMPT 2 ALSO FAILED:', fallbackError.message);
-                        console.error('❌ Full error:', JSON.stringify(fallbackError, null, 2));
-                        
-                        // Attempt 3: Send basic text only
-                        try {
-                          console.log('📤 ATTEMPT 3: Sending basic notification...');
-                          const basicMessage = `Akun berhasil dibeli!\n\nProduk: ${db.data.produk[data[0]].name}\nJumlah: ${jumlah} akun\n\nSilahkan hubungi admin untuk mendapatkan detail akun.`;
-                          const basicMsg = await ronzz.sendMessage(sender, { text: basicMessage });
-                          console.log('✅ SUCCESS: Basic notification sent:', basicMsg?.key?.id);
-                          customerMessageSent = true;
-                          
-                        } catch (finalError) {
-                          console.error('❌ ALL ATTEMPTS FAILED:', finalError.message);
-                          console.error('❌ CUSTOMER WILL NOT RECEIVE ACCOUNT DETAILS!');
-                        }
-                      }
-                    }
-                    
-                    console.log('🏁 CUSTOMER MESSAGE SEND RESULT:', customerMessageSent ? 'SUCCESS' : 'FAILED');
-
-                    // Send single comprehensive success message
-                    if (customerMessageSent) {
-                      if (isGroup) {
-                        reply("🎉 Pembayaran QRIS berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!");
-                      } else {
-                        reply("🎉 Pembayaran QRIS berhasil! Detail akun telah dikirim di atas. Terima kasih!");
-                      }
-                    } else {
-                      reply("⚠️ Pembayaran QRIS berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
-                      
-                    // Skip sending alert to admin about failed delivery
-                    }
-
-                    // Improvement #3: Async file write untuk receipt (R2 atau local)
-                    try {
-                      const { saveReceipt } = require('./config/r2-storage');
-                      const result = await saveReceipt(reffId, detailAkunCustomer);
-                      if (result.success) {
-                        if (result.url) {
-                          console.log(`✅ Receipt saved to ${result.storage}: ${result.url}`);
-                        } else {
-                          console.log(`✅ Receipt saved to ${result.storage}: ${result.path || reffId}`);
-                        }
-                      } else {
-                        console.error('❌ Error saving receipt:', result.error);
-                      }
-                    } catch (receiptError) {
-                      console.error('❌ Error saving receipt:', receiptError.message);
-                    }
-
-                    // Tambah ke database transaksi (sama seperti case 'buy')
-                    db.data.transaksi.push({
-                      id: data[0],
-                      name: db.data.produk[data[0]].name,
-                      price: hargaProduk(data[0], db.data.users[sender].role),
-                      date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
-                      profit: db.data.produk[data[0]].profit,
-                      jumlah: jumlah,
-                      user: sender.split("@")[0],
-                      userRole: db.data.users[sender].role,
-                      reffId: reffId,
-                      metodeBayar: "QRIS",
-                      totalBayar: totalAmount
-                    });
-                    
-                    // Schedule save after transaction
-                    if (typeof global.scheduleSave === 'function') {
-                      global.scheduleSave();
-                    }
-
-                    // Skip stock-empty admin notifications
-
-                    delete db.data.order[sender];
-                    
-                    // Improvement #2: Batch database save (save sekali saja di akhir)
-                    await db.save();
-                    console.log(`✅ Transaction completed: ${orderId} - ${reffId}`);
-                    break;
-                }
+              console.log('📤 ATTEMPT 1: Sending full account details to customer...');
+              
+              // Add delay before sending to avoid rate limits
+              await sleep(1000);
+              
+              const messageResult = await ronzz.sendMessage(sender, { text: detailAkunCustomer });
+              console.log('📨 Message result:', JSON.stringify(messageResult?.key || 'no key'));
+              console.log('✅ SUCCESS: Account details sent to customer!');
+              
+              customerMessageSent = true;
+              
             } catch (error) {
-                console.error(`Error checking listener for ${orderId}:`, error);
+              console.error('❌ ATTEMPT 1 FAILED:', error.message);
+              console.error('❌ Full error:', JSON.stringify(error, null, 2));
+              
+              // Attempt 2: Send in multiple smaller messages
+              try {
+                console.log('📤 ATTEMPT 2: Sending account details in multiple messages...');
+                
+                // Send header first
+                const headerParts = [
+                  `*📦 DETAIL AKUN PEMBELIAN*`,
+                  '',
+                  `*Produk:* ${db.data.produk[data[0]].name}`,
+                  `*Tanggal:* ${tanggal}`,
+                  `*Jam:* ${jamwib} WIB`,
+                  `*Jumlah Akun:* ${dataStok.length}`,
+                  '',
+                  `📋 Detail akun akan dikirim dalam pesan terpisah...`
+                ];
+                
+                await sleep(1000);
+                const headerMsg = await ronzz.sendMessage(sender, { text: headerParts.join('\n') });
+                console.log('✅ Header message sent:', headerMsg?.key?.id);
+                
+                // Send each account separately
+                for (let index = 0; index < dataStok.length; index++) {
+                  await sleep(1500); // Delay between messages
+                  const dataAkun = dataStok[index].split("|");
+                  const accountParts = [
+                    `*═══ AKUN ${index + 1} ═══*`,
+                    `📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
+                    `🔐 Password: ${dataAkun[1] || 'Tidak ada'}`
+                  ];
+                  if (dataAkun[2]) accountParts.push(`👤 Profil: ${dataAkun[2]}`);
+                  if (dataAkun[3]) accountParts.push(`🔢 Pin: ${dataAkun[3]}`);
+                  if (dataAkun[4]) accountParts.push(`🔒 2FA: ${dataAkun[4]}`);
+                  
+                  try {
+                    await ronzz.sendMessage(sender, { text: accountParts.join('\n') });
+                    console.log(`✅ Account ${index + 1} sent`);
+                  } catch (accError) {
+                    console.error(`❌ Failed to send account ${index + 1}:`, accError.message);
+                  }
+                }
+                
+                customerMessageSent = true;
+                
+              } catch (error2) {
+                console.error('❌ ATTEMPT 2 FAILED:', error2.message);
+                
+                // Attempt 3: Send basic text only
+                try {
+                  console.log('📤 ATTEMPT 3: Sending basic notification...');
+                  const basicMessage = `Akun berhasil dibeli!\n\nProduk: ${db.data.produk[data[0]].name}\nJumlah: ${jumlah} akun\n\nSilahkan hubungi admin untuk mendapatkan detail akun.`;
+                  const basicMsg = await ronzz.sendMessage(sender, { text: basicMessage });
+                  console.log('✅ SUCCESS: Basic notification sent:', basicMsg?.key?.id);
+                  customerMessageSent = true;
+                  
+                } catch (finalError) {
+                  console.error('❌ ALL ATTEMPTS FAILED:', finalError.message);
+                  console.error('❌ CUSTOMER WILL NOT RECEIVE ACCOUNT DETAILS!');
+                }
+              }
             }
-        }
-    } catch (error) {
-        console.error(`Error processing QRIS for ${data[0]}:`, error);
-        reply("Gagal membuat QR Code pembayaran. Silakan coba lagi.");
-        // Cleanup order yang gagal
-        if (db.data.order[sender]) {
+            
+            console.log('🏁 CUSTOMER MESSAGE SEND RESULT:', customerMessageSent ? 'SUCCESS' : 'FAILED');
+
+            // Send single comprehensive success message
+            if (customerMessageSent) {
+              if (isGroup) {
+                reply("🎉 Pembayaran QRIS berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!");
+              } else {
+                reply("🎉 Pembayaran QRIS berhasil! Detail akun telah dikirim di atas. Terima kasih!");
+              }
+            } else {
+              reply("⚠️ Pembayaran QRIS berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
+            }
+
+            // Improvement #3: Async file write untuk receipt (R2 atau local)
+            try {
+              const { saveReceipt } = require('./config/r2-storage');
+              const result = await saveReceipt(reffId, detailAkunCustomer);
+              if (result.success) {
+                if (result.url) {
+                  console.log(`✅ Receipt saved to ${result.storage}: ${result.url}`);
+                } else {
+                  console.log(`✅ Receipt saved to ${result.storage}: ${result.path || reffId}`);
+                }
+              } else {
+                console.error('❌ Error saving receipt:', result.error);
+              }
+            } catch (receiptError) {
+              console.error('❌ Error saving receipt:', receiptError.message);
+            }
+
+            // Tambah ke database transaksi (sama seperti case 'buy')
+            db.data.transaksi.push({
+              id: data[0],
+              name: db.data.produk[data[0]].name,
+              price: hargaProduk(data[0], db.data.users[sender].role),
+              date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+              profit: db.data.produk[data[0]].profit,
+              jumlah: jumlah,
+              user: sender.split("@")[0],
+              userRole: db.data.users[sender].role,
+              reffId: reffId,
+              metodeBayar: "QRIS",
+              totalBayar: totalAmount
+            });
+            
+            // Schedule save after transaction
+            if (typeof global.scheduleSave === 'function') {
+              global.scheduleSave();
+            }
+
             delete db.data.order[sender];
+            await db.save();
+            console.log(`✅ [BUYNOW] Transaction completed via webhook: ${orderId} - ${reffId}`);
+          }
+        } catch (error) {
+          console.error(`❌ [BUYNOW] Error in webhook listener:`, error.message);
         }
-    }
+      };
+
+      // Register webhook listener
+      process.on('payment-completed', paymentListener);
+
+      // Polling untuk timeout handling (jika webhook tidak datang)
+      let pollInterval = 3000;
+      const maxInterval = 15000;
+      let pollCount = 0;
+
+      while (db.data.order[sender]) {
+          await sleep(pollInterval);
+
+          if (pollCount < 10) {
+              pollInterval = Math.min(Math.floor(pollInterval * 1.2), maxInterval);
+          }
+          pollCount++;
+
+          if (Date.now() >= expirationTime) {
+              // Remove listener saat timeout
+              process.removeListener('payment-completed', paymentListener);
+              await ronzz.sendMessage(from, { delete: message.key });
+              reply("Pembayaran dibatalkan karena melewati batas waktu 30 menit.");
+              delete db.data.order[sender];
+              break;
+          }
+
+          // Fallback: Cek webhook dari PostgreSQL database (karena dashboard-api dan bot-wa adalah process terpisah)
+          if (pollCount % 3 === 0) { // Cek setiap 3 polling cycle (sekitar 9-15 detik)
+            try {
+              if (usePg && pg) {
+                // Query dari PostgreSQL
+                const orderAmount = Number(totalAmount);
+                const tolerance = 1; // Tolerance 1 rupiah untuk handle decimal
+                
+                const result = await pg.query(
+                  `SELECT id, order_id, transaction_id, transaction_status, payment_type, gross_amount, settlement_time, webhook_data
+                   FROM midtrans_webhooks
+                   WHERE processed = false 
+                     AND transaction_status IN ('settlement', 'capture')
+                     AND ABS(gross_amount - $1) < $2
+                   ORDER BY created_at DESC
+                   LIMIT 10`,
+                  [orderAmount, tolerance]
+                );
+                
+                if (result.rows.length > 0) {
+                  console.log(`🔍 [BUYNOW] Found ${result.rows.length} unprocessed webhooks from PostgreSQL, looking for amount Rp${orderAmount}`);
+                }
+                
+                for (const row of result.rows) {
+                  const webhookAmount = Number(row.gross_amount || 0);
+                  const amountDiff = Math.abs(webhookAmount - orderAmount);
+                  const isAmountMatch = amountDiff < tolerance;
+                  
+                  console.log(`  - Webhook: Amount Rp${webhookAmount} (${typeof row.gross_amount}), Order Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+                  
+                  if (isAmountMatch) {
+                    console.log(`✅ [BUYNOW] Payment detected via PostgreSQL webhook: Amount Rp${webhookAmount}, OrderID: ${row.order_id}`);
+                    
+                    // Mark as processed di PostgreSQL
+                    await pg.query(
+                      `UPDATE midtrans_webhooks 
+                       SET processed = true, processed_at = now() 
+                       WHERE id = $1`,
+                      [row.id]
+                    );
+                    
+                    // Trigger same processing as webhook listener
+                    paymentListener({ 
+                      orderId: row.order_id || orderId, 
+                      transactionStatus: row.transaction_status,
+                      gross_amount: webhookAmount,
+                      paymentType: row.payment_type,
+                      settlementTime: row.settlement_time
+                    });
+                    break;
+                  }
+                }
+              } else {
+                // Fallback ke JSON database jika PostgreSQL tidak tersedia
+                const webhooks = db.data.midtransWebhooks || [];
+                const unprocessedWebhooks = webhooks.filter(w => !w.processed && w.gross_amount);
+                
+                if (unprocessedWebhooks.length > 0) {
+                  console.log(`🔍 [BUYNOW] Checking ${unprocessedWebhooks.length} unprocessed webhooks from JSON, looking for amount Rp${totalAmount}`);
+                }
+                
+                for (const webhook of unprocessedWebhooks) {
+                  const webhookAmount = Number(webhook.gross_amount || 0);
+                  const amountDiff = Math.abs(webhookAmount - Number(totalAmount));
+                  const isAmountMatch = amountDiff < 1;
+                  const isStatusPaid = /(settlement|capture)/i.test(String(webhook.transactionStatus));
+                  
+                  console.log(`  - Webhook: Amount Rp${webhookAmount}, Status: ${webhook.transactionStatus}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+                  
+                  if (isAmountMatch && isStatusPaid) {
+                    console.log(`✅ [BUYNOW] Payment detected via JSON webhook: Amount Rp${webhookAmount}, OrderID: ${webhook.orderId}`);
+                    
+                    // Mark as processed
+                    webhook.processed = true;
+                    if (typeof db.save === 'function') {
+                      await db.save();
+                    }
+                    
+                    // Trigger same processing as webhook listener
+                    paymentListener({ 
+                      orderId: webhook.orderId || orderId, 
+                      transactionStatus: webhook.transactionStatus,
+                      gross_amount: webhook.gross_amount 
+                    });
+                    break;
+                  }
+                }
+              }
+            } catch (dbError) {
+              // Ignore database errors
+              console.log(`⚠️ [BUYNOW] Database webhook check failed:`, dbError.message);
+            }
+          }
+      }
+      
+      // Remove listener jika loop selesai (timeout atau payment detected)
+      try {
+        process.removeListener('payment-completed', paymentListener);
+      } catch {}
+  } catch (error) {
+    console.error(`Error creating QRIS for ${sender}:`, error)
+    reply("Gagal membuat QR Code. Silakan coba lagi.")
+    delete db.data.order[sender]
+  } finally {
+    await releaseLock(sender, 'buynow')
+  }
   } catch (outerError) {
     console.error('❌ [BUYNOW] Outer error:', outerError)
     reply("Terjadi kesalahan saat memproses pembelian. Silakan coba lagi.")
