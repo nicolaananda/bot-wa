@@ -92,4 +92,24 @@ async function qrisDinamis(nominalOrQris, outPath) {
   return outPath
 }
 
-module.exports = { qrisDinamis }
+/**
+ * QRIS Statis - Menggunakan gambar QRIS statis dengan kode unik untuk tracking
+ * Customer akan scan QRIS statis dan input nominal sesuai total + kode unik
+ * @param {string} outPath - Path output untuk copy gambar statis
+ * @returns {Promise<string>} Path ke gambar QRIS statis
+ */
+async function qrisStatis(outPath) {
+  const staticQrisPath = pathModule.join(__dirname, '../options/image/qris-gopay.jpeg');
+  
+  // Check if static QRIS image exists
+  if (!fs.existsSync(staticQrisPath)) {
+    throw new Error(`QRIS statis tidak ditemukan di: ${staticQrisPath}`);
+  }
+  
+  // Copy static QRIS image to output path
+  fs.copyFileSync(staticQrisPath, outPath);
+  
+  return outPath;
+}
+
+module.exports = { qrisDinamis, qrisStatis }

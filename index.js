@@ -26,7 +26,7 @@ const { addResponTesti, delResponTesti, isAlreadyResponTesti, updateResponTesti,
 const { expiredCheck, getAllSewa } = require("./function/sewa");
 const { TelegraPh } = require('./function/uploader');
 const { getUsernameMl, getUsernameFf, getUsernameCod, getUsernameGi, getUsernameHok, getUsernameSus, getUsernamePubg, getUsernameAg, getUsernameHsr, getUsernameHi, getUsernamePb, getUsernameSm, getUsernameValo, getUsernamePgr, getUsernameZzz, getUsernameAov } = require("./function/stalker");
-const { qrisDinamis } = require("./function/dinamis");
+const { qrisDinamis, qrisStatis } = require("./function/dinamis");
 const { createPaymentLink, getPaymentLinkStatus, isPaymentCompleted, createQRISCore, createQRISPayment, getTransactionStatusByOrderId, getTransactionStatusByTransactionId } = require('./config/midtrans');
 const { acquireLock, releaseLock, checkRateLimit, getCache, setCache, invalidateCachePattern, cacheAside } = require('./function/redis-helper');
 const { saveReceipt } = require('./config/r2-storage');
@@ -1743,9 +1743,9 @@ case 'deposit': {
 
   try {
     reply("Sedang membuat QR Code...")
-
+    
     const orderId = `DEP-${reffId}-${Date.now()}`
-    const qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg")
+    const qrImagePath = await qrisStatis("./options/sticker/qris.jpg")
 
     const expirationTime = Date.now() + toMs("30m")
     const expireDate = new Date(expirationTime)
@@ -1757,10 +1757,20 @@ case 'deposit': {
     const caption = `*🧾 MENUNGGU PEMBAYARAN DEPOSIT 🧾*\n\n` +
       `*Nominal:* Rp${toRupiah(baseAmount)}\n` +
       `*Bonus:* Rp${toRupiah(bonus)} (Rp2.000 tiap kelipatan Rp50.000)\n` +
-      `*Kode Unik:* ${uniqueCode}\n` +
-      `*Total Transfer:* Rp${toRupiah(totalAmount)}\n` +
+      `*Kode Unik:* *${uniqueCode}*\n` +
+      `*Total Transfer:* *Rp${toRupiah(totalAmount)}*\n` +
       `*Waktu:* ${timeLeft} menit\n\n` +
-      `Silakan scan QRIS di atas sebelum ${formattedTime}. Transfer sesuai total agar otomatis terdeteksi.\n\n` +
+      `📱 *Cara Bayar:*\n` +
+      `1. Scan QRIS di atas\n` +
+      `2. *⚠️ PENTING: Input nominal HARUS sesuai*\n` +
+      `   *Nominal: Rp${toRupiah(totalAmount)}*\n` +
+      `   (Rp${toRupiah(baseAmount)} + *kode unik ${uniqueCode}*)\n` +
+      `3. *Pembayaran akan terdeteksi otomatis jika nominal sesuai*\n\n` +
+      `*⚠️ PERINGATAN:*\n` +
+      `• Jika nominal tidak sesuai, pembayaran TIDAK akan terdeteksi\n` +
+      `• Pastikan total pembayaran: *Rp${toRupiah(totalAmount)}*\n` +
+      `• Kode unik: *${uniqueCode}* (WAJIB ditambahkan)\n\n` +
+      `⏰ Batas waktu: sebelum ${formattedTime}\n` +
       `Ketik *${prefix}batal* untuk membatalkan.`
 
     // Improvement: Async file read
@@ -1912,7 +1922,7 @@ case 'buynow': {
     reply("Sedang membuat QR Code...");
     
     const orderId = `TRX-${reffId}-${Date.now()}`;
-    const qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
+    const qrImagePath = await qrisStatis("./options/sticker/qris.jpg");
 
     const expirationTime = Date.now() + toMs("30m");
     const expireDate = new Date(expirationTime);
@@ -1927,10 +1937,20 @@ case 'buynow': {
         `*Harga:* Rp${toRupiah(totalHarga / jumlah)}\n` +
         `*Jumlah:* ${jumlah}\n` +
         `*Subtotal:* Rp${toRupiah(totalHarga)}\n` +
-        `*Kode Unik:* ${uniqueCode}\n` +
-        `*Total:* Rp${toRupiah(totalAmount)}\n` +
+        `*Kode Unik:* *${uniqueCode}*\n` +
+        `*Total:* *Rp${toRupiah(totalAmount)}*\n` +
         `*Waktu:* ${timeLeft} menit\n\n` +
-        `Silakan scan QRIS di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n\n` +
+        `📱 *Cara Bayar:*\n` +
+        `1. Scan QRIS di atas\n` +
+        `2. *⚠️ PENTING: Input nominal HARUS sesuai*\n` +
+        `   *Nominal: Rp${toRupiah(totalAmount)}*\n` +
+        `   (Rp${toRupiah(totalHarga)} + *kode unik ${uniqueCode}*)\n` +
+        `3. *Pembayaran akan terdeteksi otomatis jika nominal sesuai*\n\n` +
+        `*⚠️ PERINGATAN:*\n` +
+        `• Jika nominal tidak sesuai, pembayaran TIDAK akan terdeteksi\n` +
+        `• Pastikan total pembayaran: *Rp${toRupiah(totalAmount)}*\n` +
+        `• Kode unik: *${uniqueCode}* (WAJIB ditambahkan)\n\n` +
+        `⏰ Batas waktu: sebelum ${formattedTime}\n` +
         `Jika ingin membatalkan, ketik *${prefix}batal*`;
 
     // Improvement #3: Async file read
