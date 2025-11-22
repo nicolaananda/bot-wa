@@ -320,6 +320,46 @@ global.prefa = ['', '.']
 moment.tz.setDefault("Asia/Jakarta").locale("id");
 const tanggal = moment.tz('Asia/Jakarta').format('DD MMMM YYYY')
 
+// Helper function: Generate uniqueCode yang memastikan totalAmount tidak berakhiran 0
+function generateUniqueCodeWithNonZeroEnding(baseAmount) {
+  let uniqueCode;
+  let totalAmount;
+  let attempts = 0;
+  const maxAttempts = 100; // Maksimal 100 percobaan untuk menghindari infinite loop
+  
+  do {
+    uniqueCode = Math.floor(1 + Math.random() * 99);
+    totalAmount = baseAmount + uniqueCode;
+    attempts++;
+    
+    // Jika sudah mencoba 100 kali dan masih berakhiran 0, gunakan adjust manual
+    if (attempts >= maxAttempts) {
+      // Adjust uniqueCode agar totalAmount tidak berakhiran 0
+      const lastDigit = baseAmount % 10;
+      if (lastDigit === 0) {
+        // Jika baseAmount berakhiran 0, tambahkan 1-9 untuk memastikan tidak berakhiran 0
+        uniqueCode = Math.floor(1 + Math.random() * 9);
+      } else {
+        // Jika baseAmount tidak berakhiran 0, pastikan uniqueCode tidak membuat totalAmount berakhiran 0
+        const neededLastDigit = 10 - lastDigit;
+        uniqueCode = neededLastDigit === 0 ? Math.floor(1 + Math.random() * 8) + 1 : neededLastDigit;
+        // Jika uniqueCode > 99, generate ulang dengan range yang lebih kecil
+        if (uniqueCode > 99) {
+          uniqueCode = Math.floor(1 + Math.random() * 98) + 1;
+          // Pastikan tidak berakhiran 0
+          while ((baseAmount + uniqueCode) % 10 === 0 && uniqueCode < 99) {
+            uniqueCode++;
+          }
+        }
+      }
+      totalAmount = baseAmount + uniqueCode;
+      break;
+    }
+  } while (totalAmount % 10 === 0);
+  
+  return { uniqueCode, totalAmount };
+}
+
 module.exports = async (ronzz, m, mek) => {
   try {
     __wrapSendMessageOnce(ronzz)
@@ -1073,7 +1113,16 @@ module.exports = async (ronzz, m, mek) => {
           let pajakny = (Number(db.data.persentase["feeDepo"]) / 100) * Number(chats)
           let pajak2 = Number(Math.ceil(pajakny)) + Number(digit())
           db.data.deposit[sender].data.amount_deposit = Number(chats);
-          db.data.deposit[sender].data.total_deposit = Number(chats) + Number(pajak2)
+          let totalDeposit = Number(chats) + Number(pajak2)
+          // Pastikan total_deposit tidak berakhiran 0
+          if (totalDeposit % 10 === 0) {
+            // Adjust pajak2 agar total_deposit tidak berakhiran 0
+            const lastDigit = Number(chats) % 10;
+            const neededAdjustment = lastDigit === 0 ? 1 : (10 - lastDigit);
+            pajak2 += neededAdjustment;
+            totalDeposit = Number(chats) + Number(pajak2);
+          }
+          db.data.deposit[sender].data.total_deposit = totalDeposit
           db.data.deposit[sender].session = "konfirmasi_deposit";
 
           let teks = `*🧾 KONFIRMASI DEPOSIT 🧾*\n\n*ID:* ${db.data.deposit[sender].ID}\n*Nomor:* ${db.data.deposit[sender].number.split('@')[0]}\n*Payment:* ${db.data.deposit[sender].payment}\n*Jumlah Deposit:* Rp${toRupiah(db.data.deposit[sender].data.amount_deposit)}\n*Pajak:* Rp${toRupiah(Number(pajak2))}\n*Total Pembayaran:* Rp${toRupiah(db.data.deposit[sender].data.total_deposit)}\n\n_Deposit akan dibatalkan otomatis apabila terdapat kesalahan input._`
@@ -1732,8 +1781,7 @@ case 'deposit': {
   if (db.data.orderDeposit[sender]) return reply(`Kamu sedang memiliki deposit yang belum selesai. Ketik *${prefix}batal* untuk membatalkan.`)
 
   const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
-  const uniqueCode = Math.floor(1 + Math.random() * 99)
-  const totalAmount = baseAmount + uniqueCode
+  const { uniqueCode, totalAmount } = generateUniqueCodeWithNonZeroEnding(baseAmount)
   // Bonus Rp2.000 per Rp50.000 topup (minimal Rp50.000; contoh: 50.000 -> 2.000; 100.000 -> 4.000)
   const bonus = baseAmount >= 50000 ? Math.floor(baseAmount / 50000) * 2000 : 0
   // Catat waktu pembuatan order untuk menghindari match notifikasi lama
@@ -1906,8 +1954,7 @@ case 'buynow': {
   try {
     // Hitung harga (sama seperti case 'buy')
     let totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * jumlah
-    const uniqueCode = Math.floor(1 + Math.random() * 99);
-    const totalAmount = totalHarga + uniqueCode;
+    const { uniqueCode, totalAmount } = generateUniqueCodeWithNonZeroEnding(totalHarga);
 
     reply("Sedang membuat QR Code...");
     

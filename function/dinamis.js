@@ -77,6 +77,12 @@ async function qrisDinamis(nominalOrQris, outPath) {
     return outPath;
   }
 
+  // Validasi: Pastikan nominal bukan 0, kosong, atau invalid
+  const nominalNum = Number(nominalOrQris);
+  if (!nominalOrQris || nominalNum === 0 || isNaN(nominalNum) || nominalNum < 0) {
+    throw new Error(`Nominal tidak valid: ${nominalOrQris}. Nominal harus lebih dari 0.`);
+  }
+
   // Backward-compatible: treat as amount and build from global.codeqr
   let qris = codeqr
 
