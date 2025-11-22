@@ -99,7 +99,7 @@ async function qrisDinamis(nominalOrQris, outPath) {
  * @returns {Promise<string>} Path ke gambar QRIS statis
  */
 async function qrisStatis(outPath) {
-  const staticQrisPath = pathModule.join(__dirname, '../options/image/qris-gopay.jpeg');
+  const staticQrisPath = pathModule.join(__dirname, '../options/image/qris-midtrans.png');
   
   // Check if static QRIS image exists
   if (!fs.existsSync(staticQrisPath)) {
