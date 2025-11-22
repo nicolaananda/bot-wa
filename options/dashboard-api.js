@@ -120,7 +120,7 @@ app.get('/webhook/midtrans/test', (req, res) => {
   });
 });
 
-app.post('/webhook/midtrans', (req, res) => {
+app.post('/webhook/midtrans', async (req, res) => {
   try {
     const notification = req.body || {};
     console.log('🔔 [Webhook] Midtrans notification:', JSON.stringify(notification));
@@ -138,13 +138,46 @@ app.post('/webhook/midtrans', (req, res) => {
 
     if (/(settlement|capture)/i.test(String(transaction_status))) {
       console.log(`✅ [Webhook] Payment successful for ${order_id}`);
-      process.emit('payment-completed', {
+      
+      const webhookData = {
         orderId: order_id,
         transactionStatus: transaction_status,
         paymentType: payment_type,
         settlementTime: settlement_time,
         gross_amount: gross_amount || notification.gross_amount || 0
-      });
+      };
+      
+      // Emit event untuk process yang sama
+      process.emit('payment-completed', webhookData);
+      
+      // Juga simpan ke database sebagai flag untuk bot-wa process
+      try {
+        const db = await getDbInstance();
+        if (db && db.data) {
+          // Simpan webhook notification ke database untuk bot-wa process
+          if (!db.data.midtransWebhooks) db.data.midtransWebhooks = [];
+          
+          // Hapus webhook lama (lebih dari 1 jam)
+          const oneHourAgo = Date.now() - (60 * 60 * 1000);
+          db.data.midtransWebhooks = db.data.midtransWebhooks.filter(w => w.timestamp > oneHourAgo);
+          
+          // Tambah webhook baru
+          db.data.midtransWebhooks.push({
+            ...webhookData,
+            timestamp: Date.now(),
+            processed: false
+          });
+          
+          // Save database
+          if (typeof db.save === 'function') {
+            await db.save();
+          }
+          
+          console.log(`💾 [Webhook] Saved webhook notification to database for bot-wa process`);
+        }
+      } catch (dbError) {
+        console.error(`❌ [Webhook] Error saving to database:`, dbError.message);
+      }
     }
 
     return res.status(200).json({ status: 'ok' });

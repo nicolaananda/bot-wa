@@ -342,28 +342,41 @@ if (!global.midtransWebhookListenerSetup) {
         return;
       }
       
-      console.log(`🔔 [MID-GLOBAL] Webhook received: Amount Rp${webhookAmount}, Status: ${transactionStatus}`);
+      console.log(`🔔 [MID-GLOBAL] Webhook received: Amount Rp${webhookAmount}, Status: ${transactionStatus}, OrderID: ${webhookOrderId}`);
       
       // Cari order yang match dengan amount
       const orders = db.data.order || {};
       let matchedOrder = null;
       let matchedSender = null;
       
+      console.log(`🔍 [MID-GLOBAL] Searching ${Object.keys(orders).length} pending orders...`);
+      
       for (const [sender, order] of Object.entries(orders)) {
-        if (!order || order.metode !== 'MIDTRANS') continue;
+        if (!order) continue;
+        
+        // Cek metode MIDTRANS
+        if (order.metode !== 'MIDTRANS') continue;
         
         const orderAmount = Number(order.totalAmount || 0);
+        const amountDiff = Math.abs(webhookAmount - orderAmount);
+        
+        console.log(`  - Checking order ${order.orderId || 'N/A'}: Amount Rp${orderAmount}, Diff: Rp${amountDiff}`);
+        
         // Match dengan tolerance kecil (untuk handle decimal)
-        if (Math.abs(webhookAmount - orderAmount) < 1) {
+        if (amountDiff < 1) {
           matchedOrder = order;
           matchedSender = sender;
-          console.log(`✅ [MID-GLOBAL] Found matching order: ${order.orderId}, Amount: Rp${orderAmount}`);
+          console.log(`✅ [MID-GLOBAL] Found matching order: ${order.orderId}, Amount: Rp${orderAmount}, Sender: ${sender}`);
           break;
         }
       }
       
       if (!matchedOrder || !matchedSender) {
         console.log(`⚠️ [MID-GLOBAL] No matching order found for amount Rp${webhookAmount}`);
+        console.log(`   Available orders:`, Object.keys(orders).map(s => {
+          const o = orders[s];
+          return `${s}: ${o?.metode || 'N/A'} - Rp${o?.totalAmount || 0}`;
+        }).join(', '));
         return;
       }
       
@@ -2699,6 +2712,42 @@ case 'mid': {
               break;
           }
 
+          // Fallback: Cek webhook dari database (karena dashboard-api dan bot-wa adalah process terpisah)
+          if (pollCount % 3 === 0) { // Cek setiap 3 polling cycle (sekitar 9-15 detik)
+            try {
+              // Cek webhook notifications yang disimpan di database oleh dashboard-api
+              const webhooks = db.data.midtransWebhooks || [];
+              const unprocessedWebhooks = webhooks.filter(w => !w.processed && w.gross_amount);
+              
+              for (const webhook of unprocessedWebhooks) {
+                const webhookAmount = Number(webhook.gross_amount || 0);
+                const isAmountMatch = Math.abs(webhookAmount - Number(totalAmount)) < 1;
+                const isStatusPaid = /(settlement|capture)/i.test(String(webhook.transactionStatus));
+                
+                if (isAmountMatch && isStatusPaid) {
+                  console.log(`✅ [MID] Payment detected via database webhook: Amount Rp${webhookAmount}`);
+                  
+                  // Mark as processed
+                  webhook.processed = true;
+                  if (typeof db.save === 'function') {
+                    await db.save();
+                  }
+                  
+                  // Trigger same processing as webhook listener
+                  paymentListener({ 
+                    orderId: webhook.orderId || orderId, 
+                    transactionStatus: webhook.transactionStatus,
+                    gross_amount: webhook.gross_amount 
+                  });
+                  break;
+                }
+              }
+            } catch (dbError) {
+              // Ignore database errors
+              console.log(`⚠️ [MID] Database webhook check failed:`, dbError.message);
+            }
+          }
+          
           // Fallback: Cek via API juga (optional, untuk backup)
           if (USE_POLLING && pollCount % 5 === 0) { // Cek setiap 5 polling cycle
             try {
