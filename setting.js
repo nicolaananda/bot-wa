@@ -11,7 +11,7 @@ global.jamBackup = Number(process.env.BOT_BACKUP_HOURS || 12) //Contoh: 12, bera
 global.memberId = process.env.ORDER_KUOTA_MEMBER_ID || "" //Untuk cara mendapatkannya cek di file panduan.txt
 global.pin = process.env.ORDER_KUOTA_PIN || "" //Pin order kuota
 global.pw = process.env.ORDER_KUOTA_PASSWORD || "" //Password order kuota
-global.codeqr = process.env.MIDTRANS_STATIC_QRIS || "" //Code QR lu (Livin Merchant) - Ganti dengan QRIS Livin Anda
+global.codeqr = process.env.MIDTRANS_STATIC_QRIS || "" //Code QR lu (GoPay Merchant) - Ganti dengan QRIS GoPay Anda
 // Force app to use this static QR string for dynamic generation and display
 if (global.codeqr) {
   process.env.MIDTRANS_STATIC_QRIS = global.codeqr

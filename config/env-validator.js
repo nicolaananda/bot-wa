@@ -46,7 +46,7 @@ class EnvValidator {
         default: 'https://api.midtrans.com'
       },
       MIDTRANS_STATIC_QRIS: {
-        description: 'Static QRIS Code (Livin Merchant)',
+        description: 'Static QRIS Code (GoPay Merchant)',
         default: '',
         sensitive: false
       },
