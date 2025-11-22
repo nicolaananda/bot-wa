@@ -30,7 +30,7 @@ const { qrisDinamis } = require("./function/dinamis");
 const { createPaymentLink, getPaymentLinkStatus, isPaymentCompleted, createQRISCore, createQRISPayment, getTransactionStatusByOrderId, getTransactionStatusByTransactionId } = require('./config/midtrans');
 const { acquireLock, releaseLock, checkRateLimit, getCache, setCache, invalidateCachePattern, cacheAside } = require('./function/redis-helper');
 const { saveReceipt } = require('./config/r2-storage');
-const BASE_QRIS_DANA = "00020101021126690021ID.CO.BANKMANDIRI.WWW01189360000801903662320211719036623250303UMI51440014ID.CO.QRIS.WWW0215ID10254355825370303UMI5204508553033605802ID5925gh store Perlengkapan Ind6012Kediri (Kab)61056415462070703A0163044DC9";
+const BASE_QRIS_DANA = "00020101021126610014COM.GO-JEK.WWW01189360091438860810920210G8860810920303UMI51440014ID.CO.QRIS.WWW0215ID10254568207330303UMI5204899953033605802ID5918Gigihadiod Digital6006KEDIRI61056415462070703A0163043887";
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 const { core, isProduction } = require('./config/midtrans');
 const USE_POLLING = true; // true = pakai polling status Midtrans; false = andalkan webhook saja
@@ -95,14 +95,95 @@ try {
 
 // Timeout tracking system for memory leak prevention
 const activeTimeouts = new Map();
+const autoDeleteState = {
+  initialized: false,
+  ronzz: null
+};
+
+function getDatabaseInstance() {
+  if (typeof db !== 'undefined' && db?.data) return db;
+  if (global?.db?.data) return global.db;
+  return null;
+}
+
+function ensureAutoDeleteQueue() {
+  const database = getDatabaseInstance();
+  if (!database) return null;
+  if (!database.data.autoDeleteQueue) {
+    database.data.autoDeleteQueue = [];
+  }
+  return database.data.autoDeleteQueue;
+}
+
+function persistAutoDeleteQueue() {
+  try {
+    if (typeof global.scheduleSave === 'function') {
+      global.scheduleSave();
+    } else {
+      const database = getDatabaseInstance();
+      if (database && typeof database.save === 'function') {
+        database.save();
+      }
+    }
+  } catch (error) {
+    console.error('[Timeout] Failed to persist auto delete queue:', error.message);
+  }
+}
+
+function removeAutoDeleteEntry(entryId) {
+  const queue = ensureAutoDeleteQueue();
+  if (!queue) return;
+  const idx = queue.findIndex(item => item.id === entryId);
+  if (idx !== -1) {
+    queue.splice(idx, 1);
+    persistAutoDeleteQueue();
+  }
+  activeTimeouts.delete(entryId);
+}
+
+async function performAutoDelete(entry) {
+  const ronzz = autoDeleteState.ronzz;
+  if (!ronzz) return;
+  const deleteKey = {
+    remoteJid: entry.remoteJid,
+    id: entry.id,
+    participant: entry.participant || undefined,
+    fromMe: typeof entry.fromMe === 'boolean' ? entry.fromMe : true
+  };
+
+  try {
+    await ronzz.sendMessage(entry.remoteJid, { delete: deleteKey });
+    console.log(`🗑️ Auto-deleted ${entry.description} after delay`);
+  } catch (error) {
+    console.error(`[Timeout] Failed to auto-delete ${entry.description}:`, error.message);
+  } finally {
+    removeAutoDeleteEntry(entry.id);
+  }
+}
+
+function scheduleAutoDeleteEntry(entry) {
+  if (!autoDeleteState.ronzz) return;
+  if (!entry || !entry.id) return;
+  if (activeTimeouts.has(entry.id)) return;
+
+  const delay = Math.max(0, entry.deleteAt - Date.now());
+  const timeoutId = setTimeout(() => performAutoDelete(entry), delay);
+  activeTimeouts.set(entry.id, {
+    timeoutId,
+    chatId: entry.remoteJid,
+    scheduledAt: Date.now(),
+    expiresAt: entry.deleteAt,
+    description: entry.description
+  });
+}
 
 /**
- * Schedule auto-delete for a message with proper cleanup tracking
+ * Schedule auto-delete for a message with proper cleanup tracking (persisted)
  * @param {Object} messageKey - Message key object from sendMessage response
  * @param {String} chatId - Chat ID (jid)
  * @param {Number} delayMs - Delay in milliseconds (default: 5 minutes)
  * @param {String} description - Optional description for logging
- * @returns {Number} Timeout ID
+ * @returns {Object|null} Scheduled entry
  */
 function scheduleAutoDelete(messageKey, chatId, delayMs = 300000, description = 'message') {
   if (!messageKey || !chatId) {
@@ -110,29 +191,50 @@ function scheduleAutoDelete(messageKey, chatId, delayMs = 300000, description = 
     return null;
   }
 
-  const timeoutId = setTimeout(async () => {
-    try {
-      // Get ronzz from global or pass as parameter
-      // For now, we'll need to handle this in the calling code
-      // This is a placeholder - actual implementation will be in the calling code
-      activeTimeouts.delete(messageKey.id || JSON.stringify(messageKey));
-    } catch (error) {
-      console.error(`[Timeout] Failed to cleanup timeout for ${description}:`, error.message);
-      activeTimeouts.delete(messageKey.id || JSON.stringify(messageKey));
+  const keyId = messageKey.id || messageKey.key?.id;
+  const remoteJid = messageKey.remoteJid || chatId;
+  if (!keyId || !remoteJid) {
+    console.warn('[Timeout] Missing message key info for scheduleAutoDelete');
+    return null;
+  }
+
+  const entry = {
+    id: keyId,
+    remoteJid,
+    participant: messageKey.participant || messageKey.key?.participant || null,
+    fromMe: messageKey.fromMe ?? true,
+    description,
+    deleteAt: Date.now() + delayMs
+  };
+
+  const queue = ensureAutoDeleteQueue();
+  if (!queue) return null;
+  queue.push(entry);
+  persistAutoDeleteQueue();
+
+  if (autoDeleteState.initialized) {
+    scheduleAutoDeleteEntry(entry);
+  }
+
+  return entry;
+}
+
+function initializeAutoDeleteManager(ronzz) {
+  if (!ronzz) return;
+  autoDeleteState.ronzz = ronzz;
+  if (autoDeleteState.initialized) return;
+  autoDeleteState.initialized = true;
+
+  const queue = ensureAutoDeleteQueue();
+  if (!queue) return;
+
+  for (const entry of queue.slice()) {
+    if (entry.deleteAt <= Date.now()) {
+      performAutoDelete(entry);
+    } else {
+      scheduleAutoDeleteEntry(entry);
     }
-  }, delayMs);
-
-  // Store timeout with message key for tracking
-  const key = messageKey.id || JSON.stringify(messageKey);
-  activeTimeouts.set(key, {
-    timeoutId,
-    chatId,
-    scheduledAt: Date.now(),
-    expiresAt: Date.now() + delayMs,
-    description
-  });
-
-  return timeoutId;
+  }
 }
 
 /**
@@ -223,6 +325,7 @@ module.exports = async (ronzz, m, mek) => {
     __wrapSendMessageOnce(ronzz)
     const { isQuotedMsg, fromMe } = m
     if (fromMe) return
+    initializeAutoDeleteManager(ronzz)
     const jamwib = moment.tz('Asia/Jakarta').format('HH:mm:ss')
     const dt = moment.tz('Asia/Jakarta').format('HH')
     const content = JSON.stringify(mek.message)
@@ -1323,41 +1426,12 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           }
 
           // Send the message
-          const sentMessage = await ronzz.sendMessage(from, { 
-            text: teks, 
-            mentions: [ownerNomer + "@s.whatsapp.net"] 
+          const sentMessage = await ronzz.sendMessage(from, {
+            text: teks,
+            mentions: [ownerNomer + "@s.whatsapp.net"]
           }, { quoted: m })
 
-          // Auto delete setelah 5 menit (300000 ms) - dengan proper cleanup tracking
-          const deleteTimeoutId = setTimeout(async () => {
-            try {
-              await ronzz.sendMessage(from, {
-                delete: sentMessage.key
-              })
-              console.log(`🗑️ Auto-deleted stok list message after 5 minutes`)
-              // Cleanup from tracking
-              if (sentMessage.key && sentMessage.key.id) {
-                activeTimeouts.delete(sentMessage.key.id);
-              }
-            } catch (deleteError) {
-              console.error(`❌ Failed to auto-delete stok message:`, deleteError.message)
-              // Cleanup from tracking even on error
-              if (sentMessage.key && sentMessage.key.id) {
-                activeTimeouts.delete(sentMessage.key.id);
-              }
-            }
-          }, 300000) // 5 menit = 300000 ms
-          
-          // Track timeout for cleanup
-          if (sentMessage.key && sentMessage.key.id) {
-            activeTimeouts.set(sentMessage.key.id, {
-              timeoutId: deleteTimeoutId,
-              chatId: from,
-              scheduledAt: Date.now(),
-              expiresAt: Date.now() + 300000,
-              description: 'stok list message'
-            });
-          }
+          scheduleAutoDelete(sentMessage.key, from, 300000, 'stok list message')
           
         } catch (error) {
           console.error('❌ Error in stok command:', error)
@@ -2641,36 +2715,7 @@ case 'buy': {
         mentions: [ownerNomer + "@s.whatsapp.net"]
       }, { quoted: m })
 
-      // Auto delete setelah 5 menit (300000 ms) - dengan proper cleanup tracking
-      const deleteTimeoutId = setTimeout(async () => {
-        try {
-          await ronzz.sendMessage(from, {
-            delete: sentMessage.key
-          })
-          console.log(`🗑️ Auto-deleted ${command} product list message after 5 minutes`)
-          // Cleanup from tracking
-          if (sentMessage.key && sentMessage.key.id) {
-            activeTimeouts.delete(sentMessage.key.id);
-          }
-        } catch (deleteError) {
-          console.error(`❌ Failed to auto-delete ${command} message:`, deleteError.message)
-          // Cleanup from tracking even on error
-          if (sentMessage.key && sentMessage.key.id) {
-            activeTimeouts.delete(sentMessage.key.id);
-          }
-        }
-      }, 300000) // 5 menit = 300000 ms
-      
-      // Track timeout for cleanup
-      if (sentMessage.key && sentMessage.key.id) {
-        activeTimeouts.set(sentMessage.key.id, {
-          timeoutId: deleteTimeoutId,
-          chatId: from,
-          scheduledAt: Date.now(),
-          expiresAt: Date.now() + 300000,
-          description: `${command} product list message`
-        });
-      }
+      scheduleAutoDelete(sentMessage.key, from, 300000, `${command} product list message`)
   
     } catch (e) {
       console.error(`❌ Error in ${command} command:`, e)
