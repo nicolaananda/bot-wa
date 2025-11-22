@@ -616,21 +616,49 @@ module.exports = async (ronzz, m, mek) => {
     
     // 🛡️ GROUP WHITELIST: Cek apakah group diizinkan (hanya untuk group, bukan private chat)
     if (isGroup && !isOwner) {
+      // Pastikan groupName valid
+      if (!groupName || typeof groupName !== 'string') {
+        console.warn(`⚠️ [GROUP-WHITELIST] Invalid group name, blocking for safety`)
+        console.warn(`   Group metadata: ${JSON.stringify({ from, isGroup, hasMetadata: !!groupMetadata })}`)
+        return
+      }
+      
+      // Debug: Log konfigurasi whitelist
+      console.log(`🔍 [GROUP-WHITELIST] Checking group: "${groupName}" (${from})`)
+      console.log(`   BOT_GROUP_NAMES: ${global.groupNames && global.groupNames.length > 0 ? global.groupNames.join(', ') : 'NOT SET'}`)
+      console.log(`   BOT_GROUP_LINKS: ${global.linkGroup && global.linkGroup.length > 0 ? `${global.linkGroup.length} links` : 'NOT SET'}`)
+      
       let isAllowedGroup = false
       let checkMethod = ''
       
       // Prioritas 1: Cek berdasarkan nama group (jika BOT_GROUP_NAMES di-set)
-      if (global.groupNames && global.groupNames.length > 0) {
-        const normalizedGroupName = groupName.toLowerCase().trim()
-        isAllowedGroup = global.groupNames.includes(normalizedGroupName)
+      // Cek apakah BOT_GROUP_NAMES environment variable di-set (bukan hanya array kosong)
+      const hasGroupNamesEnv = process.env.BOT_GROUP_NAMES !== undefined && process.env.BOT_GROUP_NAMES !== null
+      
+      if (hasGroupNamesEnv) {
+        // Jika BOT_GROUP_NAMES di-set tapi kosong, block semua group
+        if (!global.groupNames || global.groupNames.length === 0) {
+          console.log(`🚫 [GROUP-WHITELIST] BLOCKED - BOT_GROUP_NAMES is set but empty (whitelist mode enabled, no groups allowed)`)
+          console.log(`   Group: "${groupName}" (${from})`)
+          return
+        }
+        
+        // Normalize: lowercase, trim, dan hapus karakter whitespace berlebih
+        const normalizedGroupName = groupName.toLowerCase().trim().replace(/\s+/g, ' ')
+        isAllowedGroup = global.groupNames.some(allowedName => {
+          const normalizedAllowed = allowedName.toLowerCase().trim().replace(/\s+/g, ' ')
+          return normalizedGroupName === normalizedAllowed
+        })
         checkMethod = 'name'
+        
+        console.log(`   Checking name: "${normalizedGroupName}" in [${global.groupNames.map(n => `"${n.toLowerCase().trim().replace(/\s+/g, ' ')}"`).join(', ')}]`)
         
         if (isAllowedGroup) {
           console.log(`✅ [GROUP-WHITELIST] Allowed group by name: ${groupName}`)
         } else {
-          console.log(`🚫 [GROUP-WHITELIST] Blocked group by name:`)
-          console.log(`   Group: ${groupName} (${from})`)
-          console.log(`   Allowed Names: ${global.groupNames.join(', ')}`)
+          console.log(`🚫 [GROUP-WHITELIST] BLOCKED - Group name not in whitelist:`)
+          console.log(`   Group: "${groupName}" (normalized: "${normalizedGroupName}")`)
+          console.log(`   Allowed Names: ${global.groupNames.map(n => `"${n}"`).join(', ')}`)
           return // Block jika tidak match nama
         }
       }
@@ -653,7 +681,7 @@ module.exports = async (ronzz, m, mek) => {
           checkMethod = 'invite_code'
           
           if (!isAllowedGroup) {
-            console.log(`🚫 [GROUP-WHITELIST] Blocked message from unauthorized group:`)
+            console.log(`🚫 [GROUP-WHITELIST] BLOCKED - Group invite code not in whitelist:`)
             console.log(`   Group: ${groupName} (${from})`)
             console.log(`   Group Invite Code: ${groupInviteCode}`)
             console.log(`   Allowed Codes: ${allowedInviteCodes.join(', ')}`)
@@ -668,20 +696,25 @@ module.exports = async (ronzz, m, mek) => {
             
             // Jika BOT_GROUP_NAMES tidak di-set, block untuk safety
             if (!global.groupNames || global.groupNames.length === 0) {
-              console.log(`🚫 [GROUP-WHITELIST] Blocking group: Cannot verify (no BOT_GROUP_NAMES set and invite code check failed)`)
+              console.log(`🚫 [GROUP-WHITELIST] BLOCKED - Cannot verify (no BOT_GROUP_NAMES set and invite code check failed)`)
               console.log(`   Group: ${groupName} (${from})`)
               return
             }
             
             // Coba cek berdasarkan nama group sebagai fallback
-            const normalizedGroupName = groupName.toLowerCase().trim()
-            isAllowedGroup = global.groupNames.includes(normalizedGroupName)
+            const normalizedGroupName = groupName.toLowerCase().trim().replace(/\s+/g, ' ')
+            isAllowedGroup = global.groupNames.some(allowedName => {
+              const normalizedAllowed = allowedName.toLowerCase().trim().replace(/\s+/g, ' ')
+              return normalizedGroupName === normalizedAllowed
+            })
             checkMethod = 'name (fallback)'
             
+            console.log(`   Fallback checking name: "${normalizedGroupName}" in [${global.groupNames.map(n => `"${n.toLowerCase().trim().replace(/\s+/g, ' ')}"`).join(', ')}]`)
+            
             if (!isAllowedGroup) {
-              console.log(`🚫 [GROUP-WHITELIST] Blocked group (fallback name check):`)
-              console.log(`   Group: ${groupName} (${from})`)
-              console.log(`   Allowed Names: ${global.groupNames.join(', ')}`)
+              console.log(`🚫 [GROUP-WHITELIST] BLOCKED - Group name not in whitelist (fallback):`)
+              console.log(`   Group: "${groupName}" (normalized: "${normalizedGroupName}")`)
+              console.log(`   Allowed Names: ${global.groupNames.map(n => `"${n}"`).join(', ')}`)
               return
             } else {
               console.log(`✅ [GROUP-WHITELIST] Allowed group by name (fallback): ${groupName}`)
@@ -690,7 +723,7 @@ module.exports = async (ronzz, m, mek) => {
             // Error lain, block untuk safety
             console.error(`❌ [GROUP-WHITELIST] Error checking group:`, error.message)
             console.error(`   Group: ${groupName} (${from})`)
-            console.log(`🚫 [GROUP-WHITELIST] Blocking group due to error (safety measure)`)
+            console.log(`🚫 [GROUP-WHITELIST] BLOCKED - Error during check (safety measure)`)
             return
           }
         }

@@ -54,7 +54,7 @@ global.linkGroup = groupLinksStr.split(',').map(link => link.trim()).filter(link
 
 // Group names - parse from comma-separated string (alternatif untuk whitelist berdasarkan nama)
 const groupNamesStr = process.env.BOT_GROUP_NAMES || ""
-global.groupNames = groupNamesStr.split(',').map(name => name.trim().toLowerCase()).filter(name => name) //Nama group yang diizinkan
+global.groupNames = groupNamesStr.split(',').map(name => name.trim().toLowerCase().replace(/\s+/g, ' ')).filter(name => name) //Nama group yang diizinkan (normalized: lowercase, trim, single space)
 
 //Image
 global.thumbnail = "./options/image/payment.jpg"
