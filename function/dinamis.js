@@ -5,36 +5,19 @@ const pathModule = require('path');
 const { createCanvas, loadImage } = require('canvas');
 
 function toCRC16(str) {
-  function charCodeAt(str, i) {
-    let get = str.substr(i, 1)
-    return get.charCodeAt()
-  }
-
   let crc = 0xFFFF;
-  let strlen = str.length;
-  for (let c = 0; c < strlen; c++) {
-    crc ^= charCodeAt(str, c) << 8;
-    for (let i = 0; i < 8; i++) {
-      if (crc & 0x8000) {
+  for (let i = 0; i < str.length; i++) {
+    crc ^= str.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
         crc = (crc << 1) ^ 0x1021;
       } else {
-        crc = crc << 1;
+        crc <<= 1;
       }
+      crc &= 0xFFFF;
     }
   }
-  hex = crc & 0xFFFF;
-  hex = hex.toString(16);
-  hex = hex.toUpperCase();
-  if (hex.length == 3) {
-    hex = "0" + hex;
-  }
-  if (hex.length == 2) {
-    hex = "00" + hex;
-  }
-  if (hex.length == 1) {
-    hex = "000" + hex;
-  }
-  return hex;
+  return crc.toString(16).toUpperCase().padStart(4, "0");
 }
 
 // Helper untuk membuat TLV (Tag-Length-Value)
@@ -90,21 +73,49 @@ async function qrisDinamis(nominalOrQris, outPath) {
   }
 
   // Backward-compatible: treat as amount and build from global.codeqr
-  let qris = codeqr
+  if (!codeqr) {
+    throw new Error("codeqr is not defined. Please set MIDTRANS_STATIC_QRIS in your .env file");
+  }
 
-  let qris2 = qris.slice(0, -4);
-  let replaceQris = qris2.replace("010211", "010212");
-  let pecahQris = replaceQris.split("5802ID");
-  const nominal = String(nominalOrQris)
+  let baseQris = codeqr;
   
-  // Pastikan panjang field selalu 2 digit menggunakan slice(-2) seperti kode asli
-  // Ini memastikan format konsisten untuk semua nominal (termasuk 10+ digit)
-  let uang = "54" + ("0" + nominal.length).slice(-2) + nominal + "5802ID";
+  // Ubah dari static (010211) ke dynamic (010212)
+  baseQris = baseQris.replace("010211", "010212");
 
-  let output = pecahQris[0] + uang + pecahQris[1] + toCRC16(pecahQris[0] + uang + pecahQris[1])
+  // Buang CRC lama: cari "6304" (Tag 63 len 04)
+  const idxCrc = baseQris.indexOf("6304");
+  const withoutCRC = idxCrc > -1 ? baseQris.slice(0, idxCrc) : baseQris;
 
-  await generateStyledQR(output, outPath)
-  return outPath
+  // Bersihkan Tag 54 (Amount) & Tag 62 (Additional Data) lama jika ada
+  let payload = withoutCRC
+    .replace(/54\d{2}[\d.]+/g, "")      // amount
+    .replace(/62\d{2}[0-9A-Za-z]+/g, ""); // additional data
+
+  // Pastikan amount tanpa desimal (IDR) dan sebagai string
+  const amountStr = String(Math.floor(Number(nominalOrQris)));
+
+  // Build Tag 54 (Amount) dengan format TLV yang benar
+  const tag54 = tlv("54", amountStr);
+
+  // Build Tag 62 (Additional Data) untuk trigger notifikasi
+  // Menggunakan timestamp + nominal sebagai reference ID untuk uniqueness
+  const refId = Date.now().toString().slice(-10) + amountStr.slice(-3);
+  const tag62Value = tlv("01", refId) + tlv("05", refId);
+  const tag62 = tlv("62", tag62Value);
+
+  // Sisipkan Tag 54 dan Tag 62 di akhir (sebelum CRC)
+  payload = payload + tag54 + tag62;
+
+  // Hitung CRC baru
+  const withCrcHeader = payload + "6304";
+  const crc = toCRC16(withCrcHeader);
+
+  // Hasil final
+  const output = withCrcHeader + crc;
+
+  await generateStyledQR(output, outPath);
+  return outPath;
 }
 
+module.exports = { qrisDinamis }
 module.exports = { qrisDinamis }
