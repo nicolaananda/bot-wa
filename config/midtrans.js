@@ -87,6 +87,106 @@ async function getTransactionStatusByTransactionId(transactionId) {
   return data
 }
 
+/**
+ * Cari transaksi QRIS statis berdasarkan nominal dan waktu
+ * Untuk QRIS statis, kita tidak punya order_id, jadi search berdasarkan amount dan time range
+ * @param {number} amount - Nominal yang dicari (dengan kode unik)
+ * @param {number} startTime - Timestamp mulai pencarian (milliseconds)
+ * @param {number} endTime - Timestamp akhir pencarian (milliseconds), default: sekarang
+ * @returns {Promise<Object|null>} Transaction data jika ditemukan, null jika tidak
+ */
+async function findStaticQRISTransaction(amount, startTime, endTime = Date.now()) {
+  try {
+    // Midtrans Transaction List API (jika tersedia)
+    // Format: GET /v2/transactions?from=timestamp&to=timestamp
+    const fromTimestamp = Math.floor(startTime / 1000) // Convert to seconds
+    const toTimestamp = Math.floor(endTime / 1000)
+    
+    // Coba ambil transaksi dalam rentang waktu
+    const url = `${baseUrl}/v2/transactions?from=${fromTimestamp}&to=${toTimestamp}&limit=100`
+    
+    try {
+      const { data } = await axios.get(url, { headers: getAuthHeader() })
+      
+      // Data bisa berupa array atau object dengan property transactions
+      const transactions = Array.isArray(data) ? data : (data.transactions || [])
+      
+      // Cari transaksi yang match dengan amount dan payment_type = qris
+      const match = transactions.find(tx => {
+        const txAmount = Number(tx.gross_amount || tx.amount || 0)
+        const txType = (tx.payment_type || '').toLowerCase()
+        const txStatus = (tx.transaction_status || '').toLowerCase()
+        
+        // Match jika amount sama dan payment type adalah qris, dan status settlement/capture
+        return txAmount === Number(amount) && 
+               txType === 'qris' && 
+               (txStatus === 'settlement' || txStatus === 'capture')
+      })
+      
+      if (match) {
+        console.log(`✅ [Midtrans] Found static QRIS transaction: ${match.transaction_id || match.order_id}`)
+        return match
+      }
+      
+      return null
+    } catch (apiError) {
+      // Jika endpoint tidak tersedia atau error, return null
+      console.warn(`⚠️ [Midtrans] Transaction list API not available or error:`, apiError.message)
+      return null
+    }
+  } catch (error) {
+    console.error(`❌ [Midtrans] Error finding static QRIS transaction:`, error.message)
+    return null
+  }
+}
+
+/**
+ * Check apakah pembayaran QRIS statis sudah masuk via API
+ * @param {number} totalAmount - Total amount dengan kode unik
+ * @param {number} createdAtTimestamp - Timestamp saat order dibuat (milliseconds)
+ * @returns {Promise<Object>} { found: boolean, transaction: Object|null, status: string }
+ */
+async function checkStaticQRISPayment(totalAmount, createdAtTimestamp) {
+  try {
+    // Cari transaksi dalam rentang waktu (dari order dibuat sampai sekarang + 5 menit buffer)
+    const endTime = Date.now() + (5 * 60 * 1000) // 5 menit ke depan
+    
+    const transaction = await findStaticQRISTransaction(totalAmount, createdAtTimestamp, endTime)
+    
+    if (transaction) {
+      const status = (transaction.transaction_status || '').toLowerCase()
+      const isPaid = status === 'settlement' || status === 'capture'
+      
+      return {
+        found: true,
+        paid: isPaid,
+        transaction: transaction,
+        status: status.toUpperCase(),
+        transaction_id: transaction.transaction_id,
+        order_id: transaction.order_id,
+        gross_amount: transaction.gross_amount || transaction.amount || 0,
+        settlement_time: transaction.settlement_time || transaction.transaction_time
+      }
+    }
+    
+    return {
+      found: false,
+      paid: false,
+      transaction: null,
+      status: 'NOT_FOUND'
+    }
+  } catch (error) {
+    console.error(`❌ [Midtrans] Error checking static QRIS payment:`, error.message)
+    return {
+      found: false,
+      paid: false,
+      transaction: null,
+      status: 'ERROR',
+      error: error.message
+    }
+  }
+}
+
 const core = {
   serverKey: MIDTRANS_SERVER_KEY,
   baseUrl
@@ -103,6 +203,8 @@ module.exports = {
   createQRISPayment,
   getTransactionStatusByOrderId,
   getTransactionStatusByTransactionId,
+  findStaticQRISTransaction,
+  checkStaticQRISPayment,
   core,
   isProduction
 }
