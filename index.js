@@ -613,6 +613,34 @@ module.exports = async (ronzz, m, mek) => {
     const isVideo = (m.mtype == 'videoMessage')
     const isQuotedVideo = isQuotedMsg ? content.includes('videoMessage') ? true : false : false
     const isSewa = db.data.sewa[from] ? true : false
+    
+    // 🛡️ GROUP WHITELIST: Cek apakah group diizinkan (hanya untuk group, bukan private chat)
+    if (isGroup && !isOwner) {
+      try {
+        // Ambil group invite code
+        const groupInviteCode = await ronzz.groupInviteCode(from)
+        const groupLink = `https://chat.whatsapp.com/${groupInviteCode}`
+        
+        // Cek apakah group link ada di whitelist
+        const isAllowedGroup = global.linkGroup && global.linkGroup.length > 0 
+          ? global.linkGroup.some(link => {
+              // Normalize link untuk comparison (hapus query params dan mode)
+              const normalizedLink = link.split('?')[0].split('&')[0]
+              const normalizedGroupLink = groupLink.split('?')[0]
+              return normalizedLink === normalizedGroupLink || link.includes(groupInviteCode)
+            })
+          : true // Jika tidak ada whitelist, izinkan semua (backward compatibility)
+        
+        if (!isAllowedGroup) {
+          console.log(`🚫 [GROUP-WHITELIST] Blocked message from unauthorized group: ${groupName} (${from})`)
+          return // Jangan proses pesan dari group yang tidak diizinkan
+        }
+      } catch (error) {
+        // Jika error saat cek group link, log dan izinkan (untuk avoid blocking valid groups)
+        console.error(`⚠️ [GROUP-WHITELIST] Error checking group:`, error.message)
+        // Tetap izinkan untuk backward compatibility jika error
+      }
+    }
 
     function parseMention(text = '') {
       return [...text.matchAll(/@([0-9]{5,16}|0)/g)].map(v => v[1] + '@s.whatsapp.net')
@@ -1990,7 +2018,9 @@ case 'deposit': {
     reply("Sedang membuat QR Code...")
     
     const orderId = `DEP-${reffId}-${Date.now()}`
-    const qrImagePath = await qrisStatis("./options/sticker/qris.jpg")
+    // Gunakan QRIS dinamis (sama seperti buynow)
+    const qrImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg")
+    console.log(`✅ [DEPOSIT] QRIS dinamis generated: ${orderId}, Amount: Rp${totalAmount}`)
 
     const expirationTime = Date.now() + toMs("30m")
     const expireDate = new Date(expirationTime)
@@ -2004,17 +2034,14 @@ case 'deposit': {
       `*Bonus:* Rp${toRupiah(bonus)} (Rp2.000 tiap kelipatan Rp50.000)\n` +
       `*Kode Unik:* *${uniqueCode}*\n` +
       `*Total Transfer:* *Rp${toRupiah(totalAmount)}*\n` +
+      `*Order ID:* ${orderId}\n` +
       `*Waktu:* ${timeLeft} menit\n\n` +
       `📱 *Cara Bayar:*\n` +
-      `1. Scan QRIS di atas\n` +
-      `2. *⚠️ PENTING: Input nominal HARUS sesuai*\n` +
-      `   *Nominal: Rp${toRupiah(totalAmount)}*\n` +
+      `1. Scan QRIS di atas dengan aplikasi pembayaran Anda\n` +
+      `2. *Nominal sudah ter-set otomatis: Rp${toRupiah(totalAmount)}*\n` +
       `   (Rp${toRupiah(baseAmount)} + *kode unik ${uniqueCode}*)\n` +
-      `3. *Pembayaran akan terdeteksi otomatis jika nominal sesuai*\n\n` +
-      `*⚠️ PERINGATAN:*\n` +
-      `• Jika nominal tidak sesuai, pembayaran TIDAK akan terdeteksi\n` +
-      `• Pastikan total pembayaran: *Rp${toRupiah(totalAmount)}*\n` +
-      `• Kode unik: *${uniqueCode}* (WAJIB ditambahkan)\n\n` +
+      `3. Konfirmasi pembayaran di aplikasi\n` +
+      `4. *Pembayaran akan terdeteksi otomatis via webhook*\n\n` +
       `⏰ Batas waktu: sebelum ${formattedTime}\n` +
       `Ketik *${prefix}batal* untuk membatalkan.`
 
@@ -2034,51 +2061,37 @@ case 'deposit': {
       totalAmount,
       uniqueCode,
       bonus,
-      // Simpan timestamp utk validasi notifikasi pembayaran
+      metode: 'QRIS', // Pastikan metode di-set untuk global listener
       createdAt: createdAtTs
     }
+    
+    console.log(`📝 [DEPOSIT] Order created: ${orderId}, Amount: Rp${totalAmount}, Sender: ${sender}`)
 
-    // Improvement: Exponential backoff polling
-    let pollInterval = 3000  // Mulai dari 3 detik
-    const maxInterval = 15000 // Maksimal 15 detik
-    let pollCount = 0
-
-    while (db.data.orderDeposit[sender]) {
-      await sleep(pollInterval)
-
-      // Tingkatkan interval secara bertahap
-      if (pollCount < 10) {
-        pollInterval = Math.min(Math.floor(pollInterval * 1.2), maxInterval)
-      }
-      pollCount++
-
-      if (Date.now() >= expirationTime) {
-        await ronzz.sendMessage(from, { delete: message.key })
-        reply("Deposit dibatalkan karena melewati batas waktu 30 menit.")
-        delete db.data.orderDeposit[sender]
-        break
-      }
-
+    // Setup webhook listener untuk payment-completed event
+    const paymentListener = async (webhookData) => {
       try {
-        const url = `${listener.baseUrl}/notifications?limit=50`
-        const headers = listener.apiKey ? { 'X-API-Key': listener.apiKey } : {}
-        const resp = await axios.get(url, { headers, timeout: 5000 })
-        const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : [])
-
-                // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
-                const paid = notifs.find(n => {
-                  try {
-                    const pkgOk = (n.package_name === 'com.gojek.gopaymerchant') || (String(n.app_name||'').toUpperCase().includes('GOPAY')) || (String(n.app_name||'').toUpperCase().includes('GOJEK'))
-                    const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''))
-                    const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0
-                    return pkgOk && amt === Number(totalAmount) && postedAt >= createdAtTs
-                  } catch {
-                    return false
-                  }
-                })
-
-        if (paid) {
-          await ronzz.sendMessage(from, { delete: message.key })
+        const { orderId: webhookOrderId, transactionStatus, gross_amount } = webhookData;
+        
+        // Match berdasarkan totalAmount
+        const order = db.data.orderDeposit[sender];
+        if (!order) return; // Order sudah tidak ada
+        
+        const webhookAmount = Number(gross_amount || webhookData.gross_amount || 0);
+        const orderAmount = Number(totalAmount);
+        const amountDiff = Math.abs(webhookAmount - orderAmount);
+        const isAmountMatch = amountDiff < 1; // Tolerance untuk handle decimal
+        const isStatusPaid = /(settlement|capture)/i.test(String(transactionStatus));
+        
+        console.log(`🔍 [DEPOSIT-LOCAL] Checking webhook: Amount Rp${webhookAmount}, Order Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+        
+        // Match jika amount sama (dengan tolerance) dan status paid
+        if (isAmountMatch && isStatusPaid) {
+          console.log(`✅ [DEPOSIT] Webhook payment detected: ${orderId}, Amount: ${webhookAmount}`);
+          
+          // Remove listener setelah payment detected
+          process.removeListener('payment-completed', paymentListener);
+          
+          await ronzz.sendMessage(from, { delete: message.key });
 
           const credit = baseAmount + bonus + uniqueCode
           const previousSaldo = Number(db.data.users[sender].saldo || 0)
@@ -2100,20 +2113,138 @@ case 'deposit': {
           await ronzz.sendMessage(from, { text: successText }, { quoted: m })
 
           delete db.data.orderDeposit[sender]
-          
-          // Improvement: Batch database save (save sekali saja di akhir)
           await db.save()
-          break
+          console.log(`✅ [DEPOSIT] Transaction completed via webhook: ${orderId} - ${reffId}`);
         }
-      } catch (err) {
-        if (err.message?.includes("timeout")) continue
+      } catch (error) {
+        console.error(`❌ [DEPOSIT] Error in webhook listener:`, error.message);
+      }
+    };
 
+    // Register webhook listener
+    process.on('payment-completed', paymentListener);
+
+    // Polling untuk timeout handling (jika webhook tidak datang)
+    let pollInterval = 2000; // Mulai dari 2 detik (lebih cepat)
+    const maxInterval = 10000; // Maksimal 10 detik (lebih cepat)
+    let pollCount = 0
+
+    while (db.data.orderDeposit[sender]) {
+      await sleep(pollInterval)
+
+      if (pollCount < 10) {
+        pollInterval = Math.min(Math.floor(pollInterval * 1.2), maxInterval)
+      }
+      pollCount++
+
+      if (Date.now() >= expirationTime) {
+        // Remove listener saat timeout
+        process.removeListener('payment-completed', paymentListener);
         await ronzz.sendMessage(from, { delete: message.key })
-        reply("Deposit dibatalkan karena error sistem.")
+        reply("Deposit dibatalkan karena melewati batas waktu 30 menit.")
         delete db.data.orderDeposit[sender]
         break
       }
+
+      // Fallback: Cek webhook dari PostgreSQL database (karena dashboard-api dan bot-wa adalah process terpisah)
+      if (pollCount % 2 === 0) { // Cek setiap 2 polling cycle (sekitar 4-8 detik) - lebih cepat untuk deteksi
+        try {
+          if (usePg && pg) {
+            // Query dari PostgreSQL
+            const orderAmount = Number(totalAmount);
+            const tolerance = 1; // Tolerance 1 rupiah untuk handle decimal
+            
+            const result = await pg.query(
+              `SELECT id, order_id, transaction_id, transaction_status, payment_type, gross_amount, settlement_time, webhook_data
+               FROM midtrans_webhooks
+               WHERE processed = false 
+                 AND transaction_status IN ('settlement', 'capture')
+                 AND ABS(gross_amount - $1) < $2
+               ORDER BY created_at DESC
+               LIMIT 10`,
+              [orderAmount, tolerance]
+            );
+            
+            if (result.rows.length > 0) {
+              console.log(`🔍 [DEPOSIT] Found ${result.rows.length} unprocessed webhooks from PostgreSQL, looking for amount Rp${orderAmount}`);
+            }
+            
+            for (const row of result.rows) {
+              const webhookAmount = Number(row.gross_amount || 0);
+              const amountDiff = Math.abs(webhookAmount - orderAmount);
+              const isAmountMatch = amountDiff < tolerance;
+              
+              console.log(`  - Webhook: Amount Rp${webhookAmount} (${typeof row.gross_amount}), Order Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+              
+              if (isAmountMatch) {
+                console.log(`✅ [DEPOSIT] Payment detected via PostgreSQL webhook: Amount Rp${webhookAmount}, OrderID: ${row.order_id}`);
+                
+                // Mark as processed di PostgreSQL
+                await pg.query(
+                  `UPDATE midtrans_webhooks 
+                   SET processed = true, processed_at = now() 
+                   WHERE id = $1`,
+                  [row.id]
+                );
+                
+                // Trigger same processing as webhook listener
+                paymentListener({ 
+                  orderId: row.order_id || orderId, 
+                  transactionStatus: row.transaction_status,
+                  gross_amount: webhookAmount,
+                  paymentType: row.payment_type,
+                  settlementTime: row.settlement_time
+                });
+                break;
+              }
+            }
+          } else {
+            // Fallback ke JSON database jika PostgreSQL tidak tersedia
+            const webhooks = db.data.midtransWebhooks || [];
+            const unprocessedWebhooks = webhooks.filter(w => !w.processed && w.gross_amount);
+            
+            if (unprocessedWebhooks.length > 0) {
+              console.log(`🔍 [DEPOSIT] Checking ${unprocessedWebhooks.length} unprocessed webhooks from JSON, looking for amount Rp${totalAmount}`);
+            }
+            
+            for (const webhook of unprocessedWebhooks) {
+              const webhookAmount = Number(webhook.gross_amount || 0);
+              const amountDiff = Math.abs(webhookAmount - Number(totalAmount));
+              const isAmountMatch = amountDiff < 1;
+              const isStatusPaid = /(settlement|capture)/i.test(String(webhook.transactionStatus));
+              
+              console.log(`  - Webhook: Amount Rp${webhookAmount}, Status: ${webhook.transactionStatus}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+              
+              if (isAmountMatch && isStatusPaid) {
+                console.log(`✅ [DEPOSIT] Payment detected via JSON webhook: Amount Rp${webhookAmount}, OrderID: ${webhook.orderId}`);
+                
+                // Mark as processed
+                webhook.processed = true;
+                if (typeof db.save === 'function') {
+                  await db.save();
+                }
+                
+                // Trigger same processing as webhook listener
+                paymentListener({ 
+                  orderId: webhook.orderId || orderId, 
+                  transactionStatus: webhook.transactionStatus,
+                  gross_amount: webhook.gross_amount 
+                });
+                break;
+              }
+            }
+          }
+        } catch (dbError) {
+          // Ignore database errors
+          console.log(`⚠️ [DEPOSIT] Database webhook check failed:`, dbError.message);
+        }
+      }
     }
+    
+    // Remove listener jika loop selesai (timeout atau payment detected)
+    try {
+      process.removeListener('payment-completed', paymentListener);
+    } catch {}
   } catch (error) {
     console.error(`Error creating QRIS DEPOSIT for ${sender}:`, error)
     reply("Gagal membuat QR Code deposit. Silakan coba lagi.")
@@ -2188,7 +2319,7 @@ case 'buynow': {
       const expireTimeJakarta = new Date(new Date(currentTime).getTime() + timeLeft * 60000);
       const formattedTime = `${expireTimeJakarta.getHours().toString().padStart(2, '0')}:${expireTimeJakarta.getMinutes().toString().padStart(2, '0')}`;
 
-      const caption = `*🧾 MENUNGGU PEMBAYARAN  🧾*\n\n` +
+      const caption = `*🧾 MENUNGGU PEMBAYARAN 🧾*\n\n` +
           `*Produk ID:* ${data[0]}\n` +
           `*Nama Produk:* ${db.data.produk[data[0]].name}\n` +
           `*Harga:* Rp${toRupiah(totalHarga / jumlah)}\n` +
@@ -2199,15 +2330,11 @@ case 'buynow': {
           `*Order ID:* ${orderId}\n` +
           `*Waktu:* ${timeLeft} menit\n\n` +
           `📱 *Cara Bayar:*\n` +
-          `1. Scan QRIS di atas\n` +
-          `2. *⚠️ PENTING: Input nominal HARUS sesuai*\n` +
-          `   *Nominal: Rp${toRupiah(totalAmount)}*\n` +
+          `1. Scan QRIS di atas dengan aplikasi pembayaran Anda\n` +
+          `2. *Nominal sudah ter-set otomatis: Rp${toRupiah(totalAmount)}*\n` +
           `   (Rp${toRupiah(totalHarga)} + *kode unik ${uniqueCode}*)\n` +
-          `3. *Pembayaran akan terdeteksi otomatis via webhook*\n\n` +
-          `*⚠️ PERINGATAN:*\n` +
-          `• Jika nominal tidak sesuai, pembayaran TIDAK akan terdeteksi\n` +
-          `• Pastikan total pembayaran: *Rp${toRupiah(totalAmount)}*\n` +
-          `• Kode unik: *${uniqueCode}* (WAJIB ditambahkan)\n\n` +
+          `3. Konfirmasi pembayaran di aplikasi\n` +
+          `4. *Pembayaran akan terdeteksi otomatis via webhook*\n\n` +
           `⏰ Batas waktu: sebelum ${formattedTime}\n` +
           `Jika ingin membatalkan, ketik *${prefix}batal*`;
 
@@ -2226,7 +2353,7 @@ case 'buynow': {
           reffId,
           totalAmount,
           uniqueCode,
-          metode: 'QRIS', // Pastikan metode di-set untuk global listener
+          metode: 'MIDTRANS', // Pastikan metode di-set untuk global listener
           createdAt: createdAtTs
       };
       
@@ -2348,7 +2475,7 @@ case 'buynow': {
               user: sender.split("@")[0],
               userRole: db.data.users[sender].role,
               reffId: reffId,
-              metodeBayar: "MIDTRANS",
+              metodeBayar: "QRIS",
               totalBayar: totalAmount
             });
             
@@ -2369,8 +2496,8 @@ case 'buynow': {
       process.on('payment-completed', paymentListener);
 
       // Polling untuk timeout handling (jika webhook tidak datang)
-      let pollInterval = 3000;
-      const maxInterval = 15000;
+      let pollInterval = 2000; // Mulai dari 2 detik (lebih cepat)
+      const maxInterval = 10000; // Maksimal 10 detik (lebih cepat)
       let pollCount = 0;
 
       while (db.data.order[sender]) {
@@ -2391,7 +2518,7 @@ case 'buynow': {
           }
 
           // Fallback: Cek webhook dari PostgreSQL database (karena dashboard-api dan bot-wa adalah process terpisah)
-          if (pollCount % 3 === 0) { // Cek setiap 3 polling cycle (sekitar 9-15 detik)
+          if (pollCount % 2 === 0) { // Cek setiap 2 polling cycle (sekitar 6-10 detik) - lebih cepat untuk deteksi
             try {
               if (usePg && pg) {
                 // Query dari PostgreSQL - cari webhook yang belum processed dengan amount yang match
