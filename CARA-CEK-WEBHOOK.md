@@ -6,7 +6,7 @@ Endpoint test sudah ditambahkan untuk cek apakah webhook bisa diakses:
 
 ```bash
 # Buka di browser atau gunakan curl
-https://api-botwa.nicola.id/webhook/midtrans/test
+https://api.nicola.id/webhook/midtrans/test
 ```
 
 **Jika berhasil**, akan muncul response:
@@ -82,7 +82,7 @@ tail -f /path/to/log/file
 Test manual mengirim request ke webhook (tanpa signature, hanya untuk test endpoint):
 
 ```bash
-curl -X POST https://api-botwa.nicola.id/webhook/midtrans \
+curl -X POST https://api.nicola.id/webhook/midtrans \
   -H "Content-Type: application/json" \
   -d '{"test": "manual"}'
 ```
@@ -105,10 +105,10 @@ curl -X POST https://api-botwa.nicola.id/webhook/midtrans \
    ps aux | grep dashboard-api
    ```
 
-2. ✅ Domain `api-botwa.nicola.id` terhubung ke server?
+2. ✅ Domain `api.nicola.id` terhubung ke server?
    ```bash
-   ping api-botwa.nicola.id
-   curl https://api-botwa.nicola.id/webhook/midtrans/test
+   ping api.nicola.id
+   curl https://api.nicola.id/webhook/midtrans/test
    ```
 
 3. ✅ Port 3002 (atau port yang digunakan) bisa diakses?
@@ -141,7 +141,7 @@ curl -X POST https://api-botwa.nicola.id/webhook/midtrans \
 
 Gunakan checklist ini untuk memastikan webhook berfungsi:
 
-- [ ] Endpoint test bisa diakses: `https://api-botwa.nicola.id/webhook/midtrans/test`
+- [ ] Endpoint test bisa diakses: `https://api.nicola.id/webhook/midtrans/test`
 - [ ] URL webhook sudah di-set di Midtrans Dashboard
 - [ ] Server `dashboard-api.js` sedang running
 - [ ] Log server menunjukkan request masuk saat ada transaksi
@@ -155,7 +155,7 @@ Gunakan checklist ini untuk memastikan webhook berfungsi:
 
 **Test cepat dalam 30 detik:**
 
-1. Buka: `https://api-botwa.nicola.id/webhook/midtrans/test`
+1. Buka: `https://api.nicola.id/webhook/midtrans/test`
 2. Jika muncul JSON response = ✅ Webhook endpoint accessible
 3. Lakukan transaksi kecil via QRIS statis
 4. Cek log server = Harus muncul `🔔 [Webhook] Midtrans notification`

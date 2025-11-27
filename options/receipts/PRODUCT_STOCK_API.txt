@@ -2,7 +2,7 @@ PRODUCT & STOCK API (TXT) - For Frontend Team
 
 Base URL
 - Local: http://localhost:3002
-- Prod (example): https://api-botwa.nicola.id
+- Prod (example): https://api.nicola.id
 
 Auth
 - If server requires, send header: Authorization: Bearer <DB_TOKEN>

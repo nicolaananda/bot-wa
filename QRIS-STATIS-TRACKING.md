@@ -20,7 +20,7 @@ Midtrans akan mengirim notifikasi otomatis saat ada transaksi masuk.
 2. Settings → Configuration → Notification URL
 3. Masukkan URL webhook:
    ```
-   https://api-botwa.nicola.id/webhook/midtrans
+   https://api.nicola.id/webhook/midtrans
    ```
 4. Klik **Save**
 

@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
+const fsPromises = require('fs').promises;
 const path = require('path');
 const https = require('https');
 const http = require('http');
@@ -49,7 +50,6 @@ app.use(cors({
     'http://localhost:5173',
     'https://pos.nicola.id',
     'https://api.nicola.id',
-    'https://api-botwa.nicola.id'
   ],
   credentials: true
 }));
@@ -123,7 +123,7 @@ app.get('/webhook/midtrans/test', (req, res) => {
 
 app.post('/webhook/midtrans', async (req, res) => {
   try {
-    const notification = req.body || {};
+    const notification = req.body;
     console.log('🔔 [Webhook] Midtrans notification:', JSON.stringify(notification));
 
     if (!verifyMidtransSignature(notification)) {
@@ -232,12 +232,16 @@ async function updateProdukStockPg(productId, updater) {
 }
 
 // Helper: Parse delivered account from TRX file if available
-function parseDeliveredAccountFromFile(reffId) {
+async function parseDeliveredAccountFromFile(reffId) {
   try {
     const filePath = path.join(__dirname, `TRX-${reffId}.txt`);
-    if (!fs.existsSync(filePath)) return null;
+    try {
+      await fsPromises.access(filePath);
+    } catch {
+      return null;
+    }
 
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = await fsPromises.readFile(filePath, 'utf8');
     // Attempt to extract the first account block
     const lines = content.split(/\r?\n/).map(l => l.trim());
     const acc = {};
@@ -311,7 +315,7 @@ app.get('/api/pos/database', async (req, res) => {
 app.post('/api/pos/transactions', async (req, res) => {
   if (!posAuth(req, res)) return;
   try {
-    const { transactions } = req.body || {};
+    const { transactions } = req.body;
     if (!Array.isArray(transactions)) {
       return res.status(400).json({ success: false, error: 'transactions must be array' });
     }
@@ -351,7 +355,7 @@ app.post('/api/pos/transactions', async (req, res) => {
 app.post('/api/pos/save-database', async (req, res) => {
   if (!posAuth(req, res)) return;
   try {
-    const { database } = req.body || {};
+    const { database } = req.body;
     if (!database || typeof database !== 'object') {
       return res.status(400).json({ success: false, error: 'Invalid payload: { database } required' });
     }
@@ -450,7 +454,7 @@ app.get('/api/pos/debug', async (req, res) => {
 app.post('/api/pos/update-pin', async (req, res) => {
   if (!posAuth(req, res)) return;
   try {
-    const { phone, pin } = req.body || {};
+    const { phone, pin } = req.body;
     if (!phone || !pin) {
       return res.status(400).json({ success: false, error: 'phone and pin required' });
     }
@@ -475,10 +479,10 @@ app.post('/api/pos/update-pin', async (req, res) => {
  * Body: { reffId: string, receipt: string }
  * Simpan struk transaksi ke file TRX-{reffId}.txt
  */
-app.post('/api/pos/save-receipt', (req, res) => {
+app.post('/api/pos/save-receipt', async (req, res) => {
   if (!posAuth(req, res)) return;
   try {
-    const { reffId, receipt } = req.body || {};
+    const { reffId, receipt } = req.body;
     if (!reffId || typeof reffId !== 'string' || !receipt || typeof receipt !== 'string') {
       return res.status(400).json({ success: false, error: 'reffId and receipt are required' });
     }
@@ -487,7 +491,7 @@ app.post('/api/pos/save-receipt', (req, res) => {
     }
 
     const filePath = path.join(__dirname, `TRX-${reffId}.txt`);
-    fs.writeFileSync(filePath, receipt, 'utf8');
+    await fsPromises.writeFile(filePath, receipt, 'utf8');
 
     return res.json({ success: true, reffId, savedAt: new Date().toISOString() });
   } catch (e) {
@@ -500,20 +504,22 @@ app.post('/api/pos/save-receipt', (req, res) => {
  * GET /api/pos/receipt/:reffId
  * Return struk transaksi (text/plain) dari file TRX-{reffId}.txt
  */
-app.get('/api/pos/receipt/:reffId', (req, res) => {
+app.get('/api/pos/receipt/:reffId', async (req, res) => {
   posNoStore(res);
   try {
-    const { reffId } = req.params || {};
+    const { reffId } = req.params;
     if (!reffId || !/^[a-zA-Z0-9_-]+$/.test(reffId)) {
       return res.status(400).json({ success: false, error: 'Invalid reffId' });
     }
 
     const filePath = path.join(__dirname, `TRX-${reffId}.txt`);
-    if (!fs.existsSync(filePath)) {
+    try {
+      await fsPromises.access(filePath);
+    } catch {
       return res.status(404).json({ success: false, error: 'Receipt not found' });
     }
 
-    const text = fs.readFileSync(filePath, 'utf8');
+    const text = await fsPromises.readFile(filePath, 'utf8');
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     return res.send(text);
   } catch (e) {
@@ -656,7 +662,7 @@ app.patch('/api/admin/users/:userId/saldo', async (req, res) => {
   if (!posAdminAuth(req, res)) return;
   try {
     const { userId } = req.params;
-    const { amount, reason = '', idempotencyKey } = req.body || {};
+    const { amount, reason = '', idempotencyKey } = req.body;
     if (typeof amount !== 'number' || Number.isNaN(amount)) {
       return res.status(400).json({ success: false, error: 'Invalid payload: amount must be number' });
     }
@@ -691,7 +697,7 @@ app.post('/api/admin/users/:userId/pin', async (req, res) => {
   if (!posAdminAuth(req, res)) return;
   try {
     const { userId } = req.params;
-    const { pin } = req.body || {};
+    const { pin } = req.body;
     if (typeof pin !== 'string' || !/^\d{4,6}$/.test(pin)) {
       return res.status(400).json({ success: false, error: 'Invalid payload: pin must be 4-6 numeric digits' });
     }
@@ -716,7 +722,7 @@ app.patch('/api/admin/users/:userId/role', async (req, res) => {
   if (!posAdminAuth(req, res)) return;
   try {
     const { userId } = req.params;
-    const { role } = req.body || {};
+    const { role } = req.body;
     const allowed = new Set(['bronze', 'silver', 'gold', 'admin']);
     if (!allowed.has(role)) {
       return res.status(400).json({ success: false, error: 'Invalid payload: role must be one of bronze|silver|gold|admin' });
@@ -744,7 +750,7 @@ app.patch('/api/admin/users/:userId/role', async (req, res) => {
 });
 
 // 5) Audit log query
-app.get('/api/admin/audit', (req, res) => {
+app.get('/api/admin/audit', async (req, res) => {
   if (!posAdminAuth(req, res)) return;
   try {
     const { admin, userId, action, dateFrom, dateTo, page = 1, limit = 50 } = req.query;
@@ -753,11 +759,14 @@ app.get('/api/admin/audit', (req, res) => {
 
     const filePath = path.join(__dirname, 'audit-admin.log');
     let logs = [];
-    if (fs.existsSync(filePath)) {
-      const content = fs.readFileSync(filePath, 'utf8');
+    try {
+      await fsPromises.access(filePath);
+      const content = await fsPromises.readFile(filePath, 'utf8');
       logs = content.split(/\r?\n/).filter(Boolean).map(line => {
         try { return JSON.parse(line); } catch { return null; }
       }).filter(Boolean);
+    } catch {
+      // File doesn't exist, logs remains empty array
     }
 
     let filtered = logs;
@@ -1221,7 +1230,7 @@ app.get('/api/dashboard/transactions/search/:reffId', async (req, res) => {
     const profit = Math.floor((parseInt(transaction.price) * transaction.jumlah) * (profitPercentage / 100));
     
     // Parse delivered account if exists
-    const deliveredAccount = parseDeliveredAccountFromFile(reffId);
+    const deliveredAccount = await parseDeliveredAccountFromFile(reffId);
     
     // Get receipt content if exists (from R2 or local)
     let receiptContent = null;
@@ -1676,7 +1685,7 @@ app.get('/api/dashboard/products/stock/summary', async (req, res) => {
 // Create product
 app.post('/api/dashboard/products', async (req, res) => {
   try {
-    const { id, name, desc, priceB = 0, priceS = 0, priceG = 0, snk = '', minStock = 5 } = req.body || {};
+    const { id, name, desc, priceB = 0, priceS = 0, priceG = 0, snk = '', minStock = 5 } = req.body;
     if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) return res.status(400).json({ success: false, message: 'Invalid or missing id' });
     if (!name) return res.status(400).json({ success: false, message: 'name required' });
 
@@ -1709,7 +1718,7 @@ app.get('/api/dashboard/products/:productId', async (req, res) => {
 app.patch('/api/dashboard/products/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
-    const payload = req.body || {};
+    const payload = req.body;
 
     if (usePg) {
       const row = await pg.query('SELECT data FROM produk WHERE id=$1', [productId]);
@@ -1818,7 +1827,7 @@ app.put('/api/dashboard/products/:productId/stock', async (req, res) => {
 app.post('/api/dashboard/products/:productId/stock/item', async (req, res) => {
   try {
     const { productId } = req.params;
-    const { value, position } = req.body || {};
+    const { value, position } = req.body;
     if (typeof value !== 'string') return res.status(400).json({ success: false, message: 'value must be string' });
     if (stockHelper.validateStockItem && !stockHelper.validateStockItem(value)) return res.status(400).json({ success: false, message: 'Invalid stock item format. Expected: "email|password|profile|pin|notes"' });
 
@@ -1843,7 +1852,7 @@ app.post('/api/dashboard/products/:productId/stock/item', async (req, res) => {
 app.patch('/api/dashboard/products/:productId/stock/item', async (req, res) => {
   try {
     const { productId } = req.params;
-    const { index, match, value } = req.body || {};
+    const { index, match, value } = req.body;
     if (typeof value !== 'string') return res.status(400).json({ success: false, message: 'value must be string' });
     if (stockHelper.validateStockItem && !stockHelper.validateStockItem(value)) return res.status(400).json({ success: false, message: 'Invalid stock item format' });
 
@@ -1871,7 +1880,7 @@ app.patch('/api/dashboard/products/:productId/stock/item', async (req, res) => {
 app.delete('/api/dashboard/products/:productId/stock/item', async (req, res) => {
   try {
     const { productId } = req.params;
-    const { index, match } = req.body || {};
+    const { index, match } = req.body;
 
     const removeOne = async (prod) => {
       if (!Array.isArray(prod.stok) || prod.stok.length === 0) throw new Error('No stock available to remove');
