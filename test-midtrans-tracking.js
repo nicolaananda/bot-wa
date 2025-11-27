@@ -245,7 +245,7 @@ async function main() {
   console.log('   - Solusi: Gunakan WEBHOOK untuk tracking real-time');
   console.log('   - Webhook akan otomatis detect saat ada transaksi baru');
   console.log('   - Pastikan webhook URL sudah di-set di Midtrans Dashboard');
-  console.log('   - URL webhook: https://api-botwa.nicola.id/webhook/midtrans');
+  console.log('   - URL webhook: https://api.nicola.id/webhook/midtrans');
   console.log('\n📌 Kesimpulan:');
   console.log('   - API key sudah benar ✅');
   console.log('   - Transaction List API tidak tersedia (normal) ⚠️');

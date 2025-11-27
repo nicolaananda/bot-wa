@@ -4,7 +4,7 @@ Dokumentasi lengkap untuk API Receipt Management yang memungkinkan frontend meng
 
 ## 🌐 Base URL
 ```
-https://api-botwa.nicola.id
+https://api.nicola.id
 ```
 
 ## 📚 API Endpoints
@@ -285,16 +285,16 @@ const formatReceiptForDisplay = (content) => {
 ### Test dengan cURL:
 ```bash
 # Get all receipts
-curl -X GET "https://api-botwa.nicola.id/api/dashboard/receipts"
+curl -X GET "https://api.nicola.id/api/dashboard/receipts"
 
 # Get specific receipt
-curl -X GET "https://api-botwa.nicola.id/api/dashboard/receipts/69942B1069"
+curl -X GET "https://api.nicola.id/api/dashboard/receipts/69942B1069"
 
 # Get transaction with receipt
-curl -X GET "https://api-botwa.nicola.id/api/dashboard/transactions/69942B1069/with-receipt"
+curl -X GET "https://api.nicola.id/api/dashboard/transactions/69942B1069/with-receipt"
 
 # Download receipt
-curl -X GET "https://api-botwa.nicola.id/api/dashboard/receipts/69942B1069/download" -o receipt.txt
+curl -X GET "https://api.nicola.id/api/dashboard/receipts/69942B1069/download" -o receipt.txt
 ```
 
 ---
@@ -314,4 +314,4 @@ curl -X GET "https://api-botwa.nicola.id/api/dashboard/receipts/69942B1069/downl
 Jika ada masalah dengan API, silakan hubungi:
 - **Developer**: Nicola Ananda
 - **Repository**: https://github.com/nicolaananda/bot-wa
-- **API Base**: https://api-botwa.nicola.id
+- **API Base**: https://api.nicola.id

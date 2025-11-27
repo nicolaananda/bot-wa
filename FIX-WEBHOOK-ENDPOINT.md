@@ -40,10 +40,10 @@ curl http://YOUR_SERVER_IP:3002/webhook/midtrans/test
 Jika test langsung ke port berhasil tapi via domain tidak, cek Nginx config:
 
 ```bash
-# Cek Nginx config untuk api-botwa.nicola.id
-sudo nano /etc/nginx/sites-available/api-botwa.nicola.id
+# Cek Nginx config untuk api.nicola.id
+sudo nano /etc/nginx/sites-available/api.nicola.id
 # atau
-sudo nano /etc/nginx/sites-enabled/api-botwa.nicola.id
+sudo nano /etc/nginx/sites-enabled/api.nicola.id
 ```
 
 Pastikan ada konfigurasi untuk `/webhook`:
@@ -69,7 +69,7 @@ sudo systemctl reload nginx  # Reload jika OK
 
 ```bash
 # Test via domain
-curl https://api-botwa.nicola.id/webhook/midtrans/test
+curl https://api.nicola.id/webhook/midtrans/test
 
 # Harus return:
 # {
@@ -111,7 +111,7 @@ pm2 logs | grep webhook
 
 3. **Test POST endpoint webhook:**
    ```bash
-   curl -X POST https://api-botwa.nicola.id/webhook/midtrans \
+   curl -X POST https://api.nicola.id/webhook/midtrans \
      -H "Content-Type: application/json" \
      -d '{"test": "manual"}'
    ```

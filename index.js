@@ -3671,6 +3671,78 @@ case 'buy': {
         }
         break
 
+      case 'qristoday': {
+        try {
+          if (!db?.data?.transaksi) return reply('❌ Belum ada data transaksi')
+          const today = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
+          const transaksiQris = db.data.transaksi.filter(t =>
+            String(t.metodeBayar).toUpperCase() === 'QRIS' &&
+            String(t.date || '').startsWith(today)
+          )
+          if (transaksiQris.length === 0) {
+            return reply(`📊 Tidak ada transaksi QRIS pada ${tanggal}`)
+          }
+
+          const totalAmount = transaksiQris.reduce((sum, t) => {
+            if (Number.isFinite(Number(t.totalBayar))) return sum + Number(t.totalBayar)
+            if (Number.isFinite(Number(t.price))) return sum + Number(t.price)
+            return sum
+          }, 0)
+
+          const message = [
+            `*📊 RINGKASAN TRANSAKSI QRIS HARI INI*`,
+            ``,
+            `*Tanggal:* ${tanggal}`,
+            `*Total Transaksi:* ${transaksiQris.length} kali`,
+            `*Total Nominal:* Rp${toRupiah(totalAmount)}`,
+            ``,
+            `_Data diambil dari transaksi dengan metode QRIS pada hari ini._`
+          ].join('\n')
+
+          reply(message)
+        } catch (err) {
+          console.error('❌ Error qristoday:', err)
+          reply('❌ Gagal mengambil data QRIS hari ini.')
+        }
+      }
+        break
+
+      case 'saldotoday': {
+        try {
+          if (!db?.data?.transaksi) return reply('❌ Belum ada data transaksi')
+          const today = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
+          const transaksiSaldo = db.data.transaksi.filter(t =>
+            String(t.metodeBayar).toUpperCase() === 'SALDO' &&
+            String(t.date || '').startsWith(today)
+          )
+          if (transaksiSaldo.length === 0) {
+            return reply(`📊 Tidak ada transaksi saldo pada ${tanggal}`)
+          }
+
+          const totalAmount = transaksiSaldo.reduce((sum, t) => {
+            if (Number.isFinite(Number(t.totalBayar))) return sum + Number(t.totalBayar)
+            if (Number.isFinite(Number(t.price))) return sum + Number(t.price)
+            return sum
+          }, 0)
+
+          const message = [
+            `*📊 RINGKASAN TRANSAKSI SALDO HARI INI*`,
+            ``,
+            `*Tanggal:* ${tanggal}`,
+            `*Total Transaksi:* ${transaksiSaldo.length} kali`,
+            `*Total Nominal:* Rp${toRupiah(totalAmount)}`,
+            ``,
+            `_Data diambil dari transaksi dengan metode Saldo pada hari ini._`
+          ].join('\n')
+
+          reply(message)
+        } catch (err) {
+          console.error('❌ Error saldotoday:', err)
+          reply('❌ Gagal mengambil data saldo hari ini.')
+        }
+      }
+        break
+
       case 'tes': case 'runtime':
         reply(`*STATUS : BOT ONLINE*\n_Runtime : ${runtime(process.uptime())}_`)
         break
