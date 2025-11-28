@@ -32,6 +32,7 @@ async function getDbInstance() {
   return dbInstance;
 }
 const { getReceipt, receiptExists, deleteReceipt } = require('../config/r2-storage');
+const dbHelper = require('./db-helper');
 
 // Contoh API endpoint untuk dashboard web
 // Pastikan install: npm install express cors
@@ -1198,6 +1199,72 @@ app.get('/api/dashboard/users/:userId/transactions', async (req, res) => {
       success: false,
       error: 'Internal server error'
     });
+  }
+});
+
+// Saldo history per user
+app.get('/api/dashboard/users/:userId/saldo/history', async (req, res) => {
+  try {
+    if (!dbHelper || typeof dbHelper.getSaldoHistory !== 'function') {
+      return res.status(500).json({ success: false, error: 'Saldo history helper unavailable' });
+    }
+
+    const { limit = 50, offset = 0, action, method, source, search } = req.query;
+    const historyResult = await dbHelper.getSaldoHistory(req.params.userId, {
+      limit,
+      offset,
+      action,
+      method,
+      source,
+      search
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        userId: req.params.userId,
+        total: historyResult.total,
+        limit: historyResult.limit,
+        offset: historyResult.offset,
+        entries: historyResult.entries
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching saldo history:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Global saldo history feed (optional user filter)
+app.get('/api/dashboard/saldo/history', async (req, res) => {
+  try {
+    if (!dbHelper || typeof dbHelper.getSaldoHistory !== 'function') {
+      return res.status(500).json({ success: false, error: 'Saldo history helper unavailable' });
+    }
+
+    const { userId = null, limit = 50, offset = 0, action, method, source, search } = req.query;
+    const historyResult = await dbHelper.getSaldoHistory(userId, {
+      limit,
+      offset,
+      action,
+      method,
+      source,
+      search
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        total: historyResult.total,
+        limit: historyResult.limit,
+        offset: historyResult.offset,
+        userId,
+        entries: historyResult.entries
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching saldo history feed:', error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 

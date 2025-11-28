@@ -1,6 +1,78 @@
 require('dotenv').config();
+const crypto = require('crypto');
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
 let pg; if (usePg) { pg = require('../config/postgres'); }
+const SALDO_HISTORY_LIMIT = Number(process.env.SALDO_HISTORY_LIMIT || 2000);
+let saldoHistoryTablePromise = null;
+
+function ensureDbData() {
+  if (!global.db) global.db = { data: {} };
+  if (!global.db.data) global.db.data = {};
+  return global.db.data;
+}
+
+function normalizeUserId(userId) {
+  if (!userId) return null;
+  if (/@s\.whatsapp\.net$/i.test(userId)) return userId;
+  const digits = String(userId).replace(/[^0-9]/g, '');
+  if (!digits) return userId;
+  return `${digits}@s.whatsapp.net`;
+}
+
+function collectUserIdVariants(userId) {
+  const variants = new Set();
+  if (userId) variants.add(userId);
+  const normalized = normalizeUserId(userId);
+  if (normalized) variants.add(normalized);
+  if (normalized) {
+    const digits = normalized.replace(/@s\.whatsapp\.net$/i, '');
+    if (digits) {
+      variants.add(digits);
+      variants.add(`${digits}@s.whatsapp.net`);
+    }
+  }
+  return Array.from(variants).filter(Boolean);
+}
+
+function generateHistoryId() {
+  if (crypto.randomUUID) {
+    return `SAL-${crypto.randomUUID()}`;
+  }
+  return `SAL-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+}
+
+async function ensureSaldoHistoryTable() {
+  if (!usePg) return true;
+  if (!saldoHistoryTablePromise) {
+    saldoHistoryTablePromise = pg.query(`
+      CREATE TABLE IF NOT EXISTS saldo_history (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        raw_user_id TEXT,
+        action TEXT,
+        method TEXT,
+        amount BIGINT DEFAULT 0,
+        before_balance BIGINT DEFAULT 0,
+        after_balance BIGINT DEFAULT 0,
+        actor TEXT,
+        notes TEXT,
+        ref_id TEXT,
+        source TEXT,
+        meta JSONB,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `).catch((error) => {
+      console.error('[DB] Failed to ensure saldo_history table:', error.message);
+      saldoHistoryTablePromise = null;
+    });
+  }
+  try {
+    await saldoHistoryTablePromise;
+  } catch {
+    // noop
+  }
+  return true;
+}
 
 // Helper function untuk memastikan database tersimpan (no-op untuk PG)
 async function ensureDatabaseSaved() {
@@ -98,7 +170,9 @@ async function updateUserSaldo(userId, amount, operation = 'add') {
 function getUserSaldo(userId) {
   try {
     if (usePg) {
-      const users = global.db && global.db.data && global.db.data.users ? global.db.data.users : {};
+      const dbData = ensureDbData();
+      if (!dbData.users) dbData.users = {};
+      const users = dbData.users;
       const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`;
       const idNo = userId.replace(/@s\.whatsapp\.net$/, '');
       
@@ -173,10 +247,196 @@ function hasEnoughSaldo(userId, requiredAmount) {
   return currentSaldo >= Number(requiredAmount);
 }
 
+async function recordSaldoHistory(entry = {}) {
+  try {
+    if (!entry || !entry.userId) return null;
+    const dbData = ensureDbData();
+    if (!dbData.saldoHistory) dbData.saldoHistory = [];
+
+    const variants = collectUserIdVariants(entry.userId);
+    const normalizedUserId = normalizeUserId(entry.userId) || variants[0];
+
+    const historyEntry = {
+      id: entry.id || generateHistoryId(),
+      userId: normalizedUserId,
+      rawUserId: entry.userId,
+      action: entry.action || entry.type || 'adjust',
+      method: entry.method || entry.payment || null,
+      amount: Number(entry.amount || 0),
+      before: Number(entry.before ?? entry.beforeBalance ?? entry.previous ?? 0),
+      after: Number(entry.after ?? entry.afterBalance ?? entry.next ?? 0),
+      actor: entry.actor || 'system',
+      notes: entry.notes || entry.reason || null,
+      refId: entry.refId || entry.reffId || entry.orderId || null,
+      source: entry.source || entry.feature || null,
+      meta: entry.meta || null,
+      timestamp: entry.timestamp || new Date().toISOString()
+    };
+
+    if (usePg) {
+      await ensureSaldoHistoryTable();
+      try {
+        await pg.query(
+          `INSERT INTO saldo_history (id, user_id, raw_user_id, action, method, amount, before_balance, after_balance, actor, notes, ref_id, source, meta, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            historyEntry.id,
+            historyEntry.userId,
+            historyEntry.rawUserId,
+            historyEntry.action,
+            historyEntry.method,
+            historyEntry.amount,
+            historyEntry.before,
+            historyEntry.after,
+            historyEntry.actor,
+            historyEntry.notes,
+            historyEntry.refId,
+            historyEntry.source,
+            historyEntry.meta ? JSON.stringify(historyEntry.meta) : null,
+            historyEntry.timestamp ? new Date(historyEntry.timestamp) : new Date()
+          ]
+        );
+      } catch (error) {
+        console.error('[DB] Failed to insert saldo history:', error.message);
+      }
+    }
+
+    dbData.saldoHistory.push(historyEntry);
+    if (dbData.saldoHistory.length > SALDO_HISTORY_LIMIT) {
+      dbData.saldoHistory = dbData.saldoHistory.slice(-SALDO_HISTORY_LIMIT);
+    }
+
+    if (!usePg) {
+      if (typeof global.scheduleSave === 'function') {
+        global.scheduleSave();
+      } else if (global.db && typeof global.db.save === 'function') {
+        await global.db.save();
+      }
+    }
+
+    return historyEntry;
+  } catch (error) {
+    console.error('Error recording saldo history:', error);
+    return null;
+  }
+}
+
+async function getSaldoHistory(userId = null, options = {}) {
+  try {
+    const limitVal = Math.min(Math.max(Number(options.limit) || 50, 1), 200);
+    const offsetVal = Math.max(Number(options.offset) || 0, 0);
+    const filterAction = options.action ? String(options.action).toLowerCase() : null;
+    const filterMethod = options.method ? String(options.method).toLowerCase() : null;
+    const filterSource = options.source ? String(options.source).toLowerCase() : null;
+    const searchValue = options.search ? String(options.search).toLowerCase() : null;
+    const variants = userId ? collectUserIdVariants(userId) : [];
+
+    if (usePg) {
+      await ensureSaldoHistoryTable();
+      const params = [];
+      const whereClause = [];
+
+      if (variants.length > 0) {
+        params.push(variants);
+        whereClause.push(`(user_id = ANY($${params.length}) OR raw_user_id = ANY($${params.length}))`);
+      }
+      if (filterAction) {
+        params.push(filterAction);
+        whereClause.push(`LOWER(action) = $${params.length}`);
+      }
+      if (filterMethod) {
+        params.push(filterMethod);
+        whereClause.push(`LOWER(method) = $${params.length}`);
+      }
+      if (filterSource) {
+        params.push(filterSource);
+        whereClause.push(`LOWER(source) = $${params.length}`);
+      }
+      if (searchValue) {
+        params.push(`%${searchValue}%`);
+        whereClause.push(`(LOWER(COALESCE(notes,'')) LIKE $${params.length} OR LOWER(COALESCE(ref_id,'')) LIKE $${params.length} OR LOWER(COALESCE(source,'')) LIKE $${params.length})`);
+      }
+
+      params.push(limitVal);
+      const limitIdx = params.length;
+      params.push(offsetVal);
+      const offsetIdx = params.length;
+
+      const sql = `
+        SELECT id, user_id, raw_user_id, action, method, amount, before_balance, after_balance, actor, notes, ref_id, source, meta, created_at
+        FROM saldo_history
+        ${whereClause.length ? `WHERE ${whereClause.join(' AND ')}` : ''}
+        ORDER BY created_at DESC
+        LIMIT $${limitIdx}
+        OFFSET $${offsetIdx}
+      `;
+
+      const result = await pg.query(sql, params);
+      const entries = result.rows.map((row) => ({
+        id: row.id,
+        userId: row.user_id,
+        rawUserId: row.raw_user_id,
+        action: row.action,
+        method: row.method,
+        amount: Number(row.amount || 0),
+        before: Number(row.before_balance || 0),
+        after: Number(row.after_balance || 0),
+        actor: row.actor,
+        notes: row.notes,
+        refId: row.ref_id,
+        source: row.source,
+        meta: row.meta,
+        timestamp: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at
+      }));
+
+      return {
+        entries,
+        total: entries.length,
+        limit: limitVal,
+        offset: offsetVal
+      };
+    }
+
+    const dbData = ensureDbData();
+    const history = Array.isArray(dbData.saldoHistory) ? [...dbData.saldoHistory] : [];
+    const filtered = history.filter((entry) => {
+      if (variants.length && !variants.includes(entry.userId) && !variants.includes(entry.rawUserId)) return false;
+      if (filterAction && String(entry.action || '').toLowerCase() !== filterAction) return false;
+      if (filterMethod && String(entry.method || '').toLowerCase() !== filterMethod) return false;
+      if (filterSource && String(entry.source || '').toLowerCase() !== filterSource) return false;
+      if (searchValue) {
+        const note = String(entry.notes || '').toLowerCase();
+        const refId = String(entry.refId || '').toLowerCase();
+        const sourceVal = String(entry.source || '').toLowerCase();
+        if (!note.includes(searchValue) && !refId.includes(searchValue) && !sourceVal.includes(searchValue)) {
+          return false;
+        }
+      }
+      return true;
+    }).sort((a, b) => {
+      return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+    });
+
+    const entries = filtered.slice(offsetVal, offsetVal + limitVal);
+    return {
+      entries,
+      total: filtered.length,
+      limit: limitVal,
+      offset: offsetVal
+    };
+  } catch (error) {
+    console.error('Error getting saldo history:', error);
+    return { entries: [], total: 0, limit: 0, offset: 0 };
+  }
+}
+
 module.exports = {
   ensureDatabaseSaved,
   updateUserSaldo,
   getUserSaldo,
   getUserSaldoAsync,
-  hasEnoughSaldo
+  hasEnoughSaldo,
+  recordSaldoHistory,
+  getSaldoHistory
 }; 

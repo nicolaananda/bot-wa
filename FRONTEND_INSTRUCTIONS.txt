@@ -1,0 +1,74 @@
+Frontend Integration Notes – Saldo History
+==========================================
+
+1. New REST Endpoints
+---------------------
+Base URL: follow existing dashboard-api host.
+
+- `GET /api/dashboard/users/:userId/saldo/history`
+  - Purpose: fetch saldo adjustment timeline for a specific user.
+  - Query params (optional):
+    - `limit` (default 50, max 200)
+    - `offset` (default 0)
+    - `action`, `method`, `source` (string filters, case-insensitive)
+    - `search` (matches notes/refId/source substrings)
+  - Response shape:
+    ```
+    {
+      "success": true,
+      "data": {
+        "userId": "...",
+        "total": <number>,
+        "limit": <number>,
+        "offset": <number>,
+        "entries": [
+          {
+            "id": "SAL-...",
+            "userId": "628xx@s.whatsapp.net",
+            "rawUserId": "628xx...",
+            "action": "deposit | manual-add | manual-subtract | ...",
+            "method": "qris | admin | ...",
+            "amount": 15000,
+            "before": 50000,
+            "after": 65000,
+            "actor": "6281...@s.whatsapp.net",
+            "notes": "Manual addsaldo oleh ...",
+            "refId": "MID-...",
+            "source": "deposit | addsaldo | minsado | isi",
+            "meta": null,
+            "timestamp": "2025-11-28T..."
+          }
+        ]
+      }
+    }
+    ```
+
+- `GET /api/dashboard/saldo/history`
+  - Same schema as above but accepts optional `userId` filter.
+  - Use for global feed (e.g., admin dashboard panel).
+
+
+2. UI Expectations
+------------------
+- Display entries newest-first (API already sorts by timestamp DESC).
+- Highlight positive vs negative `amount` (color coding).
+- Show contextual badges:
+  - `action` → label (Deposit, Manual Add, Manual Subtract, etc.).
+  - `method` or `source` → payment method or feature (QRIS, Admin Panel, etc.).
+- Provide pagination controls using `limit` + `offset`.
+- Expose filter controls (action/method/source/search) mirroring query params.
+- Show before/after saldo for clarity; consider tooltip for `actor` if different from user.
+
+
+3. Error Handling
+-----------------
+- If API returns `success: false`, surface the `error` field to admins.
+- Handle HTTP 404 for user-specific endpoint (user not found) by showing empty state.
+- On network/timeouts, allow retry; no client-side caching assumed.
+
+
+4. Future Hooks
+---------------
+- `meta` field is reserved for richer payloads (JSON); frontend should safely stringify if present.
+- Keep components generic so additional `action`/`source` values auto-render without code changes.
+
