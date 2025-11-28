@@ -78,6 +78,7 @@ const { isRedisAvailable, closeRedis } = require('./config/redis')
   if (!db.data.produk) db.data.produk = {}
   if (!db.data.order) db.data.order = {}
   if (!db.data.transaksi) db.data.transaksi = []
+  if (!db.data.saldoHistory) db.data.saldoHistory = []
   if (!db.data.persentase) db.data.persentase = {}
   if (!db.data.customProfit) db.data.customProfit = {}
 

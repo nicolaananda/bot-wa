@@ -2202,6 +2202,23 @@ case 'deposit': {
           ]
           const successText = successParts.join('\n')
 
+          try {
+            await dbHelper.recordSaldoHistory({
+              userId: sender,
+              action: 'deposit',
+              method: 'qris',
+              source: 'deposit',
+              amount: credit,
+              before: previousSaldo,
+              after: newSaldo,
+              actor: sender,
+              refId: orderId,
+              notes: `Bonus: Rp${toRupiah(bonus)}`
+            })
+          } catch (historyError) {
+            console.error('❌ [DEPOSIT] Failed to record saldo history:', historyError.message)
+          }
+
           await ronzz.sendMessage(from, { text: successText }, { quoted: m })
 
           delete db.data.orderDeposit[sender]
@@ -3424,9 +3441,27 @@ case 'buy': {
             role: 'bronze'
           }
         }
-        
+
+        const previousSaldo = Number(db.data.users[nomorNya].saldo || 0)
         await dbHelper.updateUserSaldo(nomorNya, nominal, 'add')
         await sleep(50)
+        const newSaldo = Number(db.data.users[nomorNya].saldo || (previousSaldo + nominal))
+        
+        try {
+          await dbHelper.recordSaldoHistory({
+            userId: nomorNya,
+            action: 'manual-add',
+            method: 'admin',
+            source: 'addsaldo',
+            amount: nominal,
+            before: previousSaldo,
+            after: newSaldo,
+            actor: sender,
+            notes: `Manual addsaldo oleh @${sender.split('@')[0]}`
+          })
+        } catch (historyError) {
+          console.error('❌ [HISTORY] Failed to record addsaldo history:', historyError.message)
+        }
         
         // Notifikasi ke admin
         ronzz.sendMessage(from, { text: `*SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
@@ -3457,8 +3492,26 @@ case 'buy': {
         if (db.data.users[nomorNya].saldo <= 0) return reply("User belum terdaftar di database saldo atau saldo 0.")
         if (db.data.users[nomorNya].saldo < nominal) return reply(`Saldo user tidak cukup! Saldo: Rp${toRupiah(db.data.users[nomorNya].saldo)}, yang ingin dikurangi: Rp${toRupiah(nominal)}`)
         
+        const previousSaldo = Number(db.data.users[nomorNya].saldo || 0)
         await dbHelper.updateUserSaldo(nomorNya, nominal, 'subtract')
         await sleep(50)
+        const newSaldo = Number(db.data.users[nomorNya].saldo || Math.max(0, previousSaldo - nominal))
+        
+        try {
+          await dbHelper.recordSaldoHistory({
+            userId: nomorNya,
+            action: 'manual-subtract',
+            method: 'admin',
+            source: 'minsaldo',
+            amount: -Math.abs(nominal),
+            before: previousSaldo,
+            after: newSaldo,
+            actor: sender,
+            notes: `Manual minsado oleh @${sender.split('@')[0]}`
+          })
+        } catch (historyError) {
+          console.error('❌ [HISTORY] Failed to record minsado history:', historyError.message)
+        }
         
         // Notifikasi ke admin
         ronzz.sendMessage(from, { text: `*SALDO BERHASIL DIKURANGI!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
@@ -3483,9 +3536,27 @@ case 'buy': {
             role: 'bronze'
           }
         }
-        
+
+        const previousSaldo = Number(db.data.users[targetUser].saldo || 0)
         await dbHelper.updateUserSaldo(targetUser, nominal, 'add')
         await sleep(50)
+        const newSaldo = Number(db.data.users[targetUser].saldo || (previousSaldo + nominal))
+        
+        try {
+          await dbHelper.recordSaldoHistory({
+            userId: targetUser,
+            action: 'manual-add',
+            method: 'admin',
+            source: 'isi',
+            amount: nominal,
+            before: previousSaldo,
+            after: newSaldo,
+            actor: sender,
+            notes: `Isi saldo manual oleh @${sender.split('@')[0]}`
+          })
+        } catch (historyError) {
+          console.error('❌ [HISTORY] Failed to record isi history:', historyError.message)
+        }
         
         reply(`✅ *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${targetUser.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[targetUser].saldo)}\n\n*By:* @${sender.split('@')[0]}`, { mentions: [targetUser, sender] })
       }
