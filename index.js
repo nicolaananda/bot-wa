@@ -130,6 +130,20 @@ function persistAutoDeleteQueue() {
   }
 }
 
+function requestPendingOrderSave() {
+  try {
+    if (typeof global.scheduleSave === 'function') {
+      global.scheduleSave();
+    } else if (global?.db && typeof global.db.save === 'function') {
+      global.db.save().catch((error) => {
+        try { console.error('[DB] Failed to persist pending orders:', error.message); } catch {}
+      });
+    }
+  } catch (error) {
+    try { console.error('[DB] Failed to schedule pending order save:', error.message); } catch {}
+  }
+}
+
 function removeAutoDeleteEntry(entryId) {
   const queue = ensureAutoDeleteQueue();
   if (!queue) return;
@@ -2219,6 +2233,31 @@ case 'deposit': {
             console.error('❌ [DEPOSIT] Failed to record saldo history:', historyError.message)
           }
 
+          try {
+            if (!db.data.transaksi) db.data.transaksi = []
+            const depositTransaction = {
+              id: 'DEPOSIT',
+              name: 'Deposit Saldo',
+              price: credit,
+              date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+              profit: 0,
+              jumlah: 1,
+              user: sender.split("@")[0],
+              userRole: db.data.users[sender]?.role || 'bronze',
+              reffId: orderId,
+              metodeBayar: 'Deposit',
+              status: 'completed',
+              totalBayar: credit,
+              type: 'deposit'
+            }
+            db.data.transaksi.push(depositTransaction)
+            if (typeof global.scheduleSave === 'function') {
+              global.scheduleSave()
+            }
+          } catch (transactionError) {
+            console.error('❌ [DEPOSIT] Failed to record deposit transaction:', transactionError.message)
+          }
+
           await ronzz.sendMessage(from, { text: successText }, { quoted: m })
 
           delete db.data.orderDeposit[sender]
@@ -2396,6 +2435,7 @@ case 'buynow': {
     const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
     const createdAtTs = Date.now()
     db.data.order[sender] = { status: 'processing', reffId, idProduk: data[0], jumlah, metode: 'MIDTRANS', startedAt: createdAtTs }
+    requestPendingOrderSave()
 
     try {
       // Hitung harga
@@ -2465,6 +2505,7 @@ case 'buynow': {
           metode: 'MIDTRANS', // Pastikan metode di-set untuk global listener
           createdAt: createdAtTs
       };
+      requestPendingOrderSave();
       
       console.log(`📝 [MID] Order created: ${orderId}, Amount: Rp${totalAmount}, Sender: ${sender}`);
 
@@ -2623,6 +2664,7 @@ case 'buynow': {
               await ronzz.sendMessage(from, { delete: message.key });
               reply("Pembayaran dibatalkan karena melewati batas waktu 30 menit.");
               delete db.data.order[sender];
+              requestPendingOrderSave();
               break;
           }
 
@@ -2748,6 +2790,7 @@ case 'buynow': {
         reply("Gagal membuat QR Code Midtrans. Silakan coba lagi.");
         if (db.data.order[sender]) {
             delete db.data.order[sender];
+            requestPendingOrderSave();
         }
     }
   } catch (outerError) {
@@ -2860,6 +2903,7 @@ case 'buy': {
 
   const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
   db.data.order[sender] = { status: 'processing', reffId, idProduk: data[0], jumlah, metode: 'Saldo', startedAt: Date.now() }
+  requestPendingOrderSave()
 
   try {
     // Cek saldo user (PG-aware)
@@ -2867,6 +2911,7 @@ case 'buy': {
     const currentSaldo = typeof dbHelper.getUserSaldoAsync === 'function' ? await dbHelper.getUserSaldoAsync(sender) : dbHelper.getUserSaldo(sender)
     if (currentSaldo < totalHarga) {
       delete db.data.order[sender]
+      requestPendingOrderSave()
       return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(currentSaldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}deposit nominal*`)
     }
 
@@ -3126,6 +3171,7 @@ case 'buy': {
             await ronzz.sendMessage(db.data.order[quotedSender].from, { delete: db.data.order[quotedSender].key })
           } catch {}
           delete db.data.order[quotedSender]
+          requestPendingOrderSave()
           cancelled = true
         }
 
@@ -3150,6 +3196,7 @@ case 'buy': {
     if (db.data.order[sender] !== undefined) {
       await ronzz.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
       delete db.data.order[sender]
+      requestPendingOrderSave()
       cancelled = true
     }
 

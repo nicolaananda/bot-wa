@@ -7,6 +7,20 @@ if (!usePg) {
 
 const { query } = require('../config/postgres')
 const UPSERT_CHUNK = Math.max(1, Number(process.env.PG_UPSERT_CHUNK || 100))
+const KV_SYNC_KEYS = ['order']
+const KV_DEFAULTS = {
+    order: {}
+}
+
+function cloneJson(value) {
+    if (value === null || typeof value !== 'object') return value
+    try {
+        return JSON.parse(JSON.stringify(value))
+    } catch {
+        if (Array.isArray(value)) return value.map((item) => cloneJson(item))
+        return { ...value }
+    }
+}
 
 class DatabasePG {
     constructor() {
@@ -24,6 +38,9 @@ class DatabasePG {
         const transaksiPromise = query('SELECT meta FROM transaksi ORDER BY id ASC')
         const produkPromise = query('SELECT id, data FROM produk')
         const settingsPromise = query('SELECT key, value FROM settings')
+        const kvPromise = KV_SYNC_KEYS.length
+            ? query('SELECT key, value FROM kv_store WHERE key = ANY($1::text[])', [KV_SYNC_KEYS])
+            : Promise.resolve({ rows: [] })
 
         const users = await usersPromise
         snapshot.users = {}
@@ -63,6 +80,27 @@ class DatabasePG {
         const settings = await settingsPromise
         snapshot.setting = {}
         for (const row of settings.rows) snapshot.setting[row.key] = row.value
+
+        if (KV_SYNC_KEYS.length) {
+            try {
+                const kvRows = await kvPromise
+                for (const row of kvRows.rows) {
+                    if (!row || !row.key) continue
+                    const storedValue = typeof row.value === 'undefined' ? KV_DEFAULTS[row.key] : row.value
+                    if (typeof storedValue !== 'undefined') {
+                        snapshot[row.key] = cloneJson(storedValue)
+                    }
+                }
+            } catch (e) {
+                try { console.error('[DBPG] Failed loading kv_store keys:', e.message) } catch {}
+            }
+
+            for (const key of KV_SYNC_KEYS) {
+                if (typeof snapshot[key] === 'undefined' && typeof KV_DEFAULTS[key] !== 'undefined') {
+                    snapshot[key] = cloneJson(KV_DEFAULTS[key])
+                }
+            }
+        }
 
         // dynamic tables made by migration (arrays as item, objects as k/v)
         // We won't eagerly load all to keep startup fast.
@@ -149,6 +187,23 @@ class DatabasePG {
 					}
 				}
 			}
+            // Persist kv_store mirrored keys (e.g., pending orders)
+            if (KV_SYNC_KEYS.length) {
+                for (const key of KV_SYNC_KEYS) {
+                    try {
+                        const value = this._data && typeof this._data[key] !== 'undefined'
+                            ? this._data[key]
+                            : KV_DEFAULTS[key]
+                        if (typeof value === 'undefined') continue
+                        await query(
+                            'INSERT INTO kv_store(key, value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()',
+                            [key, JSON.stringify(value)]
+                        )
+                    } catch (e) {
+                        try { console.error(`[DBPG] Failed to persist kv_store key "${key}":`, e.message) } catch {}
+                    }
+                }
+            }
         } catch (e) {
             try { console.error('[DBPG] save sync failed:', e.message) } catch {}
         }
