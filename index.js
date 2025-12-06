@@ -332,7 +332,7 @@ setInterval(clearExpiredCache, 10 * 60 * 1000);
 global.prefa = ['', '.']
 
 moment.tz.setDefault("Asia/Jakarta").locale("id");
-const tanggal = moment.tz('Asia/Jakarta').format('DD MMMM YYYY')
+// Removed static tanggal - now using moment.tz('Asia/Jakarta').format('DD MMMM YYYY') directly when needed
 
 // Global listener untuk webhook Midtrans (harus di luar module.exports agar bisa akses global)
 let globalRonzz = null;
@@ -1274,7 +1274,7 @@ module.exports = async (ronzz, m, mek) => {
                                 product: product.keterangan,
                                 tujuan: `${db.data.topup[sender].data.id} (${db.data.topup[sender].data.zone})`,
                                 nickname: db.data.topup[sender].data.nickname,
-                                waktu: tanggal,
+                                waktu: moment.tz('Asia/Jakarta').format('DD MMMM YYYY'),
                                 sn: responses.sn
                               }
                               let invoice = await generateInvoiceWithBackground(data, "./options/image/bg.jpg")
@@ -1287,7 +1287,7 @@ module.exports = async (ronzz, m, mek) => {
                                 product: product.keterangan,
                                 tujuan: db.data.topup[sender].data.id,
                                 nickname: db.data.topup[sender].data.nickname,
-                                waktu: tanggal,
+                                waktu: moment.tz('Asia/Jakarta').format('DD MMMM YYYY'),
                                 sn: responses.sn
                               }
                               let invoice = await generateInvoiceWithBackground(data, "./options/image/bg.jpg")
@@ -1300,7 +1300,7 @@ module.exports = async (ronzz, m, mek) => {
                                 product: product.keterangan,
                                 tujuan: db.data.topup[sender].data.id,
                                 nickname: "",
-                                waktu: tanggal,
+                                waktu: moment.tz('Asia/Jakarta').format('DD MMMM YYYY'),
                                 sn: responses.sn
                               }
                               let invoice = await generateInvoiceWithBackground(data, "./options/image/bg.jpg")
@@ -1356,7 +1356,7 @@ module.exports = async (ronzz, m, mek) => {
                           product: product.keterangan,
                           tujuan: `${db.data.topup[sender].data.id} (${db.data.topup[sender].data.zone})`,
                           nickname: db.data.topup[sender].data.nickname,
-                          waktu: tanggal,
+                          waktu: moment.tz('Asia/Jakarta').format('DD MMMM YYYY'),
                           sn: responses.sn
                         }
                         let invoice = await generateInvoiceWithBackground(data, "./options/image/bg.jpg")
@@ -1369,7 +1369,7 @@ module.exports = async (ronzz, m, mek) => {
                           product: product.keterangan,
                           tujuan: db.data.topup[sender].data.id,
                           nickname: db.data.topup[sender].data.nickname,
-                          waktu: tanggal,
+                          waktu: moment.tz('Asia/Jakarta').format('DD MMMM YYYY'),
                           sn: responses.sn
                         }
                         let invoice = await generateInvoiceWithBackground(data, "./options/image/bg.jpg")
@@ -1382,7 +1382,7 @@ module.exports = async (ronzz, m, mek) => {
                           product: product.keterangan,
                           tujuan: db.data.topup[sender].data.id,
                           nickname: "",
-                          waktu: tanggal,
+                          waktu: moment.tz('Asia/Jakarta').format('DD MMMM YYYY'),
                           sn: responses.sn
                         }
                         let invoice = await generateInvoiceWithBackground(data, "./options/image/bg.jpg")
@@ -1659,7 +1659,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           // Test 2: Formatted message
           const testMsg = `*🧪 TEST MESSAGE 2*
 *Format:* Test dengan format
-*Tanggal:* ${tanggal}
+*Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}
 *Jam:* ${jamwib} WIB
 
 📧 Test: example@test.com
@@ -1709,7 +1709,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           // Buat pesan detail akun
           let accountDetails = `*📦 RESEND AKUN MANUAL*\n\n`
           accountDetails += `*Produk:* ${db.data.produk[productId].name}\n`
-          accountDetails += `*Tanggal:* ${tanggal}\n`
+          accountDetails += `*Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n`
           accountDetails += `*Jam:* ${jamwib} WIB\n\n`
           
           accountData.forEach((item, index) => {
@@ -2546,7 +2546,7 @@ case 'buynow': {
 
             const detailParts = [
               `*📦 Produk:* ${db.data.produk[data[0]].name}`,
-              `*📅 Tanggal:* ${tanggal}`,
+              `*📅 Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
               `*⏰ Jam:* ${jamwib} WIB`,
               `*Refid:* ${reffId}`,
               ''
@@ -2932,7 +2932,7 @@ case 'buy': {
     // Improvement: Optimize string building dengan array.join()
     const detailParts = [
       `*📦 Produk:* ${db.data.produk[data[0]].name}`,
-      `*📅 Tanggal:* ${tanggal}`,
+      `*📅 Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
       `*⏰ Jam:* ${jamwib} WIB`,
       `*Refid:* ${reffId}`,
       ''
@@ -3008,7 +3008,7 @@ case 'buy': {
             `*📦 AKUN PEMBELIAN*`,
             '',
             `*Produk:* ${db.data.produk[data[0]].name}`,
-            `*Tanggal:* ${tanggal}`,
+            `*Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
             ''
           ]
           dataStok.forEach((i, index) => {
@@ -3102,7 +3102,7 @@ case 'buy': {
         `*🛒 Terjual Terakhir:* ${jumlah} akun`,
         `*👤 Pembeli:* @${sender.split("@")[0]}${isOwnerBuy ? ` (Owner buy ke ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'})` : ''}`,
         `*💰 Total Transaksi:* Rp${toRupiah(totalHarga)}`,
-        `*📅 Tanggal:* ${tanggal}`,
+        `*📅 Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
         `*⏰ Jam:* ${jamwib} WIB`,
         '',
         `*⚠️ TINDAKAN YANG DIPERLUKAN:*`,
@@ -3798,7 +3798,7 @@ case 'buy': {
             String(t.date || '').startsWith(today)
           )
           if (transaksiQris.length === 0) {
-            return reply(`📊 Tidak ada transaksi QRIS pada ${tanggal}`)
+            return reply(`📊 Tidak ada transaksi QRIS pada ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`)
           }
 
           const totalAmount = transaksiQris.reduce((sum, t) => {
@@ -3810,7 +3810,7 @@ case 'buy': {
           const message = [
             `*📊 RINGKASAN TRANSAKSI QRIS HARI INI*`,
             ``,
-            `*Tanggal:* ${tanggal}`,
+            `*Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
             `*Total Transaksi:* ${transaksiQris.length} kali`,
             `*Total Nominal:* Rp${toRupiah(totalAmount)}`,
             ``,
@@ -3834,7 +3834,7 @@ case 'buy': {
             String(t.date || '').startsWith(today)
           )
           if (transaksiSaldo.length === 0) {
-            return reply(`📊 Tidak ada transaksi saldo pada ${tanggal}`)
+            return reply(`📊 Tidak ada transaksi saldo pada ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`)
           }
 
           const totalAmount = transaksiSaldo.reduce((sum, t) => {
@@ -3846,7 +3846,7 @@ case 'buy': {
           const message = [
             `*📊 RINGKASAN TRANSAKSI SALDO HARI INI*`,
             ``,
-            `*Tanggal:* ${tanggal}`,
+            `*Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
             `*Total Transaksi:* ${transaksiSaldo.length} kali`,
             `*Total Nominal:* Rp${toRupiah(totalAmount)}`,
             ``,
@@ -3943,16 +3943,16 @@ case 'buy': {
         if (q.startsWith("@")) {
           if (db.data.chat[from].sDone.length !== 0) {
             let textDone = db.data.chat[from].sDone
-            ronzz.sendMessage(from, { text: textDone.replace('tag', q.replace(/[^0-9]/g, '')).replace('@jam', jamwib).replace('@tanggal', tanggal).replace('@status', 'Berhasil'), mentions: [q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'] });
+            ronzz.sendMessage(from, { text: textDone.replace('tag', q.replace(/[^0-9]/g, '')).replace('@jam', jamwib).replace('@tanggal', moment.tz('Asia/Jakarta').format('DD MMMM YYYY')).replace('@status', 'Berhasil'), mentions: [q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'] });
           } else {
-            ronzz.sendMessage(from, { text: `「 *TRANSAKSI BERHASIL* 」\n\n\`\`\`📆 TANGGAL : ${tanggal}\n⌚ JAM : ${jamwib}\n✨ STATUS: Berhasil\`\`\`\n\nTerimakasih @${q.replace(/[^0-9]/g, '')} next order yaa🙏`, mentions: [q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'] }, { quoted: m });
+            ronzz.sendMessage(from, { text: `「 *TRANSAKSI BERHASIL* 」\n\n\`\`\`📆 TANGGAL : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n⌚ JAM : ${jamwib}\n✨ STATUS: Berhasil\`\`\`\n\nTerimakasih @${q.replace(/[^0-9]/g, '')} next order yaa🙏`, mentions: [q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'] }, { quoted: m });
           }
         } else if (isQuotedMsg) {
           if (db.data.chat[from].sDone.length !== 0) {
             let textDone = db.data.chat[from].sDone
-            ronzz.sendMessage(from, { text: textDone.replace('tag', m.quoted.sender.split("@")[0]).replace('@jam', jamwib).replace('@tanggal', tanggal).replace('@status', 'Berhasil'), mentions: [m.quoted.sender] }, { quoted: m })
+            ronzz.sendMessage(from, { text: textDone.replace('tag', m.quoted.sender.split("@")[0]).replace('@jam', jamwib).replace('@tanggal', moment.tz('Asia/Jakarta').format('DD MMMM YYYY')).replace('@status', 'Berhasil'), mentions: [m.quoted.sender] }, { quoted: m })
           } else {
-            ronzz.sendMessage(from, { text: `「 *TRANSAKSI BERHASIL* 」\n\n\`\`\`📆 TANGGAL : ${tanggal}\n⌚ JAM : ${jamwib}\n✨ STATUS: Berhasil\`\`\`\n\nTerimakasih @${m.quoted.sender.split("@")[0]} next order yaa🙏`, mentions: [m.quoted.sender] })
+            ronzz.sendMessage(from, { text: `「 *TRANSAKSI BERHASIL* 」\n\n\`\`\`📆 TANGGAL : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n⌚ JAM : ${jamwib}\n✨ STATUS: Berhasil\`\`\`\n\nTerimakasih @${m.quoted.sender.split("@")[0]} next order yaa🙏`, mentions: [m.quoted.sender] })
           }
         } else {
           reply('Reply atau tag orangnya')
