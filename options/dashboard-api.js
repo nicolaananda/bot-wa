@@ -10,6 +10,7 @@ const { exec, spawn } = require('child_process');
 const { getDashboardData, getDailyChartData, getMonthlyChartData, getUserActivityData } = require('./dashboard-helper');
 // Midtrans webhook integration
 const crypto = require('crypto');
+const axios = require('axios');
 const envValidator = require('../config/env-validator');
 envValidator.validateOrExit();
 const { clearCachedPaymentData } = require('../config/midtrans');
@@ -199,6 +200,28 @@ app.post('/webhook/midtrans', async (req, res) => {
         }
       } catch (dbError) {
         console.error(`❌ [Webhook] Error saving to database:`, dbError.message);
+      }
+    }
+
+    // Forward ke server Nala jika order_id untuk Nala
+    const orderId = notification.order_id || '';
+    const isNalaTransaction = orderId.includes('CLASS-') || 
+                             orderId.includes('GG-') || 
+                             orderId.includes('GRASP-');
+
+    if (isNalaTransaction) {
+      try {
+        await axios.post('https://api.artstudionala.com/api/midtrans/notification', notification, {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 10000,
+        });
+        console.log(`✅ [Webhook] Forwarded to nala: ${orderId}`);
+      } catch (error) {
+        console.error(`❌ [Webhook] Failed to forward to nala: ${error.message}`);
+        // Log lebih detail untuk debugging
+        if (error.response) {
+          console.error(`   Status: ${error.response.status}, Data:`, JSON.stringify(error.response.data));
+        }
       }
     }
 
