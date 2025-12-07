@@ -52,6 +52,8 @@ app.use(cors({
     'http://localhost:5173',
     'https://pos.nicola.id',
     'https://api.nicola.id',
+    'https://mid.nicola.id',
+    'http://mid.nicola.id',
   ],
   credentials: true
 }));
