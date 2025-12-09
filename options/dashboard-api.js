@@ -42,21 +42,45 @@ const app = express();
 const PORT = process.env.PORT || 3002;
 const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 
-// Middleware
-app.use(cors({
-  origin: [
-    'http://dash.nicola.id',
-    'https://dash.nicola.id',
-    'http://localhost:8080',
-    'http://localhost:3002',
-    'http://localhost:5173',
-    'https://pos.nicola.id',
-    'https://api.nicola.id',
-    'https://mid.nicola.id',
-    'http://mid.nicola.id',
-  ],
-  credentials: true
-}));
+// CORS
+const allowedOrigins = [
+  'http://dash.nicola.id',
+  'https://dash.nicola.id',
+  'http://localhost:8080',
+  'http://localhost:3002',
+  'http://localhost:5173',
+  'https://pos.nicola.id',
+  'https://api.nicola.id',
+  'https://mid.nicola.id',
+  'http://mid.nicola.id',
+];
+
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow server-to-server or curl requests with no origin
+    if (!origin) return callback(null, true);
+
+    try {
+      const hostname = new URL(origin).hostname;
+      if (allowedOrigins.includes(origin) || hostname.endsWith('.nicola.id')) {
+        return callback(null, true);
+      }
+    } catch (err) {
+      // Fall through to rejection if origin is malformed
+      console.error('[CORS] Invalid origin format:', origin, err?.message);
+    }
+
+    console.warn('[CORS] Blocked origin:', origin);
+    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  maxAge: 86400
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '2mb' })); // ganti yang sebelumnya app.use(express.json())
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
 let pg; if (usePg) { pg = require('../config/postgres'); }
