@@ -60,18 +60,24 @@ const corsOptions = {
     // Allow server-to-server or curl requests with no origin
     if (!origin) return callback(null, true);
 
+    // Some proxies append duplicate origins separated by commas; take the first
+    const originValue = String(origin || '')
+      .split(',')
+      .map(v => v.trim())
+      .filter(Boolean)[0];
+
     try {
-      const hostname = new URL(origin).hostname;
-      if (allowedOrigins.includes(origin) || hostname.endsWith('.nicola.id')) {
+      const hostname = new URL(originValue).hostname;
+      if (allowedOrigins.includes(originValue) || hostname.endsWith('.nicola.id')) {
         return callback(null, true);
       }
     } catch (err) {
       // Fall through to rejection if origin is malformed
-      console.error('[CORS] Invalid origin format:', origin, err?.message);
+      console.error('[CORS] Invalid origin format:', originValue, err?.message);
     }
 
-    console.warn('[CORS] Blocked origin:', origin);
-    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+    console.warn('[CORS] Blocked origin:', originValue);
+    return callback(new Error(`Origin ${originValue} not allowed by CORS`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
