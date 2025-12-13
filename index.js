@@ -1640,6 +1640,44 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
     if (db.data.setting[botNumber].autoketik) ronzz.sendPresenceUpdate('composing', from)
     if (chats) console.log('->[\x1b[1;32mCMD\x1b[1;37m]', color(moment(m.messageTimestamp * 1000).format('DD/MM/YYYY HH:mm:ss'), 'yellow'), color(`${prefix + command} [${args.length}]`), 'from', color(pushname), isGroup ? 'in ' + color(groupName) : '')
 
+    // 🔔 Auto-forward pesan yang mengandung kata "zoom" ke grup admin
+    if (!fromMe && budy.toLowerCase().includes('zoom')) {
+      try {
+        let targetGroupId = global.adminGroupId
+        
+        // Jika ID grup admin tidak di-set, cari grup berdasarkan nama
+        if (!targetGroupId && global.adminGroupName) {
+          const groups = await ronzz.groupFetchAllParticipating()
+          const targetGroup = Object.values(groups).find(g => 
+            g.subject && g.subject.toLowerCase().includes(global.adminGroupName.toLowerCase())
+          )
+          if (targetGroup) {
+            targetGroupId = targetGroup.id
+          }
+        }
+        
+        if (targetGroupId) {
+          const forwardText = `🔔 *NOTIFIKASI ZOOM REQUEST*\n\n` +
+            `👤 Dari: @${sender.split('@')[0]}\n` +
+            `📝 Nama: ${pushname}\n` +
+            `💬 Chat: ${isGroup ? `Grup "${groupName}"` : 'Private Chat'}\n` +
+            `⏰ Waktu: ${moment(m.messageTimestamp * 1000).format('DD/MM/YYYY HH:mm:ss')}\n\n` +
+            `📩 Pesan:\n${budy}`
+          
+          await ronzz.sendMessage(targetGroupId, {
+            text: forwardText,
+            mentions: [sender]
+          })
+          
+          console.log(`✅ [ZOOM-FORWARD] Pesan dari ${pushname} di-forward ke grup admin`)
+        } else {
+          console.warn(`⚠️ [ZOOM-FORWARD] Grup admin "${global.adminGroupName}" tidak ditemukan`)
+        }
+      } catch (err) {
+        console.error(`❌ [ZOOM-FORWARD] Error:`, err.message)
+      }
+    }
+
     switch (command) {
       case 'testmsg':
         if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
