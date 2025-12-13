@@ -261,8 +261,7 @@ async function startronzz() {
 
   ronzz.ev.process(async (events) => {
     if (events['presence.update']) {
-      // Presence update dinonaktifkan agar HP tetap mendapat notifikasi
-      // await ronzz.sendPresenceUpdate('available')
+      await ronzz.sendPresenceUpdate('available')
     }
     if (events['messages.upsert']) {
       const upsert = events['messages.upsert']
