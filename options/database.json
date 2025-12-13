@@ -2497,17 +2497,17 @@
   "type": "persen",
   "setting": {
     "6285777992985@s.whatsapp.net": {
-      "autoread": true,
+      "autoread": false,
       "autoketik": false,
       "anticall": true
     },
     "6281359417389@s.whatsapp.net": {
-      "autoread": true,
+      "autoread": false,
       "autoketik": false,
       "anticall": true
     },
     "6287887842985@s.whatsapp.net": {
-      "autoread": true,
+      "autoread": false,
       "autoketik": false,
       "anticall": true
     }

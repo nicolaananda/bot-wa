@@ -925,8 +925,8 @@ module.exports = async (ronzz, m, mek) => {
     if (!db.data.profit["bronze"]) db.data.profit["bronze"] = nBronze
     if (!db.data.profit["silver"]) db.data.profit["silver"] = nSilver
     if (!db.data.profit["gold"]) db.data.profit["gold"] = nGold
-    if (!db.data.setting[botNumber]) db.data.setting[botNumber] = {
-      autoread: true,
+    if (!db.data.setting[botNumber])     db.data.setting[botNumber] = {
+      autoread: false, // Dinonaktifkan agar HP dapat notifikasi
       autoketik: false,
       anticall: true
     }
