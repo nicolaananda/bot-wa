@@ -159,12 +159,18 @@ async function startronzz() {
   require('./index')
   nocache('../index', module => console.log(chalk.greenBright('[ VelzzyBotz ]  ') + time + chalk.cyanBright(` "${module}" Telah diupdate!`)))
 
+  // 🚀 OPTIMIZED: Disable store to reduce RAM usage
+  // makeInMemoryStore consumes huge memory storing all chat history
+  // Uncomment below if you need message history in memory (increases RAM by ~500MB-1GB)
+  /*
   const store = makeInMemoryStore({
     logger: pino().child({
       level: 'silent',
       stream: 'store'
     })
   })
+  */
+  const store = null // Disabled to save memory
 
   const { state, saveCreds } = await useMultiFileAuthState('./session')
 
@@ -197,12 +203,28 @@ async function startronzz() {
     }
   })
 
-  store.bind(ronzz.ev)
+  // Only bind store if it exists
+  if (store) {
+    store.bind(ronzz.ev)
+  }
 
   // 🔒 Message Deduplication: Track processed message IDs to prevent duplicate responses
-  const processedMessageIds = new Set()
+  // 🚀 OPTIMIZED: Use Map with timestamps instead of Set + setInterval for better memory management
+  const processedMessageIds = new Map() // Map<messageId, timestamp>
   const MESSAGE_CACHE_TTL = 300000 // 5 minutes
-  setInterval(() => processedMessageIds.clear(), MESSAGE_CACHE_TTL)
+  
+  // Clean up old entries only when adding new ones (lazy cleanup - more efficient)
+  function cleanupOldMessages() {
+    const now = Date.now()
+    for (const [msgId, timestamp] of processedMessageIds.entries()) {
+      if (now - timestamp > MESSAGE_CACHE_TTL) {
+        processedMessageIds.delete(msgId)
+      }
+    }
+  }
+  
+  // Periodic cleanup every 5 minutes (less frequent = less CPU usage)
+  setInterval(cleanupOldMessages, MESSAGE_CACHE_TTL)
 
   ronzz.ev.on('messages.upsert', async chatUpdate => {
     try {
@@ -216,9 +238,14 @@ async function startronzz() {
           return
         }
         
-        // Mark as processed
+        // Mark as processed with timestamp
         if (messageId) {
-          processedMessageIds.add(messageId)
+          processedMessageIds.set(messageId, Date.now())
+          
+          // 🚀 Lazy cleanup: Remove old entries when cache grows too large
+          if (processedMessageIds.size > 1000) {
+            cleanupOldMessages()
+          }
         }
         
         mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
@@ -234,7 +261,8 @@ async function startronzz() {
 
   ronzz.ev.process(async (events) => {
     if (events['presence.update']) {
-      await ronzz.sendPresenceUpdate('available')
+      // Presence update dinonaktifkan agar HP tetap mendapat notifikasi
+      // await ronzz.sendPresenceUpdate('available')
     }
     if (events['messages.upsert']) {
       const upsert = events['messages.upsert']
