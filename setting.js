@@ -56,6 +56,10 @@ global.linkGroup = groupLinksStr.split(',').map(link => link.trim()).filter(link
 const groupNamesStr = process.env.BOT_GROUP_NAMES || ""
 global.groupNames = groupNamesStr.split(',').map(name => name.trim().toLowerCase().replace(/\s+/g, ' ')).filter(name => name) //Nama group yang diizinkan (normalized: lowercase, trim, single space)
 
+// Admin group untuk notifikasi zoom - kosongkan atau tambahkan ID grup (e.g., "120363419470324991@g.us")
+global.adminGroupId = process.env.ADMIN_GROUP_ID || "" // ID grup admin untuk notifikasi zoom
+global.adminGroupName = process.env.ADMIN_GROUP_NAME || "GH bot BARU" // Nama grup admin (fallback jika ID tidak di-set)
+
 //Image
 global.thumbnail = "./options/image/payment.jpg"
 
