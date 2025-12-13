@@ -3262,7 +3262,6 @@ case 'buy': {
   case 'wetv':
   case 'prime':
   case 'youtube':
-  case 'zoom':
   case 'capcut':
   case 'gpt':
     try {
