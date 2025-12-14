@@ -53,6 +53,7 @@ const allowedOrigins = [
   'https://pos.nicola.id',
   'https://api.nicola.id',
   'https://mid.nicola.id',
+  'https://dash.ghzm.us',
   'http://mid.nicola.id',
 ];
 
