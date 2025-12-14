@@ -49,6 +49,7 @@ const allowedOrigins = [
   'http://localhost:8080',
   'http://localhost:3002',
   'http://localhost:5173',
+  'http://localhost:4173',
   'https://pos.nicola.id',
   'https://api.nicola.id',
   'https://mid.nicola.id',
