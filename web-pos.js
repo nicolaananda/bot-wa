@@ -832,62 +832,35 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
       console.error(`❌ [Web POS] Error saving order:`, saveError);
     }
     
-    // Generate QRIS via Midtrans API (same as buymidtrans in bot)
+    // Generate QRIS dinamis from static QRIS (same as buynow in bot)
     let qrisImagePath = null;
     let qrisImageBase64 = null;
-    let qrisString = null;
-    let midtransOrderId = orderId; // Use our orderId for Midtrans tracking
     
     try {
-      const { createQRISPayment } = require('./config/midtrans');
+      const { qrisDinamis } = require('./function/dinamis');
       
-      // Create QRIS via Midtrans API
-      const qrisResult = await createQRISPayment(totalAmount, midtransOrderId);
-      qrisString = qrisResult.qr_string;
+      // Create dynamic QRIS with unique amount (same as buynow)
+      qrisImagePath = await qrisDinamis(`${totalAmount}`, "./options/sticker/qris.jpg");
+      console.log(`✅ [Web POS] QRIS dinamis generated: ${orderId}, Amount: Rp${totalAmount}`);
       
-      console.log(`✅ [Web POS] Midtrans QRIS created: OrderID=${midtransOrderId}, Amount=${totalAmount}`);
-      
-      // Generate QR Code image from qr_string
-      if (qrisString) {
-        const QRCode = require('qrcode');
-        const qrBuffer = await QRCode.toBuffer(qrisString, {
-          width: 400,
-          margin: 2,
-          color: {
-            dark: '#000000',
-            light: '#FFFFFF'
-          }
-        });
-        
-        qrisImageBase64 = qrBuffer.toString('base64');
-        console.log(`✅ [Web POS] QR Code image generated from Midtrans QRIS`);
-        
-        // Save QR image to file (optional)
-        const qrFilePath = `./options/sticker/qris-${reffId}.png`;
-        fs.writeFileSync(qrFilePath, qrBuffer);
-        qrisImagePath = qrFilePath;
-      }
-      
-      // Update order with Midtrans data
-      if (db.data.order[userId]) {
-        db.data.order[userId].qrisImagePath = qrisImagePath;
-        db.data.order[userId].qrisString = qrisString;
-        db.data.order[userId].midtransOrderId = midtransOrderId;
-      }
-    } catch (qrisError) {
-      console.error(`❌ [Web POS] Error generating Midtrans QRIS:`, qrisError.message);
-      
-      // Fallback to static QRIS if Midtrans fails
+      // Read QR image as base64 for frontend
       try {
-        const { qrisStatis } = require('./function/dinamis');
-        qrisImagePath = await qrisStatis("./options/sticker/qris.jpg");
-        console.log(`⚠️ [Web POS] Using fallback static QRIS: ${qrisImagePath}`);
-        
         const qrImageBuffer = fs.readFileSync(qrisImagePath);
         qrisImageBase64 = qrImageBuffer.toString('base64');
-      } catch (fallbackError) {
-        console.error(`❌ [Web POS] Fallback QRIS also failed:`, fallbackError);
+      } catch (readError) {
+        console.error(`❌ [Web POS] Error reading QRIS image:`, readError);
       }
+      
+      // Update order with QRIS data
+      if (db.data.order[userId]) {
+        db.data.order[userId].qrisImagePath = qrisImagePath;
+      }
+    } catch (qrisError) {
+      console.error(`❌ [Web POS] Error generating QRIS dinamis:`, qrisError.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Gagal membuat QR Code. Silakan coba lagi.'
+      });
     }
     
     // Calculate expiration (30 minutes, sama seperti index.js)
@@ -928,224 +901,180 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
       paymentUrl: `/payment/${orderId}`
     });
     
-    // Start polling for payment in background via Midtrans
-    setImmediate(async () => {
+    // Setup webhook listener for payment-completed event (same as buynow in bot)
+    const paymentListener = async (webhookData) => {
       try {
-        const { sleep } = require('./function/myfunc');
+        const { orderId: webhookOrderId, transactionStatus, gross_amount } = webhookData;
         
-        let pollInterval = 3000; // Mulai dari 3 detik
-        const maxInterval = 15000; // Maksimal 15 detik
-        let pollCount = 0;
-        let paymentCompleted = false;
+        // Get current order
+        const order = db.data.order[userId];
+        if (!order) return; // Order sudah tidak ada
         
-        console.log(`🔍 [Web POS] Starting payment polling for order ${orderId}`);
+        const webhookAmount = Number(gross_amount || webhookData.gross_amount || 0);
+        const orderAmount = Number(totalAmount);
+        const amountDiff = Math.abs(webhookAmount - orderAmount);
+        const isAmountMatch = amountDiff < 1; // Tolerance untuk handle decimal
+        const isStatusPaid = /(settlement|capture)/i.test(String(transactionStatus));
         
-        while (!paymentCompleted && db.data.order[userId] && Date.now() < expirationTime) {
-          await sleep(pollInterval);
+        console.log(`🔍 [Web POS] Checking webhook: Amount Rp${webhookAmount}, Order Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+        
+        // Match jika amount sama (dengan tolerance) dan status paid
+        if (isAmountMatch && isStatusPaid) {
+          console.log(`✅ [Web POS] Webhook payment detected: ${orderId}, Amount: ${webhookAmount}`);
           
-          // Tingkatkan interval secara bertahap (exponential backoff)
-          if (pollCount < 10) {
-            pollInterval = Math.min(Math.floor(pollInterval * 1.2), maxInterval);
-          }
-          pollCount++;
-          
+          // Remove listener setelah payment detected
           try {
-            let paid = false;
-            
-            // Check 1: Midtrans Webhooks (from PostgreSQL) - Primary method
-            const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
-            if (usePg) {
-              try {
-                const webhookResult = await pg.query(
-                  `SELECT * FROM midtrans_webhooks 
-                   WHERE gross_amount = $1 
-                   AND transaction_status IN ('settlement', 'capture')
-                   AND created_at >= $2
-                   AND processed = false
-                   ORDER BY created_at DESC
-                   LIMIT 1`,
-                  [totalAmount, new Date(createdAtTs)]
-                );
-                
-                if (webhookResult.rows.length > 0) {
-                  paid = webhookResult.rows[0];
-                  console.log(`✅ [Web POS] Found matching Midtrans webhook for order ${orderId}, amount: ${totalAmount}`);
-                  
-                  // Mark as processed
-                  await pg.query(
-                    'UPDATE midtrans_webhooks SET processed = true WHERE id = $1',
-                    [paid.id]
-                  );
-                }
-              } catch (webhookError) {
-                console.error(`⚠️ [Web POS] Error checking Midtrans webhooks:`, webhookError.message);
-              }
-            }
-            
-            // Check 2: Midtrans API Status (fallback if webhook not received)
-            if (!paid && db.data.order[userId] && db.data.order[userId].midtransOrderId) {
-              try {
-                const { isPaymentCompleted } = require('./config/midtrans');
-                const paymentStatus = await isPaymentCompleted(db.data.order[userId].midtransOrderId);
-                
-                if (paymentStatus.status === 'PAID') {
-                  paid = {
-                    order_id: db.data.order[userId].midtransOrderId,
-                    gross_amount: totalAmount,
-                    transaction_status: 'settlement',
-                    source: 'midtrans_api'
-                  };
-                  console.log(`✅ [Web POS] Payment confirmed via Midtrans API for order ${orderId}`);
-                }
-              } catch (apiError) {
-                // Silent fail - webhook will catch it eventually
-              }
-            }
-            
-            if (paid) {
-              paymentCompleted = true;
-              console.log(`✅ [Web POS] Payment detected for order ${orderId}, reffId: ${reffId}`);
-              
-              // Process purchase (sama seperti di index.js)
-              db.data.produk[productId].terjual += quantity;
-              let dataStok = [];
-              for (let i = 0; i < quantity; i++) {
-                dataStok.push(db.data.produk[productId].stok.shift());
-              }
-              
-              // Important: Delete old stock property to force recalculation from stok.length
-              delete db.data.produk[productId].stock;
-              
-              // Build account details
-              const detailParts = [
-                `*📦 Produk:* ${product.name || product.nama}`,
-                `*📅 Tanggal:* ${tanggal}`,
-                `*⏰ Jam:* ${jamwib} WIB`,
-                `*Refid:* ${reffId}`,
-                ''
-              ];
-              
-              dataStok.forEach((i, index) => {
-                const dataAkun = i.split("|");
-                detailParts.push(
-                  `*═══ AKUN ${index + 1} ═══*`,
-                  `📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
-                  `🔐 Password: ${dataAkun[1] || 'Tidak ada'}`
-                );
-                if (dataAkun[2]) detailParts.push(`👤 Profil: ${dataAkun[2]}`);
-                if (dataAkun[3]) detailParts.push(`🔢 Pin: ${dataAkun[3]}`);
-                if (dataAkun[4]) detailParts.push(`🔒 2FA: ${dataAkun[4]}`);
-                detailParts.push('');
-              });
-              
-              // Tambahkan SNK
-              detailParts.push(
-                `*╭────「 SYARAT & KETENTUAN 」────╮*`,
-                '',
-                `*📋 SNK PRODUK: ${product.name || product.nama}*`,
-                '',
-                product.snk || 'Tidak ada SNK',
-                '',
-                `*⚠️ PENTING:*`,
-                `• Baca dan pahami SNK sebelum menggunakan akun`,
-                `• Akun yang sudah dibeli tidak dapat dikembalikan`,
-                `• Hubungi admin jika ada masalah dengan akun`,
-                '',
-                `*╰────「 END SNK 」────╯*`
-              );
-              
-              const detailAkunCustomer = detailParts.join('\n');
-              
-              // Parse account data for frontend
-              const accountArray = dataStok.map(item => {
-                const dataAkun = item.split("|");
-                return {
-                  email: dataAkun[0] || 'Tidak ada',
-                  password: dataAkun[1] || 'Tidak ada',
-                  profile: dataAkun[2] || 'Tidak ada',
-                  pin: dataAkun[3] || 'Tidak ada',
-                  twofa: dataAkun[4] || 'Tidak ada'
-                };
-              });
-              
-              // Save receipt (sama seperti di index.js)
-              try {
-                const { saveReceipt } = require('./config/r2-storage');
-                const result = await saveReceipt(reffId, detailAkunCustomer);
-                if (result.success) {
-                  if (result.url) {
-                    console.log(`✅ [Web POS] Receipt saved to ${result.storage}: ${result.url}`);
-                  } else {
-                    console.log(`✅ [Web POS] Receipt saved to ${result.storage}: ${result.path || reffId}`);
-                  }
-                }
-              } catch (receiptError) {
-                console.error('❌ [Web POS] Error saving receipt:', receiptError.message);
-              }
-              
-              // Add to transaction database (sama seperti di index.js)
-              db.data.transaksi.push({
-                id: productId,
-                name: product.name || product.nama,
-                price: pricePerItem,
-                date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
-                profit: product.profit || 0,
-                jumlah: quantity,
-                user: cleanPhone || userId.split("@")[0],
-                userRole: userRole,
-                reffId: reffId,
-                metodeBayar: "QRIS",
-                totalBayar: totalAmount,
-                receiptText: detailAkunCustomer,
-                account: accountArray,
-                snk: product.snk || ''
-              });
-              
-              // Save database
-              try {
-                if (typeof db.save === 'function') {
-                  await db.save();
-                }
-              } catch (saveError) {
-                console.error('❌ [Web POS] Error saving database:', saveError);
-              }
-              
-              // Refresh product cache to ensure stock is updated in memory
-              try {
-                await refreshProductCache(productId);
-                console.log(`✅ [Web POS] Product cache refreshed for ${productId}`);
-              } catch (refreshError) {
-                console.error('❌ [Web POS] Error refreshing product cache:', refreshError);
-              }
-              
-              // Clean up order
-              delete db.data.order[userId];
-              
-              console.log(`✅ [Web POS] Transaction completed: ${orderId} - ${reffId}`);
-            }
-          } catch (error) {
-            if (!error.message?.includes("timeout")) {
-              console.error(`❌ [Web POS] Error checking payment for ${orderId}:`, error.message);
-            }
+            process.removeListener('payment-completed', paymentListener);
+          } catch (removeError) {
+            console.error(`⚠️ [Web POS] Error removing listener:`, removeError);
           }
-        }
-        
-        if (!paymentCompleted) {
-          console.log(`⏰ [Web POS] Payment timeout for order ${orderId}`);
-          // Clean up expired order
-          if (db.data.order[userId]) {
-            delete db.data.order[userId];
-            try {
-              if (typeof db.save === 'function') {
-                await db.save();
-              }
-            } catch {}
+          
+          // Process purchase (sama seperti di index.js buynow)
+          db.data.produk[productId].terjual += quantity;
+          let dataStok = [];
+          for (let i = 0; i < quantity; i++) {
+            dataStok.push(db.data.produk[productId].stok.shift());
           }
+          
+          // Important: Delete old stock property to force recalculation from stok.length
+          delete db.data.produk[productId].stock;
+          
+          // Build account details
+          const detailParts = [
+            `*📦 Produk:* ${product.name || product.nama}`,
+            `*📅 Tanggal:* ${tanggal}`,
+            `*⏰ Jam:* ${jamwib} WIB`,
+            `*Refid:* ${reffId}`,
+            ''
+          ];
+          
+          dataStok.forEach((i, index) => {
+            const dataAkun = i.split("|");
+            detailParts.push(
+              `*═══ AKUN ${index + 1} ═══*`,
+              `📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
+              `🔐 Password: ${dataAkun[1] || 'Tidak ada'}`
+            );
+            if (dataAkun[2]) detailParts.push(`👤 Profil: ${dataAkun[2]}`);
+            if (dataAkun[3]) detailParts.push(`🔢 Pin: ${dataAkun[3]}`);
+            if (dataAkun[4]) detailParts.push(`🔒 2FA: ${dataAkun[4]}`);
+            detailParts.push('');
+          });
+          
+          // Tambahkan SNK
+          detailParts.push(
+            `*╭────「 SYARAT & KETENTUAN 」────╮*`,
+            '',
+            `*📋 SNK PRODUK: ${product.name || product.nama}*`,
+            '',
+            product.snk || 'Tidak ada SNK',
+            '',
+            `*⚠️ PENTING:*`,
+            `• Baca dan pahami SNK sebelum menggunakan akun`,
+            `• Akun yang sudah dibeli tidak dapat dikembalikan`,
+            `• Hubungi admin jika ada masalah dengan akun`,
+            '',
+            `*╰────「 END SNK 」────╯*`
+          );
+          
+          const detailAkunCustomer = detailParts.join('\n');
+          
+          // Parse account data for frontend
+          const accountArray = dataStok.map(item => {
+            const dataAkun = item.split("|");
+            return {
+              email: dataAkun[0] || 'Tidak ada',
+              password: dataAkun[1] || 'Tidak ada',
+              profile: dataAkun[2] || 'Tidak ada',
+              pin: dataAkun[3] || 'Tidak ada',
+              twofa: dataAkun[4] || 'Tidak ada'
+            };
+          });
+          
+          // Save receipt (sama seperti di index.js)
+          try {
+            const { saveReceipt } = require('./config/r2-storage');
+            const result = await saveReceipt(reffId, detailAkunCustomer);
+            if (result.success) {
+              if (result.url) {
+                console.log(`✅ [Web POS] Receipt saved to ${result.storage}: ${result.url}`);
+              } else {
+                console.log(`✅ [Web POS] Receipt saved to ${result.storage}: ${result.path || reffId}`);
+              }
+            }
+          } catch (receiptError) {
+            console.error('❌ [Web POS] Error saving receipt:', receiptError.message);
+          }
+          
+          // Add to transaction database (sama seperti di index.js)
+          db.data.transaksi.push({
+            id: productId,
+            name: product.name || product.nama,
+            price: pricePerItem,
+            date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+            profit: product.profit || 0,
+            jumlah: quantity,
+            user: cleanPhone || userId.split("@")[0],
+            userRole: userRole,
+            reffId: reffId,
+            metodeBayar: "QRIS",
+            totalBayar: totalAmount,
+            receiptText: detailAkunCustomer,
+            account: accountArray,
+            snk: product.snk || ''
+          });
+          
+          // Save database
+          try {
+            if (typeof db.save === 'function') {
+              await db.save();
+            }
+          } catch (saveError) {
+            console.error('❌ [Web POS] Error saving database:', saveError);
+          }
+          
+          // Small delay before refresh cache
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Refresh product cache to ensure stock is updated in memory
+          try {
+            await refreshProductCache(productId);
+            console.log(`✅ [Web POS] Product cache refreshed for ${productId}`);
+          } catch (refreshError) {
+            console.error('❌ [Web POS] Error refreshing product cache:', refreshError);
+          }
+          
+          // Clean up order
+          delete db.data.order[userId];
+          
+          console.log(`✅ [Web POS] Transaction completed: ${orderId} - ${reffId}`);
         }
       } catch (error) {
-        console.error(`❌ [Web POS] Error in payment polling for ${orderId}:`, error);
+        console.error(`❌ [Web POS] Error in payment listener:`, error);
       }
-    });
+    };
+    
+    // Register listener
+    process.on('payment-completed', paymentListener);
+    console.log(`✅ [Web POS] Payment listener registered for order ${orderId}`);
+    
+    // Set timeout to remove listener after 30 minutes
+    setTimeout(() => {
+      try {
+        process.removeListener('payment-completed', paymentListener);
+        console.log(`⏰ [Web POS] Payment listener timeout for order ${orderId}`);
+        
+        // Clean up expired order
+        if (db.data.order[userId]) {
+          delete db.data.order[userId];
+          if (typeof db.save === 'function') {
+            db.save().catch(err => console.error('Error saving DB:', err));
+          }
+        }
+      } catch (err) {
+        console.error(`❌ [Web POS] Error in timeout handler:`, err);
+      }
+    }, 30 * 60 * 1000); // 30 minutes
     
   } catch (error) {
     console.error('[Web POS] Buynow error:', error);
