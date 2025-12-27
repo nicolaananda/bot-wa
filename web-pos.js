@@ -274,9 +274,14 @@ async function refreshProductCache(productId = null) {
       const productData = row.data && typeof row.data === 'object' ? row.data : {};
       if (!productData.name && row.name) productData.name = row.name;
       if (!productData.nama && row.name) productData.nama = row.name;
+      
+      // Important: sync stock number from database
       productData.stock = row.stock || (Array.isArray(productData.stok) ? productData.stok.length : 0);
       
+      // Critical: Update the existing product in memory to ensure stok array is in sync
       db.data.produk[row.id] = productData;
+      
+      console.log(`[Web POS] Cache refreshed for ${row.id}: stock=${productData.stock}, stok.length=${Array.isArray(productData.stok) ? productData.stok.length : 0}`);
       return row;
     }
     
@@ -534,6 +539,10 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
     // Update sold count
     product.terjual = (product.terjual || 0) + quantity;
     
+    // Important: Delete old stock property to force recalculation from stok.length
+    // This ensures db.save() will use the updated stok array length
+    delete product.stock;
+    
     // Get current date/time in Jakarta timezone
     const tanggal = moment.tz('Asia/Jakarta').format('DD MMMM YYYY');
     const jamwib = moment.tz('Asia/Jakarta').format('HH:mm:ss');
@@ -641,6 +650,10 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
         console.log(`✅ [Web POS] Database saved successfully. RefId: ${reffId}`);
       }
       
+      // Important: Wait a bit for PostgreSQL to commit the transaction
+      // This prevents race condition where refresh happens before save is committed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Verify save by reloading snapshot (PostgreSQL)
       if (typeof db.load === 'function') {
         await db.load();
@@ -651,6 +664,21 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
           console.error(`❌ [Web POS] WARNING: Transaction NOT found after save!`);
         }
       }
+      
+      // Refresh product cache to ensure stock is updated in memory
+      const beforeRefresh = db.data.produk[productId] ? {
+        stokLength: Array.isArray(db.data.produk[productId].stok) ? db.data.produk[productId].stok.length : 0,
+        stock: db.data.produk[productId].stock
+      } : null;
+      
+      await refreshProductCache(productId);
+      
+      const afterRefresh = db.data.produk[productId] ? {
+        stokLength: Array.isArray(db.data.produk[productId].stok) ? db.data.produk[productId].stok.length : 0,
+        stock: db.data.produk[productId].stock
+      } : null;
+      
+      console.log(`✅ [Web POS] Product cache refreshed for ${productId}:`, { before: beforeRefresh, after: afterRefresh });
     } catch (saveError) {
       console.error(`❌ [Web POS] Error saving database:`, saveError);
       throw new Error('Failed to save database: ' + saveError.message);
@@ -923,6 +951,9 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
                 dataStok.push(db.data.produk[productId].stok.shift());
               }
               
+              // Important: Delete old stock property to force recalculation from stok.length
+              delete db.data.produk[productId].stock;
+              
               // Build account details
               const detailParts = [
                 `*📦 Produk:* ${product.name || product.nama}`,
@@ -1017,6 +1048,14 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
                 console.error('❌ [Web POS] Error saving database:', saveError);
               }
               
+              // Refresh product cache to ensure stock is updated in memory
+              try {
+                await refreshProductCache(productId);
+                console.log(`✅ [Web POS] Product cache refreshed for ${productId}`);
+              } catch (refreshError) {
+                console.error('❌ [Web POS] Error refreshing product cache:', refreshError);
+              }
+              
               // Clean up order
               delete db.data.order[userId];
               
@@ -1088,6 +1127,9 @@ app.post('/api/payment/webhook', async (req, res) => {
       
       // Update sold count
       product.terjual = (product.terjual || 0) + pendingOrder.quantity;
+      
+      // Important: Delete old stock property to force recalculation from stok.length
+      delete product.stock;
       
       // Save transaction
       const transaction = {
@@ -1950,6 +1992,9 @@ app.get('/api/payment/check/:orderId', requireAuth, async (req, res) => {
           dataStok.push(product.stok.shift());
         }
         
+        // Important: Delete old stock property to force recalculation from stok.length
+        delete product.stock;
+        
         // Format detail akun
         const detailParts = [
           `*📦 Produk:* ${product.name}`,
@@ -2019,6 +2064,14 @@ app.get('/api/payment/check/:orderId', requireAuth, async (req, res) => {
         
         // Save database
         await db.save();
+        
+        // Refresh product cache to ensure stock is updated in memory
+        try {
+          await refreshProductCache(order.id);
+          console.log(`✅ [Web POS] Product cache refreshed for ${order.id}`);
+        } catch (refreshError) {
+          console.error('❌ [Web POS] Error refreshing product cache:', refreshError);
+        }
         
         console.log(`✅ [Web POS] Payment confirmed and processed - OrderID: ${orderId}, RefID: ${order.reffId}`);
         
