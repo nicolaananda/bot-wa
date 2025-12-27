@@ -470,6 +470,9 @@ if (!global.midtransWebhookListenerSetup) {
         return;
       }
       
+      // Important: Delete old stock property to force recalculation from stok.length
+      delete db.data.produk[productId].stock;
+      
       const moment = require('moment-timezone');
       const tanggal = moment.tz("Asia/Jakarta").format("DD/MM/YYYY");
       const jamwib = moment.tz("Asia/Jakarta").format("HH:mm:ss");
@@ -2581,6 +2584,9 @@ case 'buynow': {
             for (let i = 0; i < jumlah; i++) {
               dataStok.push(db.data.produk[data[0]].stok.shift())
             }
+            
+            // Important: Delete old stock property to force recalculation from stok.length
+            delete db.data.produk[data[0]].stock;
 
             const detailParts = [
               `*📦 Produk:* ${db.data.produk[data[0]].name}`,
@@ -2966,6 +2972,9 @@ case 'buy': {
     for (let i = 0; i < jumlah; i++) {
       dataStok.push(db.data.produk[data[0]].stok.shift())
     }
+    
+    // Important: Delete old stock property to force recalculation from stok.length
+    delete db.data.produk[data[0]].stock;
 
     // Improvement: Optimize string building dengan array.join()
     const detailParts = [
