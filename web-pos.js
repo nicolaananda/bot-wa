@@ -901,36 +901,57 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
       paymentUrl: `/payment/${orderId}`
     });
     
-    // Setup webhook listener for payment-completed event (same as buynow in bot)
-    const paymentListener = async (webhookData) => {
-      try {
-        const { orderId: webhookOrderId, transactionStatus, gross_amount } = webhookData;
+    // Start background polling for payment (check PostgreSQL midtrans_webhooks table)
+    setImmediate(async () => {
+      const { sleep } = require('./function/myfunc');
+      let pollInterval = 3000; // Start 3 seconds
+      const maxInterval = 15000; // Max 15 seconds
+      let pollCount = 0;
+      let paymentCompleted = false;
+      
+      console.log(`🔍 [Web POS] Starting payment polling for order ${orderId}, Amount: Rp${totalAmount}`);
+      
+      while (!paymentCompleted && db.data.order[userId] && Date.now() < expirationTime) {
+        await sleep(pollInterval);
         
-        // Get current order
-        const order = db.data.order[userId];
-        if (!order) return; // Order sudah tidak ada
+        // Exponential backoff
+        if (pollCount < 10) {
+          pollInterval = Math.min(Math.floor(pollInterval * 1.2), maxInterval);
+        }
+        pollCount++;
         
-        const webhookAmount = Number(gross_amount || webhookData.gross_amount || 0);
-        const orderAmount = Number(totalAmount);
-        const amountDiff = Math.abs(webhookAmount - orderAmount);
-        const isAmountMatch = amountDiff < 1; // Tolerance untuk handle decimal
-        const isStatusPaid = /(settlement|capture)/i.test(String(transactionStatus));
-        
-        console.log(`🔍 [Web POS] Checking webhook: Amount Rp${webhookAmount}, Order Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
-        
-        // Match jika amount sama (dengan tolerance) dan status paid
-        if (isAmountMatch && isStatusPaid) {
-          console.log(`✅ [Web POS] Webhook payment detected: ${orderId}, Amount: ${webhookAmount}`);
-          
-          // Remove listener setelah payment detected
-          try {
-            process.removeListener('payment-completed', paymentListener);
-          } catch (removeError) {
-            console.error(`⚠️ [Web POS] Error removing listener:`, removeError);
-          }
-          
-          // Process purchase (sama seperti di index.js buynow)
-          db.data.produk[productId].terjual += quantity;
+        try {
+          // Check PostgreSQL midtrans_webhooks table for matching payment
+          const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
+          if (usePg) {
+            try {
+              const webhookResult = await pg.query(
+                `SELECT * FROM midtrans_webhooks 
+                 WHERE gross_amount = $1 
+                 AND transaction_status IN ('settlement', 'capture')
+                 AND created_at >= $2
+                 AND processed = false
+                 ORDER BY created_at DESC
+                 LIMIT 1`,
+                [totalAmount, new Date(createdAtTs)]
+              );
+              
+              if (webhookResult.rows.length > 0) {
+                const webhookData = webhookResult.rows[0];
+                const webhookAmount = Number(webhookData.gross_amount);
+                
+                console.log(`✅ [Web POS] Payment detected via webhook! Order: ${orderId}, Amount: Rp${webhookAmount}`);
+                
+                // Mark as processed
+                await pg.query(
+                  'UPDATE midtrans_webhooks SET processed = true WHERE id = $1',
+                  [webhookData.id]
+                );
+                
+                paymentCompleted = true;
+                
+                // Process purchase (sama seperti di index.js buynow)
+                db.data.produk[productId].terjual += quantity;
           let dataStok = [];
           for (let i = 0; i < quantity; i++) {
             dataStok.push(db.data.produk[productId].stok.shift());
@@ -1044,37 +1065,38 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
             console.error('❌ [Web POS] Error refreshing product cache:', refreshError);
           }
           
-          // Clean up order
-          delete db.data.order[userId];
-          
-          console.log(`✅ [Web POS] Transaction completed: ${orderId} - ${reffId}`);
+                // Clean up order
+                delete db.data.order[userId];
+                
+                console.log(`✅ [Web POS] Transaction completed: ${orderId} - ${reffId}`);
+              }
+            } catch (webhookError) {
+              console.error(`⚠️ [Web POS] Error checking webhooks:`, webhookError.message);
+            }
+          }
+        } catch (error) {
+          if (!error.message?.includes("timeout")) {
+            console.error(`❌ [Web POS] Error checking payment for ${orderId}:`, error.message);
+          }
         }
-      } catch (error) {
-        console.error(`❌ [Web POS] Error in payment listener:`, error);
       }
-    };
-    
-    // Register listener
-    process.on('payment-completed', paymentListener);
-    console.log(`✅ [Web POS] Payment listener registered for order ${orderId}`);
-    
-    // Set timeout to remove listener after 30 minutes
-    setTimeout(() => {
-      try {
-        process.removeListener('payment-completed', paymentListener);
-        console.log(`⏰ [Web POS] Payment listener timeout for order ${orderId}`);
-        
+      
+      // Payment timeout
+      if (!paymentCompleted) {
+        console.log(`⏰ [Web POS] Payment timeout for order ${orderId}`);
         // Clean up expired order
         if (db.data.order[userId]) {
           delete db.data.order[userId];
-          if (typeof db.save === 'function') {
-            db.save().catch(err => console.error('Error saving DB:', err));
+          try {
+            if (typeof db.save === 'function') {
+              await db.save();
+            }
+          } catch (saveError) {
+            console.error('Error saving DB after timeout:', saveError);
           }
         }
-      } catch (err) {
-        console.error(`❌ [Web POS] Error in timeout handler:`, err);
       }
-    }, 30 * 60 * 1000); // 30 minutes
+    });
     
   } catch (error) {
     console.error('[Web POS] Buynow error:', error);
