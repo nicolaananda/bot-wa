@@ -832,28 +832,62 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
       console.error(`❌ [Web POS] Error saving order:`, saveError);
     }
     
-    // Generate QRIS image (sama seperti di index.js) - menggunakan QRIS statis
+    // Generate QRIS via Midtrans API (same as buymidtrans in bot)
     let qrisImagePath = null;
     let qrisImageBase64 = null;
+    let qrisString = null;
+    let midtransOrderId = orderId; // Use our orderId for Midtrans tracking
+    
     try {
-      const { qrisStatis } = require('./function/dinamis');
-      qrisImagePath = await qrisStatis("./options/sticker/qris.jpg");
-      console.log(`✅ [Web POS] QRIS generated: ${qrisImagePath}`);
+      const { createQRISPayment } = require('./config/midtrans');
       
-      // Update order with qrisImagePath
+      // Create QRIS via Midtrans API
+      const qrisResult = await createQRISPayment(totalAmount, midtransOrderId);
+      qrisString = qrisResult.qr_string;
+      
+      console.log(`✅ [Web POS] Midtrans QRIS created: OrderID=${midtransOrderId}, Amount=${totalAmount}`);
+      
+      // Generate QR Code image from qr_string
+      if (qrisString) {
+        const QRCode = require('qrcode');
+        const qrBuffer = await QRCode.toBuffer(qrisString, {
+          width: 400,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+        
+        qrisImageBase64 = qrBuffer.toString('base64');
+        console.log(`✅ [Web POS] QR Code image generated from Midtrans QRIS`);
+        
+        // Save QR image to file (optional)
+        const qrFilePath = `./options/sticker/qris-${reffId}.png`;
+        fs.writeFileSync(qrFilePath, qrBuffer);
+        qrisImagePath = qrFilePath;
+      }
+      
+      // Update order with Midtrans data
       if (db.data.order[userId]) {
         db.data.order[userId].qrisImagePath = qrisImagePath;
-      }
-      
-      // Read QR image as base64 for frontend
-      try {
-        const qrImageBuffer = fs.readFileSync(qrisImagePath);
-        qrisImageBase64 = qrImageBuffer.toString('base64');
-      } catch (readError) {
-        console.error(`❌ [Web POS] Error reading QRIS image:`, readError);
+        db.data.order[userId].qrisString = qrisString;
+        db.data.order[userId].midtransOrderId = midtransOrderId;
       }
     } catch (qrisError) {
-      console.error(`❌ [Web POS] Error generating QRIS:`, qrisError);
+      console.error(`❌ [Web POS] Error generating Midtrans QRIS:`, qrisError.message);
+      
+      // Fallback to static QRIS if Midtrans fails
+      try {
+        const { qrisStatis } = require('./function/dinamis');
+        qrisImagePath = await qrisStatis("./options/sticker/qris.jpg");
+        console.log(`⚠️ [Web POS] Using fallback static QRIS: ${qrisImagePath}`);
+        
+        const qrImageBuffer = fs.readFileSync(qrisImagePath);
+        qrisImageBase64 = qrImageBuffer.toString('base64');
+      } catch (fallbackError) {
+        console.error(`❌ [Web POS] Fallback QRIS also failed:`, fallbackError);
+      }
     }
     
     // Calculate expiration (30 minutes, sama seperti index.js)
@@ -894,16 +928,10 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
       paymentUrl: `/payment/${orderId}`
     });
     
-    // Start polling for payment in background (sama seperti di index.js)
+    // Start polling for payment in background via Midtrans
     setImmediate(async () => {
       try {
         const { sleep } = require('./function/myfunc');
-        
-        // Define listener config
-        const listener = {
-          baseUrl: process.env.LISTENER_URL || 'http://localhost:3001',
-          apiKey: process.env.LISTENER_API_KEY || ''
-        };
         
         let pollInterval = 3000; // Mulai dari 3 detik
         const maxInterval = 15000; // Maksimal 15 detik
@@ -922,23 +950,57 @@ app.post('/api/buynow', requireAuth, async (req, res) => {
           pollCount++;
           
           try {
-            const axios = require('axios');
-            const url = `${listener.baseUrl}/notifications?limit=50`;
-            const headers = listener.apiKey ? { 'X-API-Key': listener.apiKey } : {};
-            const resp = await axios.get(url, { headers, timeout: 5000 });
-            const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : []);
+            let paid = false;
             
-            // Hanya terima notifikasi setelah order dibuat dan jumlah harus sama persis
-            const paid = notifs.find(n => {
+            // Check 1: Midtrans Webhooks (from PostgreSQL) - Primary method
+            const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
+            if (usePg) {
               try {
-                const pkgOk = (n.package_name === 'com.gojek.gopaymerchant') || (String(n.app_name||'').toUpperCase().includes('GOPAY')) || (String(n.app_name||'').toUpperCase().includes('GOJEK'));
-                const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''));
-                const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0;
-                return pkgOk && amt === Number(totalAmount) && postedAt >= createdAtTs;
-              } catch {
-                return false;
+                const webhookResult = await pg.query(
+                  `SELECT * FROM midtrans_webhooks 
+                   WHERE gross_amount = $1 
+                   AND transaction_status IN ('settlement', 'capture')
+                   AND created_at >= $2
+                   AND processed = false
+                   ORDER BY created_at DESC
+                   LIMIT 1`,
+                  [totalAmount, new Date(createdAtTs)]
+                );
+                
+                if (webhookResult.rows.length > 0) {
+                  paid = webhookResult.rows[0];
+                  console.log(`✅ [Web POS] Found matching Midtrans webhook for order ${orderId}, amount: ${totalAmount}`);
+                  
+                  // Mark as processed
+                  await pg.query(
+                    'UPDATE midtrans_webhooks SET processed = true WHERE id = $1',
+                    [paid.id]
+                  );
+                }
+              } catch (webhookError) {
+                console.error(`⚠️ [Web POS] Error checking Midtrans webhooks:`, webhookError.message);
               }
-            });
+            }
+            
+            // Check 2: Midtrans API Status (fallback if webhook not received)
+            if (!paid && db.data.order[userId] && db.data.order[userId].midtransOrderId) {
+              try {
+                const { isPaymentCompleted } = require('./config/midtrans');
+                const paymentStatus = await isPaymentCompleted(db.data.order[userId].midtransOrderId);
+                
+                if (paymentStatus.status === 'PAID') {
+                  paid = {
+                    order_id: db.data.order[userId].midtransOrderId,
+                    gross_amount: totalAmount,
+                    transaction_status: 'settlement',
+                    source: 'midtrans_api'
+                  };
+                  console.log(`✅ [Web POS] Payment confirmed via Midtrans API for order ${orderId}`);
+                }
+              } catch (apiError) {
+                // Silent fail - webhook will catch it eventually
+              }
+            }
             
             if (paid) {
               paymentCompleted = true;
@@ -1950,30 +2012,59 @@ app.get('/api/payment/check/:orderId', requireAuth, async (req, res) => {
       });
     }
     
-    // Check payment status from listener (sama seperti di index.js)
+    // Check payment status from Midtrans
     try {
-      const axios = require('axios');
-      const listener = {
-        baseUrl: process.env.LISTENER_URL || 'http://localhost:3001',
-        apiKey: process.env.LISTENER_API_KEY || ''
-      };
+      let paid = false;
       
-      const url = `${listener.baseUrl}/notifications?limit=50`;
-      const headers = listener.apiKey ? { 'X-API-Key': listener.apiKey } : {};
-      const resp = await axios.get(url, { headers, timeout: 5000 });
-      const notifs = Array.isArray(resp.data?.data) ? resp.data.data : (Array.isArray(resp.data) ? resp.data : []);
-      
-      // Check if payment found (sama logic dengan index.js)
-      const paid = notifs.find(n => {
+      // Check 1: Midtrans Webhooks (from PostgreSQL) - Primary method
+      const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
+      if (usePg) {
         try {
-          const pkgOk = (n.package_name === 'com.gojek.gopaymerchant') || (String(n.app_name||'').toUpperCase().includes('GOPAY')) || (String(n.app_name||'').toUpperCase().includes('GOJEK'));
-          const amt = Number(String(n.amount_detected || '').replace(/[^0-9]/g, ''));
-          const postedAt = n.posted_at ? new Date(n.posted_at).getTime() : 0;
-          return pkgOk && amt === Number(order.totalAmount) && postedAt >= order.createdAt;
-        } catch {
-          return false;
+          const webhookResult = await pg.query(
+            `SELECT * FROM midtrans_webhooks 
+             WHERE gross_amount = $1 
+             AND transaction_status IN ('settlement', 'capture')
+             AND created_at >= $2
+             AND processed = false
+             ORDER BY created_at DESC
+             LIMIT 1`,
+            [order.totalAmount, new Date(order.createdAt)]
+          );
+          
+          if (webhookResult.rows.length > 0) {
+            paid = webhookResult.rows[0];
+            console.log(`✅ [Web POS] Found matching Midtrans webhook for order ${orderId}, amount: ${order.totalAmount}`);
+            
+            // Mark as processed
+            await pg.query(
+              'UPDATE midtrans_webhooks SET processed = true WHERE id = $1',
+              [paid.id]
+            );
+          }
+        } catch (webhookError) {
+          console.error(`⚠️ [Web POS] Error checking Midtrans webhooks:`, webhookError.message);
         }
-      });
+      }
+      
+      // Check 2: Midtrans API Status (fallback if webhook not received)
+      if (!paid && order.midtransOrderId) {
+        try {
+          const { isPaymentCompleted } = require('./config/midtrans');
+          const paymentStatus = await isPaymentCompleted(order.midtransOrderId);
+          
+          if (paymentStatus.status === 'PAID') {
+            paid = {
+              order_id: order.midtransOrderId,
+              gross_amount: order.totalAmount,
+              transaction_status: 'settlement',
+              source: 'midtrans_api'
+            };
+            console.log(`✅ [Web POS] Payment confirmed via Midtrans API for order ${orderId}`);
+          }
+        } catch (apiError) {
+          // Silent fail - webhook will catch it eventually
+        }
+      }
       
       if (paid) {
         // Payment confirmed! Process order
