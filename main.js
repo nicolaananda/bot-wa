@@ -194,6 +194,47 @@ async function startronzz() {
   require('./options/dashboard-api.js')
   console.log('[DASHBOARD-API] Dashboard API started successfully')
 
+  // Subscribe to Redis for webhook messages (if Redis is enabled)
+  if (process.env.REDIS !== 'OFF') {
+    try {
+      const Redis = require('ioredis');
+      const subscriber = new Redis({
+        host: process.env.REDIS_HOST || 'localhost',
+        port: process.env.REDIS_PORT || 6379,
+        password: process.env.REDIS_PASSWORD || undefined
+      });
+
+      subscriber.subscribe('gowa:messages', (err, count) => {
+        if (err) {
+          console.error('[REDIS-SUB] Subscribe error:', err.message);
+        } else {
+          console.log(`[REDIS-SUB] Subscribed to gowa:messages channel`);
+        }
+      });
+
+      subscriber.on('message', (channel, message) => {
+        try {
+          const webhookData = JSON.parse(message);
+          console.log('[REDIS-SUB] Received message from webhook');
+          ronzz.handleWebhook(webhookData);
+        } catch (error) {
+          console.error('[REDIS-SUB] Error processing message:', error.message);
+        }
+      });
+
+      subscriber.on('error', (err) => {
+        console.error('[REDIS-SUB] Error:', err.message);
+      });
+
+      console.log('[REDIS-SUB] Redis subscriber initialized');
+    } catch (error) {
+      console.error('[REDIS-SUB] Failed to initialize:', error.message);
+      console.log('[REDIS-SUB] Bot will not receive webhook messages without Redis');
+    }
+  } else {
+    console.log('[REDIS-SUB] Redis disabled - webhook messages will not be received');
+  }
+
   ronzz.on("connection.update", ({ connection }) => {
     if (connection === "open") {
       console.log("CONNECTION OPEN ( +" + ronzz.user?.id?.split(":")[0] + " || " + ronzz.user?.name + " )")
