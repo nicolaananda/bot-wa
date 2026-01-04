@@ -189,10 +189,8 @@ async function startronzz() {
   console.log('[GOWA] Bot Number:', ronzz.user?.id)
   console.log('[GOWA] Bot Name:', ronzz.user?.name)
 
-  // Start dashboard-api in the same process so it can access global.gowaAdapter
-  console.log('[DASHBOARD-API] Starting dashboard API...')
-  require('./options/dashboard-api.js')
-  console.log('[DASHBOARD-API] Dashboard API started successfully')
+  // Dashboard-API runs as separate pm2 process
+  // Communication via Redis pub/sub
 
   // Subscribe to Redis for webhook messages (if Redis is enabled)
   if (process.env.REDIS !== 'OFF') {
