@@ -16,6 +16,35 @@ envValidator.validateOrExit();
 const { clearCachedPaymentData } = require('../config/midtrans');
 const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
 
+// Initialize Redis client for webhook message queue
+let redisClient = null;
+if (process.env.REDIS !== 'OFF') {
+  try {
+    const Redis = require('ioredis');
+    redisClient = new Redis({
+      host: process.env.REDIS_HOST || 'localhost',
+      port: process.env.REDIS_PORT || 6379,
+      password: process.env.REDIS_PASSWORD || undefined,
+      retryStrategy: (times) => {
+        if (times > 3) return null;
+        return Math.min(times * 200, 1000);
+      }
+    });
+
+    redisClient.on('connect', () => {
+      console.log('[REDIS-API] Connected to Redis');
+    });
+
+    redisClient.on('error', (err) => {
+      console.error('[REDIS-API] Error:', err.message);
+    });
+  } catch (error) {
+    console.error('[REDIS-API] Failed to initialize:', error.message);
+  }
+} else {
+  console.log('[REDIS-API] Redis disabled by REDIS=OFF');
+}
+
 // Import stock helper functions
 const stockHelper = require('./stock-helper');
 const DatabaseClass = require('../function/database');
