@@ -189,6 +189,11 @@ async function startronzz() {
   console.log('[GOWA] Bot Number:', ronzz.user?.id)
   console.log('[GOWA] Bot Name:', ronzz.user?.name)
 
+  // Start dashboard-api in the same process so it can access global.gowaAdapter
+  console.log('[DASHBOARD-API] Starting dashboard API...')
+  require('./options/dashboard-api.js')
+  console.log('[DASHBOARD-API] Dashboard API started successfully')
+
   ronzz.on("connection.update", ({ connection }) => {
     if (connection === "open") {
       console.log("CONNECTION OPEN ( +" + ronzz.user?.id?.split(":")[0] + " || " + ronzz.user?.name + " )")
