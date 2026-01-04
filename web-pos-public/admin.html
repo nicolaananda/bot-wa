@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
@@ -10,6 +11,7 @@
     <title>Admin Panel - GiHa Smart Bot POS</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
+
 <body>
     <nav class="navbar">
         <div class="nav-brand">🤖 GiHa Smart Bot</div>
@@ -68,12 +70,7 @@
                             <span class="label-icon">📱</span>
                             Nomor User
                         </label>
-                        <input 
-                            type="text" 
-                            id="userNumber" 
-                            placeholder="Contoh: 628123456789 atau 08123456789"
-                            required
-                        >
+                        <input type="text" id="userNumber" placeholder="Contoh: 628123456789 atau 08123456789" required>
                         <small class="form-hint">Nomor bisa diawali dengan 0, 62, atau +62</small>
                     </div>
 
@@ -82,13 +79,8 @@
                             <span class="label-icon">💵</span>
                             Nominal
                         </label>
-                        <input 
-                            type="number" 
-                            id="nominalSaldo" 
-                            placeholder="Contoh: 50000 (tambah) atau -20000 (kurang)"
-                            step="1000"
-                            required
-                        >
+                        <input type="number" id="nominalSaldo" placeholder="Contoh: 50000 (tambah) atau -20000 (kurang)"
+                            step="1000" required>
                         <small class="form-hint">
                             <strong>Positif (+)</strong> = Tambah saldo &nbsp;|&nbsp;
                             <strong>Negatif (-)</strong> = Kurangi saldo
@@ -140,15 +132,13 @@
                             <span class="label-icon">📝</span>
                             Akun (Multiple)
                         </label>
-                        <textarea 
-                            id="accounts" 
-                            rows="10"
+                        <textarea id="accounts" rows="10"
                             placeholder="Masukkan akun, satu baris per akun dengan format:&#10;email|password|profil|pin|2fa&#10;&#10;Contoh:&#10;user1@gmail.com|pass123|Profil1|1234|ABC123&#10;user2@gmail.com|pass456|Profil2|5678|-&#10;user3@gmail.com|pass789|-|-|-"
-                            required
-                        ></textarea>
+                            required></textarea>
                         <small class="form-hint">
                             <strong>Format:</strong> email|password|profil|pin|2fa<br>
-                            <strong>Minimal:</strong> email|password (fields lain bisa dikosongkan dengan tanda - atau dikosongkan)<br>
+                            <strong>Minimal:</strong> email|password (fields lain bisa dikosongkan dengan tanda - atau
+                            dikosongkan)<br>
                             <strong>Pisahkan:</strong> Setiap akun dengan Enter (baris baru)
                         </small>
                     </div>
@@ -199,12 +189,8 @@
                             <span class="label-icon">📱</span>
                             Nomor User
                         </label>
-                        <input 
-                            type="text" 
-                            id="userNumberPin" 
-                            placeholder="Contoh: 628123456789 atau 08123456789"
-                            required
-                        >
+                        <input type="text" id="userNumberPin" placeholder="Contoh: 628123456789 atau 08123456789"
+                            required>
                         <small class="form-hint">Nomor bisa diawali dengan 0, 62, atau +62</small>
                     </div>
 
@@ -213,14 +199,8 @@
                             <span class="label-icon">🔑</span>
                             PIN Baru
                         </label>
-                        <input 
-                            type="text" 
-                            id="newPin" 
-                            placeholder="Contoh: 1234"
-                            maxlength="6"
-                            pattern="[0-9]{4,6}"
-                            required
-                        >
+                        <input type="text" id="newPin" placeholder="Contoh: 1234" maxlength="6" pattern="[0-9]{4,6}"
+                            required>
                         <small class="form-hint">PIN harus berupa 4-6 digit angka</small>
                     </div>
 
@@ -238,6 +218,29 @@
             </div>
         </div>
     </div>
+    </div>
+
+    <!-- Bottom Navigation (Mobile Only) -->
+    <div class="bottom-nav">
+        <div class="bottom-nav-inner">
+            <a href="/dashboard" class="nav-item">
+                <div class="nav-icon">📊</div>
+                <span class="nav-text">Dashboard</span>
+            </a>
+            <a href="/products" class="nav-item">
+                <div class="nav-icon">🛍️</div>
+                <span class="nav-text">Produk</span>
+            </a>
+            <a href="/admin" class="nav-item active admin-only-nav">
+                <div class="nav-icon">🛠️</div>
+                <span class="nav-text">Admin</span>
+            </a>
+            <a href="/settings" class="nav-item">
+                <div class="nav-icon">⚙️</div>
+                <span class="nav-text">Pengaturan</span>
+            </a>
+        </div>
+    </div>
 
     <!-- Success Modal for Saldo -->
     <div id="successSaldoModal" class="modal">
@@ -245,7 +248,7 @@
             <span class="modal-close" onclick="closeSuccessSaldoModal()">&times;</span>
             <div class="success-icon" id="successSaldoIcon">✅</div>
             <h2 id="successSaldoTitle">Saldo Berhasil Diupdate!</h2>
-            
+
             <div class="success-info">
                 <p><strong>Nomor User:</strong> <span id="successUserNumber"></span></p>
                 <p><strong>Operasi:</strong> <span id="successOperation"></span></p>
@@ -264,7 +267,7 @@
             <span class="modal-close" onclick="closeSuccessPinModal()">&times;</span>
             <div class="success-icon">✅</div>
             <h2>PIN Berhasil Diubah!</h2>
-            
+
             <div class="success-info">
                 <p><strong>Nomor User:</strong> <span id="successPinUserNumber"></span></p>
                 <p><strong>PIN Baru:</strong> <span id="successPinValue"></span></p>
@@ -281,7 +284,7 @@
             <span class="modal-close" onclick="closeSuccessModal()">&times;</span>
             <div class="success-icon">✅</div>
             <h2>Stok Berhasil Ditambahkan!</h2>
-            
+
             <div class="success-info">
                 <p><strong>Produk:</strong> <span id="successProduct"></span></p>
                 <p><strong>Jumlah akun:</strong> <span id="successCount"></span></p>
@@ -335,11 +338,11 @@
                 }
 
                 allProducts = data.products;
-                
+
                 // Update dropdown
                 const select = document.getElementById('productId');
                 select.innerHTML = '<option value="">Pilih Produk...</option>' +
-                    allProducts.map(p => 
+                    allProducts.map(p =>
                         `<option value="${p.id}">${p.name} (ID: ${p.id}) - Stok: ${p.stock}</option>`
                     ).join('');
 
@@ -386,7 +389,7 @@
 
         function filterProductList() {
             const searchTerm = document.getElementById('searchProduct').value.toLowerCase();
-            const filtered = allProducts.filter(p => 
+            const filtered = allProducts.filter(p =>
                 p.name.toLowerCase().includes(searchTerm) ||
                 p.id.toLowerCase().includes(searchTerm) ||
                 (p.category && p.category.toLowerCase().includes(searchTerm))
@@ -398,7 +401,7 @@
             const alertBox = document.getElementById('alertBox');
             alertBox.textContent = message;
             alertBox.className = `alert ${type} show`;
-            
+
             setTimeout(() => {
                 alertBox.classList.remove('show');
             }, 5000);
@@ -493,7 +496,7 @@
             const toast = document.getElementById('toast');
             toast.textContent = message;
             toast.className = 'toast show ' + type;
-            
+
             setTimeout(() => {
                 toast.className = 'toast';
             }, 3000);
@@ -503,7 +506,7 @@
             const alertBox = document.getElementById('saldoAlertBox');
             alertBox.textContent = message;
             alertBox.className = `alert ${type} show`;
-            
+
             setTimeout(() => {
                 alertBox.classList.remove('show');
             }, 5000);
@@ -512,7 +515,7 @@
         function normalizePhoneNumber(phone) {
             // Remove all non-digit characters (same as index.js: /[^0-9]/g)
             let nomorNya = phone.replace(/[^0-9]/g, '');
-            
+
             // Convert 0 to 62 (Indonesian phone format)
             if (nomorNya.startsWith('0')) {
                 nomorNya = '62' + nomorNya.substring(1);
@@ -520,12 +523,12 @@
                 // If doesn't start with 62, assume it's Indonesian number
                 nomorNya = '62' + nomorNya;
             }
-            
+
             // Ensure we have a valid number
             if (nomorNya.length < 10) {
                 throw new Error('Nomor telepon tidak valid');
             }
-            
+
             // Add @s.whatsapp.net (same as index.js addsaldo)
             return nomorNya + '@s.whatsapp.net';
         }
@@ -564,7 +567,7 @@
             try {
                 // Normalize phone number
                 const normalizedNumber = normalizePhoneNumber(userNumber);
-                
+
                 // Encode URI component to handle special characters
                 const encodedNumber = encodeURIComponent(normalizedNumber);
 
@@ -585,18 +588,18 @@
                     // Show success modal with before/after saldo
                     const isAdd = nominal > 0;
                     const absNominal = Math.abs(nominal);
-                    
+
                     document.getElementById('successUserNumber').textContent = userNumber;
                     document.getElementById('successOperation').textContent = isAdd ? '➕ Tambah Saldo' : '➖ Kurangi Saldo';
                     document.getElementById('successOperation').style.color = isAdd ? '#10b981' : '#ef4444';
                     document.getElementById('successNominal').textContent = formatNumber(absNominal);
                     document.getElementById('successBefore').textContent = formatNumber(data.data.before || 0);
                     document.getElementById('successAfter').textContent = formatNumber(data.data.after || 0);
-                    
+
                     // Update title and icon based on operation
                     document.getElementById('successSaldoTitle').textContent = isAdd ? 'Saldo Berhasil Ditambahkan!' : 'Saldo Berhasil Dikurangi!';
                     document.getElementById('successSaldoIcon').textContent = isAdd ? '✅' : '⚠️';
-                    
+
                     document.getElementById('successSaldoModal').style.display = 'flex';
 
                     // Clear form
@@ -624,7 +627,7 @@
         }
 
         // Close modal when clicking outside
-        window.onclick = function(event) {
+        window.onclick = function (event) {
             const modal = document.getElementById('successModal');
             const saldoModal = document.getElementById('successSaldoModal');
             const pinModal = document.getElementById('successPinModal');
@@ -648,12 +651,12 @@
         }
 
         // Close menu when clicking outside
-        document.addEventListener('click', function(event) {
+        document.addEventListener('click', function (event) {
             const navLinks = document.getElementById('navLinks');
             const navToggle = document.querySelector('.nav-toggle');
             const navbar = document.querySelector('.navbar');
-            
-            if (navLinks.classList.contains('active') && 
+
+            if (navLinks.classList.contains('active') &&
                 !navbar.contains(event.target)) {
                 toggleMenu();
             }
@@ -665,12 +668,12 @@
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
-            
+
             // Remove active class from all tabs
             document.querySelectorAll('.admin-tab').forEach(tab => {
                 tab.classList.remove('active');
             });
-            
+
             // Show selected tab content
             const tabContent = {
                 'saldo': 'saldoTab',
@@ -678,12 +681,12 @@
                 'products': 'productsTab',
                 'pin': 'pinTab'
             };
-            
+
             document.getElementById(tabContent[tabName]).classList.add('active');
-            
+
             // Add active class to clicked tab
             event.target.closest('.admin-tab').classList.add('active');
-            
+
             // Load products when switching to products tab
             if (tabName === 'products') {
                 loadProducts();
@@ -694,7 +697,7 @@
             const alertBox = document.getElementById('pinAlertBox');
             alertBox.textContent = message;
             alertBox.className = `alert ${type} show`;
-            
+
             setTimeout(() => {
                 alertBox.classList.remove('show');
             }, 5000);
@@ -740,7 +743,7 @@
             try {
                 // Normalize phone number (already includes @s.whatsapp.net)
                 const userIdWith = normalizePhoneNumber(userNumber);
-                
+
                 // Encode URI component to handle special characters
                 const encodedNumber = encodeURIComponent(userIdWith);
 
@@ -762,7 +765,7 @@
                     document.getElementById('successPinValue').textContent = newPin; // Show PIN for admin confirmation
                     const now = new Date();
                     document.getElementById('successPinTime').textContent = now.toLocaleString('id-ID');
-                    
+
                     document.getElementById('successPinModal').style.display = 'flex';
 
                     // Clear form
@@ -784,5 +787,5 @@
         loadProducts();
     </script>
 </body>
-</html>
 
+</html>

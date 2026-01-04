@@ -9,10 +9,10 @@ class CommandContext {
         this.ronzz = ronzz;
         this.m = m;
         this.mek = mek;
-        
+
         // Extract message data
         Object.assign(this, messageData);
-        
+
         // Bind reply functions
         this.reply = this.reply.bind(this);
         this.Reply = this.Reply.bind(this);
@@ -22,9 +22,9 @@ class CommandContext {
      * Send a reply message
      */
     async reply(text, options = {}) {
-        return this.ronzz.sendMessage(this.from, { 
-            text: text, 
-            ...options 
+        return this.ronzz.sendMessage(this.from, {
+            text: text,
+            ...options
         }, { quoted: this.m });
     }
 
@@ -34,21 +34,21 @@ class CommandContext {
     async Reply(text) {
         const { Styles, parseMention } = require('../../function/myfunc');
         const fs = require('fs');
-        
-        return this.ronzz.sendMessage(this.from, { 
-            text: Styles(text), 
-            contextInfo: { 
-                mentionedJid: parseMention(text), 
-                externalAdReply: { 
-                    showAdAttribution: true, 
-                    title: ${global.botName} © , 
-                    body: global.ownerName + global.botName, 
-                    thumbnail: fs.readFileSync(global.thumbnail), 
-                    sourceUrl: global.linkGroup, 
-                    mediaType: 1, 
-                    renderLargerThumbnail: true 
-                } 
-            } 
+
+        return this.ronzz.sendMessage(this.from, {
+            text: Styles(text),
+            contextInfo: {
+                mentionedJid: parseMention(text),
+                externalAdReply: {
+                    showAdAttribution: true,
+                    title: `${global.botName} ©`,
+                    body: global.ownerName + global.botName,
+                    thumbnail: fs.readFileSync(global.thumbnail),
+                    sourceUrl: global.linkGroup,
+                    mediaType: 1,
+                    renderLargerThumbnail: true
+                }
+            }
         }, { quoted: this.m });
     }
 
@@ -63,49 +63,38 @@ class CommandContext {
      * Download and save media
      */
     async downloadMedia(type, filename) {
-        const { downloadContentFromMessage } = require('@dappaoffc/baileys');
         const fs = require('fs');
-        
-        let stream;
+
+        let messageToDownload = null;
         switch (type) {
             case 'image':
-                stream = await downloadContentFromMessage(
-                    this.m.message.imageMessage || this.m.message.extendedTextMessage?.contextInfo.quotedMessage.imageMessage, 
-                    'image'
-                );
+                messageToDownload = this.m.message.imageMessage || this.m.message.extendedTextMessage?.contextInfo.quotedMessage.imageMessage;
                 break;
             case 'video':
-                stream = await downloadContentFromMessage(
-                    this.m.message.videoMessage || this.m.message.extendedTextMessage?.contextInfo.quotedMessage.videoMessage, 
-                    'video'
-                );
+                messageToDownload = this.m.message.videoMessage || this.m.message.extendedTextMessage?.contextInfo.quotedMessage.videoMessage;
                 break;
             case 'audio':
-                stream = await downloadContentFromMessage(
-                    this.m.message.audioMessage || this.m.message.extendedTextMessage?.contextInfo.quotedMessage.audioMessage, 
-                    'audio'
-                );
+                messageToDownload = this.m.message.audioMessage || this.m.message.extendedTextMessage?.contextInfo.quotedMessage.audioMessage;
                 break;
             case 'sticker':
-                stream = await downloadContentFromMessage(
-                    this.m.message.stickerMessage || this.m.message.extendedTextMessage?.contextInfo.quotedMessage.stickerMessage, 
-                    'sticker'
-                );
+                messageToDownload = this.m.message.stickerMessage || this.m.message.extendedTextMessage?.contextInfo.quotedMessage.stickerMessage;
                 break;
             default:
                 throw new Error('Unsupported media type');
         }
 
-        let buffer = Buffer.from([]);
-        for await (const chunk of stream) {
-            buffer = Buffer.concat([buffer, chunk]);
+        if (!messageToDownload) {
+            throw new Error(`No ${type} message found`);
         }
-        
+
+        // Use Gowa adapter's downloadMedia method
+        const buffer = await this.ronzz.downloadMedia(messageToDownload);
+
         if (filename) {
             fs.writeFileSync(filename, buffer);
             return filename;
         }
-        
+
         return buffer;
     }
 
@@ -127,7 +116,7 @@ class CommandContext {
      */
     async updateSaldo(amount, operation = 'add') {
         const userData = this.getUserData();
-        
+
         switch (operation) {
             case 'add':
                 userData.saldo += Number(amount);
@@ -140,7 +129,7 @@ class CommandContext {
                 userData.saldo = Number(amount);
                 break;
         }
-        
+
         await global.db.save();
         return userData.saldo;
     }

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
@@ -10,16 +11,17 @@
     <title>Dashboard - GiHa Smart Bot POS</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
+
 <body>
     <nav class="navbar">
         <div class="nav-brand">🤖 GiHa Smart Bot</div>
-        
+
         <!-- User Balance in Navbar -->
         <div class="navbar-balance">
             <span class="balance-label">Saldo:</span>
             <span class="balance-value" id="navbarBalance">Rp 0</span>
         </div>
-        
+
         <button class="nav-toggle" onclick="toggleMenu()" aria-label="Toggle menu">
             <span id="menuIcon">☰</span>
         </button>
@@ -37,6 +39,15 @@
         <div class="dashboard-header">
             <h1>Dashboard</h1>
             <p>Selamat datang! Kelola aktivitas dan transaksi Anda di sini</p>
+        </div>
+
+        <!-- Mobile Balance Card (Visible only on Mobile) -->
+        <div class="mobile-only mobile-balance-card">
+            <div class="mobile-balance-info">
+                <span class="mobile-balance-label">Total Saldo</span>
+                <span class="mobile-balance-value" id="mobileBalance">Rp 0</span>
+            </div>
+            <div class="balance-icon" style="font-size: 2rem;">💰</div>
         </div>
 
         <!-- Running Text Promo -->
@@ -141,7 +152,7 @@
                 <h2 class="section-title-simple">📋 Log Aktivitas Sistem</h2>
                 <button class="btn-close-simple" onclick="toggleAuditLogs()">✕</button>
             </div>
-            
+
             <div class="filters-simple">
                 <select id="auditTypeFilter" onchange="filterAuditLogs()" class="select-simple">
                     <option value="all">Semua Aktivitas</option>
@@ -166,9 +177,10 @@
                 <h2 class="section-title-simple">📜 Riwayat Transaksi</h2>
                 <button class="btn-close-simple" onclick="closeTransactions()">✕</button>
             </div>
-            
+
             <div class="filters-simple">
-                <input type="text" id="transactionSearch" placeholder="🔍 Cari transaksi..." class="input-simple" onkeyup="filterTransactions()">
+                <input type="text" id="transactionSearch" placeholder="🔍 Cari transaksi..." class="input-simple"
+                    onkeyup="filterTransactions()">
                 <select id="statusFilter" onchange="filterTransactions()" class="select-simple">
                     <option value="all">Semua Status</option>
                     <option value="success">Berhasil</option>
@@ -185,7 +197,7 @@
                 <button class="btn-simple" onclick="resetTransactionFilters()">🔄 Reset Filter</button>
             </div>
             <div class="summary-text" id="filterSummary"></div>
-            
+
             <div id="transactionList" class="transaction-list-simple"></div>
         </div>
     </div>
@@ -202,12 +214,12 @@
                     <span class="modal-close" onclick="closeTransactionModal()">&times;</span>
                 </div>
             </div>
-            
+
             <div class="modal-body">
                 <div id="transactionDetail" class="transaction-detail"></div>
                 <div id="accountDetailsSection" class="account-details-section"></div>
             </div>
-            
+
             <div class="modal-actions-bottom">
                 <button class="btn-secondary" onclick="closeTransactionModal()">Tutup</button>
             </div>
@@ -243,6 +255,13 @@
                 if (navbarBalance) {
                     navbarBalance.textContent = formatRupiah(data.user.saldo || 0);
                 }
+
+                // Update Mobile Balance
+                const mobileBalance = document.getElementById('mobileBalance');
+                if (mobileBalance) {
+                    mobileBalance.textContent = formatRupiah(data.user.saldo || 0);
+                }
+
                 document.getElementById('userRole').textContent = (data.user.role || 'bronze').toUpperCase();
                 document.getElementById('userPhone').textContent = formatPhone(data.user.phone);
 
@@ -278,10 +297,10 @@
 
                 if (data.success && data.transactions && data.transactions.length > 0) {
                     const transactions = data.transactions;
-                    
+
                     // Calculate total spent
                     const totalSpent = transactions.reduce((sum, t) => sum + (t.totalPrice || t.amount || 0), 0);
-                    
+
                     // Count transactions this month
                     const now = new Date();
                     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -289,14 +308,14 @@
                         const transDate = new Date(t.createdAt || t.date);
                         return transDate >= thisMonthStart;
                     });
-                    
+
                     // Find favorite product (most purchased)
                     const productCount = {};
                     transactions.forEach(t => {
                         const productName = t.productName || t.product?.name || 'Unknown';
                         productCount[productName] = (productCount[productName] || 0) + 1;
                     });
-                    
+
                     let favoriteProduct = '-';
                     let maxCount = 0;
                     Object.entries(productCount).forEach(([product, count]) => {
@@ -305,22 +324,22 @@
                             favoriteProduct = product;
                         }
                     });
-                    
+
                     // Get last transaction
                     const lastTrans = transactions[0]; // Assuming sorted by date desc
                     const lastTransDate = lastTrans ? new Date(lastTrans.createdAt || lastTrans.date) : null;
                     const lastTransTime = lastTransDate ? getTimeAgo(lastTransDate) : '-';
-                    
+
                     // Update UI
                     document.getElementById('userTotalSpent').textContent = formatRupiah(totalSpent);
                     document.getElementById('userTotalTransactions').textContent = transactions.length;
                     document.getElementById('userTransactionsChange').textContent = `${thisMonthTransactions.length} bulan ini`;
-                    document.getElementById('userFavoriteProduct').textContent = favoriteProduct.length > 20 ? 
+                    document.getElementById('userFavoriteProduct').textContent = favoriteProduct.length > 20 ?
                         favoriteProduct.substring(0, 17) + '...' : favoriteProduct;
                     document.getElementById('userFavoriteCount').textContent = maxCount > 0 ? `${maxCount}x dibeli` : 'Belum ada';
                     document.getElementById('userLastTransaction').textContent = lastTrans?.productName || '-';
                     document.getElementById('userLastTransactionTime').textContent = lastTransTime;
-                    
+
                     // Calculate spending change (compare with previous month)
                     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
                     const lastMonthEnd = thisMonthStart;
@@ -328,13 +347,13 @@
                         const transDate = new Date(t.createdAt || t.date);
                         return transDate >= lastMonthStart && transDate < lastMonthEnd;
                     }).reduce((sum, t) => sum + (t.totalPrice || t.amount || 0), 0);
-                    
-                    const thisMonthSpent = thisMonthTransactions.reduce((sum, t) => 
+
+                    const thisMonthSpent = thisMonthTransactions.reduce((sum, t) =>
                         sum + (t.totalPrice || t.amount || 0), 0);
-                    
-                    const changePercent = lastMonthSpent > 0 ? 
+
+                    const changePercent = lastMonthSpent > 0 ?
                         Math.round(((thisMonthSpent - lastMonthSpent) / lastMonthSpent) * 100) : 0;
-                    
+
                     const changeEl = document.getElementById('userSpentChange');
                     if (changePercent > 0) {
                         changeEl.textContent = `+${changePercent}%`;
@@ -346,7 +365,7 @@
                         changeEl.textContent = '0%';
                         changeEl.className = 'personal-stat-change';
                     }
-                    
+
                     console.log('User Summary loaded:', {
                         totalSpent,
                         transactions: transactions.length,
@@ -368,7 +387,7 @@
                 showToast('Gagal memuat aktivitas', 'error');
             }
         }
-        
+
         // Helper: Get time ago string
         function getTimeAgo(date) {
             const now = new Date();
@@ -377,7 +396,7 @@
             const minutes = Math.floor(seconds / 60);
             const hours = Math.floor(minutes / 60);
             const days = Math.floor(hours / 24);
-            
+
             if (days > 0) return `${days} hari lalu`;
             if (hours > 0) return `${hours} jam lalu`;
             if (minutes > 0) return `${minutes} menit lalu`;
@@ -403,14 +422,14 @@
 
         async function loadAuditLogs() {
             if (!isAdmin) return;
-            
+
             try {
                 // Since audit log API might not exist yet, we'll simulate with transaction history
                 const response = await fetch('/api/transactions/all').catch(() => ({ ok: false }));
-                
+
                 if (response.ok) {
                     const data = await response.json();
-                    
+
                     if (data.success && data.transactions) {
                         // Transform transactions into audit log format
                         allAuditLogs = data.transactions.map(t => ({
@@ -422,18 +441,18 @@
                             timestamp: new Date(t.createdAt || t.date),
                             details: `${t.quantity}x ${t.productName} - ${t.metode}`
                         }));
-                        
+
                         // Sort by timestamp desc
                         allAuditLogs.sort((a, b) => b.timestamp - a.timestamp);
-                        
+
                         // Populate user filter
                         const uniqueUsers = [...new Set(allAuditLogs.map(log => log.user))];
                         const userFilter = document.getElementById('auditUserFilter');
-                        userFilter.innerHTML = '<option value="all">Semua Pengguna</option>' + 
+                        userFilter.innerHTML = '<option value="all">Semua Pengguna</option>' +
                             uniqueUsers.map(user => `<option value="${user}">${formatPhone(user)}</option>`).join('');
-                        
+
                         displayAuditLogs(allAuditLogs);
-                        document.getElementById('auditSummary').textContent = 
+                        document.getElementById('auditSummary').textContent =
                             `Menampilkan ${allAuditLogs.length} log aktivitas`;
                     } else {
                         // No data
@@ -456,7 +475,7 @@
 
         function displayAuditLogs(logs) {
             const container = document.getElementById('auditLogsList');
-            
+
             if (logs.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state-simple">
@@ -469,9 +488,9 @@
             container.innerHTML = logs.map((log) => `
                 <div class="log-item-simple">
                     <div class="log-icon-simple">
-                        ${log.type === 'transaction' ? '🛒' : 
-                          log.type === 'saldo' ? '💰' : 
-                          log.type === 'stock' ? '📦' : '🔐'}
+                        ${log.type === 'transaction' ? '🛒' :
+                    log.type === 'saldo' ? '💰' :
+                        log.type === 'stock' ? '📦' : '🔐'}
                     </div>
                     <div class="log-content-simple">
                         <div class="log-header-simple">
@@ -503,10 +522,10 @@
             }
 
             displayAuditLogs(filtered);
-            document.getElementById('auditSummary').textContent = 
-                filtered.length === allAuditLogs.length ? 
-                `Menampilkan ${filtered.length} log aktivitas` :
-                `Menampilkan ${filtered.length} dari ${allAuditLogs.length} log aktivitas`;
+            document.getElementById('auditSummary').textContent =
+                filtered.length === allAuditLogs.length ?
+                    `Menampilkan ${filtered.length} log aktivitas` :
+                    `Menampilkan ${filtered.length} dari ${allAuditLogs.length} log aktivitas`;
         }
 
         async function loadTransactions() {
@@ -525,7 +544,7 @@
                 const transactionSection = document.getElementById('transactionSection');
                 transactionSection.style.display = 'block';
                 transactionSection.scrollIntoView({ behavior: 'smooth' });
-                
+
                 // Update filter summary
                 updateFilterSummary(allTransactions.length, allTransactions.length);
             } catch (error) {
@@ -560,7 +579,7 @@
                     status = 'success';
                 }
                 const statusBadge = status === 'success' ? '✓' : status === 'pending' ? '⏳' : '✗';
-                
+
                 return `
                     <div class="transaction-card-simple">
                         <div class="transaction-header-simple">
@@ -685,7 +704,7 @@
 
                 const transaction = data.transaction;
                 const accountDetails = data.accountDetails;
-                
+
                 // Store receipt content and reffId globally
                 currentReceiptContent = data.receiptContent;
                 currentReffId = reffId;
@@ -723,7 +742,7 @@
                         `;
                     });
                     accountHTML += '</div>';
-                    
+
                     // Tambah info pembayaran di bawah
                     accountHTML += `<div class="payment-info">`;
                     accountHTML += `<div class="payment-row"><span>💰 <strong>Metode:</strong></span> <span>${transaction.metode}</span></div>`;
@@ -734,7 +753,7 @@
                 }
 
                 document.getElementById('accountDetailsSection').innerHTML = accountHTML;
-                
+
                 document.getElementById('transactionModal').style.display = 'flex';
             } catch (error) {
                 console.error('View transaction detail failed:', error);
@@ -760,7 +779,7 @@
                 showToast('✅ Receipt berhasil dicopy!', 'success');
             } catch (error) {
                 console.error('Copy failed:', error);
-                
+
                 // Fallback method for older browsers
                 try {
                     const textArea = document.createElement('textarea');
@@ -782,7 +801,7 @@
             const toast = document.getElementById('toast');
             toast.textContent = message;
             toast.className = 'toast show ' + type;
-            
+
             setTimeout(() => {
                 toast.className = 'toast';
             }, 3000);
@@ -823,12 +842,12 @@
         }
 
         // Close menu when clicking outside
-        document.addEventListener('click', function(event) {
+        document.addEventListener('click', function (event) {
             const navLinks = document.getElementById('navLinks');
             const navToggle = document.querySelector('.nav-toggle');
             const navbar = document.querySelector('.navbar');
-            
-            if (navLinks.classList.contains('active') && 
+
+            if (navLinks.classList.contains('active') &&
                 !navbar.contains(event.target)) {
                 toggleMenu();
             }
@@ -838,5 +857,5 @@
         checkAuth();
     </script>
 </body>
-</html>
 
+</html>
