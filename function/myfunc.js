@@ -19,7 +19,7 @@ exports.smsg = (conn, m, store) => {
   if (m.key) {
     m.id = m.key.id
     m.isBaileys = m.id.startsWith('BAE5') && m.id.length === 16
-    m.chat = m.key.remoteJid
+    m.chat = m.key.remoteJid || ''
     m.fromMe = m.key.fromMe
     m.isGroup = m.chat.endsWith('@g.us')
 
