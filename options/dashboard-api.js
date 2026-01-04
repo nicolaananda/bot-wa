@@ -302,12 +302,14 @@ app.post('/webhook/gowa', async (req, res) => {
     const webhookData = req.body;
     console.log('[GOWA-WEBHOOK] Received:', JSON.stringify(webhookData).substring(0, 200));
 
-    // Forward to global Gowa adapter if available
-    if (global.gowaAdapter) {
-      global.gowaAdapter.handleWebhook(webhookData);
-      console.log('[GOWA-WEBHOOK] Forwarded to adapter');
+    // Publish to Redis for bot to consume
+    // Check if redisClient exists and is ready (ioredis uses .status, but we can check existence too)
+    if (redisClient) {
+      // Use the global redisClient initialized at start of file
+      await redisClient.publish('gowa:messages', JSON.stringify(webhookData));
+      console.log('[GOWA-WEBHOOK] Published to Redis');
     } else {
-      console.warn('[GOWA-WEBHOOK] No adapter available yet');
+      console.warn('[GOWA-WEBHOOK] Redis not available, message dropped');
     }
 
     return res.status(200).json({ success: true, status: 'ok' });
