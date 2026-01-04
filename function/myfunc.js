@@ -11,17 +11,28 @@ function getTypeMessage(message) {
 
 exports.smsg = (conn, m, store) => {
   if (!m) return m
+
+  // GowaAdapter already converts webhook data to Baileys-like structure
+  // So we don't need proto.WebMessageInfo.fromObject
   let M = proto.WebMessageInfo
-  var m = M.fromObject(m)
+
   if (m.key) {
     m.id = m.key.id
     m.isBaileys = m.id.startsWith('BAE5') && m.id.length === 16
     m.chat = m.key.remoteJid
     m.fromMe = m.key.fromMe
     m.isGroup = m.chat.endsWith('@g.us')
-    m.sender = conn.decodeJid(m.fromMe && conn.user.id || m.participant || m.key.participant || m.chat || '')
-    if (m.isGroup) m.participant = conn.decodeJid(m.key.participant) || ''
+
+    // Handle sender ID safely
+    const sender = m.fromMe ? (conn.user?.id || '') : (m.participant || m.key.participant || m.chat || '')
+    m.sender = conn.decodeJid(sender)
+
+    if (m.isGroup) {
+      const participant = m.key.participant || m.participant || ''
+      m.participant = conn.decodeJid(participant)
+    }
   }
+
   if (m.message) {
     m.mtype = getTypeMessage(m.message)
     m.msg = (m.mtype == 'viewOnceMessage' ? m.message[m.mtype].message[getTypeMessage(m.message[m.mtype].message)] : m.message[m.mtype])
@@ -29,12 +40,11 @@ exports.smsg = (conn, m, store) => {
     try {
       m.body =
         m.message.conversation ||
-        m.message[m.type].text ||
-        m.message[m.type].caption ||
-        (m.type === "listResponseMessage" && m.message[m.type].singleSelectReply.selectedRowId) ||
-        (m.type === "buttonsResponseMessage" &&
-          m.message[m.type].selectedButtonId) ||
-        (m.type === "templateButtonReplyMessage" && m.message[m.type].selectedId) ||
+        m.message[m.mtype]?.text ||
+        m.message[m.mtype]?.caption ||
+        (m.mtype === "listResponseMessage" && m.message[m.mtype].singleSelectReply.selectedRowId) ||
+        (m.mtype === "buttonsResponseMessage" && m.message[m.mtype].selectedButtonId) ||
+        (m.mtype === "templateButtonReplyMessage" && m.message[m.mtype].selectedId) ||
         "";
     } catch {
       m.body = "";
@@ -42,6 +52,7 @@ exports.smsg = (conn, m, store) => {
 
     let quoted = m.quoted = m.msg.contextInfo ? m.msg.contextInfo.quotedMessage : null
     m.mentionedJid = m.msg.contextInfo ? m.msg.contextInfo.mentionedJid : []
+
     if (m.quoted) {
       let type = Object.keys(quoted)[0]
       m.quoted = m.quoted[type]
@@ -61,22 +72,24 @@ exports.smsg = (conn, m, store) => {
       m.quoted.fromMe = m.quoted.sender === (conn.user && conn.user.jid)
       m.quoted.text = m.quoted.text || m.quoted.caption || m.quoted.conversation || m.quoted.contentText || m.quoted.selectedDisplayText || m.quoted.title || ''
       m.quoted.mentionedJid = m.quoted.contextInfo ? m.quoted.contextInfo.mentionedJid : []
+
       m.getQuotedObj = m.getQuotedMessage = async () => {
         if (!m.quoted.id) return false
-        let q = await store.loadMessage(m.chat, m.quoted.id, conn)
-        return exports.smsg(conn, q, store)
+        // Skip store loading for Gowa since store is simplified
+        return exports.smsg(conn, m.quoted, store)
       }
-      let vM = m.quoted.fakeObj = M.fromObject({
+
+      // Removed M.fromObject call which caused TypeError
+      let vM = {
         key: {
           remoteJid: m.quoted.chat,
           fromMe: m.quoted.fromMe,
-          id: m.quoted.id
+          id: m.quoted.id,
+          participant: m.isGroup ? m.quoted.sender : undefined
         },
-        message: quoted,
-        ...(m.isGroup ? {
-          participant: m.quoted.sender
-        } : {})
-      })
+        message: quoted
+      }
+      m.quoted.fakeObj = vM
 
       m.quoted.delete = () => conn.sendMessage(m.quoted.chat, {
         delete: vM.key
@@ -89,10 +102,20 @@ exports.smsg = (conn, m, store) => {
       m.isQuotedMsg = false
     }
   }
-  if (m.msg.url) m.download = () => conn.downloadMediaMessage(m.msg)
-  m.text = m.msg.text || m.msg.caption || m.message.conversation || m.msg.contentText || m.msg.selectedDisplayText || m.msg.title || ''
-  m.reply = (text, chatId = m.chat, options = {}) => Buffer.isBuffer(text) ? conn.sendMedia(chatId, text, 'file', '', m, { ...options }) : conn.sendText(chatId, text, m, { ...options })
-  m.copy = () => exports.smsg(conn, M.fromObject(M.toObject(m)))
+
+  if (m.msg?.url) m.download = () => conn.downloadMediaMessage(m.msg)
+  m.text = m.msg?.text || m.msg?.caption || m.message?.conversation || m.msg?.contentText || m.msg?.selectedDisplayText || m.msg?.title || ''
+
+  m.reply = (text, chatId = m.chat, options = {}) => {
+    // Check if text is buffer or object, if so treat as media
+    if (Buffer.isBuffer(text)) {
+      return conn.sendFile(chatId, text, 'file', '', m, { ...options })
+    }
+    // GowaAdapter sendMessage handles text and options
+    return conn.sendMessage(chatId, { text: text }, { quoted: m, ...options })
+  }
+
+  m.copy = () => exports.smsg(conn, Object.assign({}, m)) // Simple shallow copy compatible
   m.copyNForward = (jid = m.chat, forceForward = false, options = {}) => conn.copyNForward(jid, m, forceForward, options)
 
   return m
@@ -136,8 +159,10 @@ exports.sleep = async (ms) => {
 
 exports.getGroupAdmins = function (participants) {
   let admins = []
-  for (let i of participants) {
-    i.admin !== null ? admins.push(i.id) : ''
+  if (participants) {
+    for (let i of participants) {
+      i.admin !== null ? admins.push(i.id) : ''
+    }
   }
   return admins
 }
