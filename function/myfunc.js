@@ -1,9 +1,9 @@
-const { proto, delay, getContentType } = require('@dappaoffc/baileys')
+const { proto, delay, getContentType } = require('../lib/gowa-proto')
 const axios = require("axios");
 
 function getTypeMessage(message) {
   const type = Object.keys(message)
-  var restype =  (!['senderKeyDistributionMessage', 'messageContextInfo'].includes(type[0]) && type[0]) || // Sometimes message in the front
+  var restype = (!['senderKeyDistributionMessage', 'messageContextInfo'].includes(type[0]) && type[0]) || // Sometimes message in the front
     (type.length >= 3 && type[1] !== 'messageContextInfo' && type[1]) || // Sometimes message in midle if mtype length is greater than or equal to 3
     type[type.length - 1] || Object.keys(message)[0] // common case
   return restype
@@ -25,66 +25,66 @@ exports.smsg = (conn, m, store) => {
   if (m.message) {
     m.mtype = getTypeMessage(m.message)
     m.msg = (m.mtype == 'viewOnceMessage' ? m.message[m.mtype].message[getTypeMessage(m.message[m.mtype].message)] : m.message[m.mtype])
-	
-	try {
-  	  m.body =
-  	    m.message.conversation ||
-		m.message[m.type].text ||
-		m.message[m.type].caption ||
-		(m.type === "listResponseMessage" && m.message[m.type].singleSelectReply.selectedRowId) ||
-		(m.type === "buttonsResponseMessage" &&
-	      m.message[m.type].selectedButtonId) ||
-		(m.type === "templateButtonReplyMessage" && m.message[m.type].selectedId) ||
-		"";
-	} catch {
-	  m.body = "";
-	}
-		
-	let quoted = m.quoted = m.msg.contextInfo ? m.msg.contextInfo.quotedMessage : null
-	m.mentionedJid = m.msg.contextInfo ? m.msg.contextInfo.mentionedJid : []
-	if (m.quoted) {
-  	  let type = Object.keys(quoted)[0]
-	  m.quoted = m.quoted[type]
-	  if (['productMessage'].includes(type)) {
-		type = getContentType(m.quoted)
-		m.quoted = m.quoted[type]
-	  }
-	  if (typeof m.quoted === 'string') m.quoted = {
-		text: m.quoted
-	  }
-	  m.isQuotedMsg = true
-	  m.quoted.mtype = type
-	  m.quoted.id = m.msg.contextInfo.stanzaId
-	  m.quoted.chat = m.msg.contextInfo.remoteJid || m.chat
-	  m.quoted.isBaileys = m.quoted.id ? m.quoted.id.startsWith('BAE5') && m.quoted.id.length === 16 : false
-	  m.quoted.sender = conn.decodeJid(m.msg.contextInfo.participant)
-	  m.quoted.fromMe = m.quoted.sender === (conn.user && conn.user.jid)
-	  m.quoted.text = m.quoted.text || m.quoted.caption || m.quoted.conversation || m.quoted.contentText || m.quoted.selectedDisplayText || m.quoted.title || ''
-	  m.quoted.mentionedJid = m.quoted.contextInfo ? m.quoted.contextInfo.mentionedJid : []
-	  m.getQuotedObj = m.getQuotedMessage = async () => {
-		if (!m.quoted.id) return false
-		let q = await store.loadMessage(m.chat, m.quoted.id, conn)
-		return exports.smsg(conn, q, store)
-	  }
-	  let vM = m.quoted.fakeObj = M.fromObject({
-		key: {
-		  remoteJid: m.quoted.chat,
-		  fromMe: m.quoted.fromMe,
-		  id: m.quoted.id
-		},
-		message: quoted,
-		...(m.isGroup ? {
-		  participant: m.quoted.sender
-		} : {})
-	  })
 
-	  m.quoted.delete = () => conn.sendMessage(m.quoted.chat, {
-		delete: vM.key
-	  })
+    try {
+      m.body =
+        m.message.conversation ||
+        m.message[m.type].text ||
+        m.message[m.type].caption ||
+        (m.type === "listResponseMessage" && m.message[m.type].singleSelectReply.selectedRowId) ||
+        (m.type === "buttonsResponseMessage" &&
+          m.message[m.type].selectedButtonId) ||
+        (m.type === "templateButtonReplyMessage" && m.message[m.type].selectedId) ||
+        "";
+    } catch {
+      m.body = "";
+    }
 
-	  m.quoted.copyNForward = (jid, forceForward = false, options = {}) => conn.copyNForward(jid, vM, forceForward, options)
+    let quoted = m.quoted = m.msg.contextInfo ? m.msg.contextInfo.quotedMessage : null
+    m.mentionedJid = m.msg.contextInfo ? m.msg.contextInfo.mentionedJid : []
+    if (m.quoted) {
+      let type = Object.keys(quoted)[0]
+      m.quoted = m.quoted[type]
+      if (['productMessage'].includes(type)) {
+        type = getContentType(m.quoted)
+        m.quoted = m.quoted[type]
+      }
+      if (typeof m.quoted === 'string') m.quoted = {
+        text: m.quoted
+      }
+      m.isQuotedMsg = true
+      m.quoted.mtype = type
+      m.quoted.id = m.msg.contextInfo.stanzaId
+      m.quoted.chat = m.msg.contextInfo.remoteJid || m.chat
+      m.quoted.isBaileys = m.quoted.id ? m.quoted.id.startsWith('BAE5') && m.quoted.id.length === 16 : false
+      m.quoted.sender = conn.decodeJid(m.msg.contextInfo.participant)
+      m.quoted.fromMe = m.quoted.sender === (conn.user && conn.user.jid)
+      m.quoted.text = m.quoted.text || m.quoted.caption || m.quoted.conversation || m.quoted.contentText || m.quoted.selectedDisplayText || m.quoted.title || ''
+      m.quoted.mentionedJid = m.quoted.contextInfo ? m.quoted.contextInfo.mentionedJid : []
+      m.getQuotedObj = m.getQuotedMessage = async () => {
+        if (!m.quoted.id) return false
+        let q = await store.loadMessage(m.chat, m.quoted.id, conn)
+        return exports.smsg(conn, q, store)
+      }
+      let vM = m.quoted.fakeObj = M.fromObject({
+        key: {
+          remoteJid: m.quoted.chat,
+          fromMe: m.quoted.fromMe,
+          id: m.quoted.id
+        },
+        message: quoted,
+        ...(m.isGroup ? {
+          participant: m.quoted.sender
+        } : {})
+      })
 
-	  m.quoted.download = () => conn.downloadMediaMessage(m.quoted)
+      m.quoted.delete = () => conn.sendMessage(m.quoted.chat, {
+        delete: vM.key
+      })
+
+      m.quoted.copyNForward = (jid, forceForward = false, options = {}) => conn.copyNForward(jid, vM, forceForward, options)
+
+      m.quoted.download = () => conn.downloadMediaMessage(m.quoted)
     } else {
       m.isQuotedMsg = false
     }

@@ -113,7 +113,7 @@ async function getFormattedDataAsync() {
   if (!db) {
     return null;
   }
-  
+
   // Format data sesuai dengan yang diharapkan dashboard-helper
   return {
     data: {
@@ -147,9 +147,9 @@ function verifyMidtransSignature(notification) {
 
 // Test endpoint untuk cek webhook accessible (harus sebelum catch-all route)
 app.get('/webhook/midtrans/test', (req, res) => {
-  res.json({ 
+  res.json({
     success: true,
-    status: 'ok', 
+    status: 'ok',
     message: 'Webhook endpoint is accessible',
     timestamp: new Date().toISOString(),
     url: '/webhook/midtrans',
@@ -171,11 +171,11 @@ app.post('/webhook/midtrans', async (req, res) => {
     console.log(`📋 [Webhook] Order: ${order_id}, Status: ${transaction_status}, Payment: ${payment_type}, Amount: ${gross_amount}`);
 
     // Clear any cached status to avoid stale reads
-    try { clearCachedPaymentData(order_id); } catch {}
+    try { clearCachedPaymentData(order_id); } catch { }
 
     if (/(settlement|capture)/i.test(String(transaction_status))) {
       console.log(`✅ [Webhook] Payment successful for ${order_id}`);
-      
+
       const webhookData = {
         orderId: order_id,
         transactionStatus: transaction_status,
@@ -183,10 +183,10 @@ app.post('/webhook/midtrans', async (req, res) => {
         settlementTime: settlement_time,
         gross_amount: gross_amount || notification.gross_amount || 0
       };
-      
+
       // Emit event untuk process yang sama
       process.emit('payment-completed', webhookData);
-      
+
       // Simpan ke PostgreSQL database untuk bot-wa process (lebih reliable untuk multi-process)
       try {
         if (usePg && pg) {
@@ -213,22 +213,22 @@ app.post('/webhook/midtrans', async (req, res) => {
           const db = await getDbInstance();
           if (db && db.data) {
             if (!db.data.midtransWebhooks) db.data.midtransWebhooks = [];
-            
+
             // Hapus webhook lama (lebih dari 1 jam)
             const oneHourAgo = Date.now() - (60 * 60 * 1000);
             db.data.midtransWebhooks = db.data.midtransWebhooks.filter(w => w.timestamp > oneHourAgo);
-            
+
             // Tambah webhook baru
             db.data.midtransWebhooks.push({
               ...webhookData,
               timestamp: Date.now(),
               processed: false
             });
-            
+
             if (typeof db.save === 'function') {
               await db.save();
             }
-            
+
             console.log(`💾 [Webhook] Saved webhook to JSON database: OrderID ${order_id}`);
           }
         }
@@ -239,9 +239,9 @@ app.post('/webhook/midtrans', async (req, res) => {
 
     // Forward ke server Nala jika order_id untuk Nala
     const orderId = notification.order_id || '';
-    const isNalaTransaction = orderId.includes('CLASS-') || 
-                             orderId.includes('GG-') || 
-                             orderId.includes('GRASP-');
+    const isNalaTransaction = orderId.includes('CLASS-') ||
+      orderId.includes('GG-') ||
+      orderId.includes('GRASP-');
 
     if (isNalaTransaction) {
       try {
@@ -264,6 +264,40 @@ app.post('/webhook/midtrans', async (req, res) => {
     console.error('❌ [Webhook] Error:', e);
     return res.status(500).json({ status: 'error', message: e.message });
   }
+});
+
+// ===== Gowa WhatsApp Webhook =====
+// Webhook endpoint for incoming WhatsApp messages from Gowa service
+app.post('/webhook/gowa', async (req, res) => {
+  try {
+    const webhookData = req.body;
+    console.log('[GOWA-WEBHOOK] Received:', JSON.stringify(webhookData).substring(0, 200));
+
+    // Forward to global Gowa adapter if available
+    if (global.gowaAdapter) {
+      global.gowaAdapter.handleWebhook(webhookData);
+      console.log('[GOWA-WEBHOOK] Forwarded to adapter');
+    } else {
+      console.warn('[GOWA-WEBHOOK] No adapter available yet');
+    }
+
+    return res.status(200).json({ success: true, status: 'ok' });
+  } catch (error) {
+    console.error('[GOWA-WEBHOOK] Error:', error.message);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Test endpoint for Gowa webhook
+app.get('/webhook/gowa/test', (req, res) => {
+  res.json({
+    success: true,
+    status: 'ok',
+    message: 'Gowa webhook endpoint is accessible',
+    timestamp: new Date().toISOString(),
+    url: '/webhook/gowa',
+    adapterReady: !!global.gowaAdapter
+  });
 });
 
 // Helper untuk mengambil satu produk by id (PG/file)
@@ -327,7 +361,7 @@ async function parseDeliveredAccountFromFile(reffId) {
   }
 }
 
-    // ===== POS WEB INTEGRATION ENDPOINTS (BEGIN) =====
+// ===== POS WEB INTEGRATION ENDPOINTS (BEGIN) =====
 
 // Token opsional untuk write-protect endpoint POS
 const POS_TOKEN = process.env.DB_TOKEN || process.env.VITE_DB_TOKEN;
@@ -387,7 +421,7 @@ app.post('/api/pos/transactions', async (req, res) => {
           const uid = t && (t.user_id || t.userId || t.user) || null;
           const amt = parseInt(t && (t.totalBayar || t.amount || (t.price * t.jumlah)) || 0);
           const status = t && (t.status || 'completed') || 'completed';
-          
+
           await pg.query(
             'INSERT INTO transaksi(ref_id, user_id, amount, status, meta) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
             [refId, uid, amt, status, JSON.stringify(t)]
@@ -469,7 +503,7 @@ app.post('/api/pos/save-database', async (req, res) => {
               );
             } catch (e) {
               // best-effort; continue with others
-              try { console.error('[POS save-database PG] insert transaksi failed:', e.message) } catch {}
+              try { console.error('[POS save-database PG] insert transaksi failed:', e.message) } catch { }
             }
           }
         }
@@ -629,11 +663,11 @@ function writeAudit(entry) {
     const filePath = path.join(__dirname, 'audit-admin.log');
     const line = JSON.stringify(entry) + '\n';
     fs.appendFileSync(filePath, line, 'utf8');
-  } catch {}
+  } catch { }
 }
 
 function generateAuditId() {
-  const ts = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const ts = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const rnd = Math.random().toString(36).slice(2, 8).toUpperCase();
   return `AUD-${ts}-${rnd}`;
 }
@@ -663,7 +697,7 @@ app.get('/api/admin/users', async (req, res) => {
     let list = Object.keys(users).map(userId => {
       const u = users[userId] || {};
       const idNoSuffix = userId.replace('@s.whatsapp.net', '');
-      const txs = transaksi.filter(t => t.user === idNoSuffix || t.user === `${idNoSuffix}@s.whatsapp.net`);      return {
+      const txs = transaksi.filter(t => t.user === idNoSuffix || t.user === `${idNoSuffix}@s.whatsapp.net`); return {
         userId,
         username: u.username || `User ${userId.slice(-4)}`,
         saldo: parseInt(u.saldo) || 0,
@@ -866,7 +900,7 @@ function hasPermission(userRole, requiredRole) {
     'admin': 3,
     'superadmin': 4
   };
-  
+
   return roleHierarchy[userRole] >= roleHierarchy[requiredRole];
 }
 
@@ -886,7 +920,7 @@ app.get('/api/dashboard/overview', async (req, res) => {
         error: 'Failed to load database'
       });
     }
-    
+
     const dashboardData = getDashboardData(db);
     if (dashboardData) {
       res.json({
@@ -917,7 +951,7 @@ app.get('/api/dashboard/chart/daily', async (req, res) => {
         error: 'Failed to load database'
       });
     }
-    
+
     const dailyData = getDailyChartData(db);
     res.json({
       success: true,
@@ -941,7 +975,7 @@ app.get('/api/dashboard/chart/monthly', async (req, res) => {
         error: 'Failed to load database'
       });
     }
-    
+
     const monthlyData = getMonthlyChartData(db);
     res.json({
       success: true,
@@ -965,17 +999,17 @@ app.get('/api/dashboard/users/activity', async (req, res) => {
         error: 'Failed to load database'
       });
     }
-    
+
     // Get user activity data
     const users = db.data.users || {};
     const transaksi = db.data.transaksi || [];
-    
+
     // Calculate active users
     const activeUsers = Object.keys(users).filter(userId => {
       const user = users[userId];
       return user && user.isActive !== false;
     }).length;
-    
+
     // Calculate new users this month
     const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
     const newUsers = Object.keys(users).filter(userId => {
@@ -984,26 +1018,26 @@ app.get('/api/dashboard/users/activity', async (req, res) => {
       const userMonth = user.createdAt.toString().slice(0, 7);
       return userMonth === currentMonth;
     }).length;
-    
+
     // Get user activity details with saldo, username, and role
     const userActivity = Object.keys(users).map(userId => {
       const user = users[userId];
       if (!user) return null;
-      
+
       // Get user transactions
       const userTransactions = transaksi.filter(t => t.user === userId);
       const totalTransaksi = userTransactions.length;
       const totalSpent = userTransactions.reduce((sum, t) => {
         return sum + (parseInt(t.totalBayar) || (parseInt(t.price) * (t.jumlah || 1)));
       }, 0);
-      
+
       // Calculate payment method breakdown
       const metodeBayar = {
         saldo: 0,
         qris: 0,
         unknown: 0
       };
-      
+
       userTransactions.forEach(t => {
         const paymentMethod = (t.payment_method || t.metodeBayar || '').toLowerCase();
         if (paymentMethod.includes('saldo')) {
@@ -1014,10 +1048,10 @@ app.get('/api/dashboard/users/activity', async (req, res) => {
           metodeBayar.unknown++;
         }
       });
-      
+
       // Auto-generate username if not exists
       const username = user.username || `User ${userId.slice(-4)}`;
-      
+
       // Auto-calculate role based on total spending
       let role = user.role || 'bronze';
       if (totalSpent >= 1000000) {
@@ -1027,7 +1061,7 @@ app.get('/api/dashboard/users/activity', async (req, res) => {
       } else {
         role = 'bronze';
       }
-      
+
       return {
         user: userId,
         username: username,
@@ -1039,14 +1073,14 @@ app.get('/api/dashboard/users/activity', async (req, res) => {
         metodeBayar: metodeBayar
       };
     }).filter(Boolean).sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
-    
+
     // Calculate activity trends (mock data for now)
     const activityTrends = {
       dailyActive: [120, 135, 142, 128, 156, 149, 138],
       weeklyActive: [890, 920, 945, 912, 978, 934, 956],
       monthlyActive: [2800, 2950, 3100, 3020, 3180, 3050, 3120]
     };
-    
+
     res.json({
       success: true,
       data: {
@@ -1057,7 +1091,7 @@ app.get('/api/dashboard/users/activity', async (req, res) => {
       },
       message: "User activity data retrieved successfully"
     });
-    
+
   } catch (error) {
     console.error('Error in user activity endpoint:', error);
     res.status(500).json({
@@ -1072,30 +1106,30 @@ app.get('/api/dashboard/users/all', async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '', role = 'all' } = req.query;
     const db = await getFormattedDataAsync();
-    
+
     if (!db) {
       return res.status(500).json({
         success: false,
         error: 'Failed to load database'
       });
     }
-    
+
     const users = db.data.users || {};
     const transaksi = db.data.transaksi || [];
-    
+
     // Parse pagination parameters
     const currentPage = parseInt(page);
     const usersPerPage = Math.min(parseInt(limit), 50); // Max 50 users per page
     const offset = (currentPage - 1) * usersPerPage;
-    
+
     // Filter users based on search and role
     let filteredUsers = Object.keys(users).filter(userId => {
       const user = users[userId];
       if (!user || user.isActive === false) return false;
-      
+
       // Role filter
       if (role !== 'all' && user.role !== role) return false;
-      
+
       // Search filter
       if (search) {
         const searchLower = search.toLowerCase();
@@ -1105,31 +1139,31 @@ app.get('/api/dashboard/users/all', async (req, res) => {
           return false;
         }
       }
-      
+
       return true;
     });
 
     // Get total count for pagination
     const totalUsers = filteredUsers.length;
     const totalPages = Math.ceil(totalUsers / usersPerPage);
-    
+
     // Apply pagination
     const paginatedUsers = filteredUsers.slice(offset, offset + usersPerPage);
-    
+
     // Transform user data
     const transformedUsers = paginatedUsers.map(userId => {
       const user = users[userId];
-      
+
       // Get user transactions
       const userTransactions = transaksi.filter(t => t.user === userId);
       const transactionCount = userTransactions.length;
       const totalSpent = userTransactions.reduce((sum, t) => {
         return sum + (parseInt(t.totalBayar) || (parseInt(t.price) * (t.jumlah || 1)));
       }, 0);
-      
+
       // Auto-generate username if not exists
       const username = user.username || `User ${userId.slice(-4)}`;
-      
+
       // Auto-calculate role based on total spending
       let calculatedRole = user.role || 'bronze';
       if (totalSpent >= 1000000) {
@@ -1139,7 +1173,7 @@ app.get('/api/dashboard/users/all', async (req, res) => {
       } else {
         calculatedRole = 'bronze';
       }
-      
+
       return {
         userId: userId,
         username: username,
@@ -1155,10 +1189,10 @@ app.get('/api/dashboard/users/all', async (req, res) => {
         hasTransactions: transactionCount > 0
       };
     });
-    
+
     // Sort by creation date (newest first)
     transformedUsers.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    
+
     // Pagination info
     const pagination = {
       currentPage: currentPage,
@@ -1168,7 +1202,7 @@ app.get('/api/dashboard/users/all', async (req, res) => {
       hasNextPage: currentPage < totalPages,
       hasPrevPage: currentPage > 1
     };
-    
+
     res.json({
       success: true,
       data: {
@@ -1177,7 +1211,7 @@ app.get('/api/dashboard/users/all', async (req, res) => {
       },
       message: "All users retrieved successfully"
     });
-    
+
   } catch (error) {
     console.error('Error in get all users endpoint:', error);
     res.status(500).json({
@@ -1192,33 +1226,33 @@ app.get('/api/dashboard/users/:userId/transactions', async (req, res) => {
   try {
     const { userId } = req.params;
     const db = await getFormattedDataAsync();
-    
+
     if (!db) {
       return res.status(500).json({
         success: false,
         error: 'Failed to load database'
       });
     }
-    
+
     // Get user info - search with and without @s.whatsapp.net
     const userWithDomain = `${userId}@s.whatsapp.net`;
     const user = db.data.users[userId] || db.data.users[userWithDomain];
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
         error: 'User not found'
       });
     }
-    
+
     // Filter transaksi berdasarkan userId (both formats)
-    const userTransactions = db.data.transaksi.filter(t => 
+    const userTransactions = db.data.transaksi.filter(t =>
       t.user === userId || t.user === userWithDomain
     );
-    
+
     const totalTransaksi = userTransactions.length;
     const totalSpent = userTransactions.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
-    
+
     // Transform data sesuai dengan kontrak API
     const transformedTransactions = userTransactions.map(t => ({
       id: t.id || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1234,10 +1268,10 @@ app.get('/api/dashboard/users/:userId/transactions', async (req, res) => {
       metodeBayar: t.metodeBayar || 'Not specified',
       status: t.status || 'completed'
     }));
-    
+
     // Sort transactions by date (newest first)
     transformedTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-    
+
     res.json({
       success: true,
       data: {
@@ -1249,7 +1283,7 @@ app.get('/api/dashboard/users/:userId/transactions', async (req, res) => {
         transaksi: transformedTransactions
       }
     });
-    
+
   } catch (error) {
     console.error('Error in user transactions endpoint:', error);
     res.status(500).json({
@@ -1330,32 +1364,32 @@ app.get('/api/dashboard/transactions/search/:reffId', async (req, res) => {
   try {
     const { reffId } = req.params;
     const db = await getFormattedDataAsync();
-    
+
     if (!db) {
       return res.status(500).json({
         success: false,
         error: 'Failed to load database'
       });
     }
-    
+
     // Cari transaksi berdasarkan reff ID
     const transaction = db.data.transaksi.find(t => t.reffId === reffId);
-    
+
     if (!transaction) {
       return res.status(404).json({
         success: false,
         error: 'Transaction not found'
       });
     }
-    
+
     // Hitung profit berdasarkan persentase
     const userRole = db.data.users[transaction.user]?.role || "bronze";
     const profitPercentage = db.data.persentase[userRole] || 2;
     const profit = Math.floor((parseInt(transaction.price) * transaction.jumlah) * (profitPercentage / 100));
-    
+
     // Parse delivered account if exists
     const deliveredAccount = await parseDeliveredAccountFromFile(reffId);
-    
+
     // Get receipt content if exists (from R2 or local)
     let receiptContent = null;
     let receiptExistsFlag = false;
@@ -1368,7 +1402,7 @@ app.get('/api/dashboard/transactions/search/:reffId', async (req, res) => {
     } catch (error) {
       console.error('Error reading receipt:', error);
     }
-    
+
     // Transform data sebelum kirim ke frontend
     const transformedTransaction = {
       reffId: reffId,
@@ -1393,7 +1427,7 @@ app.get('/api/dashboard/transactions/search/:reffId', async (req, res) => {
       user_id: transaction.user_id || transaction.user,
       order_id: transaction.order_id || transaction.reffId
     };
-    
+
     res.json({
       success: true,
       data: transformedTransaction
@@ -1411,17 +1445,17 @@ app.get('/api/dashboard/export/:format', async (req, res) => {
   try {
     const { format } = req.params;
     const db = await getFormattedDataAsync();
-    
+
     if (!db) {
       return res.status(500).json({
         success: false,
         error: 'Failed to load database'
       });
     }
-    
+
     // Export data berdasarkan format
     const filename = `dashboard_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.${format}`;
-    
+
     res.json({
       success: true,
       message: `Data berhasil diexport ke format ${format}`,
@@ -1445,16 +1479,16 @@ app.get('/api/dashboard/users/stats', async (req, res) => {
         error: 'Failed to load database'
       });
     }
-    
+
     const users = db.data.users || {};
     const transaksi = db.data.transaksi || [];
-    
+
     // Calculate total users
     const totalUsers = Object.keys(users).filter(userId => {
       const user = users[userId];
       return user && user.isActive !== false;
     }).length;
-    
+
     // Calculate total balance
     const totalSaldo = Object.keys(users).reduce((sum, userId) => {
       const user = users[userId];
@@ -1463,31 +1497,31 @@ app.get('/api/dashboard/users/stats', async (req, res) => {
       }
       return sum;
     }, 0);
-    
+
     // Calculate average balance
     const averageSaldo = totalUsers > 0 ? Math.round(totalSaldo / totalUsers) : 0;
-    
+
     // Calculate user growth
     const currentMonth = new Date().toISOString().slice(0, 7);
     const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
-    
+
     const thisMonthUsers = Object.keys(users).filter(userId => {
       const user = users[userId];
       if (!user || !user.createdAt) return false;
       const userMonth = user.createdAt.toString().slice(0, 7);
       return userMonth === currentMonth;
     }).length;
-    
+
     const lastMonthUsers = Object.keys(users).filter(userId => {
       const user = users[userId];
       if (!user || !user.createdAt) return false;
       const userMonth = user.createdAt.toString().slice(0, 7);
       return userMonth === lastMonth;
     }).length;
-    
-    const growthRate = lastMonthUsers > 0 ? 
+
+    const growthRate = lastMonthUsers > 0 ?
       Math.round(((thisMonthUsers - lastMonthUsers) / lastMonthUsers) * 100 * 10) / 10 : 0;
-    
+
     // Calculate role distribution
     const roleDistribution = {};
     Object.keys(users).forEach(userId => {
@@ -1497,19 +1531,19 @@ app.get('/api/dashboard/users/stats', async (req, res) => {
         roleDistribution[role] = (roleDistribution[role] || 0) + 1;
       }
     });
-    
+
     // Ensure all roles are present
     if (!roleDistribution.bronze) roleDistribution.bronze = 0;
     if (!roleDistribution.silver) roleDistribution.silver = 0;
     if (!roleDistribution.gold) roleDistribution.gold = 0;
-    
+
     // Calculate balance distribution
     const balanceDistribution = {
       high: 0,
       medium: 0,
       low: 0
     };
-    
+
     Object.keys(users).forEach(userId => {
       const user = users[userId];
       if (user && user.isActive !== false) {
@@ -1523,7 +1557,7 @@ app.get('/api/dashboard/users/stats', async (req, res) => {
         }
       }
     });
-    
+
     res.json({
       success: true,
       data: {
@@ -1540,7 +1574,7 @@ app.get('/api/dashboard/users/stats', async (req, res) => {
       },
       message: "User statistics retrieved successfully"
     });
-    
+
   } catch (error) {
     console.error('Error in user stats endpoint:', error);
     res.status(500).json({
@@ -1560,11 +1594,11 @@ app.get('/api/dashboard/products/stats', async (req, res) => {
         error: 'Failed to load database'
       });
     }
-    
+
     const productStats = {};
     let totalProducts = 0;
     let totalSold = 0;
-    
+
     // Process transaksi data to get product statistics
     db.data.transaksi.forEach(t => {
       const productId = t.id;
@@ -1572,7 +1606,7 @@ app.get('/api/dashboard/products/stats', async (req, res) => {
       const price = parseInt(t.price) || 0;
       const jumlah = parseInt(t.jumlah) || 1;
       const totalBayar = parseInt(t.totalBayar) || (price * jumlah);
-      
+
       if (!productStats[productId]) {
         productStats[productId] = {
           id: productId,
@@ -1583,19 +1617,19 @@ app.get('/api/dashboard/products/stats', async (req, res) => {
           transactionCount: 0
         };
       }
-      
+
       productStats[productId].totalSold += jumlah;
       productStats[productId].totalRevenue += totalBayar;
       productStats[productId].transactionCount += 1;
       productStats[productId].averagePrice = Math.round(productStats[productId].totalRevenue / productStats[productId].totalSold);
-      
+
       totalProducts++;
       totalSold += jumlah;
     });
-    
+
     // Convert to array and sort by revenue
     const productStatsArray = Object.values(productStats).sort((a, b) => b.totalRevenue - a.totalRevenue);
-    
+
     res.json({
       success: true,
       data: {
@@ -1618,14 +1652,14 @@ app.get('/api/dashboard/transactions/recent', async (req, res) => {
   try {
     const { limit = 20 } = req.query;
     const db = await getFormattedDataAsync();
-    
+
     if (!db) {
       return res.status(500).json({
         success: false,
         error: 'Failed to load database'
       });
     }
-    
+
     // Sort transactions by date (most recent first) and limit results
     const recentTransactions = db.data.transaksi
       .filter(t => t.date) // Only transactions with dates
@@ -1648,7 +1682,7 @@ app.get('/api/dashboard/transactions/recent', async (req, res) => {
         user_id: t.user_id || t.user,
         order_id: t.order_id || t.reffId
       }));
-    
+
     res.json({
       success: true,
       data: {
@@ -1698,7 +1732,7 @@ app.get('/api/dashboard/products/stock', async (req, res) => {
       const stockMetrics = calculateStockMetrics(product);
       const minStock = product.minStock || 5; // Default minimum stock
       const utilization = calculateUtilization(product.terjual || 0, stockCount);
-      
+
       const formattedProduct = {
         id: product.id,
         name: product.name,
@@ -1767,10 +1801,10 @@ app.get('/api/dashboard/products/stock/summary', async (req, res) => {
     for (const [productId, product] of Object.entries(produkMap)) {
       const stockCount = product.stok ? product.stok.length : 0;
       const category = getProductCategory(productId, product.name);
-      
+
       totalStockItems += stockCount;
       categories.add(category);
-      
+
       if (stockCount === 0) {
         outOfStockProducts++;
       } else if (stockCount <= 3) {
@@ -1817,7 +1851,7 @@ app.post('/api/dashboard/products', async (req, res) => {
       const existing = await pg.query('SELECT id FROM produk WHERE id=$1', [id]);
       if (existing.rows[0]) return res.status(409).json({ success: false, message: 'Product already exists' });
       const data = { id, name, desc, priceB, priceS, priceG, snk, minStock, stok: [], terjual: 0 };
-      await pg.query('INSERT INTO produk(id, name, price, stock, data) VALUES ($1,$2,$3,$4,$5)', [id, name, parseInt(priceB)||0, 0, JSON.stringify(data)]);
+      await pg.query('INSERT INTO produk(id, name, price, stock, data) VALUES ($1,$2,$3,$4,$5)', [id, name, parseInt(priceB) || 0, 0, JSON.stringify(data)]);
       return res.json({ success: true, data });
     }
     return res.status(500).json({ success: false, message: 'PostgreSQL mode is required' });
@@ -2042,7 +2076,7 @@ app.get('/api/dashboard/products/stock/alerts', async (req, res) => {
 
     for (const [productId, product] of Object.entries(produkMap)) {
       const stockCount = product.stok ? product.stok.length : 0;
-      
+
       if (stockCount <= threshold) {
         alerts.push({
           productId: product.id,
@@ -2090,17 +2124,17 @@ app.get('/api/dashboard/products/:productId/stock/history', async (req, res) => 
   try {
     const { productId } = req.params;
     const product = await loadSingleProdukAsync(productId);
-    
+
     if (!product) {
       return res.status(404).json({
         success: false,
         message: 'Product not found'
       });
     }
-    
+
     // Basic history - in a real implementation, you'd want to track this separately
     const history = [];
-    
+
     if (product.lastRestock) {
       history.push({
         type: 'restock',
@@ -2135,7 +2169,7 @@ app.get('/api/dashboard/products/:productId/stock/history', async (req, res) => 
 app.get('/api/dashboard/products/stock/analytics', async (req, res) => {
   try {
     const analytics = stockHelper.getStockAnalytics && !usePg ? stockHelper.getStockAnalytics() : null;
-    
+
     if (!analytics) {
       return res.status(404).json({
         success: false,
@@ -2161,7 +2195,7 @@ app.get('/api/dashboard/products/stock/analytics', async (req, res) => {
 app.get('/api/dashboard/products/stock/report', async (req, res) => {
   try {
     const report = stockHelper.generateStockReport && !usePg ? stockHelper.generateStockReport() : null;
-    
+
     if (!report) {
       return res.status(404).json({
         success: false,
@@ -2187,7 +2221,7 @@ app.get('/api/dashboard/products/stock/report', async (req, res) => {
 app.get('/api/dashboard/products/stock/export', async (req, res) => {
   try {
     const csv = stockHelper.exportStockToCSV && !usePg ? stockHelper.exportStockToCSV() : null;
-    
+
     if (!csv) {
       return res.status(404).json({
         success: false,
@@ -2198,7 +2232,7 @@ app.get('/api/dashboard/products/stock/export', async (req, res) => {
     // Set headers for CSV download
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="stock_report_${new Date().toISOString().split('T')[0]}.csv"`);
-    
+
     res.send(csv);
   } catch (error) {
     console.error('Error exporting stock data:', error);
@@ -2214,7 +2248,7 @@ app.get('/api/dashboard/products/stock/export', async (req, res) => {
 app.post('/api/dashboard/products/stock/bulk-update', async (req, res) => {
   try {
     const { updates } = req.body;
-    
+
     if (!updates || !Array.isArray(updates)) {
       return res.status(400).json({
         success: false,
@@ -2349,12 +2383,12 @@ app.get('/api/dashboard/analytics/advanced', async (req, res) => {
         error: 'Failed to load database'
       });
     }
-    
+
     const users = db.data.users || {};
     const transaksi = db.data.transaksi || [];
     const profit = db.data.profit || {};
     const persentase = db.data.persentase || {};
-    
+
     // Calculate comprehensive metrics
     const totalUsers = Object.keys(users).length;
     const totalTransactions = transaksi.length;
@@ -2364,21 +2398,21 @@ app.get('/api/dashboard/analytics/advanced', async (req, res) => {
       const profitPercent = persentase[userRole] || 2;
       return sum + Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
     }, 0);
-    
+
     // User role distribution
     const roleDistribution = {};
     Object.values(users).forEach(user => {
       const role = user.role || 'bronze';
       roleDistribution[role] = (roleDistribution[role] || 0) + 1;
     });
-    
+
     // Payment method distribution
     const paymentMethods = {};
     transaksi.forEach(t => {
       const method = t.metodeBayar || 'Unknown';
       paymentMethods[method] = (paymentMethods[method] || 0) + 1;
     });
-    
+
     // Monthly growth analysis
     const monthlyData = {};
     transaksi.forEach(t => {
@@ -2395,13 +2429,13 @@ app.get('/api/dashboard/analytics/advanced', async (req, res) => {
         monthlyData[month].transactions++;
         monthlyData[month].revenue += parseInt(t.totalBayar) || 0;
         monthlyData[month].users.add(t.user);
-        
+
         const userRole = t.userRole || 'bronze';
         const profitPercent = persentase[userRole] || 2;
         monthlyData[month].profit += Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
       }
     });
-    
+
     // Convert monthly data for chart
     const monthlyChart = Object.entries(monthlyData)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -2412,7 +2446,7 @@ app.get('/api/dashboard/analytics/advanced', async (req, res) => {
         profit: data.profit,
         uniqueUsers: data.users.size
       }));
-    
+
     // Top products by revenue
     const productRevenue = {};
     transaksi.forEach(t => {
@@ -2430,11 +2464,11 @@ app.get('/api/dashboard/analytics/advanced', async (req, res) => {
       productRevenue[productId].totalSold += t.jumlah || 1;
       productRevenue[productId].transactionCount++;
     });
-    
+
     const topProducts = Object.values(productRevenue)
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
       .slice(0, 10);
-    
+
     // User activity heatmap (by hour)
     const hourlyActivity = Array(24).fill(0);
     transaksi.forEach(t => {
@@ -2456,7 +2490,7 @@ app.get('/api/dashboard/analytics/advanced', async (req, res) => {
         }
       }
     });
-    
+
     // Customer lifetime value
     const userLTV = {};
     transaksi.forEach(t => {
@@ -2473,9 +2507,9 @@ app.get('/api/dashboard/analytics/advanced', async (req, res) => {
       if (t.date < userLTV[t.user].firstPurchase) userLTV[t.user].firstPurchase = t.date;
       if (t.date > userLTV[t.user].lastPurchase) userLTV[t.user].lastPurchase = t.date;
     });
-    
+
     const avgLTV = Object.values(userLTV).reduce((sum, user) => sum + user.totalSpent, 0) / Object.keys(userLTV).length;
-    
+
     res.json({
       success: true,
       data: {
@@ -2502,7 +2536,7 @@ app.get('/api/dashboard/analytics/advanced', async (req, res) => {
         }
       }
     });
-    
+
   } catch (error) {
     console.error('Error in advanced analytics:', error);
     res.status(500).json({
@@ -2517,41 +2551,41 @@ app.get('/api/dashboard/products/performance', async (req, res) => {
   try {
     const rawDb = await loadDatabaseAsync();
     const db = await getFormattedDataAsync();
-    
+
     if (!rawDb || !rawDb.produk || !db) {
       return res.status(500).json({
         success: false,
         error: 'Failed to load database'
       });
     }
-    
+
     const products = rawDb.produk;
     const transaksi = db.data.transaksi || [];
     const persentase = db.data.persentase || {};
-    
+
     // Calculate performance metrics for each product
     const productPerformance = Object.entries(products).map(([productId, product]) => {
       // Get transactions for this product
       const productTransactions = transaksi.filter(t => t.id === productId);
       const totalSold = productTransactions.reduce((sum, t) => sum + (t.jumlah || 1), 0);
       const totalRevenue = productTransactions.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
-      
+
       // Calculate profit
       const totalProfit = productTransactions.reduce((sum, t) => {
         const userRole = t.userRole || 'bronze';
         const profitPercent = persentase[userRole] || 2;
         return sum + Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
       }, 0);
-      
+
       // Stock analysis
       const currentStock = product.stok ? product.stok.length : 0;
-      const stockStatus = currentStock === 0 ? 'out_of_stock' : 
-                         currentStock <= 5 ? 'low_stock' : 'in_stock';
-      
+      const stockStatus = currentStock === 0 ? 'out_of_stock' :
+        currentStock <= 5 ? 'low_stock' : 'in_stock';
+
       // Performance metrics
       const conversionRate = currentStock > 0 ? (totalSold / (totalSold + currentStock)) * 100 : 0;
       const avgOrderValue = productTransactions.length > 0 ? totalRevenue / productTransactions.length : 0;
-      
+
       // Category detection
       let category = 'Other';
       const name = product.name.toLowerCase();
@@ -2560,14 +2594,14 @@ app.get('/api/dashboard/products/performance', async (req, res) => {
       else if (name.includes('spotify') || name.includes('youtube')) category = 'Music';
       else if (name.includes('zoom') || name.includes('meet')) category = 'Meeting';
       else if (name.includes('office') || name.includes('word')) category = 'Productivity';
-      
+
       // Price analysis
       const priceRange = {
         bronze: parseInt(product.priceB) || 0,
         silver: parseInt(product.priceS) || parseInt(product.priceB) || 0,
         gold: parseInt(product.priceG) || parseInt(product.priceB) || 0
       };
-      
+
       return {
         id: productId,
         name: product.name,
@@ -2591,14 +2625,14 @@ app.get('/api/dashboard/products/performance', async (req, res) => {
           profitMargin: totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 100 * 100) / 100 : 0,
           stockTurnover: currentStock > 0 ? Math.round((totalSold / currentStock) * 100) / 100 : 0
         },
-        lastSale: productTransactions.length > 0 ? 
+        lastSale: productTransactions.length > 0 ?
           productTransactions.sort((a, b) => new Date(b.date) - new Date(a.date))[0].date : null
       };
     });
-    
+
     // Sort by total revenue
     productPerformance.sort((a, b) => b.sales.totalRevenue - a.sales.totalRevenue);
-    
+
     // Category performance summary
     const categoryPerformance = {};
     productPerformance.forEach(product => {
@@ -2611,7 +2645,7 @@ app.get('/api/dashboard/products/performance', async (req, res) => {
           avgConversionRate: 0
         };
       }
-      
+
       const cat = categoryPerformance[product.category];
       cat.totalProducts++;
       cat.totalRevenue += product.sales.totalRevenue;
@@ -2619,13 +2653,13 @@ app.get('/api/dashboard/products/performance', async (req, res) => {
       cat.totalProfit += product.sales.totalProfit;
       cat.avgConversionRate += product.metrics.conversionRate;
     });
-    
+
     // Calculate averages for categories
     Object.keys(categoryPerformance).forEach(category => {
       const cat = categoryPerformance[category];
       cat.avgConversionRate = Math.round((cat.avgConversionRate / cat.totalProducts) * 100) / 100;
     });
-    
+
     res.json({
       success: true,
       data: {
@@ -2645,7 +2679,7 @@ app.get('/api/dashboard/products/performance', async (req, res) => {
         }
       }
     });
-    
+
   } catch (error) {
     console.error('Error in product performance:', error);
     res.status(500).json({
@@ -2665,10 +2699,10 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
         error: 'Failed to load database'
       });
     }
-    
+
     const users = db.data.users || {};
     const transaksi = db.data.transaksi || [];
-    
+
     // User segmentation analysis
     const userSegments = {
       new: [], // 0-1 transactions
@@ -2676,18 +2710,18 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
       loyal: [], // 6-10 transactions
       vip: [] // 11+ transactions
     };
-    
+
     const userBehavior = {};
-    
+
     // Analyze each user's behavior
     Object.keys(users).forEach(userId => {
       const user = users[userId];
       const userTransactions = transaksi.filter(t => t.user === userId || t.user === `${userId}@s.whatsapp.net`);
-      
+
       const totalTransactions = userTransactions.length;
       const totalSpent = userTransactions.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
       const avgOrderValue = totalTransactions > 0 ? totalSpent / totalTransactions : 0;
-      
+
       // Calculate purchase frequency
       let daysBetweenPurchases = 0;
       if (userTransactions.length > 1) {
@@ -2697,7 +2731,7 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
         const totalDays = (lastPurchase - firstPurchase) / (1000 * 60 * 60 * 24);
         daysBetweenPurchases = totalDays / (totalTransactions - 1);
       }
-      
+
       // Preferred payment method
       const paymentMethods = {};
       userTransactions.forEach(t => {
@@ -2705,8 +2739,8 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
         paymentMethods[method] = (paymentMethods[method] || 0) + 1;
       });
       const preferredPayment = Object.entries(paymentMethods)
-        .sort(([,a], [,b]) => b - a)[0]?.[0] || 'None';
-      
+        .sort(([, a], [, b]) => b - a)[0]?.[0] || 'None';
+
       // Product preferences
       const productPreferences = {};
       userTransactions.forEach(t => {
@@ -2714,8 +2748,8 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
         productPreferences[productId] = (productPreferences[productId] || 0) + 1;
       });
       const favoriteProduct = Object.entries(productPreferences)
-        .sort(([,a], [,b]) => b - a)[0]?.[0] || 'None';
-      
+        .sort(([, a], [, b]) => b - a)[0]?.[0] || 'None';
+
       // Shopping time analysis
       const hourlyPurchases = Array(24).fill(0);
       userTransactions.forEach(t => {
@@ -2737,7 +2771,7 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
         }
       });
       const preferredHour = hourlyPurchases.indexOf(Math.max(...hourlyPurchases));
-      
+
       const userAnalysis = {
         userId: userId,
         username: user.username || `User ${userId.slice(-4)}`,
@@ -2753,9 +2787,9 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
         lastActivity: user.lastActivity || user.createdAt || null,
         createdAt: user.createdAt || null
       };
-      
+
       userBehavior[userId] = userAnalysis;
-      
+
       // Segment users
       if (totalTransactions <= 1) {
         userSegments.new.push(userAnalysis);
@@ -2767,15 +2801,15 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
         userSegments.vip.push(userAnalysis);
       }
     });
-    
+
     // Calculate segment statistics
     const segmentStats = {};
     Object.entries(userSegments).forEach(([segment, users]) => {
       const totalSpent = users.reduce((sum, user) => sum + user.totalSpent, 0);
       const avgSpent = users.length > 0 ? totalSpent / users.length : 0;
-      const avgTransactions = users.length > 0 ? 
+      const avgTransactions = users.length > 0 ?
         users.reduce((sum, user) => sum + user.totalTransactions, 0) / users.length : 0;
-      
+
       segmentStats[segment] = {
         count: users.length,
         totalSpent: totalSpent,
@@ -2784,14 +2818,14 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
         percentage: users.length > 0 ? Math.round((users.length / Object.keys(users).length) * 100 * 10) / 10 : 0
       };
     });
-    
+
     // Churn analysis (users who haven't purchased in 30+ days)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const churnedUsers = Object.values(userBehavior).filter(user => {
       if (!user.lastActivity) return true;
       return new Date(user.lastActivity) < thirtyDaysAgo;
     });
-    
+
     // Payment method preferences by segment
     const paymentBySegment = {};
     Object.entries(userSegments).forEach(([segment, users]) => {
@@ -2801,7 +2835,7 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
         paymentBySegment[segment][method] = (paymentBySegment[segment][method] || 0) + 1;
       });
     });
-    
+
     res.json({
       success: true,
       data: {
@@ -2845,7 +2879,7 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
         }
       }
     });
-    
+
   } catch (error) {
     console.error('Error in user behavior analytics:', error);
     res.status(500).json({
@@ -2865,11 +2899,11 @@ app.get('/api/dashboard/finance/analytics', async (req, res) => {
         error: 'Failed to load database'
       });
     }
-    
+
     const transaksi = db.data.transaksi || [];
     const users = db.data.users || {};
     const persentase = db.data.persentase || {};
-    
+
     // Calculate comprehensive financial metrics
     const totalRevenue = transaksi.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
     const totalProfit = transaksi.reduce((sum, t) => {
@@ -2877,35 +2911,35 @@ app.get('/api/dashboard/finance/analytics', async (req, res) => {
       const profitPercent = persentase[userRole] || 2;
       return sum + Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
     }, 0);
-    
+
     // Revenue by payment method
     const revenueByPayment = {};
     transaksi.forEach(t => {
       const method = t.metodeBayar || 'Unknown';
       revenueByPayment[method] = (revenueByPayment[method] || 0) + (parseInt(t.totalBayar) || 0);
     });
-    
+
     // Revenue by user role
     const revenueByRole = {};
     const profitByRole = {};
     transaksi.forEach(t => {
       const role = t.userRole || 'bronze';
       revenueByRole[role] = (revenueByRole[role] || 0) + (parseInt(t.totalBayar) || 0);
-      
+
       const profitPercent = persentase[role] || 2;
       const profit = Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
       profitByRole[role] = (profitByRole[role] || 0) + profit;
     });
-    
+
     // Daily revenue analysis (last 30 days)
     const dailyRevenue = {};
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    
+
     transaksi.forEach(t => {
       if (t.date) {
         const date = t.date.split(' ')[0]; // Get date part
         const transactionDate = new Date(date);
-        
+
         if (transactionDate >= thirtyDaysAgo) {
           if (!dailyRevenue[date]) {
             dailyRevenue[date] = {
@@ -2914,10 +2948,10 @@ app.get('/api/dashboard/finance/analytics', async (req, res) => {
               transactions: 0
             };
           }
-          
+
           dailyRevenue[date].revenue += parseInt(t.totalBayar) || 0;
           dailyRevenue[date].transactions++;
-          
+
           const userRole = t.userRole || 'bronze';
           const profitPercent = persentase[userRole] || 2;
           const profit = Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
@@ -2925,7 +2959,7 @@ app.get('/api/dashboard/finance/analytics', async (req, res) => {
         }
       }
     });
-    
+
     // Convert to chart data
     const dailyChart = Object.entries(dailyRevenue)
       .sort(([a], [b]) => new Date(a) - new Date(b))
@@ -2936,26 +2970,26 @@ app.get('/api/dashboard/finance/analytics', async (req, res) => {
         transactions: data.transactions,
         avgOrderValue: Math.round(data.revenue / data.transactions)
       }));
-    
+
     // Calculate growth rates
     const currentMonth = new Date().toISOString().slice(0, 7);
     const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
-    
+
     const currentMonthRevenue = transaksi
       .filter(t => t.date && t.date.startsWith(currentMonth))
       .reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
-    
+
     const lastMonthRevenue = transaksi
       .filter(t => t.date && t.date.startsWith(lastMonth))
       .reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
-    
-    const revenueGrowthRate = lastMonthRevenue > 0 ? 
+
+    const revenueGrowthRate = lastMonthRevenue > 0 ?
       Math.round(((currentMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 * 10) / 10 : 0;
-    
+
     // User balance analysis
     const totalUserBalance = Object.values(users).reduce((sum, user) => sum + (parseInt(user.saldo) || 0), 0);
     const avgUserBalance = Object.keys(users).length > 0 ? totalUserBalance / Object.keys(users).length : 0;
-    
+
     // Top revenue generating products
     const productRevenue = {};
     transaksi.forEach(t => {
@@ -2968,24 +3002,24 @@ app.get('/api/dashboard/finance/analytics', async (req, res) => {
           transactions: 0
         };
       }
-      
+
       productRevenue[t.id].revenue += parseInt(t.totalBayar) || 0;
       productRevenue[t.id].transactions++;
-      
+
       const userRole = t.userRole || 'bronze';
       const profitPercent = persentase[userRole] || 2;
       const profit = Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
       productRevenue[t.id].profit += profit;
     });
-    
+
     const topRevenueProducts = Object.values(productRevenue)
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
-    
+
     // Financial health indicators
     const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
     const avgOrderValue = transaksi.length > 0 ? totalRevenue / transaksi.length : 0;
-    
+
     res.json({
       success: true,
       data: {
@@ -3024,7 +3058,7 @@ app.get('/api/dashboard/finance/analytics', async (req, res) => {
         },
         topProducts: topRevenueProducts,
         insights: {
-          healthScore: Math.round((profitMargin + (revenueGrowthRate > 0 ? 10 : 0) + 
+          healthScore: Math.round((profitMargin + (revenueGrowthRate > 0 ? 10 : 0) +
             (avgOrderValue > 10000 ? 10 : 5)) * 10) / 10,
           recommendations: [
             profitMargin < 10 ? "Consider optimizing profit margins" : null,
@@ -3034,7 +3068,7 @@ app.get('/api/dashboard/finance/analytics', async (req, res) => {
         }
       }
     });
-    
+
   } catch (error) {
     console.error('Error in financial analytics:', error);
     res.status(500).json({
@@ -3054,14 +3088,14 @@ app.get('/api/dashboard/realtime', async (req, res) => {
         error: 'Failed to load database'
       });
     }
-    
+
     const transaksi = db.data.transaksi || [];
     const users = db.data.users || {};
-    
+
     // Get today's data
     const today = new Date().toISOString().slice(0, 10);
     const todayTransactions = transaksi.filter(t => t.date && t.date.startsWith(today));
-    
+
     // Get last 24 hours data
     const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const recent24hTransactions = transaksi.filter(t => {
@@ -3072,18 +3106,18 @@ app.get('/api/dashboard/realtime', async (req, res) => {
         return t.date.startsWith(today);
       }
     });
-    
+
     // Real-time metrics
     const todayRevenue = todayTransactions.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
     const last24hRevenue = recent24hTransactions.reduce((sum, t) => sum + (parseInt(t.totalBayar) || 0), 0);
-    
+
     // Hourly breakdown for today
     const hourlyData = Array(24).fill(0).map((_, hour) => ({
       hour: hour,
       transactions: 0,
       revenue: 0
     }));
-    
+
     todayTransactions.forEach(t => {
       try {
         const hour = new Date(t.date).getHours();
@@ -3102,7 +3136,7 @@ app.get('/api/dashboard/realtime', async (req, res) => {
         }
       }
     });
-    
+
     // Active users (users with transactions in last 7 days)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const activeUsers = new Set();
@@ -3117,7 +3151,7 @@ app.get('/api/dashboard/realtime', async (req, res) => {
         }
       }
     });
-    
+
     // Top products today
     const todayProducts = {};
     todayTransactions.forEach(t => {
@@ -3132,11 +3166,11 @@ app.get('/api/dashboard/realtime', async (req, res) => {
       todayProducts[t.id].sold += t.jumlah || 1;
       todayProducts[t.id].revenue += parseInt(t.totalBayar) || 0;
     });
-    
+
     const topTodayProducts = Object.values(todayProducts)
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
-    
+
     // Recent transactions (last 10)
     const recentTransactions = transaksi
       .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -3149,12 +3183,12 @@ app.get('/api/dashboard/realtime', async (req, res) => {
         method: t.metodeBayar,
         time: t.date
       }));
-    
+
     // Performance indicators
     const avgOrderValue = todayTransactions.length > 0 ? todayRevenue / todayTransactions.length : 0;
-    const conversionRate = Object.keys(users).length > 0 ? 
+    const conversionRate = Object.keys(users).length > 0 ?
       (activeUsers.size / Object.keys(users).length) * 100 : 0;
-    
+
     res.json({
       success: true,
       data: {
@@ -3184,7 +3218,7 @@ app.get('/api/dashboard/realtime', async (req, res) => {
         ].filter(Boolean)
       }
     });
-    
+
   } catch (error) {
     console.error('Error in realtime dashboard:', error);
     res.status(500).json({
@@ -3230,10 +3264,10 @@ app.get("/logs/stream", (req, res) => {
     journal.on("error", (err) => {
       res.write(`Process error: ${err.message}\n`);
     });
-    const keepAlive = setInterval(() => { try { res.write("\n"); } catch {} }, 15000);
+    const keepAlive = setInterval(() => { try { res.write("\n"); } catch { } }, 15000);
     req.on("close", () => {
       clearInterval(keepAlive);
-      try { journal.kill(); } catch {}
+      try { journal.kill(); } catch { }
     });
   } catch (e) {
     res.status(500).send(`Exception: ${e.message}`);
@@ -3249,7 +3283,7 @@ app.get("/logs/sse", (req, res) => {
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no' // avoid buffering in some proxies
     });
-    if (res.flushHeaders) try { res.flushHeaders(); } catch {}
+    if (res.flushHeaders) try { res.flushHeaders(); } catch { }
     res.write('retry: 2000\n\n');
 
     const journal = spawn("journalctl", ["-u", "bot-wa", "-f", "--no-pager"]);
@@ -3274,10 +3308,10 @@ app.get("/logs/sse", (req, res) => {
       send(`Process error: ${err.message}`);
     });
 
-    const keepAlive = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 15000);
+    const keepAlive = setInterval(() => { try { res.write(': ping\n\n'); } catch { } }, 15000);
     const cleanup = () => {
       clearInterval(keepAlive);
-      try { journal.kill(); } catch {}
+      try { journal.kill(); } catch { }
     };
     req.on("close", cleanup);
   } catch (e) {
@@ -3374,10 +3408,10 @@ app.get('/api/dashboard/predictions', async (req, res) => {
         error: 'Failed to load database'
       });
     }
-    
+
     const transaksi = db.data.transaksi || [];
     const users = db.data.users || {};
-    
+
     // Monthly revenue prediction based on historical data
     const monthlyRevenue = {};
     transaksi.forEach(t => {
@@ -3386,11 +3420,11 @@ app.get('/api/dashboard/predictions', async (req, res) => {
         monthlyRevenue[month] = (monthlyRevenue[month] || 0) + (parseInt(t.totalBayar) || 0);
       }
     });
-    
+
     const monthlyData = Object.entries(monthlyRevenue)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, revenue]) => ({ month, revenue }));
-    
+
     // Simple linear regression for revenue prediction
     let predictedRevenue = 0;
     if (monthlyData.length >= 3) {
@@ -3401,11 +3435,11 @@ app.get('/api/dashboard/predictions', async (req, res) => {
         const growth = (curr.revenue - prev.revenue) / prev.revenue;
         return sum + growth;
       }, 0) / (recentMonths.length - 1);
-      
+
       const lastMonthRevenue = recentMonths[recentMonths.length - 1].revenue;
       predictedRevenue = Math.round(lastMonthRevenue * (1 + avgGrowth));
     }
-    
+
     // User growth prediction
     const monthlyUsers = {};
     Object.values(users).forEach(user => {
@@ -3414,11 +3448,11 @@ app.get('/api/dashboard/predictions', async (req, res) => {
         monthlyUsers[month] = (monthlyUsers[month] || 0) + 1;
       }
     });
-    
+
     const userGrowthData = Object.entries(monthlyUsers)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, count]) => ({ month, users: count }));
-    
+
     let predictedUsers = 0;
     if (userGrowthData.length >= 3) {
       const recentUserGrowth = userGrowthData.slice(-3);
@@ -3428,10 +3462,10 @@ app.get('/api/dashboard/predictions', async (req, res) => {
         const growth = curr.users - prev.users;
         return sum + growth;
       }, 0) / (recentUserGrowth.length - 1);
-      
+
       predictedUsers = Math.round(Math.max(0, avgUserGrowth));
     }
-    
+
     // Product demand prediction
     const productDemand = {};
     transaksi.forEach(t => {
@@ -3444,16 +3478,16 @@ app.get('/api/dashboard/predictions', async (req, res) => {
       }
       productDemand[t.id].weeklyData[week] = (productDemand[t.id].weeklyData[week] || 0) + (t.jumlah || 1);
     });
-    
+
     // Predict stock needs for top products
     const stockPredictions = Object.entries(productDemand)
       .map(([productId, data]) => {
         const weeklyValues = Object.values(data.weeklyData);
         if (weeklyValues.length < 2) return null;
-        
+
         const avgWeeklySales = weeklyValues.reduce((sum, val) => sum + val, 0) / weeklyValues.length;
         const predictedMonthlySales = Math.round(avgWeeklySales * 4.33); // Average weeks per month
-        
+
         return {
           productId,
           name: data.name,
@@ -3465,19 +3499,19 @@ app.get('/api/dashboard/predictions', async (req, res) => {
       .filter(Boolean)
       .sort((a, b) => b.predictedMonthlySales - a.predictedMonthlySales)
       .slice(0, 10);
-    
+
     // Churn risk analysis
     const churnRisk = Object.keys(users).map(userId => {
       const userTransactions = transaksi.filter(t => t.user === userId);
       if (userTransactions.length === 0) return null;
-      
+
       const lastTransaction = userTransactions.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
       const daysSinceLastPurchase = Math.floor((Date.now() - new Date(lastTransaction.date)) / (1000 * 60 * 60 * 24));
-      
+
       let riskLevel = 'low';
       if (daysSinceLastPurchase > 60) riskLevel = 'high';
       else if (daysSinceLastPurchase > 30) riskLevel = 'medium';
-      
+
       return {
         userId,
         username: users[userId]?.username || `User ${userId.slice(-4)}`,
@@ -3487,10 +3521,10 @@ app.get('/api/dashboard/predictions', async (req, res) => {
         transactionCount: userTransactions.length
       };
     })
-    .filter(Boolean)
-    .filter(user => user.riskLevel !== 'low')
-    .sort((a, b) => b.totalSpent - a.totalSpent);
-    
+      .filter(Boolean)
+      .filter(user => user.riskLevel !== 'low')
+      .sort((a, b) => b.totalSpent - a.totalSpent);
+
     // Market trends analysis
     const categoryTrends = {};
     transaksi.forEach(t => {
@@ -3499,12 +3533,12 @@ app.get('/api/dashboard/predictions', async (req, res) => {
       if (name.includes('netflix')) category = 'Streaming';
       else if (name.includes('capcut') || name.includes('canva')) category = 'Design';
       else if (name.includes('spotify') || name.includes('youtube')) category = 'Music';
-      
+
       const month = t.date.slice(0, 7);
       if (!categoryTrends[category]) categoryTrends[category] = {};
       categoryTrends[category][month] = (categoryTrends[category][month] || 0) + (t.jumlah || 1);
     });
-    
+
     res.json({
       success: true,
       data: {
@@ -3540,16 +3574,16 @@ app.get('/api/dashboard/predictions', async (req, res) => {
           ]
         },
         recommendations: [
-          predictedRevenue < monthlyData[monthlyData.length - 1]?.revenue ? 
+          predictedRevenue < monthlyData[monthlyData.length - 1]?.revenue ?
             'Revenue decline predicted - implement retention strategies' : null,
-          churnRisk.length > Object.keys(users).length * 0.2 ? 
+          churnRisk.length > Object.keys(users).length * 0.2 ?
             'High churn risk detected - focus on customer engagement' : null,
-          stockPredictions.some(p => p.recommendedStock > 50) ? 
+          stockPredictions.some(p => p.recommendedStock > 50) ?
             'High demand products identified - ensure adequate stock' : null
         ].filter(Boolean)
       }
     });
-    
+
   } catch (error) {
     console.error('Error in predictive analytics:', error);
     res.status(500).json({
@@ -3585,7 +3619,7 @@ if (require.main === module) {
       console.log(`ðŸš€ Dashboard API HTTP server running on port ${PORT}`);
       console.log(`ðŸ“± Access via: http://localhost:${PORT} or http://dash.nicola.id:${PORT}`);
     });
-    
+
     httpServer.on('error', (error) => {
       if (error.code === 'EADDRINUSE') {
         console.error(`âŒ Port ${PORT} is already in use. Please use a different port.`);
@@ -3635,7 +3669,7 @@ if (require.main === module) {
   console.log(`- GET /api/dashboard/transactions/search/:reffId`);
   console.log(`- GET /api/dashboard/transactions/recent?limit=20`);
   console.log(`- GET /api/dashboard/export/:format`);
-  
+
   console.log(`\nðŸ“Š Statistics & Analytics:`);
   console.log(`- GET /api/dashboard/users/stats`);
   console.log(`- GET /api/dashboard/products/stats`);
@@ -3645,7 +3679,7 @@ if (require.main === module) {
   console.log(`- GET /api/dashboard/finance/analytics`);
   console.log(`- GET /api/dashboard/realtime`);
   console.log(`- GET /api/dashboard/predictions`);
-  
+
   console.log(`\nðŸ“¦ Stock Management:`);
   console.log(`- GET /api/dashboard/products/stock`);
   console.log(`- GET /api/dashboard/products/stock/summary`);
@@ -3657,7 +3691,7 @@ if (require.main === module) {
   console.log(`- GET /api/dashboard/products/stock/export`);
   console.log(`- POST /api/dashboard/products/stock/bulk-update`);
   console.log(`- GET /api/dashboard/products/:productId/stock/details`);
-  
+
   console.log(`\n🧾 Receipt Management:`);
   console.log(`- GET /api/dashboard/receipts`);
   console.log(`- GET /api/dashboard/receipts/:reffId`);
@@ -3672,7 +3706,7 @@ if (require.main === module) {
 app.get('/api/dashboard/receipts', async (req, res) => {
   try {
     const receiptsDir = path.join(__dirname, 'receipts');
-    
+
     if (!fs.existsSync(receiptsDir)) {
       return res.json({
         success: true,
@@ -3686,12 +3720,12 @@ app.get('/api/dashboard/receipts', async (req, res) => {
 
     const files = fs.readdirSync(receiptsDir);
     const receiptFiles = files.filter(file => file.endsWith('.txt'));
-    
+
     const receipts = receiptFiles.map(file => {
       const reffId = file.replace('.txt', '');
       const filePath = path.join(receiptsDir, file);
       const stats = fs.statSync(filePath);
-      
+
       return {
         reffId: reffId,
         filename: file,
@@ -3724,7 +3758,7 @@ app.get('/api/dashboard/receipts', async (req, res) => {
 app.get('/api/dashboard/receipts/:reffId', async (req, res) => {
   try {
     const { reffId } = req.params;
-    
+
     const receiptResult = await getReceipt(reffId);
     if (!receiptResult.success) {
       return res.status(404).json({
@@ -3735,7 +3769,7 @@ app.get('/api/dashboard/receipts/:reffId', async (req, res) => {
 
     const content = receiptResult.content;
     const size = Buffer.byteLength(content, 'utf8');
-    
+
     res.json({
       success: true,
       data: {
@@ -3763,7 +3797,7 @@ app.get('/api/dashboard/receipts/:reffId', async (req, res) => {
 app.get('/api/dashboard/receipts/:reffId/download', async (req, res) => {
   try {
     const { reffId } = req.params;
-    
+
     const receiptResult = await getReceipt(reffId);
     if (!receiptResult.success) {
       return res.status(404).json({
@@ -3790,7 +3824,7 @@ app.get('/api/dashboard/receipts/:reffId/download', async (req, res) => {
 app.get('/api/dashboard/transactions/:reffId/with-receipt', async (req, res) => {
   try {
     const { reffId } = req.params;
-    
+
     const db = await loadDatabaseAsync();
     if (!db || !db.transaksi) {
       return res.status(404).json({
@@ -3810,7 +3844,7 @@ app.get('/api/dashboard/transactions/:reffId/with-receipt', async (req, res) => 
     // Get receipt content (from R2 or local)
     let receiptContent = null;
     let receiptExistsFlag = false;
-    
+
     const receiptResult = await getReceipt(reffId);
     if (receiptResult.success) {
       receiptContent = receiptResult.content;
@@ -3843,7 +3877,7 @@ app.get('/api/dashboard/transactions/:reffId/with-receipt', async (req, res) => 
 app.delete('/api/dashboard/receipts/:reffId', async (req, res) => {
   try {
     const { reffId } = req.params;
-    
+
     const existsResult = await receiptExists(reffId);
     if (!existsResult.exists) {
       return res.status(404).json({
@@ -3860,7 +3894,7 @@ app.delete('/api/dashboard/receipts/:reffId', async (req, res) => {
         error: deleteResult.error
       });
     }
-    
+
     res.json({
       success: true,
       message: 'Receipt deleted successfully'
@@ -3879,13 +3913,13 @@ app.delete('/api/dashboard/receipts/:reffId', async (req, res) => {
 // Helper function to format bytes
 function formatBytes(bytes, decimals = 2) {
   if (bytes === 0) return '0 Bytes';
-  
+
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-  
+
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 

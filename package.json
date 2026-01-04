@@ -29,7 +29,6 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.932.0",
-    "@dappaoffc/baileys": "^2.0.6",
     "awesome-phonenumber": "^2.69.0",
     "canvas": "^3.0.0",
     "chalk": "^4.1.2",

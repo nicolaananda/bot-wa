@@ -15,22 +15,22 @@
     --warning-gradient: linear-gradient(135deg, #ffaa00 0%, #ff6600 100%);
     --info-gradient: linear-gradient(135deg, #00ccff 0%, #0066ff 100%);
     --dark-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    
+
     /* Backgrounds */
     --bg-primary: #0f0f1e;
     --bg-secondary: rgba(26, 26, 46, 0.8);
     --bg-glass: rgba(255, 255, 255, 0.05);
     --bg-glass-hover: rgba(255, 255, 255, 0.1);
-    
+
     /* Text */
     --text-primary: #ffffff;
     --text-secondary: rgba(255, 255, 255, 0.7);
     --text-tertiary: rgba(255, 255, 255, 0.5);
-    
+
     /* Borders & Dividers */
     --border-color: rgba(255, 255, 255, 0.1);
     --border-glass: rgba(255, 255, 255, 0.2);
-    
+
     /* Shadows with color tints */
     --shadow-aurora: 0 8px 32px rgba(0, 245, 255, 0.15);
     --shadow-pink: 0 8px 32px rgba(255, 0, 153, 0.15);
@@ -39,19 +39,19 @@
     --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
     --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.6);
-    
+
     /* Radius */
     --radius-sm: 8px;
     --radius-md: 16px;
     --radius-lg: 24px;
     --radius-xl: 32px;
     --radius-full: 999px;
-    
+
     /* Liquid Glass Properties */
     --glass-blur: 20px;
     --glass-opacity: 0.1;
     --glass-border: 1px;
-    --glass-shine: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 50%, rgba(255,255,255,0.1) 100%);
+    --glass-shine: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, 0.1) 100%);
 }
 
 body {
@@ -74,7 +74,7 @@ body::before {
     left: 0;
     width: 200%;
     height: 200%;
-    background: 
+    background:
         radial-gradient(ellipse at 20% 30%, rgba(0, 245, 255, 0.15) 0%, transparent 50%),
         radial-gradient(ellipse at 80% 70%, rgba(153, 51, 255, 0.15) 0%, transparent 50%),
         radial-gradient(ellipse at 50% 50%, rgba(255, 0, 153, 0.1) 0%, transparent 50%);
@@ -86,6 +86,7 @@ body::before {
     0% {
         transform: translate(0, 0) rotate(0deg);
     }
+
     100% {
         transform: translate(-10%, -10%) rotate(5deg);
     }
@@ -136,7 +137,7 @@ body::before {
     left: -50%;
     width: 200%;
     height: 200%;
-    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
     opacity: 0;
     transition: opacity 0.4s ease, transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
     pointer-events: none;
@@ -145,7 +146,7 @@ body::before {
 .liquid-glass-elastic:hover {
     transform: translateY(-4px);
     border-color: rgba(255, 255, 255, 0.3);
-    box-shadow: 
+    box-shadow:
         0 20px 60px rgba(0, 0, 0, 0.4),
         0 0 40px rgba(0, 245, 255, 0.2),
         inset 0 0 20px rgba(255, 255, 255, 0.05);
@@ -191,7 +192,7 @@ body::before {
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: var(--radius-xl);
-    box-shadow: 
+    box-shadow:
         0 8px 32px rgba(0, 0, 0, 0.4),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
     position: relative;
@@ -205,28 +206,28 @@ body::before {
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, 
-        transparent 0%, 
-        rgba(255, 255, 255, 0.3) 50%, 
-        transparent 100%);
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.3) 50%,
+            transparent 100%);
 }
 
 /* Glow Effect */
 .glow-aurora {
-    box-shadow: 
+    box-shadow:
         0 0 20px rgba(0, 245, 255, 0.3),
         0 0 40px rgba(0, 245, 255, 0.2),
         0 0 60px rgba(153, 51, 255, 0.1);
 }
 
 .glow-pink {
-    box-shadow: 
+    box-shadow:
         0 0 20px rgba(255, 0, 153, 0.3),
         0 0 40px rgba(255, 0, 153, 0.2);
 }
 
 .glow-green {
-    box-shadow: 
+    box-shadow:
         0 0 20px rgba(0, 255, 136, 0.3),
         0 0 40px rgba(0, 255, 136, 0.2);
 }
@@ -375,6 +376,7 @@ body::before {
     0% {
         transform: translateX(100%);
     }
+
     100% {
         transform: translateX(-33.333%);
     }
@@ -903,7 +905,8 @@ body::before {
 .modal {
     display: none;
     position: fixed;
-    z-index: 1000;
+    z-index: 2000;
+    /* Higher than bottom-nav (1000) */
     left: 0;
     top: 0;
     width: 100%;
@@ -934,6 +937,7 @@ body::before {
         opacity: 0;
         transform: translateY(40px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -962,6 +966,15 @@ body::before {
     background: var(--danger-gradient);
     color: white;
     transform: rotate(90deg);
+}
+
+@media (max-width: 768px) {
+    .modal-content {
+        padding: 1.5rem;
+        width: 95%;
+        max-height: 85vh;
+        margin-bottom: 3rem;
+    }
 }
 
 .modal-content h2 {
@@ -1265,6 +1278,7 @@ body::before {
         opacity: 0;
         transform: translateY(-15px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -1283,6 +1297,7 @@ body::before {
     from {
         transform: scale(0);
     }
+
     to {
         transform: scale(1);
     }
@@ -1524,7 +1539,9 @@ body::before {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .loading-state {
@@ -1567,16 +1584,16 @@ body::before {
     .nav-links {
         gap: 0.25rem;
     }
-    
+
     .navbar-balance {
         margin: 0 0.25rem;
         padding: 0.4rem 0.75rem;
     }
-    
+
     .navbar-balance .balance-label {
         font-size: 0.8rem;
     }
-    
+
     .navbar-balance .balance-value {
         font-size: 0.85rem;
     }
@@ -1721,7 +1738,7 @@ body::before {
     .transaction-meta {
         font-size: 0.8rem;
     }
-    
+
     .transaction-actions {
         flex-direction: row;
         justify-content: space-between;
@@ -1775,7 +1792,8 @@ body::before {
         margin-top: 1.5rem;
     }
 
-    .btn-copy, .btn-secondary {
+    .btn-copy,
+    .btn-secondary {
         width: 100%;
         padding: 0.875rem 1.5rem;
     }
@@ -2093,6 +2111,7 @@ body::before {
 
 /* Improve touch targets for mobile */
 @media (hover: none) and (pointer: coarse) {
+
     /* Increase button sizes for better touch interaction */
     .btn-primary,
     .btn-secondary,
@@ -2566,6 +2585,7 @@ body::before {
         opacity: 0;
         transform: translateY(10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -2799,7 +2819,8 @@ body::before {
     .form-group select,
     .form-group textarea {
         min-height: 48px;
-        font-size: 16px; /* Prevents zoom on iOS */
+        font-size: 16px;
+        /* Prevents zoom on iOS */
     }
 
     .btn-primary,
@@ -2852,11 +2873,12 @@ body::before {
         margin: 0.5rem 0.5rem 0 0.5rem;
         animation: slideUpMobile 0.3s ease;
     }
-    
+
     @keyframes slideUpMobile {
         from {
             transform: translateY(100%);
         }
+
         to {
             transform: translateY(0);
         }
@@ -2879,7 +2901,7 @@ body::before {
         padding: 0.5rem;
         align-items: flex-end;
     }
-    
+
     .transaction-modal-content {
         width: 100%;
         max-width: 100%;
@@ -3054,24 +3076,25 @@ body::before {
         font-size: 0.875rem;
         word-break: break-word;
     }
-    
+
     /* Improve form elements on mobile */
     .form-group input,
     .form-group select,
     .form-group textarea {
-        font-size: 16px !important; /* Prevents zoom on iOS */
+        font-size: 16px !important;
+        /* Prevents zoom on iOS */
         padding: 0.875rem 1rem;
     }
-    
+
     .purchase-summary {
         padding: 1.25rem;
     }
-    
+
     .summary-row {
         font-size: 0.9rem;
         margin-bottom: 0.75rem;
     }
-    
+
     .summary-row.total {
         font-size: 1.125rem;
     }
@@ -3102,13 +3125,13 @@ body::before {
     right: -20%;
     width: 400px;
     height: 400px;
-    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
     border-radius: 50%;
 }
 
 .welcome-badge {
     display: inline-block;
-    background: rgba(255,255,255,0.2);
+    background: rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
     padding: 0.5rem 1.25rem;
     border-radius: 50px;
@@ -3137,6 +3160,7 @@ body::before {
         opacity: 0;
         transform: translateY(20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -3148,6 +3172,7 @@ body::before {
         opacity: 0;
         transform: translateY(-20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -3156,9 +3181,9 @@ body::before {
 
 /* Balance Card Hero */
 .balance-card-hero {
-    background: rgba(255,255,255,0.15);
+    background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: var(--radius-lg);
     padding: 2rem;
     animation: scaleIn 0.6s ease 0.3s both;
@@ -3169,6 +3194,7 @@ body::before {
         opacity: 0;
         transform: scale(0.9);
     }
+
     to {
         opacity: 1;
         transform: scale(1);
@@ -3278,7 +3304,7 @@ body::before {
     right: -50%;
     width: 200%;
     height: 200%;
-    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
     transition: transform 0.6s ease;
 }
 
@@ -3288,7 +3314,7 @@ body::before {
 
 .quick-action-card:hover {
     transform: translateY(-8px);
-    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
 
 .quick-card-content {
@@ -3484,6 +3510,7 @@ body::before {
         opacity: 0;
         transform: translateY(30px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -3612,8 +3639,15 @@ body::before {
 }
 
 @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
 }
 
 .empty-state-modern h3 {
@@ -3643,7 +3677,7 @@ body::before {
 
 .hero-badge {
     display: inline-block;
-    background: rgba(255,255,255,0.2);
+    background: rgba(255, 255, 255, 0.2);
     padding: 0.5rem 1rem;
     border-radius: 50px;
     font-size: 0.875rem;
@@ -3663,9 +3697,9 @@ body::before {
 }
 
 .balance-widget {
-    background: rgba(255,255,255,0.15);
+    background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     padding: 1.5rem;
     border-radius: var(--radius-lg);
     display: flex;
@@ -3739,7 +3773,7 @@ body::before {
     transition: width 0.3s ease;
 }
 
-.search-input-modern:focus + .search-animation {
+.search-input-modern:focus+.search-animation {
     width: 100%;
 }
 
@@ -3774,7 +3808,7 @@ body::before {
     left: -50%;
     width: 200%;
     height: 200%;
-    background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
+    background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
     transition: transform 0.6s;
     pointer-events: none;
 }
@@ -3946,7 +3980,9 @@ body::before {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Mobile Responsive for New Design */
@@ -3988,12 +4024,12 @@ body::before {
         grid-template-columns: 1fr;
         gap: 0.75rem;
     }
-    
+
     .search-box-transaction input {
         padding: 0.875rem 1rem 0.875rem 2.75rem;
         font-size: 0.95rem;
     }
-    
+
     .select-filter {
         padding: 0.875rem 1rem;
         font-size: 0.9rem;
@@ -4015,7 +4051,7 @@ body::before {
     .products-hero-title {
         font-size: 1.75rem;
     }
-    
+
     .products-hero-subtitle {
         font-size: 0.95rem;
     }
@@ -4048,7 +4084,7 @@ body::before {
     body {
         font-size: 14px;
     }
-    
+
     .container {
         padding: 1rem;
     }
@@ -4062,7 +4098,7 @@ body::before {
         font-size: 1.5rem;
         letter-spacing: -1px;
     }
-    
+
     .products-hero {
         padding: 1.25rem;
     }
@@ -4070,7 +4106,7 @@ body::before {
     .quick-action-card h3 {
         font-size: 1.125rem;
     }
-    
+
     .quick-action-card p {
         font-size: 0.85rem;
     }
@@ -4080,7 +4116,7 @@ body::before {
         text-align: center;
         padding: 1rem;
     }
-    
+
     .balance-widget-value {
         font-size: 1.25rem;
     }
@@ -4095,172 +4131,172 @@ body::before {
         justify-content: center;
         padding: 0.75rem 1.25rem;
     }
-    
+
     .transaction-card-modern {
         padding: 1.25rem;
     }
-    
+
     .transaction-title {
         font-size: 1rem;
     }
-    
+
     .transaction-price {
         font-size: 1.125rem;
     }
-    
+
     .btn-view-detail {
         padding: 0.5rem 1rem;
         font-size: 0.8rem;
     }
-    
+
     /* Modal improvements for very small screens */
     .modal-content {
         max-height: 95vh;
     }
-    
+
     .transaction-modal-content {
         max-height: 95vh;
     }
-    
+
     .transaction-modal-content .modal-header {
         padding: 0.875rem 1rem;
         min-height: 56px;
     }
-    
+
     .transaction-modal-content .modal-header h2 {
         font-size: 0.95rem;
         line-height: 1.3;
     }
-    
+
     .btn-copy-header {
         padding: 0.4rem 0.75rem;
         font-size: 0.7rem;
     }
-    
+
     .modal-body {
         padding: 0.875rem 1rem;
         max-height: calc(95vh - 130px);
     }
-    
+
     .modal-actions-bottom {
         padding: 0.875rem 1rem;
     }
-    
+
     .account-info-header {
         padding: 0.875rem;
     }
-    
+
     .account-info-header h3 {
         font-size: 0.95rem;
     }
-    
+
     .info-item {
         font-size: 0.8rem;
         line-height: 1.5;
     }
-    
+
     .account-details-list {
         padding: 0.875rem;
     }
-    
+
     .account-detail-item {
         padding: 0.875rem;
     }
-    
+
     .detail-line {
         font-size: 0.8rem;
         gap: 0.375rem;
     }
-    
+
     .detail-label {
         min-width: 65px;
         font-size: 0.75rem;
     }
-    
+
     .detail-value {
         font-size: 0.8rem;
     }
-    
+
     .payment-info {
         padding: 0.875rem;
     }
-    
+
     .payment-row {
         font-size: 0.8rem;
     }
-    
+
     .snk-container {
         padding: 0.875rem;
     }
-    
+
     .snk-title {
         font-size: 0.8rem;
     }
-    
+
     .snk-content {
         font-size: 0.75rem;
     }
-    
+
     .snk-item {
         font-size: 0.75rem;
         padding: 0.375rem 0;
     }
-    
+
     /* Navbar improvements */
     .nav-brand {
         font-size: 1.125rem;
     }
-    
+
     /* Search improvements */
     .search-input-modern {
         padding: 1rem 1rem 1rem 3rem;
         font-size: 0.9rem;
     }
-    
+
     .search-icon {
         font-size: 1.125rem;
         left: 1rem;
     }
-    
+
     /* Card spacing */
     .product-card-new {
         border-radius: var(--radius-lg);
     }
-    
+
     .product-content-new {
         padding: 1.25rem;
     }
-    
+
     .product-title-new {
         font-size: 1.125rem;
     }
-    
+
     .product-desc-new {
         font-size: 0.875rem;
     }
-    
+
     .price-value {
         font-size: 1.375rem;
     }
-    
+
     /* Form improvements */
     .purchase-summary {
         padding: 1rem;
     }
-    
+
     .summary-row {
         font-size: 0.85rem;
     }
-    
+
     .summary-row.total {
         font-size: 1rem;
     }
-    
+
     /* Page header */
     .page-header h1 {
         font-size: 1.625rem;
     }
-    
+
     .page-header p {
         font-size: 0.9rem;
     }
@@ -4289,15 +4325,22 @@ body::before {
     width: 100%;
     height: 100%;
     pointer-events: none;
-    background: 
+    background:
         radial-gradient(circle at 30% 40%, rgba(0, 245, 255, 0.1) 0%, transparent 50%),
         radial-gradient(circle at 70% 60%, rgba(255, 0, 153, 0.1) 0%, transparent 50%);
     animation: particles-float 8s ease-in-out infinite;
 }
 
 @keyframes particles-float {
-    0%, 100% { transform: translate(0, 0); }
-    50% { transform: translate(10px, -10px); }
+
+    0%,
+    100% {
+        transform: translate(0, 0);
+    }
+
+    50% {
+        transform: translate(10px, -10px);
+    }
 }
 
 .hero-content-new {
@@ -4318,9 +4361,19 @@ body::before {
 }
 
 @keyframes wave {
-    0%, 100% { transform: rotate(0deg); }
-    25% { transform: rotate(20deg); }
-    75% { transform: rotate(-20deg); }
+
+    0%,
+    100% {
+        transform: rotate(0deg);
+    }
+
+    25% {
+        transform: rotate(20deg);
+    }
+
+    75% {
+        transform: rotate(-20deg);
+    }
 }
 
 .hero-title-aurora {
@@ -4584,7 +4637,7 @@ body::before {
 .personal-stat-card:hover {
     transform: translateY(-8px);
     border-color: rgba(255, 255, 255, 0.3);
-    box-shadow: 
+    box-shadow:
         0 20px 60px rgba(0, 0, 0, 0.4),
         0 0 40px rgba(0, 245, 255, 0.15);
 }
@@ -4917,7 +4970,7 @@ body::before {
 .audit-log-item:hover {
     transform: translateX(8px);
     border-color: rgba(255, 255, 255, 0.3);
-    box-shadow: 
+    box-shadow:
         0 8px 32px rgba(0, 0, 0, 0.3),
         0 0 20px rgba(0, 245, 255, 0.1);
 }
@@ -5016,7 +5069,7 @@ body::before {
     border-radius: 50%;
     animation: spin 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
     margin: 0 auto 1.5rem;
-    box-shadow: 
+    box-shadow:
         0 0 20px rgba(0, 245, 255, 0.5),
         inset 0 0 20px rgba(153, 51, 255, 0.3);
 }
@@ -5153,23 +5206,35 @@ body::before {
 
 /* Prevent horizontal overflow on all mobile devices */
 @media (max-width: 768px) {
-    html, body {
+
+    html,
+    body {
         overflow-x: hidden;
         width: 100%;
         position: relative;
     }
-    
+
     * {
         max-width: 100%;
     }
-    
+
     /* Ensure all text wraps properly */
-    h1, h2, h3, h4, h5, h6, p, span, div, a, button {
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p,
+    span,
+    div,
+    a,
+    button {
         word-wrap: break-word;
         overflow-wrap: break-word;
         hyphens: auto;
     }
-    
+
     /* Prevent text overflow in containers */
     .container,
     .modal-content,
@@ -5181,7 +5246,7 @@ body::before {
     .account-detail-item {
         overflow: hidden;
     }
-    
+
     /* Ensure long URLs/emails don't cause overflow */
     .detail-value,
     .info-value,
@@ -5190,7 +5255,7 @@ body::before {
         word-break: break-all;
         overflow-wrap: anywhere;
     }
-    
+
     /* Improve button sizing on mobile */
     button,
     .btn-primary,
@@ -5199,26 +5264,27 @@ body::before {
     .btn-buy-new,
     .btn-view-detail,
     .btn-view-account {
-        min-height: 44px; /* iOS recommended touch target size */
+        min-height: 44px;
+        /* iOS recommended touch target size */
         padding: 0.75rem 1.25rem;
         font-size: 0.95rem;
         white-space: normal;
         text-align: center;
     }
-    
+
     /* Improve link sizing */
     a {
         min-height: 40px;
         display: inline-flex;
         align-items: center;
     }
-    
+
     /* Ensure modals don't overflow screen */
     .modal {
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
     }
-    
+
     /* Improve table/grid responsiveness */
     .stats-grid,
     .product-grid,
@@ -5230,18 +5296,18 @@ body::before {
         grid-template-columns: 1fr !important;
         gap: 1rem;
     }
-    
+
     /* Improve spacing on mobile */
     .container {
         padding: 1rem;
     }
-    
+
     /* Ensure images don't overflow */
     img {
         max-width: 100%;
         height: auto;
     }
-    
+
     /* Better touch scrolling */
     .modal-body,
     .account-details-section,
@@ -5251,7 +5317,7 @@ body::before {
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
     }
-    
+
     /* Prevent zoom on input focus (iOS) */
     input[type="text"],
     input[type="password"],
@@ -5262,18 +5328,18 @@ body::before {
     textarea {
         font-size: 16px !important;
     }
-    
+
     /* Better visibility for form elements */
     .form-group {
         margin-bottom: 1rem;
     }
-    
+
     .form-group label {
         font-size: 0.9rem;
         margin-bottom: 0.5rem;
         display: block;
     }
-    
+
     /* Improve toast visibility on mobile */
     .toast {
         left: 1.25rem;
@@ -5285,12 +5351,12 @@ body::before {
         padding: 1rem 1.25rem;
         border-radius: 12px;
     }
-    
+
     .toast.show {
         bottom: 1.5rem;
         bottom: calc(1.5rem + env(safe-area-inset-bottom));
     }
-    
+
     /* Better navbar on mobile */
     .navbar {
         padding: 0.875rem 1rem;
@@ -5298,7 +5364,7 @@ body::before {
         top: 0;
         z-index: 100;
     }
-    
+
     /* Improve section spacing */
     .section-title-glass,
     .section-title {
@@ -5306,7 +5372,7 @@ body::before {
         margin-bottom: 1.25rem;
         line-height: 1.3;
     }
-    
+
     /* Better card spacing */
     .settings-card,
     .admin-card,
@@ -5315,14 +5381,14 @@ body::before {
         padding: 1.25rem;
         margin-bottom: 1rem;
     }
-    
+
     /* Improve action cards */
     .action-card-liquid,
     .quick-action-card {
         padding: 1.5rem;
         text-align: center;
     }
-    
+
     /* Better empty states */
     .empty-state-modern,
     .empty-state,
@@ -5330,7 +5396,7 @@ body::before {
     .loading-state {
         padding: 2rem 1rem;
     }
-    
+
     .empty-icon {
         font-size: 3.5rem;
     }
@@ -5341,22 +5407,22 @@ body::before {
     .container {
         padding: 0.75rem;
     }
-    
+
     .modal-body {
         padding: 0.75rem;
     }
-    
+
     .transaction-modal-content .modal-header {
         padding: 0.75rem;
         flex-wrap: wrap;
     }
-    
+
     .btn-copy-header {
         flex: 1 0 100%;
         order: 3;
         margin-top: 0.5rem;
     }
-    
+
     .account-info-header,
     .account-details-list,
     .account-detail-item,
@@ -5364,25 +5430,25 @@ body::before {
     .snk-container {
         padding: 0.75rem;
     }
-    
+
     .detail-line {
         font-size: 0.75rem;
         flex-direction: column;
         align-items: flex-start;
         gap: 0.25rem;
     }
-    
+
     .detail-label {
         min-width: 0;
         font-weight: 700;
     }
-    
+
     .hero-title-aurora,
     .products-hero-title,
     .hero-title {
         font-size: 1.375rem;
     }
-    
+
     button {
         font-size: 0.875rem;
     }
@@ -5429,7 +5495,7 @@ body::before {
 }
 
 .payment-option.selected .payment-option-label,
-.payment-option input[type="radio"]:checked + .payment-option-label {
+.payment-option input[type="radio"]:checked+.payment-option-label {
     border-color: #6366f1;
     background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
     box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
@@ -5443,7 +5509,7 @@ body::before {
 }
 
 .payment-option.selected .payment-option-icon,
-.payment-option input[type="radio"]:checked ~ .payment-option-label .payment-option-icon {
+.payment-option input[type="radio"]:checked~.payment-option-label .payment-option-icon {
     filter: grayscale(0);
     transform: scale(1.1);
 }
@@ -5502,24 +5568,24 @@ body::before {
     .payment-method-selector {
         gap: 0.875rem;
     }
-    
+
     .payment-option-label {
         padding: 1rem;
         gap: 0.875rem;
     }
-    
+
     .payment-option-icon {
         font-size: 2rem;
     }
-    
+
     .payment-option-content strong {
         font-size: 1rem;
     }
-    
+
     .payment-option-content small {
         font-size: 0.8rem;
     }
-    
+
     .payment-saldo-info,
     .payment-buynow-badge {
         font-size: 0.8rem;
@@ -5534,15 +5600,15 @@ body::before {
         flex-direction: column;
         text-align: center;
     }
-    
+
     .payment-option-icon {
         font-size: 2.5rem;
     }
-    
+
     .payment-option-content {
         align-items: center;
     }
-    
+
     .payment-saldo-info,
     .payment-buynow-badge {
         align-self: center;
@@ -6004,12 +6070,12 @@ body::before {
     .dashboard-header h1 {
         font-size: 1.5rem;
     }
-    
+
     .running-text-container {
         margin: -1rem 0 1.5rem 0;
         padding: 0.625rem 0;
     }
-    
+
     .running-text span {
         font-size: 0.85rem;
         padding: 0 1.5rem;
@@ -6195,7 +6261,8 @@ body .product-card-new {
 }
 
 .product-card-shine {
-    display: none; /* Hide shine effect for simplicity */
+    display: none;
+    /* Hide shine effect for simplicity */
 }
 
 .product-image-placeholder {
@@ -6377,8 +6444,167 @@ body .product-card-new {
     font-size: 1rem;
 }
 
-/* Mobile Responsive for Products */
+/* ============================================
+   BOTTOM NAVIGATION - Mobile Only
+   ============================================ */
+
+.bottom-nav {
+    display: none;
+    /* Hidden on desktop */
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(26, 26, 46, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 1000;
+    padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.bottom-nav-inner {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 0.5rem;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    flex: 1;
+}
+
+.nav-item.active {
+    color: var(--text-primary);
+}
+
+.nav-item.active .nav-icon {
+    background: rgba(255, 255, 255, 0.1);
+    color: #00f5ff;
+}
+
+.nav-icon {
+    font-size: 1.25rem;
+    padding: 0.5rem;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-text {
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+/* Mobile Utilities */
+.mobile-only {
+    display: none !important;
+}
+
+.desktop-only {
+    display: block !important;
+}
+
+/* ============================================
+   MOBILE RESPONSIVENESS (max-width: 768px)
+   ============================================ */
 @media (max-width: 768px) {
+
+    /* Hide Desktop Navbar */
+    .navbar {
+        display: none !important;
+    }
+
+    /* Show Bottom Nav */
+    .bottom-nav {
+        display: block;
+    }
+
+    /* Show/Hide Utilities */
+    .mobile-only {
+        display: flex !important;
+    }
+
+    div.mobile-only {
+        display: block !important;
+    }
+
+    span.mobile-only {
+        display: inline-block !important;
+    }
+
+    .desktop-only {
+        display: none !important;
+    }
+
+    /* Adjust Body Padding for Bottom Nav */
+    body {
+        padding-bottom: 80px;
+        /* Space for bottom nav */
+    }
+
+    /* Adjust Container Padding */
+    .container {
+        padding: 1.5rem 1rem;
+    }
+
+    /* Mobile Header adjustments */
+    .page-header {
+        margin-bottom: 1.5rem;
+    }
+
+    .page-header h1 {
+        font-size: 1.75rem;
+    }
+
+    /* Balance Card for Mobile (Replacement for Navbar Balance) */
+    .mobile-balance-card {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .mobile-balance-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .mobile-balance-label {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+
+    .mobile-balance-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    /* Global Adjustments */
+    .product-grid-modern {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 0.75rem;
+    }
+
     .products-header-simple {
         flex-direction: column;
         align-items: flex-start;
@@ -6392,11 +6618,6 @@ body .product-card-new {
     .balance-simple {
         width: 100%;
         justify-content: space-between;
-    }
-
-    .product-grid-modern {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        gap: 0.75rem;
     }
 
     .product-image-placeholder {
@@ -6427,7 +6648,7 @@ body .product-card-new {
         gap: 0.625rem;
         min-height: auto;
     }
-    
+
     .btn-buy-new {
         width: 100%;
         padding: 0.625rem;

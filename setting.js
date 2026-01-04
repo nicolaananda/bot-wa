@@ -104,6 +104,14 @@ global.listener = {
   apiKey: process.env.LISTENER_API_KEY || "kodeku"
 }
 
+// Gowa WhatsApp Service Configuration
+global.gowaConfig = {
+  apiUrl: process.env.GOWA_API_URL || 'https://gowa2.nicola.id',
+  apiKey: process.env.GOWA_API_KEY || 'apiku',
+  deviceId: process.env.GOWA_DEVICE_ID || 'default',
+  webhookSecret: process.env.GOWA_WEBHOOK_SECRET || ''
+}
+
 //Function buat menu
 const fs = require("fs");
 const chalk = require('chalk');

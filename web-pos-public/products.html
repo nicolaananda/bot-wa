@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
@@ -25,40 +26,47 @@
             margin: 0 auto;
             max-width: 280px;
         }
-        
+
         .payment-countdown-indicator:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
         }
-        
+
         .countdown-icon {
             font-size: 1.5rem;
             animation: pulse 2s infinite;
         }
-        
+
         @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
         }
-        
+
         .countdown-content {
             display: flex;
             flex-direction: column;
             gap: 2px;
         }
-        
+
         .countdown-label {
             font-size: 0.75rem;
             opacity: 0.9;
             font-weight: 500;
         }
-        
+
         .countdown-timer {
             font-size: 1rem;
             font-weight: 700;
             letter-spacing: 1px;
         }
-        
+
         /* Payment Modal Content */
         .payment-modal-content {
             max-width: 420px;
@@ -68,26 +76,26 @@
             margin: 1rem auto;
             padding: 0;
         }
-        
+
         .payment-modal-content h2 {
             font-size: 1rem;
             font-weight: 600;
             margin: 0 0 0.75rem 0;
             padding: 0.875rem 1rem 0;
         }
-        
+
         .payment-modal-content .modal-close {
             top: 0.625rem;
             right: 0.625rem;
         }
-        
+
         .payment-info-container {
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
             padding: 0 1rem 0.875rem;
         }
-        
+
         .payment-countdown-box {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -96,13 +104,13 @@
             text-align: center;
             box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
         }
-        
+
         .countdown-label {
             font-size: 0.8rem;
             opacity: 0.9;
             margin-bottom: 0.25rem;
         }
-        
+
         .countdown-display {
             font-size: 1.5rem;
             font-weight: 700;
@@ -110,27 +118,27 @@
             margin: 0.25rem 0;
             text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
-        
+
         .countdown-warning {
             font-size: 0.7rem;
             font-weight: 600;
             min-height: 14px;
             margin-top: 0.25rem;
         }
-        
+
         .order-info-box {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
             padding: 0.875rem 1rem;
             border-radius: 10px;
         }
-        
+
         .order-info-box h3 {
             margin: 0 0 0.625rem 0;
             color: var(--text-primary);
             font-size: 0.9rem;
         }
-        
+
         .order-detail-row {
             display: flex;
             justify-content: space-between;
@@ -138,11 +146,11 @@
             border-bottom: 1px solid var(--border-color);
             font-size: 0.85rem;
         }
-        
+
         .order-detail-row:last-child {
             border-bottom: none;
         }
-        
+
         .order-detail-row.total-row {
             background: rgba(99, 102, 241, 0.1);
             padding: 0.75rem;
@@ -150,12 +158,12 @@
             border-radius: 0 0 8px 8px;
             border-bottom: none;
         }
-        
+
         .order-detail-row.total-row strong {
             font-size: 1rem;
             color: var(--primary);
         }
-        
+
         .unique-code-info {
             margin-top: 0.625rem;
             padding: 0.625rem;
@@ -164,7 +172,7 @@
             text-align: center;
             font-size: 0.8rem;
         }
-        
+
         .qris-image-container {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -172,14 +180,14 @@
             border-radius: 10px;
             text-align: center;
         }
-        
+
         .qris-label {
             font-weight: 600;
             margin-bottom: 0.75rem;
             color: var(--text-primary);
             font-size: 0.9rem;
         }
-        
+
         .qris-image-wrapper {
             width: 100%;
             max-width: 220px;
@@ -192,42 +200,42 @@
             justify-content: center;
             box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
         }
-        
+
         .loading-spinner {
             color: var(--text-secondary);
             font-size: 1rem;
         }
-        
+
         .error-message {
             color: #ef4444;
             font-weight: 600;
         }
-        
+
         .payment-instructions {
             background: rgba(99, 102, 241, 0.05);
             padding: 0.875rem 1rem;
             border-radius: 10px;
             border-left: 3px solid var(--primary);
         }
-        
+
         .payment-instructions h4 {
             margin: 0 0 0.625rem 0;
             color: var(--text-primary);
             font-size: 0.9rem;
         }
-        
+
         .payment-instructions ol {
             margin: 0;
             padding-left: 1.125rem;
         }
-        
+
         .payment-instructions li {
             margin-bottom: 0.375rem;
             line-height: 1.4;
             color: var(--text-primary);
             font-size: 0.8rem;
         }
-        
+
         .payment-status-box {
             background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
             color: white;
@@ -240,16 +248,16 @@
             gap: 0.625rem;
             box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
         }
-        
+
         .status-icon {
             font-size: 1.25rem;
         }
-        
+
         .status-text {
             font-size: 0.9rem;
             font-weight: 600;
         }
-        
+
         /* Mobile Responsiveness */
         @media (max-width: 768px) {
             .payment-countdown-indicator {
@@ -257,63 +265,63 @@
                 gap: 8px;
                 max-width: 220px;
             }
-            
+
             .countdown-icon {
                 font-size: 1.2rem;
             }
-            
+
             .countdown-label {
                 font-size: 0.7rem;
             }
-            
+
             .countdown-timer {
                 font-size: 0.9rem;
             }
-            
+
             .payment-modal-content {
                 max-width: calc(100% - 1rem);
                 width: calc(100% - 1rem);
                 max-height: 95vh;
                 margin: 0.5rem;
             }
-            
+
             .payment-info-container {
                 padding: 0 0.875rem 0.75rem;
                 gap: 0.625rem;
             }
-            
+
             .payment-modal-content h2 {
                 padding: 0.75rem 0.875rem 0;
                 font-size: 0.95rem;
                 margin-bottom: 0.625rem;
             }
-            
+
             .payment-countdown-box {
                 padding: 0.5rem 0.75rem;
             }
-            
+
             .countdown-label {
                 font-size: 0.75rem;
                 margin-bottom: 0.125rem;
             }
-            
+
             .countdown-display {
                 font-size: 1.25rem;
                 letter-spacing: 1px;
                 margin: 0.125rem 0;
             }
-            
+
             .countdown-warning {
                 font-size: 0.65rem;
                 min-height: 12px;
                 margin-top: 0.125rem;
             }
-            
+
             .qris-image-wrapper {
                 height: 180px;
                 max-width: 180px;
             }
-            
+
             .payment-countdown-box,
             .order-info-box,
             .qris-image-container,
@@ -321,43 +329,43 @@
             .payment-status-box {
                 padding: 0.75rem 0.875rem;
             }
-            
+
             .order-info-box h3,
             .qris-label {
                 font-size: 0.85rem;
                 margin-bottom: 0.5rem;
             }
-            
+
             .order-detail-row {
                 font-size: 0.8rem;
                 padding: 0.25rem 0;
             }
-            
+
             .order-detail-row.total-row {
                 margin: 0.5rem -0.875rem -0.875rem -0.875rem;
                 padding: 0.625rem;
             }
-            
+
             .payment-instructions h4 {
                 font-size: 0.85rem;
                 margin-bottom: 0.5rem;
             }
-            
+
             .payment-instructions li {
                 font-size: 0.75rem;
                 margin-bottom: 0.25rem;
             }
-            
+
             .status-text {
                 font-size: 0.8rem;
             }
-            
+
             div[style*="margin-top: 0.75rem"] {
                 padding: 0 0.875rem 0.875rem !important;
                 margin-top: 0.625rem !important;
             }
         }
-        
+
         @media (max-width: 480px) {
             .payment-modal-content {
                 max-width: calc(100% - 0.75rem);
@@ -365,40 +373,40 @@
                 max-height: 95vh;
                 margin: 0.375rem;
             }
-            
+
             .payment-info-container {
                 padding: 0 0.75rem 0.625rem;
                 gap: 0.5rem;
             }
-            
+
             .payment-modal-content h2 {
                 padding: 0.625rem 0.75rem 0;
                 font-size: 0.9rem;
                 margin-bottom: 0.5rem;
             }
-            
+
             .payment-countdown-box {
                 padding: 0.5rem 0.625rem;
             }
-            
+
             .countdown-label {
                 font-size: 0.7rem;
             }
-            
+
             .countdown-display {
                 font-size: 1.1rem;
                 margin: 0.125rem 0;
             }
-            
+
             .countdown-warning {
                 font-size: 0.6rem;
             }
-            
+
             .qris-image-wrapper {
                 height: 160px;
                 max-width: 160px;
             }
-            
+
             .payment-countdown-box,
             .order-info-box,
             .qris-image-container,
@@ -406,17 +414,17 @@
             .payment-status-box {
                 padding: 0.625rem 0.75rem;
             }
-            
+
             .order-detail-row.total-row {
                 margin: 0.5rem -0.75rem -0.75rem -0.75rem;
             }
-            
+
             div[style*="margin-top: 0.75rem"] {
                 padding: 0 0.75rem 0.75rem !important;
                 margin-top: 0.5rem !important;
             }
         }
-        
+
         /* Confirmation Modal */
         .confirm-modal-overlay {
             position: fixed;
@@ -432,7 +440,7 @@
             z-index: 10000;
             padding: 1rem;
         }
-        
+
         .confirm-modal {
             background: rgba(26, 26, 46, 0.95);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -441,36 +449,36 @@
             width: 100%;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
-        
+
         .confirm-modal-content {
             padding: 1.5rem;
             text-align: center;
         }
-        
+
         .confirm-icon {
             font-size: 3rem;
             margin-bottom: 1rem;
         }
-        
+
         .confirm-modal-content h3 {
             color: var(--text-primary);
             font-size: 1.25rem;
             font-weight: 700;
             margin: 0 0 0.75rem 0;
         }
-        
+
         .confirm-modal-content p {
             color: var(--text-secondary);
             font-size: 0.95rem;
             line-height: 1.5;
             margin: 0 0 1.5rem 0;
         }
-        
+
         .confirm-actions {
             display: flex;
             gap: 0.75rem;
         }
-        
+
         .confirm-btn-cancel,
         .confirm-btn-ok {
             flex: 1;
@@ -482,68 +490,68 @@
             transition: all 0.2s ease;
             border: none;
         }
-        
+
         .confirm-btn-cancel {
             background: rgba(255, 255, 255, 0.1);
             color: var(--text-primary);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        
+
         .confirm-btn-cancel:hover {
             background: rgba(255, 255, 255, 0.15);
         }
-        
+
         .confirm-btn-ok {
             background: rgba(239, 68, 68, 0.2);
             color: #ef4444;
             border: 1px solid rgba(239, 68, 68, 0.3);
         }
-        
+
         .confirm-btn-ok:hover {
             background: rgba(239, 68, 68, 0.3);
             border-color: rgba(239, 68, 68, 0.5);
         }
-        
+
         @media (max-width: 480px) {
             .confirm-modal {
                 max-width: calc(100% - 2rem);
             }
-            
+
             .confirm-modal-content {
                 padding: 1.25rem;
             }
-            
+
             .confirm-icon {
                 font-size: 2.5rem;
                 margin-bottom: 0.75rem;
             }
-            
+
             .confirm-modal-content h3 {
                 font-size: 1.1rem;
             }
-            
+
             .confirm-modal-content p {
                 font-size: 0.9rem;
             }
-            
+
             .confirm-actions {
                 flex-direction: column;
             }
         }
-        
+
         /* Product Card Pricing */
         .product-price-new {
             display: flex;
             flex-direction: column;
             gap: 4px;
         }
-        
+
         .price-label {
             font-size: 0.85rem;
             color: var(--text-secondary);
             font-weight: 500;
         }
-        
+
         .price-value {
             font-size: 1.25rem;
             font-weight: 700;
@@ -553,7 +561,7 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-        
+
         .product-footer-new {
             display: flex;
             justify-content: space-between;
@@ -562,13 +570,13 @@
             border-top: 1px solid var(--border-color);
             gap: 12px;
         }
-        
+
         @media (max-width: 768px) {
             .price-value {
                 font-size: 1.1rem;
             }
         }
-        
+
         /* Product Filter Buttons */
         .product-filters-container {
             margin: 1.5rem 0;
@@ -577,7 +585,7 @@
             gap: 0.75rem;
             align-items: center;
         }
-        
+
         .filter-btn {
             display: inline-flex;
             align-items: center;
@@ -593,35 +601,35 @@
             transition: all 0.3s ease;
             white-space: nowrap;
         }
-        
+
         .filter-btn:hover {
             border-color: var(--primary);
             background: rgba(99, 102, 241, 0.1);
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
         }
-        
+
         .filter-btn.active {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border-color: transparent;
             box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
         }
-        
+
         .filter-btn.active:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
         }
-        
+
         .filter-btn span:first-child {
             font-size: 1.1rem;
         }
-        
+
         @media (max-width: 768px) {
             .product-filters-container {
                 gap: 0.5rem;
             }
-            
+
             .filter-btn {
                 padding: 0.5rem 1rem;
                 font-size: 0.85rem;
@@ -629,25 +637,27 @@
         }
     </style>
 </head>
+
 <body>
     <nav class="navbar" id="mainNavbar" style="display: none;">
         <div class="nav-brand">🤖 GiHa Smart Bot</div>
-        
+
         <!-- Payment Countdown Indicator -->
-        <div id="paymentCountdown" class="payment-countdown-indicator" style="display: none;" onclick="reopenPaymentModal()">
+        <div id="paymentCountdown" class="payment-countdown-indicator" style="display: none;"
+            onclick="reopenPaymentModal()">
             <span class="countdown-icon">⏰</span>
             <div class="countdown-content">
                 <div class="countdown-label">Menunggu Pembayaran</div>
                 <div class="countdown-timer" id="navCountdownTimer">--:--</div>
             </div>
         </div>
-        
+
         <!-- User Balance in Navbar -->
         <div class="navbar-balance">
             <span class="balance-label">Saldo:</span>
             <span class="balance-value" id="navbarBalance">Rp 0</span>
         </div>
-        
+
         <button class="nav-toggle" onclick="toggleMenu()" aria-label="Toggle menu">
             <span id="menuIcon">☰</span>
         </button>
@@ -666,9 +676,19 @@
             <h1>Produk Digital</h1>
         </div>
 
+        <!-- Mobile Balance Card (Visible only on Mobile) -->
+        <div class="mobile-only mobile-balance-card">
+            <div class="mobile-balance-info">
+                <span class="mobile-balance-label">Total Saldo</span>
+                <span class="mobile-balance-value" id="mobileBalance">Rp 0</span>
+            </div>
+            <div class="balance-icon" style="font-size: 2rem;">💰</div>
+        </div>
+
         <!-- Simple Search Bar -->
         <div class="search-simple">
-            <input type="text" id="searchInput" class="search-input-simple" placeholder="🔍 Cari produk..." onkeyup="filterProducts()">
+            <input type="text" id="searchInput" class="search-input-simple" placeholder="🔍 Cari produk..."
+                onkeyup="filterProducts()">
         </div>
 
         <!-- Product Filter Buttons -->
@@ -694,7 +714,7 @@
         <div class="modal-content">
             <span class="modal-close" onclick="closePurchaseModal()">&times;</span>
             <h2>Konfirmasi Pembelian</h2>
-            
+
             <div class="product-detail">
                 <h3 id="modalProductName"></h3>
                 <p id="modalProductDesc"></p>
@@ -719,17 +739,20 @@
                     <span id="totalPrice">Rp 0</span>
                 </div>
             </div>
-            
+
             <!-- User Balance Info -->
-            <div class="user-balance-info" style="background: rgba(99, 102, 241, 0.1); padding: 12px; border-radius: 12px; margin: 16px 0; text-align: center;">
+            <div class="user-balance-info"
+                style="background: rgba(99, 102, 241, 0.1); padding: 12px; border-radius: 12px; margin: 16px 0; text-align: center;">
                 <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 4px;">Saldo Anda</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);" id="modalUserBalance">Rp 0</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);" id="modalUserBalance">Rp 0
+                </div>
             </div>
 
             <div id="modalAlert" class="alert"></div>
 
             <!-- Payment Method Buttons (1-Step Direct Purchase) -->
-            <div class="payment-buttons-container" style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;">
+            <div class="payment-buttons-container"
+                style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;">
                 <button class="btn-payment-saldo" onclick="confirmPurchase('saldo')">
                     <span style="font-size: 1.5rem;">💰</span>
                     <div style="text-align: left;">
@@ -737,7 +760,7 @@
                         <div style="font-size: 0.85rem; opacity: 0.9;">Langsung dari saldo akun Anda</div>
                     </div>
                 </button>
-                
+
                 <button class="btn-payment-qris" onclick="confirmPurchase('buynow')">
                     <span style="font-size: 1.5rem;">💳</span>
                     <div style="text-align: left;">
@@ -746,7 +769,7 @@
                     </div>
                 </button>
             </div>
-            
+
             <style>
                 .btn-payment-saldo,
                 .btn-payment-qris {
@@ -766,27 +789,27 @@
                     box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
                     width: 100%;
                 }
-                
+
                 .btn-payment-qris {
                     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
                     box-shadow: 0 4px 16px rgba(245, 87, 108, 0.3);
                 }
-                
+
                 .btn-payment-saldo:hover:not(:disabled) {
                     transform: translateY(-2px);
                     box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
                 }
-                
+
                 .btn-payment-qris:hover:not(:disabled) {
                     transform: translateY(-2px);
                     box-shadow: 0 8px 24px rgba(245, 87, 108, 0.4);
                 }
-                
+
                 .btn-payment-saldo:active:not(:disabled),
                 .btn-payment-qris:active:not(:disabled) {
                     transform: translateY(0);
                 }
-                
+
                 .btn-payment-saldo:disabled,
                 .btn-payment-qris:disabled {
                     opacity: 0.6;
@@ -808,12 +831,12 @@
                     <span class="modal-close" onclick="closeSuccessModal()">&times;</span>
                 </div>
             </div>
-            
+
             <div class="modal-body">
                 <div id="transactionDetail" class="transaction-detail"></div>
                 <div id="accountDetailsSection" class="account-details-section"></div>
             </div>
-            
+
             <div class="modal-actions-bottom">
                 <button class="btn-secondary" onclick="closeSuccessModal()">Tutup</button>
             </div>
@@ -825,7 +848,7 @@
         <div class="modal-content payment-modal-content">
             <span class="modal-close" onclick="closeQrisPaymentModal()">&times;</span>
             <h2>Pembayaran QRIS</h2>
-            
+
             <div class="payment-info-container">
                 <!-- Countdown Timer -->
                 <div class="payment-countdown-box">
@@ -833,7 +856,7 @@
                     <div class="countdown-display" id="qrisCountdown">30:00</div>
                     <div class="countdown-warning" id="countdownWarning"></div>
                 </div>
-                
+
                 <!-- Order Info -->
                 <div class="order-info-box">
                     <h3>Detail Pesanan</h3>
@@ -857,7 +880,7 @@
                         <small>💡 Termasuk kode unik: <span id="qrisUniqueCode">0</span></small>
                     </div>
                 </div>
-                
+
                 <!-- QRIS Image -->
                 <div class="qris-image-container">
                     <div class="qris-label">Scan QRIS di bawah ini:</div>
@@ -865,7 +888,7 @@
                         <div class="loading-spinner">Memuat QR...</div>
                     </div>
                 </div>
-                
+
                 <!-- Instructions -->
                 <div class="payment-instructions">
                     <h4>📱 Cara Pembayaran:</h4>
@@ -877,19 +900,21 @@
                         <li>Tunggu notifikasi pembayaran berhasil</li>
                     </ol>
                 </div>
-                
+
                 <!-- Payment Status -->
                 <div class="payment-status-box" id="paymentStatusBox">
                     <div class="status-icon">🔄</div>
                     <div class="status-text">Menunggu pembayaran...</div>
                 </div>
             </div>
-            
+
             <div style="display: flex; gap: 0.625rem; margin-top: 0.75rem; padding: 0 1rem 1rem;">
-                <button class="btn-secondary" onclick="closeQrisPaymentModal()" style="flex: 1; padding: 0.5rem 0.875rem; font-size: 0.85rem; border-radius: 8px;">
+                <button class="btn-secondary" onclick="closeQrisPaymentModal()"
+                    style="flex: 1; padding: 0.5rem 0.875rem; font-size: 0.85rem; border-radius: 8px;">
                     Tutup
                 </button>
-                <button class="btn-danger" onclick="cancelPayment()" style="flex: 1; background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.5rem 0.875rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease;">
+                <button class="btn-danger" onclick="cancelPayment()"
+                    style="flex: 1; background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.5rem 0.875rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease;">
                     ❌ Batalkan
                 </button>
             </div>
@@ -920,7 +945,7 @@
                     currentUserData = null;
                     const navbar = document.getElementById('mainNavbar');
                     if (navbar) navbar.style.display = 'none';
-                    
+
                     return;
                 }
 
@@ -928,11 +953,17 @@
                 currentUserData = data.user;
                 const navbar = document.getElementById('mainNavbar');
                 if (navbar) navbar.style.display = 'flex';
-                
+
                 // Update balance in navbar
                 const navbarBalance = document.getElementById('navbarBalance');
                 if (navbarBalance) {
-                    navbarBalance.textContent = formatRupiah(data.user.saldo);
+                    navbarBalance.textContent = formatRupiah(data.user.saldo || 0);
+                }
+
+                // Update Mobile Balance
+                const mobileBalance = document.getElementById('mobileBalance');
+                if (mobileBalance) {
+                    mobileBalance.textContent = formatRupiah(data.user.saldo || 0);
                 }
 
                 // Show Admin tab if user is admin
@@ -940,7 +971,7 @@
                     const adminLink = document.querySelector('a[href="/admin"]');
                     if (adminLink) adminLink.classList.add('show-admin');
                 }
-                
+
                 // Update balance in modal if exists
                 const modalBalance = document.getElementById('modalUserBalance');
                 if (modalBalance && currentUserData) {
@@ -955,7 +986,7 @@
                 currentUserData = null;
                 const navbar = document.getElementById('mainNavbar');
                 if (navbar) navbar.style.display = 'none';
-                
+
             }
         }
 
@@ -967,7 +998,7 @@
                 if (data.success && data.hasPendingOrder && data.order) {
                     // Set pending order
                     pendingPaymentOrder = data.order;
-                    
+
                     // Load QR image if available
                     if (data.order.qrisImageBase64) {
                         const qrisWrapper = document.getElementById('qrisImageWrapper');
@@ -979,14 +1010,14 @@
                             `;
                         }
                     }
-                    
+
                     // Start countdown and payment checking
                     startPaymentCountdown();
                     startPaymentStatusCheck();
-                    
+
                     // Show navbar countdown
                     showNavbarCountdown();
-                    
+
                     console.log('✅ Pending order restored from database');
                 } else {
                     // No pending order, clear any existing intervals
@@ -1007,26 +1038,26 @@
                 const data = await response.json();
 
                 if (!data.success) {
-                    document.getElementById('productGrid').innerHTML = 
+                    document.getElementById('productGrid').innerHTML =
                         '<p class="empty-state">Gagal memuat produk</p>';
                     return;
                 }
 
                 allProducts = data.products;
-                
+
                 // Debug: log product data to check prices
                 console.log('Loaded products:', allProducts);
                 if (allProducts.length > 0) {
                     console.log('First product:', allProducts[0]);
                 }
-                
+
                 // Generate filter buttons based on product categories
                 generateFilterButtons(allProducts);
-                
+
                 displayProducts(allProducts);
             } catch (error) {
                 console.error('Load products failed:', error);
-                document.getElementById('productGrid').innerHTML = 
+                document.getElementById('productGrid').innerHTML =
                     '<p class="empty-state">Terjadi kesalahan saat memuat produk</p>';
             }
         }
@@ -1040,7 +1071,7 @@
                 hash = ((hash << 5) - hash) + char;
                 hash = hash & hash; // Convert to 32bit integer
             }
-            
+
             // Use predefined vibrant color palette for better variety
             const colors = [
                 // Blues & Purples
@@ -1048,40 +1079,40 @@
                 'hsl(260, 70%, 60%)',  // Purple
                 'hsl(280, 65%, 55%)',  // Violet
                 'hsl(220, 75%, 60%)',  // Sky Blue
-                
+
                 // Greens & Teals
                 'hsl(150, 70%, 50%)',  // Teal
                 'hsl(160, 75%, 45%)',  // Turquoise
                 'hsl(140, 70%, 50%)',  // Green
                 'hsl(180, 70%, 50%)',  // Cyan
-                
+
                 // Oranges & Reds
                 'hsl(15, 85%, 55%)',   // Orange Red
                 'hsl(25, 80%, 55%)',   // Orange
                 'hsl(0, 75%, 55%)',    // Red
                 'hsl(350, 75%, 55%)',  // Pink Red
-                
+
                 // Yellows & Golds
                 'hsl(45, 85%, 55%)',   // Gold
                 'hsl(35, 80%, 55%)',   // Amber
                 'hsl(50, 85%, 60%)',   // Yellow
-                
+
                 // Pinks & Magentas
                 'hsl(320, 70%, 60%)',  // Magenta
                 'hsl(330, 70%, 60%)',  // Pink
                 'hsl(300, 65%, 60%)',  // Fuchsia
-                
+
                 // Additional vibrant colors
                 'hsl(200, 75%, 55%)',  // Light Blue
                 'hsl(190, 75%, 50%)',  // Aqua
                 'hsl(170, 70%, 50%)',  // Mint
             ];
-            
+
             // Select color based on hash
             const colorIndex = Math.abs(hash) % colors.length;
             return colors[colorIndex];
         }
-        
+
         function displayProducts(products) {
             const productGrid = document.getElementById('productGrid');
 
@@ -1099,10 +1130,10 @@
                 // Ensure price is valid
                 const productPrice = product.price || product.basePrice || 0;
                 const formattedPrice = productPrice > 0 ? formatRupiah(productPrice) : 'Hubungi Admin';
-                
+
                 // Get consistent color for this product
                 const productColor = getProductColor(product.name);
-                
+
                 // Create darker variant for gradient end
                 const colorMatch = productColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
                 let darkerColor = productColor;
@@ -1112,16 +1143,16 @@
                     const light = Math.max(35, parseInt(colorMatch[3]) - 15); // Darker by 15%
                     darkerColor = `hsl(${hue}, ${sat}%, ${light}%)`;
                 }
-                
+
                 return `
                 <div class="product-card-new" style="animation-delay: ${index * 0.1}s" onclick="openPurchaseModal('${product.id}')">
                     <div class="product-card-shine"></div>
                     <div class="product-image-placeholder" style="background: linear-gradient(135deg, ${productColor} 0%, ${darkerColor} 100%); box-shadow: 0 4px 20px ${productColor}40;">
                         <span class="product-emoji" style="font-size: 3rem;">📦</span>
-                        ${product.stock > 0 ? 
-                            `<div class="stock-badge available">✓ Tersedia</div>` : 
-                            `<div class="stock-badge unavailable">✕ Habis</div>`
-                        }
+                        ${product.stock > 0 ?
+                        `<div class="stock-badge available">✓ Tersedia</div>` :
+                        `<div class="stock-badge unavailable">✕ Habis</div>`
+                    }
                     </div>
                     <div class="product-content-new">
                         <div class="product-category-badge" style="background: ${productColor}25; color: ${productColor}; border: 1px solid ${productColor}40;">Digital</div>
@@ -1151,7 +1182,7 @@
         // Extract category from product name (e.g., "Netflix Premium" -> "Netflix")
         function extractCategoryFromName(productName) {
             if (!productName) return null;
-            
+
             // Common patterns: "Netflix Premium", "Canva Pro", "Zoom 100P", etc.
             // Take the first word as category
             const words = productName.trim().split(/\s+/);
@@ -1167,20 +1198,20 @@
         // Generate filter buttons based on unique categories
         function generateFilterButtons(products) {
             const categories = new Set();
-            
+
             products.forEach(product => {
                 const category = extractCategoryFromName(product.name);
                 if (category) {
                     categories.add(category);
                 }
             });
-            
+
             // Sort categories alphabetically
             const sortedCategories = Array.from(categories).sort();
-            
+
             const filtersContainer = document.getElementById('productFilters');
             if (!filtersContainer) return;
-            
+
             // Keep "Semua" button and add category buttons
             let html = `
                 <button class="filter-btn active" onclick="filterByCategory(null)" data-category="all">
@@ -1188,7 +1219,7 @@
                     <span>Semua</span>
                 </button>
             `;
-            
+
             sortedCategories.forEach(category => {
                 // Get emoji for category (optional, can be improved)
                 const emoji = getCategoryEmoji(category);
@@ -1199,7 +1230,7 @@
                     </button>
                 `;
             });
-            
+
             filtersContainer.innerHTML = html;
         }
 
@@ -1220,31 +1251,31 @@
                 'YouTube': '▶️',
                 'Sewa': '🏠'
             };
-            
+
             // Check if category starts with any key
             for (const [key, emoji] of Object.entries(emojiMap)) {
                 if (category.toLowerCase().includes(key.toLowerCase())) {
                     return emoji;
                 }
             }
-            
+
             return '📦'; // Default emoji
         }
 
         // Filter products by category
         function filterByCategory(category) {
             selectedCategory = category;
-            
+
             // Update active button
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            
+
             const activeBtn = document.querySelector(`[data-category="${category || 'all'}"]`);
             if (activeBtn) {
                 activeBtn.classList.add('active');
             }
-            
+
             // Apply filters (category + search)
             applyFilters();
         }
@@ -1252,9 +1283,9 @@
         // Apply both category and search filters
         function applyFilters() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            
+
             let filtered = allProducts;
-            
+
             // Apply category filter
             if (selectedCategory) {
                 filtered = filtered.filter(p => {
@@ -1262,15 +1293,15 @@
                     return productCategory && productCategory.toLowerCase() === selectedCategory.toLowerCase();
                 });
             }
-            
+
             // Apply search filter
             if (searchTerm) {
-                filtered = filtered.filter(p => 
+                filtered = filtered.filter(p =>
                     p.name.toLowerCase().includes(searchTerm) ||
                     (p.description && p.description.toLowerCase().includes(searchTerm))
                 );
             }
-            
+
             displayProducts(filtered);
         }
 
@@ -1294,7 +1325,7 @@
 
             // Check if there's pending order
             const hasPendingOrder = pendingPaymentOrder !== null;
-            
+
             if (hasPendingOrder) {
                 showModalAlert('Anda sedang memiliki order yang belum selesai. Silakan selesaikan atau batalkan terlebih dahulu.', 'error');
                 // Still show modal but disable buttons
@@ -1309,19 +1340,19 @@
 
             // Update modal content
             document.getElementById('modalProductName').textContent = selectedProduct.name;
-            document.getElementById('modalProductDesc').textContent = 
+            document.getElementById('modalProductDesc').textContent =
                 selectedProduct.description || 'Tidak ada deskripsi';
             document.getElementById('pricePerItem').textContent = formatRupiah(selectedProduct.price);
             document.getElementById('quantity').value = 1;
             document.getElementById('quantity').max = selectedProduct.stock;
-            
+
             // Show user balance in modal
             document.getElementById('modalUserBalance').textContent = formatRupiah(currentUserData.saldo || 0);
-            
+
             // Disable/enable payment buttons based on pending order
             const btnSaldo = document.querySelector('.btn-payment-saldo');
             const btnQris = document.querySelector('.btn-payment-qris');
-            
+
             if (hasPendingOrder) {
                 // Disable both buttons
                 if (btnSaldo) {
@@ -1367,23 +1398,23 @@
                     `;
                 }
             }
-            
+
             updateTotalPrice();
-            
+
             document.getElementById('purchaseModal').style.display = 'flex';
         }
 
         function closePurchaseModal() {
             document.getElementById('purchaseModal').style.display = 'none';
             selectedProduct = null;
-            
+
             // Clear alert
             const alertBox = document.getElementById('modalAlert');
             if (alertBox) {
                 alertBox.className = 'alert';
                 alertBox.textContent = '';
             }
-            
+
             // Enable buttons if no pending order (untuk next purchase)
             if (!pendingPaymentOrder) {
                 const btnSaldo = document.querySelector('.btn-payment-saldo');
@@ -1433,7 +1464,7 @@
             const alertBox = document.getElementById('modalAlert');
             alertBox.textContent = message;
             alertBox.className = `alert ${type} show`;
-            
+
             setTimeout(() => {
                 alertBox.classList.remove('show');
             }, 5000);
@@ -1468,7 +1499,7 @@
             const btnQris = document.querySelector('.btn-payment-qris');
             const activeButton = paymentMethod === 'saldo' ? btnSaldo : btnQris;
             const originalHTML = activeButton.innerHTML;
-            
+
             btnSaldo.disabled = true;
             btnSaldo.style.opacity = '0.6';
             btnSaldo.style.cursor = 'not-allowed';
@@ -1480,7 +1511,7 @@
             try {
                 // Choose endpoint based on payment method
                 const endpoint = paymentMethod === 'saldo' ? '/api/purchase' : '/api/buynow';
-                
+
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
@@ -1496,13 +1527,13 @@
 
                 if (data.success) {
                     closePurchaseModal();
-                    
+
                     // Handle different responses for saldo vs buynow
                     if (paymentMethod === 'saldo') {
                         // Pembelian dengan saldo langsung selesai, tidak ada pending order
                         // Pastikan pendingPaymentOrder tetap null
                         pendingPaymentOrder = null;
-                        
+
                         // Reset payment buttons to original state (untuk next purchase)
                         btnSaldo.disabled = false;
                         btnSaldo.style.opacity = '1';
@@ -1514,7 +1545,7 @@
                                 <div style="font-size: 0.85rem; opacity: 0.9;">Langsung dari saldo akun Anda</div>
                             </div>
                         `;
-                        
+
                         btnQris.disabled = false;
                         btnQris.style.opacity = '1';
                         btnQris.style.cursor = 'pointer';
@@ -1525,7 +1556,7 @@
                                 <div style="font-size: 0.85rem; opacity: 0.9;">Otomatis & Instant</div>
                             </div>
                         `;
-                        
+
                         // Update balance in navbar after transaction
                         if (data.transaction && data.transaction.newBalance !== undefined) {
                             const navbarBalance = document.getElementById('navbarBalance');
@@ -1537,7 +1568,7 @@
                                 currentUserData.saldo = data.transaction.newBalance;
                             }
                         }
-                        
+
                         // Show success modal with receipt
                         showSuccessModal(data.transaction);
                     } else {
@@ -1545,7 +1576,7 @@
                         showToast('✅ Order berhasil dibuat!', 'success');
                         showQrisPaymentModal(data);
                     }
-                    
+
                     // Reload products and balance
                     await loadProducts();
                     await checkAuth();
@@ -1573,7 +1604,7 @@
                 btnQris.style.cursor = 'pointer';
             }
         }
-        
+
         function showPaymentModal(data) {
             // Placeholder for payment modal (QRIS/Transfer)
             // You can implement this based on your payment gateway
@@ -1620,7 +1651,7 @@
                     `;
                 });
                 accountHTML += '</div>';
-                
+
                 // Tambah info pembayaran di bawah
                 accountHTML += `<div class="payment-info">`;
                 accountHTML += `<div class="payment-row"><span>💰 <strong>Metode:</strong></span> <span>${transaction.metode || 'Saldo'}</span></div>`;
@@ -1631,7 +1662,7 @@
             }
 
             document.getElementById('accountDetailsSection').innerHTML = accountHTML;
-            
+
             document.getElementById('successModal').style.display = 'flex';
         }
 
@@ -1653,7 +1684,7 @@
                 showToast('✅ Receipt berhasil dicopy!', 'success');
             } catch (error) {
                 console.error('Copy failed:', error);
-                
+
                 // Fallback method for older browsers
                 try {
                     const textArea = document.createElement('textarea');
@@ -1675,12 +1706,12 @@
             const toast = document.getElementById('toast');
             toast.textContent = message;
             toast.className = 'toast show ' + type;
-            
+
             setTimeout(() => {
                 toast.className = 'toast';
             }, 3000);
         }
-        
+
         function showConfirm(message, onConfirm, onCancel = null) {
             // Create confirmation modal
             const confirmModal = document.createElement('div');
@@ -1698,23 +1729,23 @@
                     </div>
                 </div>
             `;
-            
+
             document.body.appendChild(confirmModal);
-            
+
             // Handle cancel
             const cancelBtn = confirmModal.querySelector('.confirm-btn-cancel');
             cancelBtn.addEventListener('click', () => {
                 if (onCancel) onCancel();
                 confirmModal.remove();
             });
-            
+
             // Handle confirm
             const okBtn = confirmModal.querySelector('.confirm-btn-ok');
             okBtn.addEventListener('click', () => {
                 onConfirm();
                 confirmModal.remove();
             });
-            
+
             // Close on overlay click
             confirmModal.addEventListener('click', (e) => {
                 if (e.target === confirmModal) {
@@ -1743,7 +1774,7 @@
         }
 
         // Close modal when clicking outside
-        window.onclick = function(event) {
+        window.onclick = function (event) {
             const purchaseModal = document.getElementById('purchaseModal');
             const successModal = document.getElementById('successModal');
             if (event.target === purchaseModal) {
@@ -1763,27 +1794,27 @@
         }
 
         // Close menu when clicking outside
-        document.addEventListener('click', function(event) {
+        document.addEventListener('click', function (event) {
             const navLinks = document.getElementById('navLinks');
             const navToggle = document.querySelector('.nav-toggle');
             const navbar = document.querySelector('.navbar');
-            
-            if (navLinks.classList.contains('active') && 
+
+            if (navLinks.classList.contains('active') &&
                 !navbar.contains(event.target)) {
                 toggleMenu();
             }
         });
 
         // ===== QRIS PAYMENT MODAL FUNCTIONS =====
-        
+
         function showQrisPaymentModal(data) {
             // Store order data
             pendingPaymentOrder = data.order;
-            
+
             // Clear any existing intervals
             if (countdownInterval) clearInterval(countdownInterval);
             if (paymentCheckInterval) clearInterval(paymentCheckInterval);
-            
+
             // Populate modal with order data
             document.getElementById('qrisOrderId').textContent = data.order.orderId || '-';
             document.getElementById('qrisProductName').textContent = data.order.productName || '-';
@@ -1791,7 +1822,7 @@
             document.getElementById('qrisTotalAmount').textContent = formatRupiah(data.order.totalAmount || 0);
             document.getElementById('qrisTotalAmount2').textContent = formatRupiah(data.order.totalAmount || 0);
             document.getElementById('qrisUniqueCode').textContent = formatRupiah(data.order.uniqueCode || 0);
-            
+
             // Load QRIS image
             const qrisWrapper = document.getElementById('qrisImageWrapper');
             if (data.payment && data.payment.qrisImageBase64) {
@@ -1803,27 +1834,27 @@
             } else {
                 qrisWrapper.innerHTML = '<div class="error-message">⚠️ Gagal memuat QR Code</div>';
             }
-            
+
             // Show modal
             document.getElementById('qrisPaymentModal').style.display = 'flex';
-            
+
             // Start countdown and payment checking
             startPaymentCountdown();
             startPaymentStatusCheck();
         }
-        
+
         function closeQrisPaymentModal() {
             document.getElementById('qrisPaymentModal').style.display = 'none';
-            
+
             // Keep countdown running in navbar if there's pending payment
             if (pendingPaymentOrder) {
                 showNavbarCountdown();
             }
         }
-        
+
         function reopenPaymentModal() {
             if (!pendingPaymentOrder) return;
-            
+
             // Re-populate modal with existing order data
             document.getElementById('qrisOrderId').textContent = pendingPaymentOrder.orderId || '-';
             document.getElementById('qrisProductName').textContent = pendingPaymentOrder.productName || '-';
@@ -1831,7 +1862,7 @@
             document.getElementById('qrisTotalAmount').textContent = formatRupiah(pendingPaymentOrder.totalAmount || 0);
             document.getElementById('qrisTotalAmount2').textContent = formatRupiah(pendingPaymentOrder.totalAmount || 0);
             document.getElementById('qrisUniqueCode').textContent = formatRupiah(pendingPaymentOrder.uniqueCode || 0);
-            
+
             // Load QR image if not already loaded, or reload it
             const qrisWrapper = document.getElementById('qrisImageWrapper');
             if (pendingPaymentOrder.qrisImageBase64) {
@@ -1845,25 +1876,25 @@
                 // Reload QR image from API
                 loadQrisImage();
             }
-            
+
             // Hide navbar countdown
             document.getElementById('paymentCountdown').style.display = 'none';
-            
+
             // Show modal
             document.getElementById('qrisPaymentModal').style.display = 'flex';
         }
-        
+
         async function loadQrisImage() {
             if (!pendingPaymentOrder || !pendingPaymentOrder.orderId) return;
-            
+
             try {
                 const response = await fetch(`/api/order/${pendingPaymentOrder.orderId}`);
                 const data = await response.json();
-                
+
                 if (data.success && data.order.qrisImageBase64) {
                     // Store QR image in pendingPaymentOrder for future use
                     pendingPaymentOrder.qrisImageBase64 = data.order.qrisImageBase64;
-                    
+
                     const qrisWrapper = document.getElementById('qrisImageWrapper');
                     qrisWrapper.innerHTML = `
                         <img src="data:image/png;base64,${data.order.qrisImageBase64}" 
@@ -1875,16 +1906,16 @@
                 console.error('Error loading QRIS image:', error);
             }
         }
-        
+
         function startPaymentCountdown() {
             if (!pendingPaymentOrder || !pendingPaymentOrder.createdAt) return;
-            
+
             const expirationTime = pendingPaymentOrder.createdAt + (30 * 60 * 1000); // 30 minutes
-            
+
             countdownInterval = setInterval(() => {
                 const now = Date.now();
                 const timeLeft = expirationTime - now;
-                
+
                 if (timeLeft <= 0) {
                     // Expired
                     clearInterval(countdownInterval);
@@ -1898,7 +1929,7 @@
                     `;
                     pendingPaymentOrder = null;
                     document.getElementById('paymentCountdown').style.display = 'none';
-                    
+
                     // Enable payment buttons
                     const btnSaldo = document.querySelector('.btn-payment-saldo');
                     const btnQris = document.querySelector('.btn-payment-qris');
@@ -1914,17 +1945,17 @@
                         btnQris.style.cursor = 'pointer';
                         btnQris.title = '';
                     }
-                    
+
                     return;
                 }
-                
+
                 const minutes = Math.floor(timeLeft / 60000);
                 const seconds = Math.floor((timeLeft % 60000) / 1000);
                 const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                
+
                 document.getElementById('qrisCountdown').textContent = timeString;
                 document.getElementById('navCountdownTimer').textContent = timeString;
-                
+
                 // Show warning if less than 5 minutes
                 if (minutes < 5) {
                     document.getElementById('countdownWarning').innerHTML = '<span style="color: #f59e0b;">⚠️ Segera lakukan pembayaran</span>';
@@ -1933,43 +1964,43 @@
                 }
             }, 1000);
         }
-        
+
         function showNavbarCountdown() {
             document.getElementById('paymentCountdown').style.display = 'flex';
         }
-        
+
         async function cancelPayment() {
             if (!pendingPaymentOrder) return;
-            
+
             // Confirm cancellation with custom modal
             showConfirm('Apakah Anda yakin ingin membatalkan pesanan ini?', async () => {
                 // User confirmed, proceed with cancellation
                 await proceedCancelPayment();
             });
         }
-        
+
         async function proceedCancelPayment() {
-            
+
             try {
                 // Call backend to cancel order
                 const response = await fetch(`/api/cancel-order/${pendingPaymentOrder.orderId}`, {
                     method: 'POST'
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.success) {
                     // Stop all intervals
                     clearInterval(countdownInterval);
                     clearInterval(paymentCheckInterval);
-                    
+
                     // Reset pending order
                     pendingPaymentOrder = null;
-                    
+
                     // Close modal and hide navbar countdown
                     document.getElementById('qrisPaymentModal').style.display = 'none';
                     document.getElementById('paymentCountdown').style.display = 'none';
-                    
+
                     // Reset payment buttons
                     const btnSaldo = document.querySelector('.btn-payment-saldo');
                     const btnQris = document.querySelector('.btn-payment-qris');
@@ -1997,9 +2028,9 @@
                             </div>
                         `;
                     }
-                    
+
                     showToast('✅ Pesanan berhasil dibatalkan', 'success');
-                    
+
                     // Reload products
                     await loadProducts();
                 } else {
@@ -2010,31 +2041,31 @@
                 showToast('❌ Terjadi kesalahan saat membatalkan pesanan', 'error');
             }
         }
-        
+
         function startPaymentStatusCheck() {
             if (!pendingPaymentOrder || !pendingPaymentOrder.orderId) return;
-            
+
             // Check immediately
             checkPaymentStatus();
-            
+
             // Then check every 5 seconds
             paymentCheckInterval = setInterval(() => {
                 checkPaymentStatus();
             }, 5000);
         }
-        
+
         async function checkPaymentStatus() {
             if (!pendingPaymentOrder || !pendingPaymentOrder.orderId) return;
-            
+
             try {
                 const response = await fetch(`/api/order/${pendingPaymentOrder.orderId}`);
                 const data = await response.json();
-                
+
                 if (data.success && data.order.status === 'completed') {
                     // Payment successful!
                     clearInterval(countdownInterval);
                     clearInterval(paymentCheckInterval);
-                    
+
                     // Reset payment buttons to enabled state
                     const btnSaldo = document.querySelector('.btn-payment-saldo');
                     const btnQris = document.querySelector('.btn-payment-qris');
@@ -2062,22 +2093,22 @@
                             </div>
                         `;
                     }
-                    
+
                     document.getElementById('paymentStatusBox').innerHTML = `
                         <div class="status-icon">✅</div>
                         <div class="status-text" style="color: #10b981; font-weight: 700;">Pembayaran Berhasil!</div>
                     `;
-                    
+
                     document.getElementById('qrisPaymentModal').style.display = 'none';
                     document.getElementById('paymentCountdown').style.display = 'none';
-                    
+
                     showToast('🎉 Pembayaran berhasil! Produk sedang diproses...', 'success');
-                    
+
                     // Transform data for showSuccessModal
                     if (data.order.receipt || data.order.receiptText) {
                         // Reload user data for newBalance
                         await checkAuth();
-                        
+
                         const transformedData = {
                             receiptContent: data.order.receiptText || data.order.receipt,
                             refId: data.order.reffId,
@@ -2089,7 +2120,7 @@
                             items: data.order.account || [],
                             snk: data.order.snk || ''
                         };
-                        
+
                         // Update balance in navbar
                         if (transformedData.newBalance !== undefined) {
                             const navbarBalance = document.getElementById('navbarBalance');
@@ -2097,7 +2128,7 @@
                                 navbarBalance.textContent = formatRupiah(transformedData.newBalance);
                             }
                         }
-                        
+
                         setTimeout(() => {
                             showSuccessModal(transformedData);
                         }, 1000);
@@ -2105,9 +2136,9 @@
                         // No receipt, just show toast and reload
                         showToast('✅ Transaksi berhasil! Detail akan segera tersedia.', 'success');
                     }
-                    
+
                     pendingPaymentOrder = null;
-                    
+
                     // Reload products and balance
                     await loadProducts();
                     await checkAuth();
@@ -2116,11 +2147,28 @@
                 console.error('Error checking payment status:', error);
             }
         }
-        
+
         // Initialize
         checkAuth();
         loadProducts();
     </script>
+    <!-- Bottom Navigation (Mobile Only) -->
+    <div class="bottom-nav">
+        <div class="bottom-nav-inner">
+            <a href="/dashboard" class="nav-item">
+                <div class="nav-icon">📊</div>
+                <span class="nav-text">Dashboard</span>
+            </a>
+            <a href="/products" class="nav-item active">
+                <div class="nav-icon">🛍️</div>
+                <span class="nav-text">Produk</span>
+            </a>
+            <a href="/settings" class="nav-item">
+                <div class="nav-icon">⚙️</div>
+                <span class="nav-text">Pengaturan</span>
+            </a>
+        </div>
+    </div>
 </body>
-</html>
 
+</html>
