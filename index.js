@@ -639,10 +639,25 @@ module.exports = async (ronzz, m, mek) => {
     let groupMetadata = ''
     try {
       groupMetadata = isGroup ? await ronzz.groupMetadata(from) : ''
+      if (isGroup) {
+        console.log(`[DEBUG-GROUP] Raw groupMetadata:`, JSON.stringify(groupMetadata, null, 2))
+      }
     } catch (e) {
       console.warn(`WARNING: Failed to fetch group metadata for ${from}: ${e.message}`)
       groupMetadata = { subject: 'Unknown Group', id: from, participants: [] }
     }
+
+    // Ensure groupMetadata has subject property
+    if (isGroup && (!groupMetadata || !groupMetadata.subject)) {
+      console.warn(`WARNING: groupMetadata.subject is missing for ${from}, using fallback`)
+      console.warn(`   groupMetadata:`, JSON.stringify(groupMetadata))
+      groupMetadata = {
+        subject: groupMetadata?.subject || groupMetadata?.name || 'Unknown Group',
+        id: from,
+        participants: groupMetadata?.participants || []
+      }
+    }
+
     const groupName = isGroup ? groupMetadata.subject : ''
     const groupId = isGroup ? groupMetadata.id : ''
     const groupMembers = isGroup ? groupMetadata.participants : ''
