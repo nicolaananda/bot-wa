@@ -3974,17 +3974,27 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       case 'hidetag': case 'ht': case 'h': {
         if (!isGroup) return reply(mess.group)
         if (!isGroupAdmins && !isOwner) return reply(mess.admin)
+
+        // Use provided text or quoted text or default
+        const quotedText = m.quoted ? m.quoted.text : '';
+        const textToSay = q ? q : (quotedText ? quotedText : 'Tag all members');
+
         let mem = groupMembers.map(i => i.id)
-        ronzz.sendMessage(from, { text: q ? q : '', mentions: mem })
+
+        // Send message with mentions
+        await ronzz.sendMessage(from, { text: textToSay, mentions: mem })
+
+        // Delete command message
         if (isBotGroupAdmins) {
           try {
-            const deleteKey = m.isGroup
-              ? { remoteJid: from, id: (mek && mek.key && mek.key.id) || (m.key && m.key.id), participant: (mek && (mek.key && mek.key.participant)) || mek.participant || sender, fromMe: false }
-              : { remoteJid: from, id: (mek && mek.key && mek.key.id) || (m.key && m.key.id), fromMe: false }
-            if (deleteKey && deleteKey.id) {
-              await ronzz.sendMessage(from, { delete: deleteKey })
+            // Use proper delete ID
+            const keyId = (mek && mek.key && mek.key.id) || (m.key && m.key.id);
+            if (keyId) {
+              await ronzz.deleteMessage(from, keyId);
             }
-          } catch { }
+          } catch (e) {
+            console.warn('Failed to delete hidetag command:', e.message);
+          }
         }
       }
         break
