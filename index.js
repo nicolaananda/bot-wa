@@ -2608,6 +2608,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   // We just remove this listener to avoid memory leaks.
                   process.removeListener('payment-completed', paymentListener);
                 }
+              } catch (error) {
                 console.error(`❌ [MID] Error in webhook listener:`, error.message);
               }
             };
