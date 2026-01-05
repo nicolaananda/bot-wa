@@ -2572,12 +2572,28 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
                 // Match jika amount sama (dengan tolerance) dan status paid
                 if (isAmountMatch && isStatusPaid) {
+                  // IDEMPOTENCY CHECK: Prevent duplicate processing for same order
+                  if (order.processed) {
+                    console.log(`⚠️ [MID-LOCAL] Order ${orderId} already processed, skipping duplicate event.`);
+                    return;
+                  }
+
+                  // Mark as processed immediately
+                  order.processed = true;
+                  db.data.order[sender] = order; // Save state back to memory
+
                   console.log(`✅ [MID] Webhook payment detected: ${orderId}, Amount: ${webhookAmount}`);
 
                   // Remove listener setelah payment detected
                   process.removeListener('payment-completed', paymentListener);
 
-                  await ronzz.sendMessage(from, { delete: message.key });
+                  // Fix message deletion: use deleteMessage explicitly
+                  try {
+                    await ronzz.deleteMessage(from, message.key.id);
+                  } catch (delError) {
+                    console.warn(`[MID] Failed to delete QRIS bubble: ${delError.message}`);
+                  }
+
                   reply("Pembayaran berhasil, data akun akan segera diproses.");
 
                   // Proses pembelian
