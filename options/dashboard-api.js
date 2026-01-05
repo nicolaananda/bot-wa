@@ -216,6 +216,19 @@ app.post('/webhook/midtrans', async (req, res) => {
       // Emit event untuk process yang sama
       process.emit('payment-completed', webhookData);
 
+      // Publish ke Redis untuk inter-process communication (penting jika bot-wa & dashboard-api beda process)
+      if (redisClient) {
+        try {
+          redisClient.publish('midtrans:events', JSON.stringify({
+            event: 'payment-completed',
+            data: webhookData
+          }));
+          console.log(`📡 [Webhook] Published to Redis midtrans:events: ${order_id}`);
+        } catch (publishError) {
+          console.error(`❌ [Webhook] Failed to publish to Redis:`, publishError.message);
+        }
+      }
+
       // Simpan ke PostgreSQL database untuk bot-wa process (lebih reliable untuk multi-process)
       try {
         if (usePg && pg) {
