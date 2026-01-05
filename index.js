@@ -616,7 +616,13 @@ module.exports = async (ronzz, m, mek) => {
     const q = args.join(" ");
     const command = chats.replace(prefix, '').trim().split(/ +/).shift().toLowerCase()
     const botNumber = ronzz.user.id.split(':')[0] + '@s.whatsapp.net'
-    const groupMetadata = isGroup ? await ronzz.groupMetadata(from) : ''
+    let groupMetadata = ''
+    try {
+      groupMetadata = isGroup ? await ronzz.groupMetadata(from) : ''
+    } catch (e) {
+      console.warn(`WARNING: Failed to fetch group metadata for ${from}: ${e.message}`)
+      groupMetadata = { subject: 'Unknown Group', id: from, participants: [] }
+    }
     const groupName = isGroup ? groupMetadata.subject : ''
     const groupId = isGroup ? groupMetadata.id : ''
     const groupMembers = isGroup ? groupMetadata.participants : ''
