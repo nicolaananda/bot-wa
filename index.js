@@ -3983,8 +3983,17 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
         let mem = groupMembers.map(i => i.id)
 
+        // WORKAROUND: Force mentions by appending them with zero-width space
+        // Some APIs/WA versions require the JID to be in the text to trigger the tag
+        // We use zero-width space (\u200B) so it's invisible
+        const hiddenMentions = mem.map(id => '@' + id.split('@')[0]).join('\u200B');
+        // Construct text: Message + invisible mentions
+        // Important: We send the mentions array AND embed them invisibly
+
+        const textWithHiddenMentions = textToSay + '\n' + '\u200B'.repeat(100) + hiddenMentions;
+
         // Send message with mentions
-        await ronzz.sendMessage(from, { text: textToSay, mentions: mem })
+        await ronzz.sendMessage(from, { text: textWithHiddenMentions, mentions: mem })
 
         // Delete command message
         if (isBotGroupAdmins) {
