@@ -522,6 +522,11 @@ if (!global.midtransWebhookListenerSetup) {
           await sleep(1000);
           await globalRonzz.sendMessage(sender, { text: detailAkunCustomer });
           console.log(`✅ [MID-GLOBAL] Account details sent to ${sender}`);
+
+          // If group message, send public confirmation
+          if (from.endsWith('@g.us')) {
+            await globalRonzz.sendMessage(from, { text: "🎉 Pembayaran QRIS berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!" }, { quoted: { key: messageKey } });
+          }
         } catch (error) {
           console.error(`❌ [MID-GLOBAL] Error sending account details:`, error.message);
         }
