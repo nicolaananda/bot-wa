@@ -461,7 +461,9 @@ if (!global.midtransWebhookListenerSetup) {
       // Delete message - use deleteMessage directly
       if (globalRonzz && messageKey) {
         try {
+          console.log(`[DEBUG-DELETE] messageKey object:`, JSON.stringify(messageKey, null, 2));
           const keyId = messageKey.id || messageKey;
+          console.log(`[DEBUG-DELETE] Extracted keyId:`, keyId);
           await globalRonzz.deleteMessage(from, keyId);
           console.log(`✅ [MID-GLOBAL] QRIS bubble deleted: ${keyId}`);
         } catch (e) {
@@ -2548,6 +2550,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               image: qrImage,
               caption: caption
             }, { quoted: m });
+
+            console.log(`[DEBUG-QRIS] Message key after send:`, JSON.stringify(message.key, null, 2));
 
             db.data.order[sender] = {
               id: data[0],
