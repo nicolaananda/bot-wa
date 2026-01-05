@@ -365,6 +365,18 @@ async function startronzz() {
     return await ronzz.sendMessage(jid, { image: buffer, caption: caption, ...options }, { quoted })
   }
 
+  const jidDecode = (jid) => {
+    if (!jid) return null
+    if (typeof jid !== 'string') return jid
+    const decode = /^(.*?)(:([0-9]+))?@(.*)$/.exec(jid)
+    if (!decode) return null
+    return {
+      user: decode[1],
+      device: decode[3],
+      server: decode[4]
+    }
+  }
+
   ronzz.decodeJid = (jid) => {
     if (!jid) return jid
     if (/:\d+@/gi.test(jid)) {
