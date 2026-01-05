@@ -2607,617 +2607,592 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   // Decision: We will let the GLOBAL listener do the work. 
                   // We just remove this listener to avoid memory leaks.
                   process.removeListener('payment-completed', paymentListener);
-                  if (result.success) {
-                    console.log(`✅ Receipt saved: ${result.url || result.path || reffId}`);
-                  }
-                } catch (receiptError) {
-                  console.error('❌ Error saving receipt:', receiptError.message);
                 }
-
-                // Tambah ke database transaksi
-                db.data.transaksi.push({
-                  id: data[0],
-                  name: db.data.produk[data[0]].name,
-                  price: hargaProduk(data[0], db.data.users[sender].role),
-                  date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
-                  profit: db.data.produk[data[0]].profit,
-                  jumlah: jumlah,
-                  user: sender.split("@")[0],
-                  userRole: db.data.users[sender].role,
-                  reffId: reffId,
-                  metodeBayar: "QRIS",
-                  totalBayar: totalAmount
-                });
-
-                if (typeof global.scheduleSave === 'function') {
-                  global.scheduleSave();
-                }
-
-                delete db.data.order[sender];
-                await db.save();
-                console.log(`✅ [MID] Transaction completed via webhook: ${orderId} - ${reffId}`);
-              }
               } catch (error) {
-              console.error(`❌ [MID] Error in webhook listener:`, error.message);
-            }
-          };
+                console.error(`❌ [MID] Error in webhook listener:`, error.message);
+              }
+            };
+          } catch (error) {
+            console.error(`❌ [MID] Error in webhook listener:`, error.message);
+          }
+        };
 
-          // Register webhook listener
-          process.on('payment-completed', paymentListener);
+        // Register webhook listener
+        process.on('payment-completed', paymentListener);
 
-          // Polling untuk timeout handling (jika webhook tidak datang)
-          let pollInterval = 2000; // Mulai dari 2 detik (lebih cepat)
-          const maxInterval = 10000; // Maksimal 10 detik (lebih cepat)
-          let pollCount = 0;
+        // Polling untuk timeout handling (jika webhook tidak datang)
+        let pollInterval = 2000; // Mulai dari 2 detik (lebih cepat)
+        const maxInterval = 10000; // Maksimal 10 detik (lebih cepat)
+        let pollCount = 0;
 
-          while (db.data.order[sender]) {
-            await sleep(pollInterval);
+        while (db.data.order[sender]) {
+          await sleep(pollInterval);
 
-            if (pollCount < 10) {
-              pollInterval = Math.min(Math.floor(pollInterval * 1.2), maxInterval);
-            }
-            pollCount++;
+          if (pollCount < 10) {
+            pollInterval = Math.min(Math.floor(pollInterval * 1.2), maxInterval);
+          }
+          pollCount++;
 
-            if (Date.now() >= expirationTime) {
-              // Remove listener saat timeout
-              process.removeListener('payment-completed', paymentListener);
-              await ronzz.sendMessage(from, { delete: message.key });
-              reply("Pembayaran dibatalkan karena melewati batas waktu 30 menit.");
-              delete db.data.order[sender];
-              requestPendingOrderSave();
-              break;
-            }
+          if (Date.now() >= expirationTime) {
+            // Remove listener saat timeout
+            process.removeListener('payment-completed', paymentListener);
+            await ronzz.sendMessage(from, { delete: message.key });
+            reply("Pembayaran dibatalkan karena melewati batas waktu 30 menit.");
+            delete db.data.order[sender];
+            requestPendingOrderSave();
+            break;
+          }
 
-            // Fallback: Cek webhook dari PostgreSQL database (karena dashboard-api dan bot-wa adalah process terpisah)
-            if (pollCount % 2 === 0) { // Cek setiap 2 polling cycle (sekitar 6-10 detik) - lebih cepat untuk deteksi
-              try {
-                if (usePg && pg) {
-                  // Query dari PostgreSQL - cari webhook yang belum processed dengan amount yang match
-                  const orderAmount = Number(totalAmount);
-                  const tolerance = 1; // Tolerance 1 rupiah untuk handle decimal
+          // Fallback: Cek webhook dari PostgreSQL database (karena dashboard-api dan bot-wa adalah process terpisah)
+          if (pollCount % 2 === 0) { // Cek setiap 2 polling cycle (sekitar 6-10 detik) - lebih cepat untuk deteksi
+            try {
+              if (usePg && pg) {
+                // Query dari PostgreSQL - cari webhook yang belum processed dengan amount yang match
+                const orderAmount = Number(totalAmount);
+                const tolerance = 1; // Tolerance 1 rupiah untuk handle decimal
 
-                  const result = await pg.query(
-                    `SELECT id, order_id, transaction_id, transaction_status, payment_type, gross_amount, settlement_time, webhook_data
+                const result = await pg.query(
+                  `SELECT id, order_id, transaction_id, transaction_status, payment_type, gross_amount, settlement_time, webhook_data
                    FROM midtrans_webhooks
                    WHERE processed = false 
                      AND transaction_status IN ('settlement', 'capture')
                      AND ABS(gross_amount - $1) < $2
                    ORDER BY created_at DESC
                    LIMIT 10`,
-                    [orderAmount, tolerance]
-                  );
+                  [orderAmount, tolerance]
+                );
 
-                  if (result.rows.length > 0) {
-                    console.log(`🔍 [MID] Found ${result.rows.length} unprocessed webhooks from PostgreSQL, looking for amount Rp${orderAmount}`);
-                  }
+                if (result.rows.length > 0) {
+                  console.log(`🔍 [MID] Found ${result.rows.length} unprocessed webhooks from PostgreSQL, looking for amount Rp${orderAmount}`);
+                }
 
-                  for (const row of result.rows) {
-                    const webhookAmount = Number(row.gross_amount || 0);
-                    const amountDiff = Math.abs(webhookAmount - orderAmount);
-                    const isAmountMatch = amountDiff < tolerance;
+                for (const row of result.rows) {
+                  const webhookAmount = Number(row.gross_amount || 0);
+                  const amountDiff = Math.abs(webhookAmount - orderAmount);
+                  const isAmountMatch = amountDiff < tolerance;
 
-                    console.log(`  - Webhook: Amount Rp${webhookAmount} (${typeof row.gross_amount}), Order Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+                  console.log(`  - Webhook: Amount Rp${webhookAmount} (${typeof row.gross_amount}), Order Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
 
-                    if (isAmountMatch) {
-                      console.log(`✅ [MID] Payment detected via PostgreSQL webhook: Amount Rp${webhookAmount}, OrderID: ${row.order_id}`);
+                  if (isAmountMatch) {
+                    console.log(`✅ [MID] Payment detected via PostgreSQL webhook: Amount Rp${webhookAmount}, OrderID: ${row.order_id}`);
 
-                      // Mark as processed di PostgreSQL
-                      await pg.query(
-                        `UPDATE midtrans_webhooks 
+                    // Mark as processed di PostgreSQL
+                    await pg.query(
+                      `UPDATE midtrans_webhooks 
                        SET processed = true, processed_at = now() 
                        WHERE id = $1`,
-                        [row.id]
-                      );
+                      [row.id]
+                    );
 
-                      // Trigger same processing as webhook listener
-                      paymentListener({
-                        orderId: row.order_id || orderId,
-                        transactionStatus: row.transaction_status,
-                        gross_amount: webhookAmount,
-                        paymentType: row.payment_type,
-                        settlementTime: row.settlement_time
-                      });
-                      break;
-                    }
-                  }
-                } else {
-                  // Fallback ke JSON database jika PostgreSQL tidak tersedia
-                  const webhooks = db.data.midtransWebhooks || [];
-                  const unprocessedWebhooks = webhooks.filter(w => !w.processed && w.gross_amount);
-
-                  if (unprocessedWebhooks.length > 0) {
-                    console.log(`🔍 [MID] Checking ${unprocessedWebhooks.length} unprocessed webhooks from JSON, looking for amount Rp${totalAmount}`);
-                  }
-
-                  for (const webhook of unprocessedWebhooks) {
-                    const webhookAmount = Number(webhook.gross_amount || 0);
-                    const amountDiff = Math.abs(webhookAmount - Number(totalAmount));
-                    const isAmountMatch = amountDiff < 1;
-                    const isStatusPaid = /(settlement|capture)/i.test(String(webhook.transactionStatus));
-
-                    console.log(`  - Webhook: Amount Rp${webhookAmount}, Status: ${webhook.transactionStatus}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
-
-                    if (isAmountMatch && isStatusPaid) {
-                      console.log(`✅ [MID] Payment detected via JSON webhook: Amount Rp${webhookAmount}, OrderID: ${webhook.orderId}`);
-
-                      // Mark as processed
-                      webhook.processed = true;
-                      if (typeof db.save === 'function') {
-                        await db.save();
-                      }
-
-                      // Trigger same processing as webhook listener
-                      paymentListener({
-                        orderId: webhook.orderId || orderId,
-                        transactionStatus: webhook.transactionStatus,
-                        gross_amount: webhook.gross_amount
-                      });
-                      break;
-                    }
+                    // Trigger same processing as webhook listener
+                    paymentListener({
+                      orderId: row.order_id || orderId,
+                      transactionStatus: row.transaction_status,
+                      gross_amount: webhookAmount,
+                      paymentType: row.payment_type,
+                      settlementTime: row.settlement_time
+                    });
+                    break;
                   }
                 }
-              } catch (dbError) {
-                // Ignore database errors
-                console.log(`⚠️ [MID] Database webhook check failed:`, dbError.message);
-              }
-            }
+              } else {
+                // Fallback ke JSON database jika PostgreSQL tidak tersedia
+                const webhooks = db.data.midtransWebhooks || [];
+                const unprocessedWebhooks = webhooks.filter(w => !w.processed && w.gross_amount);
 
-            // Fallback: Cek via API juga (optional, untuk backup)
-            if (USE_POLLING && pollCount % 5 === 0) { // Cek setiap 5 polling cycle
-              try {
-                // Cek via checkStaticQRISPayment untuk backup
-                const { checkStaticQRISPayment } = require('./config/midtrans');
-                const backupCheck = await checkStaticQRISPayment(totalAmount, createdAtTs);
-
-                if (backupCheck.found && backupCheck.paid) {
-                  console.log(`✅ [MID] Payment detected via API backup check: ${orderId}`);
-                  // Trigger same processing as webhook
-                  paymentListener({
-                    orderId: orderId,
-                    transactionStatus: backupCheck.status,
-                    gross_amount: backupCheck.gross_amount
-                  });
-                  break;
+                if (unprocessedWebhooks.length > 0) {
+                  console.log(`🔍 [MID] Checking ${unprocessedWebhooks.length} unprocessed webhooks from JSON, looking for amount Rp${totalAmount}`);
                 }
-              } catch (apiError) {
-                // Ignore API errors, continue with webhook
-                console.log(`⚠️ [MID] API backup check failed:`, apiError.message);
+
+                for (const webhook of unprocessedWebhooks) {
+                  const webhookAmount = Number(webhook.gross_amount || 0);
+                  const amountDiff = Math.abs(webhookAmount - Number(totalAmount));
+                  const isAmountMatch = amountDiff < 1;
+                  const isStatusPaid = /(settlement|capture)/i.test(String(webhook.transactionStatus));
+
+                  console.log(`  - Webhook: Amount Rp${webhookAmount}, Status: ${webhook.transactionStatus}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+
+                  if (isAmountMatch && isStatusPaid) {
+                    console.log(`✅ [MID] Payment detected via JSON webhook: Amount Rp${webhookAmount}, OrderID: ${webhook.orderId}`);
+
+                    // Mark as processed
+                    webhook.processed = true;
+                    if (typeof db.save === 'function') {
+                      await db.save();
+                    }
+
+                    // Trigger same processing as webhook listener
+                    paymentListener({
+                      orderId: webhook.orderId || orderId,
+                      transactionStatus: webhook.transactionStatus,
+                      gross_amount: webhook.gross_amount
+                    });
+                    break;
+                  }
+                }
               }
+            } catch (dbError) {
+              // Ignore database errors
+              console.log(`⚠️ [MID] Database webhook check failed:`, dbError.message);
             }
           }
-        } catch (error) {
-          console.error(`❌ [MID] Error processing Midtrans for ${data[0]}:`, error);
-          reply("Gagal membuat QR Code Midtrans. Silakan coba lagi.");
-          if (db.data.order[sender]) {
-            delete db.data.order[sender];
-            requestPendingOrderSave();
+
+          // Fallback: Cek via API juga (optional, untuk backup)
+          if (USE_POLLING && pollCount % 5 === 0) { // Cek setiap 5 polling cycle
+            try {
+              // Cek via checkStaticQRISPayment untuk backup
+              const { checkStaticQRISPayment } = require('./config/midtrans');
+              const backupCheck = await checkStaticQRISPayment(totalAmount, createdAtTs);
+
+              if (backupCheck.found && backupCheck.paid) {
+                console.log(`✅ [MID] Payment detected via API backup check: ${orderId}`);
+                // Trigger same processing as webhook
+                paymentListener({
+                  orderId: orderId,
+                  transactionStatus: backupCheck.status,
+                  gross_amount: backupCheck.gross_amount
+                });
+                break;
+              }
+            } catch (apiError) {
+              // Ignore API errors, continue with webhook
+              console.log(`⚠️ [MID] API backup check failed:`, apiError.message);
+            }
           }
         }
-      } catch (outerError) {
-        console.error('❌ [MID] Outer error:', outerError)
-        reply("Terjadi kesalahan saat memproses pembelian. Silakan coba lagi.")
-      } finally {
-          await releaseLock(sender, 'mid')
+      } catch (error) {
+        console.error(`❌ [MID] Error processing Midtrans for ${data[0]}:`, error);
+        reply("Gagal membuat QR Code Midtrans. Silakan coba lagi.");
+        if (db.data.order[sender]) {
+          delete db.data.order[sender];
+          requestPendingOrderSave();
         }
+      }
+    } catch (outerError) {
+      console.error('❌ [MID] Outer error:', outerError)
+      reply("Terjadi kesalahan saat memproses pembelian. Silakan coba lagi.")
+    } finally {
+      await releaseLock(sender, 'mid')
     }
+  }
     break;
 
       case 'buy': {
-      // 🛡️ RATE LIMIT: Prevent spam (max 3 buy per minute for non-owners)
-      if (!isOwner) {
-        const rateLimit = await checkRateLimit(sender, 'buy', 3, 60)
-        if (!rateLimit.allowed) {
-          return reply(`⚠️ *Terlalu banyak request!*\n\nAnda sudah melakukan ${rateLimit.current} pembelian dalam 1 menit.\nSilakan tunggu ${rateLimit.resetIn} detik lagi.`)
+    // 🛡️ RATE LIMIT: Prevent spam (max 3 buy per minute for non-owners)
+    if (!isOwner) {
+      const rateLimit = await checkRateLimit(sender, 'buy', 3, 60)
+      if (!rateLimit.allowed) {
+        return reply(`⚠️ *Terlalu banyak request!*\n\nAnda sudah melakukan ${rateLimit.current} pembelian dalam 1 menit.\nSilakan tunggu ${rateLimit.resetIn} detik lagi.`)
+      }
+    }
+
+    // 🔒 REDIS LOCK: Prevent race condition (double purchase)
+    const lockAcquired = await acquireLock(sender, 'buy', 30)
+    if (!lockAcquired) {
+      return reply(`⚠️ *Transaksi sedang diproses*\n\nAnda sedang melakukan transaksi lain. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`)
+    }
+
+    try {
+      if (db.data.order[sender] !== undefined) {
+        await releaseLock(sender, 'buy')
+        return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
+      }
+      let data = q.split(" ")
+
+      // Cek apakah ini adalah command untuk owner/admin dengan nomor tujuan
+      let targetNumber = null
+      let isOwnerBuy = false
+      let cleanedNumber = null
+
+      if (isOwner && data.length >= 3) {
+        // Format: buy kode nominal nomorcust
+        // Contoh: buy net2u 1 6281389592981 atau buy net2u 1 +62 852-3554-0944
+        // Gabungkan semua parameter setelah jumlah menjadi nomor (untuk handle spasi dan dash)
+        const nomorTujuan = data.slice(2).join(' ')
+
+        // Fungsi untuk membersihkan nomor WhatsApp
+        function cleanWhatsAppNumber(input) {
+          if (!input) return null
+
+          // Hapus semua karakter selain angka dan +
+          let cleaned = input.replace(/[^\d+]/g, '')
+
+          // Jika dimulai dengan +62, hapus + dan ganti dengan 62
+          if (cleaned.startsWith('+62')) {
+            cleaned = '62' + cleaned.substring(3)
+          }
+          // Jika dimulai dengan 62, biarkan
+          else if (cleaned.startsWith('62')) {
+            // Sudah benar
+          }
+          // Jika dimulai dengan 0, ganti dengan 62
+          else if (cleaned.startsWith('0')) {
+            cleaned = '62' + cleaned.substring(1)
+          }
+          // Jika dimulai dengan 8 (tanpa 0), tambahkan 62
+          else if (cleaned.startsWith('8')) {
+            cleaned = '62' + cleaned
+          }
+
+          return cleaned
         }
+
+        cleanedNumber = cleanWhatsAppNumber(nomorTujuan)
+
+        if (cleanedNumber && cleanedNumber.match(/^62\d{9,13}$/)) {
+          // Validasi nomor WhatsApp Indonesia (62 + 9-13 digit)
+          targetNumber = cleanedNumber + '@s.whatsapp.net'
+          isOwnerBuy = true
+          console.log(`🛒 Owner/Admin buy detected - Target: ${targetNumber}`)
+          console.log(`📱 Original input: ${nomorTujuan} -> Cleaned: ${cleanedNumber}`)
+        } else {
+          return reply(`❌ Format nomor tidak valid.\n\n✅ Format yang diterima:\n• ${prefix + command} ${data[0]} ${data[1]} 6281389592981\n• ${prefix + command} ${data[0]} ${data[1]} +62 852-3554-0944\n• ${prefix + command} ${data[0]} ${data[1]} 085235540944\n• ${prefix + command} ${data[0]} ${data[1]} 85235540944`)
+        }
+      } else if (!isOwner && data.length >= 3) {
+        // Jika bukan owner tapi ada 3 parameter, abaikan parameter ketiga dan stop
+        console.log(`⚠️ Non-owner user tried to use 3 parameters, ignoring third parameter`)
+        return reply(`ℹ️ Parameter ketiga diabaikan. Untuk membeli akun dan mengirim ke nomor lain, hubungi owner/admin.\n\nGunakan format: ${prefix + command} ${data[0]} ${data[1]}`)
       }
 
-      // 🔒 REDIS LOCK: Prevent race condition (double purchase)
-      const lockAcquired = await acquireLock(sender, 'buy', 30)
-      if (!lockAcquired) {
-        return reply(`⚠️ *Transaksi sedang diproses*\n\nAnda sedang melakukan transaksi lain. Harap tunggu sampai selesai atau ketik *${prefix}batal* untuk membatalkan.`)
-      }
-
-      try {
-        if (db.data.order[sender] !== undefined) {
-          await releaseLock(sender, 'buy')
-          return reply(`Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`)
-        }
-        let data = q.split(" ")
-
-        // Cek apakah ini adalah command untuk owner/admin dengan nomor tujuan
-        let targetNumber = null
-        let isOwnerBuy = false
-        let cleanedNumber = null
-
-        if (isOwner && data.length >= 3) {
-          // Format: buy kode nominal nomorcust
-          // Contoh: buy net2u 1 6281389592981 atau buy net2u 1 +62 852-3554-0944
-          // Gabungkan semua parameter setelah jumlah menjadi nomor (untuk handle spasi dan dash)
-          const nomorTujuan = data.slice(2).join(' ')
-
-          // Fungsi untuk membersihkan nomor WhatsApp
-          function cleanWhatsAppNumber(input) {
-            if (!input) return null
-
-            // Hapus semua karakter selain angka dan +
-            let cleaned = input.replace(/[^\d+]/g, '')
-
-            // Jika dimulai dengan +62, hapus + dan ganti dengan 62
-            if (cleaned.startsWith('+62')) {
-              cleaned = '62' + cleaned.substring(3)
-            }
-            // Jika dimulai dengan 62, biarkan
-            else if (cleaned.startsWith('62')) {
-              // Sudah benar
-            }
-            // Jika dimulai dengan 0, ganti dengan 62
-            else if (cleaned.startsWith('0')) {
-              cleaned = '62' + cleaned.substring(1)
-            }
-            // Jika dimulai dengan 8 (tanpa 0), tambahkan 62
-            else if (cleaned.startsWith('8')) {
-              cleaned = '62' + cleaned
-            }
-
-            return cleaned
-          }
-
-          cleanedNumber = cleanWhatsAppNumber(nomorTujuan)
-
-          if (cleanedNumber && cleanedNumber.match(/^62\d{9,13}$/)) {
-            // Validasi nomor WhatsApp Indonesia (62 + 9-13 digit)
-            targetNumber = cleanedNumber + '@s.whatsapp.net'
-            isOwnerBuy = true
-            console.log(`🛒 Owner/Admin buy detected - Target: ${targetNumber}`)
-            console.log(`📱 Original input: ${nomorTujuan} -> Cleaned: ${cleanedNumber}`)
-          } else {
-            return reply(`❌ Format nomor tidak valid.\n\n✅ Format yang diterima:\n• ${prefix + command} ${data[0]} ${data[1]} 6281389592981\n• ${prefix + command} ${data[0]} ${data[1]} +62 852-3554-0944\n• ${prefix + command} ${data[0]} ${data[1]} 085235540944\n• ${prefix + command} ${data[0]} ${data[1]} 85235540944`)
-          }
-        } else if (!isOwner && data.length >= 3) {
-          // Jika bukan owner tapi ada 3 parameter, abaikan parameter ketiga dan stop
-          console.log(`⚠️ Non-owner user tried to use 3 parameters, ignoring third parameter`)
-          return reply(`ℹ️ Parameter ketiga diabaikan. Untuk membeli akun dan mengirim ke nomor lain, hubungi owner/admin.\n\nGunakan format: ${prefix + command} ${data[0]} ${data[1]}`)
-        }
-
-        if (!data[1]) {
-          if (isOwner) {
-            return reply(`Contoh: ${prefix + command} idproduk jumlah\nAtau untuk kirim ke nomor lain: ${prefix + command} idproduk jumlah nomorcust\n\n✅ Format nomor yang diterima:\n• 6281389592981\n• +62 852-3554-0944\n• 085235540944\n• 85235540944`)
-          } else {
-            return reply(`Contoh: ${prefix + command} idproduk jumlah`)
-          }
-        }
-
-        // Pastikan minimal ada 2 parameter (kode dan jumlah)
-        if (data.length < 2) {
+      if (!data[1]) {
+        if (isOwner) {
+          return reply(`Contoh: ${prefix + command} idproduk jumlah\nAtau untuk kirim ke nomor lain: ${prefix + command} idproduk jumlah nomorcust\n\n✅ Format nomor yang diterima:\n• 6281389592981\n• +62 852-3554-0944\n• 085235540944\n• 85235540944`)
+        } else {
           return reply(`Contoh: ${prefix + command} idproduk jumlah`)
         }
+      }
 
-        if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
+      // Pastikan minimal ada 2 parameter (kode dan jumlah)
+      if (data.length < 2) {
+        return reply(`Contoh: ${prefix + command} idproduk jumlah`)
+      }
 
-        const jumlah = Number(data[1])
-        if (!Number.isFinite(jumlah) || jumlah <= 0) return reply("Jumlah harus berupa angka lebih dari 0")
+      if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
 
-        let stok = db.data.produk[data[0]].stok
-        if (stok.length <= 0) return reply("Stok habis, silahkan hubungi Owner untuk restok")
-        if (stok.length < jumlah) return reply(`Stok tersedia ${stok.length}, jadi harap jumlah tidak melebihi stok`)
+      const jumlah = Number(data[1])
+      if (!Number.isFinite(jumlah) || jumlah <= 0) return reply("Jumlah harus berupa angka lebih dari 0")
 
-        const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
-        db.data.order[sender] = { status: 'processing', reffId, idProduk: data[0], jumlah, metode: 'Saldo', startedAt: Date.now() }
-        requestPendingOrderSave()
+      let stok = db.data.produk[data[0]].stok
+      if (stok.length <= 0) return reply("Stok habis, silahkan hubungi Owner untuk restok")
+      if (stok.length < jumlah) return reply(`Stok tersedia ${stok.length}, jadi harap jumlah tidak melebihi stok`)
+
+      const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
+      db.data.order[sender] = { status: 'processing', reffId, idProduk: data[0], jumlah, metode: 'Saldo', startedAt: Date.now() }
+      requestPendingOrderSave()
+
+      try {
+        // Cek saldo user (PG-aware)
+        let totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * jumlah
+        const currentSaldo = typeof dbHelper.getUserSaldoAsync === 'function' ? await dbHelper.getUserSaldoAsync(sender) : dbHelper.getUserSaldo(sender)
+        if (currentSaldo < totalHarga) {
+          delete db.data.order[sender]
+          requestPendingOrderSave()
+          return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(currentSaldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}deposit nominal*`)
+        }
+
+        reply(isOwnerBuy ? `Sedang memproses pembelian untuk nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}.` : "Sedang memproses pembelian dengan saldo...")
+
+        // Kurangi saldo user (PG)
+        await dbHelper.updateUserSaldo(sender, totalHarga, 'subtract')
+
+        await sleep(1000)
+
+        // Proses pembelian langsung
+        db.data.produk[data[0]].terjual += jumlah
+        let dataStok = []
+        for (let i = 0; i < jumlah; i++) {
+          dataStok.push(db.data.produk[data[0]].stok.shift())
+        }
+
+        // Important: Delete old stock property to force recalculation from stok.length
+        delete db.data.produk[data[0]].stock;
+
+        // Improvement: Optimize string building dengan array.join()
+        const detailParts = [
+          `*📦 Produk:* ${db.data.produk[data[0]].name}`,
+          `*📅 Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
+          `*⏰ Jam:* ${jamwib} WIB`,
+          `*Refid:* ${reffId}`,
+          ''
+        ]
+
+        dataStok.forEach((i) => {
+          const dataAkun = i.split("|")
+          detailParts.push(
+            `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
+            `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}`,
+            `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}`,
+            `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}`,
+            `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}`,
+            ''
+          )
+        })
+
+        // Tambahkan SNK
+        detailParts.push(
+          `*╭────「 SYARAT & KETENTUAN 」────╮*`,
+          '',
+          `*📋 SNK PRODUK: ${db.data.produk[data[0]].name}*`,
+          '',
+          db.data.produk[data[0]].snk,
+          '',
+          `*╰────「 END SNK 」────╯*`
+        )
+
+        const detailAkunCustomer = detailParts.join('\n')
+
+        // Improvement: Remove unused detailAkunOwner variable
+
+        // Improvement: Better message sending with detailed logging
+        const recipientNumber = isOwnerBuy ? targetNumber : sender
+        const recipientType = isOwnerBuy ? 'target customer' : 'customer'
+
+        console.log('🚀 STARTING CUSTOMER MESSAGE SEND PROCESS (BUY CASE)');
+        console.log('📞 Customer WhatsApp ID:', recipientNumber);
+        console.log('📏 Message length:', detailAkunCustomer.length);
+        console.log('🎯 Owner buy mode:', isOwnerBuy ? 'YES' : 'NO');
+
+        let customerMessageSent = false;
 
         try {
-          // Cek saldo user (PG-aware)
-          let totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * jumlah
-          const currentSaldo = typeof dbHelper.getUserSaldoAsync === 'function' ? await dbHelper.getUserSaldoAsync(sender) : dbHelper.getUserSaldo(sender)
-          if (currentSaldo < totalHarga) {
-            delete db.data.order[sender]
-            requestPendingOrderSave()
-            return reply(`Saldo tidak cukup! Saldo kamu: Rp${toRupiah(currentSaldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}deposit nominal*`)
+          console.log(`📤 ATTEMPT 1: Sending complete account details to ${recipientType}...`);
+
+          await sleep(500)
+          const messageResult = await ronzz.sendMessage(recipientNumber, { text: detailAkunCustomer }, { quoted: m })
+          console.log('📨 Message result:', JSON.stringify(messageResult?.key || 'no key'))
+          console.log(`✅ SUCCESS: Complete account details sent to ${recipientType}!`)
+          customerMessageSent = true;
+
+        } catch (error) {
+          console.error('❌ ATTEMPT 1 FAILED:', error.message);
+          console.error('❌ Full error:', JSON.stringify(error, null, 2));
+
+          // Attempt 2: coba kirim tanpa quoted message
+          try {
+            console.log(`📤 ATTEMPT 2: Sending without quoted message to ${recipientType}...`);
+            await sleep(500)
+            const msg2 = await ronzz.sendMessage(recipientNumber, { text: detailAkunCustomer })
+            console.log('📨 Message result:', JSON.stringify(msg2?.key || 'no key'))
+            console.log(`✅ SUCCESS: Account details sent without quoted message to ${recipientType}!`)
+            customerMessageSent = true;
+          } catch (fallbackError1) {
+            console.error('❌ ATTEMPT 2 FAILED:', fallbackError1.message);
+            console.error('❌ Full error:', JSON.stringify(fallbackError1, null, 2));
+
+            // Attempt 3: send simple account info
+            try {
+              console.log(`📤 ATTEMPT 3: Sending simple account info to ${recipientType}...`);
+              const simpleParts = [
+                `*📦 AKUN PEMBELIAN*`,
+                '',
+                `*Produk:* ${db.data.produk[data[0]].name}`,
+                `*Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
+                ''
+              ]
+              dataStok.forEach((i, index) => {
+                const dataAkun = i.split("|")
+                simpleParts.push(
+                  `*Akun ${index + 1}:*`,
+                  `Email: ${dataAkun[0] || 'Tidak ada'}`,
+                  `Password: ${dataAkun[1] || 'Tidak ada'}`,
+                  ''
+                )
+              })
+              await sleep(500)
+              const msg3 = await ronzz.sendMessage(recipientNumber, { text: simpleParts.join('\n') })
+              console.log('📨 Message result:', JSON.stringify(msg3?.key || 'no key'))
+              console.log(`✅ SUCCESS: Simple account details sent to ${recipientType}!`)
+              customerMessageSent = true;
+            } catch (fallbackError2) {
+              console.error('❌ ALL ATTEMPTS FAILED:', fallbackError2.message);
+              console.error('❌ CUSTOMER WILL NOT RECEIVE ACCOUNT DETAILS!');
+            }
           }
+        }
 
-          reply(isOwnerBuy ? `Sedang memproses pembelian untuk nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}.` : "Sedang memproses pembelian dengan saldo...")
+        console.log('🏁 CUSTOMER MESSAGE SEND RESULT (BUY CASE):', customerMessageSent ? 'SUCCESS' : 'FAILED');
+        if (isOwnerBuy) {
+          console.log(`🎯 OWNER BUY SUMMARY:`);
+          console.log(`   - Owner: ${sender}`);
+          console.log(`   - Target User: ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}`);
+          console.log(`   - Target WhatsApp: ${targetNumber}`);
+          console.log(`   - Product: ${data[0]} (${jumlah} items)`);
+          console.log(`   - Delivery: ${customerMessageSent ? 'SUCCESS' : 'FAILED'}`);
+          console.log(`   - Database User: ${isOwnerBuy ? (cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || sender.split("@")[0]) : sender.split("@")[0]}`);
+        } else {
+          console.log(`👤 REGULAR BUY SUMMARY:`);
+          console.log(`   - Customer: ${sender}`);
+          console.log(`   - Product: ${data[0]} (${jumlah} items)`);
+          console.log(`   - Delivery: ${customerMessageSent ? 'SUCCESS' : 'FAILED'}`);
+        }
 
-          // Kurangi saldo user (PG)
-          await dbHelper.updateUserSaldo(sender, totalHarga, 'subtract')
-
-          await sleep(1000)
-
-          // Proses pembelian langsung
-          db.data.produk[data[0]].terjual += jumlah
-          let dataStok = []
-          for (let i = 0; i < jumlah; i++) {
-            dataStok.push(db.data.produk[data[0]].stok.shift())
+        // Improvement: Async file write untuk receipt (R2 atau local)
+        try {
+          const result = await saveReceipt(reffId, detailAkunCustomer);
+          if (result.success) {
+            if (result.url) {
+              console.log(`✅ Receipt saved to ${result.storage}: ${result.url}`);
+            } else {
+              console.log(`✅ Receipt saved to ${result.storage}: ${result.path || reffId}`);
+            }
+          } else {
+            console.error('❌ Error saving receipt:', result.error);
           }
+        } catch (receiptError) {
+          console.error('❌ Error saving receipt:', receiptError.message);
+        }
 
-          // Important: Delete old stock property to force recalculation from stok.length
-          delete db.data.produk[data[0]].stock;
+        // Tambah ke database transaksi
+        db.data.transaksi.push({
+          id: data[0],
+          name: db.data.produk[data[0]].name,
+          price: hargaProduk(data[0], db.data.users[sender].role),
+          date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
+          profit: db.data.produk[data[0]].profit,
+          jumlah: jumlah,
+          user: isOwnerBuy ? (cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || sender.split("@")[0]) : sender.split("@")[0],
+          userRole: db.data.users[sender].role,
+          reffId: reffId,
+          metodeBayar: "Saldo",
+          totalBayar: totalHarga,
+          isOwnerBuy: isOwnerBuy,
+          targetNumber: isOwnerBuy ? (cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '')) : null,
+          ownerNumber: isOwnerBuy ? sender.split("@")[0] : null
+        })
 
-          // Improvement: Optimize string building dengan array.join()
-          const detailParts = [
+        // Schedule save after transaction (debounced)
+        if (typeof global.scheduleSave === 'function') {
+          global.scheduleSave();
+        } else {
+          await db.save();
+        }
+
+        // Cek apakah stok habis dan kirim notifikasi ke admin
+        if (db.data.produk[data[0]].stok.length === 0) {
+          // Improvement: Optimize string building
+          const alertParts = [
+            `🚨 *STOK HABIS ALERT!* 🚨`,
+            '',
             `*📦 Produk:* ${db.data.produk[data[0]].name}`,
+            `*🆔 ID Produk:* ${data[0]}`,
+            `*📊 Stok Sebelumnya:* ${jumlah}`,
+            `*📉 Stok Sekarang:* 0 (HABIS)`,
+            `*🛒 Terjual Terakhir:* ${jumlah} akun`,
+            `*👤 Pembeli:* @${sender.split("@")[0]}${isOwnerBuy ? ` (Owner buy ke ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'})` : ''}`,
+            `*💰 Total Transaksi:* Rp${toRupiah(totalHarga)}`,
             `*📅 Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
             `*⏰ Jam:* ${jamwib} WIB`,
-            `*Refid:* ${reffId}`,
-            ''
+            '',
+            `*⚠️ TINDAKAN YANG DIPERLUKAN:*`,
+            `• Segera restok produk ini`,
+            `• Update harga jika diperlukan`,
+            `• Cek profit margin`,
+            '',
+            `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`
           ]
+          const stokHabisMessage = alertParts.join('\n')
 
-          dataStok.forEach((i) => {
-            const dataAkun = i.split("|")
-            detailParts.push(
-              `│ 📧 Email: ${dataAkun[0] || 'Tidak ada'}`,
-              `│ 🔐 Password: ${dataAkun[1] || 'Tidak ada'}`,
-              `│ 👤 Profil: ${dataAkun[2] || 'Tidak ada'}`,
-              `│ 🔢 Pin: ${dataAkun[3] || 'Tidak ada'}`,
-              `│ 🔒 2FA: ${dataAkun[4] || 'Tidak ada'}`,
-              ''
-            )
-          })
-
-          // Tambahkan SNK
-          detailParts.push(
-            `*╭────「 SYARAT & KETENTUAN 」────╮*`,
-            '',
-            `*📋 SNK PRODUK: ${db.data.produk[data[0]].name}*`,
-            '',
-            db.data.produk[data[0]].snk,
-            '',
-            `*╰────「 END SNK 」────╯*`
-          )
-
-          const detailAkunCustomer = detailParts.join('\n')
-
-          // Improvement: Remove unused detailAkunOwner variable
-
-          // Improvement: Better message sending with detailed logging
-          const recipientNumber = isOwnerBuy ? targetNumber : sender
-          const recipientType = isOwnerBuy ? 'target customer' : 'customer'
-
-          console.log('🚀 STARTING CUSTOMER MESSAGE SEND PROCESS (BUY CASE)');
-          console.log('📞 Customer WhatsApp ID:', recipientNumber);
-          console.log('📏 Message length:', detailAkunCustomer.length);
-          console.log('🎯 Owner buy mode:', isOwnerBuy ? 'YES' : 'NO');
-
-          let customerMessageSent = false;
-
-          try {
-            console.log(`📤 ATTEMPT 1: Sending complete account details to ${recipientType}...`);
-
-            await sleep(500)
-            const messageResult = await ronzz.sendMessage(recipientNumber, { text: detailAkunCustomer }, { quoted: m })
-            console.log('📨 Message result:', JSON.stringify(messageResult?.key || 'no key'))
-            console.log(`✅ SUCCESS: Complete account details sent to ${recipientType}!`)
-            customerMessageSent = true;
-
-          } catch (error) {
-            console.error('❌ ATTEMPT 1 FAILED:', error.message);
-            console.error('❌ Full error:', JSON.stringify(error, null, 2));
-
-            // Attempt 2: coba kirim tanpa quoted message
-            try {
-              console.log(`📤 ATTEMPT 2: Sending without quoted message to ${recipientType}...`);
-              await sleep(500)
-              const msg2 = await ronzz.sendMessage(recipientNumber, { text: detailAkunCustomer })
-              console.log('📨 Message result:', JSON.stringify(msg2?.key || 'no key'))
-              console.log(`✅ SUCCESS: Account details sent without quoted message to ${recipientType}!`)
-              customerMessageSent = true;
-            } catch (fallbackError1) {
-              console.error('❌ ATTEMPT 2 FAILED:', fallbackError1.message);
-              console.error('❌ Full error:', JSON.stringify(fallbackError1, null, 2));
-
-              // Attempt 3: send simple account info
-              try {
-                console.log(`📤 ATTEMPT 3: Sending simple account info to ${recipientType}...`);
-                const simpleParts = [
-                  `*📦 AKUN PEMBELIAN*`,
-                  '',
-                  `*Produk:* ${db.data.produk[data[0]].name}`,
-                  `*Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
-                  ''
-                ]
-                dataStok.forEach((i, index) => {
-                  const dataAkun = i.split("|")
-                  simpleParts.push(
-                    `*Akun ${index + 1}:*`,
-                    `Email: ${dataAkun[0] || 'Tidak ada'}`,
-                    `Password: ${dataAkun[1] || 'Tidak ada'}`,
-                    ''
-                  )
-                })
-                await sleep(500)
-                const msg3 = await ronzz.sendMessage(recipientNumber, { text: simpleParts.join('\n') })
-                console.log('📨 Message result:', JSON.stringify(msg3?.key || 'no key'))
-                console.log(`✅ SUCCESS: Simple account details sent to ${recipientType}!`)
-                customerMessageSent = true;
-              } catch (fallbackError2) {
-                console.error('❌ ALL ATTEMPTS FAILED:', fallbackError2.message);
-                console.error('❌ CUSTOMER WILL NOT RECEIVE ACCOUNT DETAILS!');
-              }
-            }
-          }
-
-          console.log('🏁 CUSTOMER MESSAGE SEND RESULT (BUY CASE):', customerMessageSent ? 'SUCCESS' : 'FAILED');
-          if (isOwnerBuy) {
-            console.log(`🎯 OWNER BUY SUMMARY:`);
-            console.log(`   - Owner: ${sender}`);
-            console.log(`   - Target User: ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}`);
-            console.log(`   - Target WhatsApp: ${targetNumber}`);
-            console.log(`   - Product: ${data[0]} (${jumlah} items)`);
-            console.log(`   - Delivery: ${customerMessageSent ? 'SUCCESS' : 'FAILED'}`);
-            console.log(`   - Database User: ${isOwnerBuy ? (cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || sender.split("@")[0]) : sender.split("@")[0]}`);
-          } else {
-            console.log(`👤 REGULAR BUY SUMMARY:`);
-            console.log(`   - Customer: ${sender}`);
-            console.log(`   - Product: ${data[0]} (${jumlah} items)`);
-            console.log(`   - Delivery: ${customerMessageSent ? 'SUCCESS' : 'FAILED'}`);
-          }
-
-          // Improvement: Async file write untuk receipt (R2 atau local)
-          try {
-            const result = await saveReceipt(reffId, detailAkunCustomer);
-            if (result.success) {
-              if (result.url) {
-                console.log(`✅ Receipt saved to ${result.storage}: ${result.url}`);
-              } else {
-                console.log(`✅ Receipt saved to ${result.storage}: ${result.path || reffId}`);
-              }
-            } else {
-              console.error('❌ Error saving receipt:', result.error);
-            }
-          } catch (receiptError) {
-            console.error('❌ Error saving receipt:', receiptError.message);
-          }
-
-          // Tambah ke database transaksi
-          db.data.transaksi.push({
-            id: data[0],
-            name: db.data.produk[data[0]].name,
-            price: hargaProduk(data[0], db.data.users[sender].role),
-            date: moment.tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss"),
-            profit: db.data.produk[data[0]].profit,
-            jumlah: jumlah,
-            user: isOwnerBuy ? (cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || sender.split("@")[0]) : sender.split("@")[0],
-            userRole: db.data.users[sender].role,
-            reffId: reffId,
-            metodeBayar: "Saldo",
-            totalBayar: totalHarga,
-            isOwnerBuy: isOwnerBuy,
-            targetNumber: isOwnerBuy ? (cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '')) : null,
-            ownerNumber: isOwnerBuy ? sender.split("@")[0] : null
-          })
-
-          // Schedule save after transaction (debounced)
-          if (typeof global.scheduleSave === 'function') {
-            global.scheduleSave();
-          } else {
-            await db.save();
-          }
-
-          // Cek apakah stok habis dan kirim notifikasi ke admin
-          if (db.data.produk[data[0]].stok.length === 0) {
-            // Improvement: Optimize string building
-            const alertParts = [
-              `🚨 *STOK HABIS ALERT!* 🚨`,
-              '',
-              `*📦 Produk:* ${db.data.produk[data[0]].name}`,
-              `*🆔 ID Produk:* ${data[0]}`,
-              `*📊 Stok Sebelumnya:* ${jumlah}`,
-              `*📉 Stok Sekarang:* 0 (HABIS)`,
-              `*🛒 Terjual Terakhir:* ${jumlah} akun`,
-              `*👤 Pembeli:* @${sender.split("@")[0]}${isOwnerBuy ? ` (Owner buy ke ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'})` : ''}`,
-              `*💰 Total Transaksi:* Rp${toRupiah(totalHarga)}`,
-              `*📅 Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
-              `*⏰ Jam:* ${jamwib} WIB`,
-              '',
-              `*⚠️ TINDAKAN YANG DIPERLUKAN:*`,
-              `• Segera restok produk ini`,
-              `• Update harga jika diperlukan`,
-              `• Cek profit margin`,
-              '',
-              `*💡 Tips:* Gunakan command *${prefix}addstok ${data[0]} jumlah* untuk menambah stok`
-            ]
-            const stokHabisMessage = alertParts.join('\n')
-
-            // Skip admin stock-empty notifications
-          }
-
-          // Send single comprehensive success message
-          if (customerMessageSent) {
-            if (isOwnerBuy) {
-              reply(`🎉 Pembelian berhasil! Detail akun telah dikirim ke nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}. Terima kasih!`)
-
-            } else if (isGroup) {
-              reply("🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!");
-            } else {
-              reply("🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim di atas. Apabila tidak terlihat rechat agar dikirim ulang Terima kasih!");
-            }
-          } else {
-            if (isOwnerBuy) {
-              reply(`⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun ke nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}. Silakan coba kirim ulang atau hubungi admin.`);
-
-            } else {
-              reply("⚠️ Pembelian dengan saldo berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
-            }
-
-            // Skip failed-delivery alert to admin
-          }
-        } catch (error) {
-          console.log("Error processing buy:", error)
-          reply("Terjadi kesalahan saat memproses pembelian. Silakan coba lagi atau hubungi admin.")
-        } finally {
-          delete db.data.order[sender]
-          await db.save()
+          // Skip admin stock-empty notifications
         }
-      } catch (outerError) {
-        console.error('❌ [BUY] Outer error:', outerError)
-        reply("Terjadi kesalahan saat memproses pembelian. Silakan coba lagi.")
+
+        // Send single comprehensive success message
+        if (customerMessageSent) {
+          if (isOwnerBuy) {
+            reply(`🎉 Pembelian berhasil! Detail akun telah dikirim ke nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}. Terima kasih!`)
+
+          } else if (isGroup) {
+            reply("🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!");
+          } else {
+            reply("🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim di atas. Apabila tidak terlihat rechat agar dikirim ulang Terima kasih!");
+          }
+        } else {
+          if (isOwnerBuy) {
+            reply(`⚠️ Pembelian berhasil, tetapi terjadi masalah saat mengirim detail akun ke nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}. Silakan coba kirim ulang atau hubungi admin.`);
+
+          } else {
+            reply("⚠️ Pembelian dengan saldo berhasil, tetapi terjadi masalah saat mengirim detail akun. Admin akan segera mengirim detail akun secara manual.");
+          }
+
+          // Skip failed-delivery alert to admin
+        }
+      } catch (error) {
+        console.log("Error processing buy:", error)
+        reply("Terjadi kesalahan saat memproses pembelian. Silakan coba lagi atau hubungi admin.")
       } finally {
-        // 🔓 REDIS UNLOCK: Always release lock
-        await releaseLock(sender, 'buy')
+        delete db.data.order[sender]
+        await db.save()
       }
+    } catch (outerError) {
+      console.error('❌ [BUY] Outer error:', outerError)
+      reply("Terjadi kesalahan saat memproses pembelian. Silakan coba lagi.")
+    } finally {
+      // 🔓 REDIS UNLOCK: Always release lock
+      await releaseLock(sender, 'buy')
     }
-    break
+  }
+  break
 
       case 'batal': {
-      let cancelled = false
+    let cancelled = false
 
-      // Initialize if not exists
-      if (!db.data.order) db.data.order = {}
-      if (!db.data.orderDeposit) db.data.orderDeposit = {}
+    // Initialize if not exists
+    if (!db.data.order) db.data.order = {}
+    if (!db.data.orderDeposit) db.data.orderDeposit = {}
 
-      // Jika admin/owner quote pesan user LAIN, batalkan pesanan user yang di-quote
-      if (m.quoted && (isOwner || isGroupAdmins)) {
-        const quotedSender = m.quoted.sender
-        if (quotedSender && quotedSender !== sender) {
-          // Admin membatalkan pesanan user lain
-          if (db.data.order[quotedSender] !== undefined) {
-            try {
-              await ronzz.sendMessage(db.data.order[quotedSender].from, { delete: db.data.order[quotedSender].key })
-            } catch { }
-            delete db.data.order[quotedSender]
-            requestPendingOrderSave()
-            cancelled = true
-          }
-
-          if (db.data.orderDeposit && db.data.orderDeposit[quotedSender] !== undefined) {
-            try {
-              await ronzz.sendMessage(db.data.orderDeposit[quotedSender].from, { delete: db.data.orderDeposit[quotedSender].key })
-            } catch { }
-            delete db.data.orderDeposit[quotedSender]
-            cancelled = true
-          }
-
-          if (cancelled) {
-            reply(`✅ Berhasil membatalkan pembayaran user @${quotedSender.split('@')[0]}`, { mentions: [quotedSender] })
-          } else {
-            reply(`❌ Tidak ada pembayaran yang sedang berlangsung untuk user @${quotedSender.split('@')[0]}`, { mentions: [quotedSender] })
-          }
-          break
+    // Jika admin/owner quote pesan user LAIN, batalkan pesanan user yang di-quote
+    if (m.quoted && (isOwner || isGroupAdmins)) {
+      const quotedSender = m.quoted.sender
+      if (quotedSender && quotedSender !== sender) {
+        // Admin membatalkan pesanan user lain
+        if (db.data.order[quotedSender] !== undefined) {
+          try {
+            await ronzz.sendMessage(db.data.order[quotedSender].from, { delete: db.data.order[quotedSender].key })
+          } catch { }
+          delete db.data.order[quotedSender]
+          requestPendingOrderSave()
+          cancelled = true
         }
-      }
 
-      // Logika: user membatalkan pesanan sendiri (dengan atau tanpa quote)
-      if (db.data.order[sender] !== undefined) {
-        await ronzz.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
-        delete db.data.order[sender]
-        requestPendingOrderSave()
-        cancelled = true
-      }
+        if (db.data.orderDeposit && db.data.orderDeposit[quotedSender] !== undefined) {
+          try {
+            await ronzz.sendMessage(db.data.orderDeposit[quotedSender].from, { delete: db.data.orderDeposit[quotedSender].key })
+          } catch { }
+          delete db.data.orderDeposit[quotedSender]
+          cancelled = true
+        }
 
-      if (db.data.orderDeposit && db.data.orderDeposit[sender] !== undefined) {
-        try {
-          await ronzz.sendMessage(db.data.orderDeposit[sender].from, { delete: db.data.orderDeposit[sender].key })
-        } catch { }
-        delete db.data.orderDeposit[sender]
-        cancelled = true
-      }
-
-      if (cancelled) {
-        reply("Berhasil membatalkan pembayaran")
-      } else {
-        reply("Tidak ada pembayaran yang sedang berlangsung untuk dibatalkan")
+        if (cancelled) {
+          reply(`✅ Berhasil membatalkan pembayaran user @${quotedSender.split('@')[0]}`, { mentions: [quotedSender] })
+        } else {
+          reply(`❌ Tidak ada pembayaran yang sedang berlangsung untuk user @${quotedSender.split('@')[0]}`, { mentions: [quotedSender] })
+        }
+        break
       }
     }
-    break
+
+    // Logika: user membatalkan pesanan sendiri (dengan atau tanpa quote)
+    if (db.data.order[sender] !== undefined) {
+      await ronzz.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
+      delete db.data.order[sender]
+      requestPendingOrderSave()
+      cancelled = true
+    }
+
+    if (db.data.orderDeposit && db.data.orderDeposit[sender] !== undefined) {
+      try {
+        await ronzz.sendMessage(db.data.orderDeposit[sender].from, { delete: db.data.orderDeposit[sender].key })
+      } catch { }
+      delete db.data.orderDeposit[sender]
+      cancelled = true
+    }
+
+    if (cancelled) {
+      reply("Berhasil membatalkan pembayaran")
+    } else {
+      reply("Tidak ada pembayaran yang sedang berlangsung untuk dibatalkan")
+    }
+  }
+  break
 
       // Handler umum: user bisa ketik "netflix", "canva", "viu", dll
       case 'netflix':
@@ -3229,105 +3204,190 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       case 'youtube':
       case 'capcut':
       case 'gpt':
-    try {
-      if (!db?.data?.produk) return reply("❌ Database tidak tersedia atau rusak")
-      const products = db.data.produk
-      if (Object.keys(products).length === 0) return reply("📦 Belum ada produk di database")
+  try {
+    if (!db?.data?.produk) return reply("❌ Database tidak tersedia atau rusak")
+    const products = db.data.produk
+    if (Object.keys(products).length === 0) return reply("📦 Belum ada produk di database")
 
-      // ambil keyword dari command
-      const keyword = command.toLowerCase()
+    // ambil keyword dari command
+    const keyword = command.toLowerCase()
 
-      // cari produk yang mengandung keyword di nama
-      const matchedProducts = Object.entries(products).filter(([id, product]) =>
-        product.name && product.name.toLowerCase().includes(keyword)
-      )
+    // cari produk yang mengandung keyword di nama
+    const matchedProducts = Object.entries(products).filter(([id, product]) =>
+      product.name && product.name.toLowerCase().includes(keyword)
+    )
 
-      if (matchedProducts.length === 0) {
-        return reply(`❌ Tidak ada produk *${command}* yang tersedia saat ini`)
-      }
-
-      // format teks hasil
-      let teks = `*╭────〔 ${command.toUpperCase()} PRODUCTS 📦 〕────╮*\n\n`
-      teks += `*📋 Daftar Produk ${command.toUpperCase()} yang Tersedia:*\n\n`
-
-      matchedProducts.forEach(([productId, product], index) => {
-        const name = product.name || 'Unknown'
-        const desc = product.desc || 'Tidak ada deskripsi'
-        const stokLength = Array.isArray(product.stok) ? product.stok.length : 0
-        const terjual = product.terjual || 0
-
-        // cek harga sesuai role
-        let harga = 'Harga tidak tersedia'
-        try {
-          if (typeof hargaProduk === 'function' && typeof toRupiah === 'function') {
-            const userRole = db.data.users?.[sender]?.role || 'bronze'
-            const hargaValue = hargaProduk(productId, userRole)
-            if (hargaValue && !isNaN(hargaValue)) {
-              harga = `Rp${toRupiah(hargaValue)}`
-            }
-          }
-        } catch { }
-
-        teks += `*${index + 1}. ${name}*\n`
-        teks += `   🔐 Kode: ${productId}\n`
-        teks += `   🏷️ Harga: ${harga}\n`
-        teks += `   📦 Stok: ${stokLength}\n`
-        teks += `   🧾 Terjual: ${terjual}\n`
-        teks += `   📝 Deskripsi: ${desc}\n`
-        teks += `   ✍️ Beli: ${prefix}buy ${productId} 1\n\n`
-      })
-
-      teks += `*╰────「 END LIST 」────╯*\n\n`
-      teks += `*💡 Cara membeli:*\n`
-      teks += `*┊・* Buynow (QRIS Otomatis): ${prefix}buynow kodeproduk jumlah\n`
-      teks += `*┊・*    Contoh: ${prefix}buynow netflix 2\n`
-      teks += `*┊・* Buy (Saldo): ${prefix}buy kodeproduk jumlah\n`
-      teks += `*┊・*    Contoh: ${prefix}buy netflix 2\n`
-      teks += `*📞 Kontak Admin:* @${ownerNomer}\n\n`
-      teks += `_⏰ Pesan ini akan terhapus otomatis dalam 5 menit_`
-
-      const sentMessage = await ronzz.sendMessage(from, {
-        text: teks,
-        mentions: [ownerNomer + "@s.whatsapp.net"]
-      }, { quoted: m })
-
-      scheduleAutoDelete(sentMessage.key, from, 300000, `${command} product list message`)
-
-    } catch (e) {
-      console.error(`❌ Error in ${command} command:`, e)
-      reply(`❌ Terjadi kesalahan pada command ${command}: ${e.message}`)
+    if (matchedProducts.length === 0) {
+      return reply(`❌ Tidak ada produk *${command}* yang tersedia saat ini`)
     }
-    break
+
+    // format teks hasil
+    let teks = `*╭────〔 ${command.toUpperCase()} PRODUCTS 📦 〕────╮*\n\n`
+    teks += `*📋 Daftar Produk ${command.toUpperCase()} yang Tersedia:*\n\n`
+
+    matchedProducts.forEach(([productId, product], index) => {
+      const name = product.name || 'Unknown'
+      const desc = product.desc || 'Tidak ada deskripsi'
+      const stokLength = Array.isArray(product.stok) ? product.stok.length : 0
+      const terjual = product.terjual || 0
+
+      // cek harga sesuai role
+      let harga = 'Harga tidak tersedia'
+      try {
+        if (typeof hargaProduk === 'function' && typeof toRupiah === 'function') {
+          const userRole = db.data.users?.[sender]?.role || 'bronze'
+          const hargaValue = hargaProduk(productId, userRole)
+          if (hargaValue && !isNaN(hargaValue)) {
+            harga = `Rp${toRupiah(hargaValue)}`
+          }
+        }
+      } catch { }
+
+      teks += `*${index + 1}. ${name}*\n`
+      teks += `   🔐 Kode: ${productId}\n`
+      teks += `   🏷️ Harga: ${harga}\n`
+      teks += `   📦 Stok: ${stokLength}\n`
+      teks += `   🧾 Terjual: ${terjual}\n`
+      teks += `   📝 Deskripsi: ${desc}\n`
+      teks += `   ✍️ Beli: ${prefix}buy ${productId} 1\n\n`
+    })
+
+    teks += `*╰────「 END LIST 」────╯*\n\n`
+    teks += `*💡 Cara membeli:*\n`
+    teks += `*┊・* Buynow (QRIS Otomatis): ${prefix}buynow kodeproduk jumlah\n`
+    teks += `*┊・*    Contoh: ${prefix}buynow netflix 2\n`
+    teks += `*┊・* Buy (Saldo): ${prefix}buy kodeproduk jumlah\n`
+    teks += `*┊・*    Contoh: ${prefix}buy netflix 2\n`
+    teks += `*📞 Kontak Admin:* @${ownerNomer}\n\n`
+    teks += `_⏰ Pesan ini akan terhapus otomatis dalam 5 menit_`
+
+    const sentMessage = await ronzz.sendMessage(from, {
+      text: teks,
+      mentions: [ownerNomer + "@s.whatsapp.net"]
+    }, { quoted: m })
+
+    scheduleAutoDelete(sentMessage.key, from, 300000, `${command} product list message`)
+
+  } catch (e) {
+    console.error(`❌ Error in ${command} command:`, e)
+    reply(`❌ Terjadi kesalahan pada command ${command}: ${e.message}`)
+  }
+  break
 
       case 'ceksaldo': case 'saldo': {
-      // Check if there's a phone number parameter
-      if (args.length > 0) {
-        // Only owner can check other people's saldo by phone number
-        if (!isOwner) {
-          reply(`❌ Maaf, hanya owner yang bisa cek saldo user lain dengan nomor HP.\n\n💡 *Tips:* Gunakan command ini tanpa parameter untuk cek saldo sendiri.`);
-          return;
+    // Check if there's a phone number parameter
+    if (args.length > 0) {
+      // Only owner can check other people's saldo by phone number
+      if (!isOwner) {
+        reply(`❌ Maaf, hanya owner yang bisa cek saldo user lain dengan nomor HP.\n\n💡 *Tips:* Gunakan command ini tanpa parameter untuk cek saldo sendiri.`);
+        return;
+      }
+
+      let phoneNumber = args[0];
+
+      // Clean phone number (remove +, -, spaces, etc)
+      phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+
+      // Check both formats: with and without @s.whatsapp.net suffix
+      const cleanPhoneNumber = phoneNumber;
+      const targetUserIdWithSuffix = phoneNumber + '@s.whatsapp.net';
+
+      // Try to find user in database with both formats
+      let targetUser = null;
+      let foundKey = null;
+
+      if (db.data.users && db.data.users[cleanPhoneNumber]) {
+        targetUser = db.data.users[cleanPhoneNumber];
+        foundKey = cleanPhoneNumber;
+      } else if (db.data.users && db.data.users[targetUserIdWithSuffix]) {
+        targetUser = db.data.users[targetUserIdWithSuffix];
+        foundKey = targetUserIdWithSuffix;
+      }
+
+      if (targetUser) {
+        // Try to get saldo from cache first for better performance
+        let saldo = getCachedSaldo(foundKey);
+        if (saldo === null) {
+          // If not in cache, get from database and cache it
+          saldo = parseInt(targetUser.saldo) || 0;
+          setCachedSaldo(foundKey, saldo);
         }
 
-        let phoneNumber = args[0];
+        const username = targetUser.username || `User ${cleanPhoneNumber.slice(-4)}`;
 
-        // Clean phone number (remove +, -, spaces, etc)
-        phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+        reply(`*💰 Cek Saldo User (Owner Only)*\n\n👤 *User:* ${username}\n📱 *Nomor HP:* ${cleanPhoneNumber}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`);
+      } else {
+        // User not found, create new user with 0 saldo
+        if (!db.data.users) db.data.users = {};
 
-        // Check both formats: with and without @s.whatsapp.net suffix
-        const cleanPhoneNumber = phoneNumber;
-        const targetUserIdWithSuffix = phoneNumber + '@s.whatsapp.net';
+        // Create user with both formats
+        db.data.users[cleanPhoneNumber] = {
+          saldo: 0,
+          role: 'bronze',
+          username: `User ${cleanPhoneNumber.slice(-4)}`,
+          createdAt: new Date().toISOString()
+        };
+
+        // Also create with suffix format for consistency
+        db.data.users[targetUserIdWithSuffix] = {
+          saldo: 0,
+          role: 'bronze',
+          username: `User ${cleanPhoneNumber.slice(-4)}`,
+          createdAt: new Date().toISOString()
+        };
+
+        await db.save();
+
+        reply(`*💰 Cek Saldo User (Owner Only)*\n\n👤 *User:* User ${cleanPhoneNumber.slice(-4)}\n📱 *Nomor HP:* ${cleanPhoneNumber}\n💳 *Saldo:* Rp0\n\n👑 *Checked by:* Owner\n\n💡 *Info:* User baru dibuat dengan saldo 0`);
+      }
+    }
+    // Check if this is a reply/quote reply
+    else if (m.quoted) {
+      // Only owner can check other people's saldo
+      if (!isOwner) {
+        reply(`❌ Maaf, hanya owner yang bisa cek saldo user lain.\n\n💡 *Tips:* Gunakan command ini tanpa reply untuk cek saldo sendiri.`, { quoted: m });
+        return;
+      }
+
+      // Get the quoted message sender - use m.quoted.sender which is processed by myfunc.js
+      const quotedSender = m.quoted.sender;
+
+      // Debug: Log the quoted message structure
+      console.log('🔍 Quote Debug:', {
+        quotedSender,
+        quoted: m.quoted,
+        participant: m.quoted.participant,
+        key: m.quoted.key,
+        sender: m.quoted.sender,
+        isQuotedMsg: m.isQuotedMsg,
+        contextInfo: m.msg?.contextInfo
+      });
+
+      if (quotedSender) {
+        // Extract user ID from quoted sender
+        const targetUserId = quotedSender.split('@')[0];
+        const targetUserIdWithSuffix = quotedSender;
 
         // Try to find user in database with both formats
         let targetUser = null;
         let foundKey = null;
 
-        if (db.data.users && db.data.users[cleanPhoneNumber]) {
-          targetUser = db.data.users[cleanPhoneNumber];
-          foundKey = cleanPhoneNumber;
+        if (db.data.users && db.data.users[targetUserId]) {
+          targetUser = db.data.users[targetUserId];
+          foundKey = targetUserId;
         } else if (db.data.users && db.data.users[targetUserIdWithSuffix]) {
           targetUser = db.data.users[targetUserIdWithSuffix];
           foundKey = targetUserIdWithSuffix;
         }
+
+        // Debug: Log database search
+        console.log('🔍 Database Search:', {
+          targetUserId,
+          targetUserIdWithSuffix,
+          foundInDB: !!targetUser,
+          foundKey,
+          availableKeys: Object.keys(db.data.users || {}).slice(0, 5) // Show first 5 keys
+        });
 
         if (targetUser) {
           // Try to get saldo from cache first for better performance
@@ -3338,18 +3398,18 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             setCachedSaldo(foundKey, saldo);
           }
 
-          const username = targetUser.username || `User ${cleanPhoneNumber.slice(-4)}`;
+          const username = targetUser.username || `User ${targetUserId.slice(-4)}`;
 
-          reply(`*💰 Cek Saldo User (Owner Only)*\n\n👤 *User:* ${username}\n📱 *Nomor HP:* ${cleanPhoneNumber}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`);
+          reply(`*💰 Cek Saldo User Lain (Owner Only)*\n\n👤 *User:* ${username}\n🆔 *ID:* ${targetUserId}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`, { quoted: m });
         } else {
           // User not found, create new user with 0 saldo
           if (!db.data.users) db.data.users = {};
 
           // Create user with both formats
-          db.data.users[cleanPhoneNumber] = {
+          db.data.users[targetUserId] = {
             saldo: 0,
             role: 'bronze',
-            username: `User ${cleanPhoneNumber.slice(-4)}`,
+            username: `User ${targetUserId.slice(-4)}`,
             createdAt: new Date().toISOString()
           };
 
@@ -3357,776 +3417,691 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           db.data.users[targetUserIdWithSuffix] = {
             saldo: 0,
             role: 'bronze',
-            username: `User ${cleanPhoneNumber.slice(-4)}`,
+            username: `User ${targetUserId.slice(-4)}`,
             createdAt: new Date().toISOString()
           };
 
           await db.save();
 
-          reply(`*💰 Cek Saldo User (Owner Only)*\n\n👤 *User:* User ${cleanPhoneNumber.slice(-4)}\n📱 *Nomor HP:* ${cleanPhoneNumber}\n💳 *Saldo:* Rp0\n\n👑 *Checked by:* Owner\n\n💡 *Info:* User baru dibuat dengan saldo 0`);
-        }
-      }
-      // Check if this is a reply/quote reply
-      else if (m.quoted) {
-        // Only owner can check other people's saldo
-        if (!isOwner) {
-          reply(`❌ Maaf, hanya owner yang bisa cek saldo user lain.\n\n💡 *Tips:* Gunakan command ini tanpa reply untuk cek saldo sendiri.`, { quoted: m });
-          return;
-        }
-
-        // Get the quoted message sender - use m.quoted.sender which is processed by myfunc.js
-        const quotedSender = m.quoted.sender;
-
-        // Debug: Log the quoted message structure
-        console.log('🔍 Quote Debug:', {
-          quotedSender,
-          quoted: m.quoted,
-          participant: m.quoted.participant,
-          key: m.quoted.key,
-          sender: m.quoted.sender,
-          isQuotedMsg: m.isQuotedMsg,
-          contextInfo: m.msg?.contextInfo
-        });
-
-        if (quotedSender) {
-          // Extract user ID from quoted sender
-          const targetUserId = quotedSender.split('@')[0];
-          const targetUserIdWithSuffix = quotedSender;
-
-          // Try to find user in database with both formats
-          let targetUser = null;
-          let foundKey = null;
-
-          if (db.data.users && db.data.users[targetUserId]) {
-            targetUser = db.data.users[targetUserId];
-            foundKey = targetUserId;
-          } else if (db.data.users && db.data.users[targetUserIdWithSuffix]) {
-            targetUser = db.data.users[targetUserIdWithSuffix];
-            foundKey = targetUserIdWithSuffix;
-          }
-
-          // Debug: Log database search
-          console.log('🔍 Database Search:', {
-            targetUserId,
-            targetUserIdWithSuffix,
-            foundInDB: !!targetUser,
-            foundKey,
-            availableKeys: Object.keys(db.data.users || {}).slice(0, 5) // Show first 5 keys
-          });
-
-          if (targetUser) {
-            // Try to get saldo from cache first for better performance
-            let saldo = getCachedSaldo(foundKey);
-            if (saldo === null) {
-              // If not in cache, get from database and cache it
-              saldo = parseInt(targetUser.saldo) || 0;
-              setCachedSaldo(foundKey, saldo);
-            }
-
-            const username = targetUser.username || `User ${targetUserId.slice(-4)}`;
-
-            reply(`*💰 Cek Saldo User Lain (Owner Only)*\n\n👤 *User:* ${username}\n🆔 *ID:* ${targetUserId}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`, { quoted: m });
-          } else {
-            // User not found, create new user with 0 saldo
-            if (!db.data.users) db.data.users = {};
-
-            // Create user with both formats
-            db.data.users[targetUserId] = {
-              saldo: 0,
-              role: 'bronze',
-              username: `User ${targetUserId.slice(-4)}`,
-              createdAt: new Date().toISOString()
-            };
-
-            // Also create with suffix format for consistency
-            db.data.users[targetUserIdWithSuffix] = {
-              saldo: 0,
-              role: 'bronze',
-              username: `User ${targetUserId.slice(-4)}`,
-              createdAt: new Date().toISOString()
-            };
-
-            await db.save();
-
-            reply(`*💰 Cek Saldo User Lain (Owner Only)*\n\n👤 *User:* User ${targetUserId.slice(-4)}\n🆔 *ID:* ${targetUserId}\n💳 *Saldo:* Rp0\n\n👑 *Checked by:* Owner\n\n💡 *Info:* User baru dibuat dengan saldo 0`, { quoted: m });
-          }
-        } else {
-          reply(`❌ Tidak bisa mendapatkan informasi user dari pesan yang di-reply.\n\n💡 *Tips:* Reply/quote reply pesan user lain yang ingin di-cek saldonya.\n\n🔍 *Debug Info:*\n• Quoted Structure: ${JSON.stringify(m.quoted, null, 2)}`, { quoted: m });
+          reply(`*💰 Cek Saldo User Lain (Owner Only)*\n\n👤 *User:* User ${targetUserId.slice(-4)}\n🆔 *ID:* ${targetUserId}\n💳 *Saldo:* Rp0\n\n👑 *Checked by:* Owner\n\n💡 *Info:* User baru dibuat dengan saldo 0`, { quoted: m });
         }
       } else {
-        // If not reply and no parameter, check own saldo (all users can do this)
-        // Self saldo check
-        const senderWithoutSuffix = sender.replace(/@s\.whatsapp\.net$/, '');
-        const saldo = typeof dbHelper.getUserSaldoAsync === 'function' ? await dbHelper.getUserSaldoAsync(sender) : dbHelper.getUserSaldo(sender);
-
-        // Try to find user record key for display
-        let foundKey = sender;
-        if (db.data && db.data.users) {
-          if (!db.data.users[sender] && db.data.users[senderWithoutSuffix]) {
-            foundKey = senderWithoutSuffix;
-          }
-        }
-
-        const user = (db.data && db.data.users && db.data.users[foundKey]) || {};
-        const username = user.username || `User ${senderWithoutSuffix.slice(-4)}`;
-
-        reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* ${username}\n🆔 *ID:* ${foundKey}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n💡 *Saldo hanya untuk transaksi dibot ini.*`);
+        reply(`❌ Tidak bisa mendapatkan informasi user dari pesan yang di-reply.\n\n💡 *Tips:* Reply/quote reply pesan user lain yang ingin di-cek saldonya.\n\n🔍 *Debug Info:*\n• Quoted Structure: ${JSON.stringify(m.quoted, null, 2)}`, { quoted: m });
       }
+    } else {
+      // If not reply and no parameter, check own saldo (all users can do this)
+      // Self saldo check
+      const senderWithoutSuffix = sender.replace(/@s\.whatsapp\.net$/, '');
+      const saldo = typeof dbHelper.getUserSaldoAsync === 'function' ? await dbHelper.getUserSaldoAsync(sender) : dbHelper.getUserSaldo(sender);
+
+      // Try to find user record key for display
+      let foundKey = sender;
+      if (db.data && db.data.users) {
+        if (!db.data.users[sender] && db.data.users[senderWithoutSuffix]) {
+          foundKey = senderWithoutSuffix;
+        }
+      }
+
+      const user = (db.data && db.data.users && db.data.users[foundKey]) || {};
+      const username = user.username || `User ${senderWithoutSuffix.slice(-4)}`;
+
+      reply(`*💰 Cek Saldo Sendiri*\n\n👤 *User:* ${username}\n🆔 *ID:* ${foundKey}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n💡 *Saldo hanya untuk transaksi dibot ini.*`);
     }
-    break
+  }
+  break
 
       case 'addsaldo': {
-      if (!isOwner) return reply(mess.owner)
-      if (!q) return reply(`Contoh: ${prefix + command} 628xx,20000`)
-      if (!q.split(",")[0]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
-      if (!q.split(",")[1]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
-      let nomorNya = q.split(",")[0].replace(/[^0-9]/g, '') + "@s.whatsapp.net"
-      let nominal = Number(q.split(",")[1])
+    if (!isOwner) return reply(mess.owner)
+    if (!q) return reply(`Contoh: ${prefix + command} 628xx,20000`)
+    if (!q.split(",")[0]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
+    if (!q.split(",")[1]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
+    let nomorNya = q.split(",")[0].replace(/[^0-9]/g, '') + "@s.whatsapp.net"
+    let nominal = Number(q.split(",")[1])
 
-      // Check if user exists, if not create them
-      if (!db.data.users[nomorNya]) {
-        db.data.users[nomorNya] = {
-          saldo: 0,
-          role: 'bronze'
-        }
+    // Check if user exists, if not create them
+    if (!db.data.users[nomorNya]) {
+      db.data.users[nomorNya] = {
+        saldo: 0,
+        role: 'bronze'
       }
-
-      const previousSaldo = Number(db.data.users[nomorNya].saldo || 0)
-      await dbHelper.updateUserSaldo(nomorNya, nominal, 'add')
-      await sleep(50)
-      const newSaldo = Number(db.data.users[nomorNya].saldo || (previousSaldo + nominal))
-
-      try {
-        await dbHelper.recordSaldoHistory({
-          userId: nomorNya,
-          action: 'manual-add',
-          method: 'admin',
-          source: 'addsaldo',
-          amount: nominal,
-          before: previousSaldo,
-          after: newSaldo,
-          actor: sender,
-          notes: `Manual addsaldo oleh @${sender.split('@')[0]}`
-        })
-      } catch (historyError) {
-        console.error('❌ [HISTORY] Failed to record addsaldo history:', historyError.message)
-      }
-
-      // Notifikasi ke admin
-      ronzz.sendMessage(from, { text: `*SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
-
-      // Notifikasi ke user yang ditambahkan saldonya
-      ronzz.sendMessage(nomorNya, { text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
     }
-    break
+
+    const previousSaldo = Number(db.data.users[nomorNya].saldo || 0)
+    await dbHelper.updateUserSaldo(nomorNya, nominal, 'add')
+    await sleep(50)
+    const newSaldo = Number(db.data.users[nomorNya].saldo || (previousSaldo + nominal))
+
+    try {
+      await dbHelper.recordSaldoHistory({
+        userId: nomorNya,
+        action: 'manual-add',
+        method: 'admin',
+        source: 'addsaldo',
+        amount: nominal,
+        before: previousSaldo,
+        after: newSaldo,
+        actor: sender,
+        notes: `Manual addsaldo oleh @${sender.split('@')[0]}`
+      })
+    } catch (historyError) {
+      console.error('❌ [HISTORY] Failed to record addsaldo history:', historyError.message)
+    }
+
+    // Notifikasi ke admin
+    ronzz.sendMessage(from, { text: `*SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
+
+    // Notifikasi ke user yang ditambahkan saldonya
+    ronzz.sendMessage(nomorNya, { text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
+  }
+  break
 
       case 'minsaldo': {
-      if (!isOwner) return reply(mess.owner)
-      if (!q) return reply(`Contoh: ${prefix + command} 628xx,20000`)
-      if (!q.split(",")[0]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
-      if (!q.split(",")[1]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
+    if (!isOwner) return reply(mess.owner)
+    if (!q) return reply(`Contoh: ${prefix + command} 628xx,20000`)
+    if (!q.split(",")[0]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
+    if (!q.split(",")[1]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
 
-      let nomorNya = q.split(",")[0].replace(/[^0-9]/g, '') + "@s.whatsapp.net"
-      let nominal = Number(q.split(",")[1])
+    let nomorNya = q.split(",")[0].replace(/[^0-9]/g, '') + "@s.whatsapp.net"
+    let nominal = Number(q.split(",")[1])
 
-      // Check if user exists, if not create them
-      if (!db.data.users[nomorNya]) {
-        db.data.users[nomorNya] = {
-          saldo: 0,
-          role: 'bronze'
-        }
+    // Check if user exists, if not create them
+    if (!db.data.users[nomorNya]) {
+      db.data.users[nomorNya] = {
+        saldo: 0,
+        role: 'bronze'
       }
-
-      // Validate saldo before deduction
-      if (db.data.users[nomorNya].saldo <= 0) return reply("User belum terdaftar di database saldo atau saldo 0.")
-      if (db.data.users[nomorNya].saldo < nominal) return reply(`Saldo user tidak cukup! Saldo: Rp${toRupiah(db.data.users[nomorNya].saldo)}, yang ingin dikurangi: Rp${toRupiah(nominal)}`)
-
-      const previousSaldo = Number(db.data.users[nomorNya].saldo || 0)
-      await dbHelper.updateUserSaldo(nomorNya, nominal, 'subtract')
-      await sleep(50)
-      const newSaldo = Number(db.data.users[nomorNya].saldo || Math.max(0, previousSaldo - nominal))
-
-      try {
-        await dbHelper.recordSaldoHistory({
-          userId: nomorNya,
-          action: 'manual-subtract',
-          method: 'admin',
-          source: 'minsaldo',
-          amount: -Math.abs(nominal),
-          before: previousSaldo,
-          after: newSaldo,
-          actor: sender,
-          notes: `Manual minsado oleh @${sender.split('@')[0]}`
-        })
-      } catch (historyError) {
-        console.error('❌ [HISTORY] Failed to record minsado history:', historyError.message)
-      }
-
-      // Notifikasi ke admin
-      ronzz.sendMessage(from, { text: `*SALDO BERHASIL DIKURANGI!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
-
-      // Notifikasi ke user yang dikurangi saldonya
-      ronzz.sendMessage(nomorNya, { text: `⚠️ *SALDO TELAH DIKURANGI!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
     }
-    break
+
+    // Validate saldo before deduction
+    if (db.data.users[nomorNya].saldo <= 0) return reply("User belum terdaftar di database saldo atau saldo 0.")
+    if (db.data.users[nomorNya].saldo < nominal) return reply(`Saldo user tidak cukup! Saldo: Rp${toRupiah(db.data.users[nomorNya].saldo)}, yang ingin dikurangi: Rp${toRupiah(nominal)}`)
+
+    const previousSaldo = Number(db.data.users[nomorNya].saldo || 0)
+    await dbHelper.updateUserSaldo(nomorNya, nominal, 'subtract')
+    await sleep(50)
+    const newSaldo = Number(db.data.users[nomorNya].saldo || Math.max(0, previousSaldo - nominal))
+
+    try {
+      await dbHelper.recordSaldoHistory({
+        userId: nomorNya,
+        action: 'manual-subtract',
+        method: 'admin',
+        source: 'minsaldo',
+        amount: -Math.abs(nominal),
+        before: previousSaldo,
+        after: newSaldo,
+        actor: sender,
+        notes: `Manual minsado oleh @${sender.split('@')[0]}`
+      })
+    } catch (historyError) {
+      console.error('❌ [HISTORY] Failed to record minsado history:', historyError.message)
+    }
+
+    // Notifikasi ke admin
+    ronzz.sendMessage(from, { text: `*SALDO BERHASIL DIKURANGI!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
+
+    // Notifikasi ke user yang dikurangi saldonya
+    ronzz.sendMessage(nomorNya, { text: `⚠️ *SALDO TELAH DIKURANGI!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
+  }
+  break
 
       case 'isi': {
-      if (!isOwner) return reply(mess.owner)
-      if (!isQuotedMsg) return reply(`Reply pesan orang yang ingin diisi saldonya dengan caption *${prefix + command} nominal*\n\nContoh: ${prefix + command} 100000`)
-      if (!q) return reply(`Masukkan nominal saldo yang ingin diisi!\n\nContoh: ${prefix + command} 100000`)
+    if (!isOwner) return reply(mess.owner)
+    if (!isQuotedMsg) return reply(`Reply pesan orang yang ingin diisi saldonya dengan caption *${prefix + command} nominal*\n\nContoh: ${prefix + command} 100000`)
+    if (!q) return reply(`Masukkan nominal saldo yang ingin diisi!\n\nContoh: ${prefix + command} 100000`)
 
-      let nominal = parseInt(q.replace(/[^0-9]/g, ''))
-      if (isNaN(nominal) || nominal <= 0) return reply(`Nominal tidak valid! Masukkan angka yang benar.\n\nContoh: ${prefix + command} 100000`)
+    let nominal = parseInt(q.replace(/[^0-9]/g, ''))
+    if (isNaN(nominal) || nominal <= 0) return reply(`Nominal tidak valid! Masukkan angka yang benar.\n\nContoh: ${prefix + command} 100000`)
 
-      let targetUser = m.quoted.sender
-      if (!db.data.users[targetUser]) {
-        db.data.users[targetUser] = {
-          saldo: 0,
-          role: 'bronze'
-        }
+    let targetUser = m.quoted.sender
+    if (!db.data.users[targetUser]) {
+      db.data.users[targetUser] = {
+        saldo: 0,
+        role: 'bronze'
       }
-
-      const previousSaldo = Number(db.data.users[targetUser].saldo || 0)
-      await dbHelper.updateUserSaldo(targetUser, nominal, 'add')
-      await sleep(50)
-      const newSaldo = Number(db.data.users[targetUser].saldo || (previousSaldo + nominal))
-
-      try {
-        await dbHelper.recordSaldoHistory({
-          userId: targetUser,
-          action: 'manual-add',
-          method: 'admin',
-          source: 'isi',
-          amount: nominal,
-          before: previousSaldo,
-          after: newSaldo,
-          actor: sender,
-          notes: `Isi saldo manual oleh @${sender.split('@')[0]}`
-        })
-      } catch (historyError) {
-        console.error('❌ [HISTORY] Failed to record isi history:', historyError.message)
-      }
-
-      reply(`✅ *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${targetUser.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[targetUser].saldo)}\n\n*By:* @${sender.split('@')[0]}`, { mentions: [targetUser, sender] })
     }
-    break
+
+    const previousSaldo = Number(db.data.users[targetUser].saldo || 0)
+    await dbHelper.updateUserSaldo(targetUser, nominal, 'add')
+    await sleep(50)
+    const newSaldo = Number(db.data.users[targetUser].saldo || (previousSaldo + nominal))
+
+    try {
+      await dbHelper.recordSaldoHistory({
+        userId: targetUser,
+        action: 'manual-add',
+        method: 'admin',
+        source: 'isi',
+        amount: nominal,
+        before: previousSaldo,
+        after: newSaldo,
+        actor: sender,
+        notes: `Isi saldo manual oleh @${sender.split('@')[0]}`
+      })
+    } catch (historyError) {
+      console.error('❌ [HISTORY] Failed to record isi history:', historyError.message)
+    }
+
+    reply(`✅ *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${targetUser.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[targetUser].saldo)}\n\n*By:* @${sender.split('@')[0]}`, { mentions: [targetUser, sender] })
+  }
+  break
 
       case 'antilink': {
-      if (!isGroup) return reply(mess.group)
-      if (!isGroupAdmins && !isOwner) return reply(mess.admin)
-      if (!q) return reply(`Contoh: ${prefix + command} on/off`)
-      if (q.toLowerCase() == "on") {
-        if (db.data.chat[from].antilink) return reply('Antilink sudah aktif di grup ini.')
-        db.data.chat[from].antilink = true
-        reply('Sukses mengaktifkan antilink di grup ini.')
-      } else if (q.toLowerCase() == "off") {
-        if (!db.data.chat[from].antilink) return reply('Antilink sudah tidak aktif di grup ini.')
-        db.data.chat[from].antilink = false
-        reply('Sukses menonaktifkan antilink di grup ini.')
-      }
+    if (!isGroup) return reply(mess.group)
+    if (!isGroupAdmins && !isOwner) return reply(mess.admin)
+    if (!q) return reply(`Contoh: ${prefix + command} on/off`)
+    if (q.toLowerCase() == "on") {
+      if (db.data.chat[from].antilink) return reply('Antilink sudah aktif di grup ini.')
+      db.data.chat[from].antilink = true
+      reply('Sukses mengaktifkan antilink di grup ini.')
+    } else if (q.toLowerCase() == "off") {
+      if (!db.data.chat[from].antilink) return reply('Antilink sudah tidak aktif di grup ini.')
+      db.data.chat[from].antilink = false
+      reply('Sukses menonaktifkan antilink di grup ini.')
     }
-    break
+  }
+  break
 
       case 'antilinkv2': {
-      if (!isGroup) return reply(mess.group)
-      if (!isGroupAdmins && !isOwner) return reply(mess.admin)
-      if (!q) return reply(`Contoh: ${prefix + command} on/off`)
-      if (q.toLowerCase() == "on") {
-        if (db.data.chat[from].antilink2) return reply('Antilinkv2 sudah aktif di grup ini.')
-        db.data.chat[from].antilink2 = true
-        reply('Sukses mengaktifkan antilinkv2 di grup ini.')
-      } else if (q.toLowerCase() == "off") {
-        if (!db.data.chat[from].antilink2) return reply('Antilinkv2 sudah tidak aktif di grup ini.')
-        db.data.chat[from].antilink2 = false
-        reply('Sukses menonaktifkan antilinkv2 di grup ini.')
-      }
+    if (!isGroup) return reply(mess.group)
+    if (!isGroupAdmins && !isOwner) return reply(mess.admin)
+    if (!q) return reply(`Contoh: ${prefix + command} on/off`)
+    if (q.toLowerCase() == "on") {
+      if (db.data.chat[from].antilink2) return reply('Antilinkv2 sudah aktif di grup ini.')
+      db.data.chat[from].antilink2 = true
+      reply('Sukses mengaktifkan antilinkv2 di grup ini.')
+    } else if (q.toLowerCase() == "off") {
+      if (!db.data.chat[from].antilink2) return reply('Antilinkv2 sudah tidak aktif di grup ini.')
+      db.data.chat[from].antilink2 = false
+      reply('Sukses menonaktifkan antilinkv2 di grup ini.')
     }
-    break
+  }
+  break
 
       case 'anticall': {
-      if (!isOwner) return reply(mess.owner)
-      if (!q) return reply(`Contoh: ${prefix + command} on/off`)
-      if (q.toLowerCase() == "on") {
-        if (db.data.chat[from].anticall) return reply('Anticall sudah aktif.')
-        db.data.chat[from].anticall = true
-        reply('Sukses mengaktifkan anticall.')
-      } else if (q.toLowerCase() == "off") {
-        if (!db.data.chat[from].anticall) return reply('Anticall sudah tidak aktif.')
-        db.data.chat[from].anticall = false
-        reply('Sukses menonaktifkan anticall.')
-      }
+    if (!isOwner) return reply(mess.owner)
+    if (!q) return reply(`Contoh: ${prefix + command} on/off`)
+    if (q.toLowerCase() == "on") {
+      if (db.data.chat[from].anticall) return reply('Anticall sudah aktif.')
+      db.data.chat[from].anticall = true
+      reply('Sukses mengaktifkan anticall.')
+    } else if (q.toLowerCase() == "off") {
+      if (!db.data.chat[from].anticall) return reply('Anticall sudah tidak aktif.')
+      db.data.chat[from].anticall = false
+      reply('Sukses menonaktifkan anticall.')
     }
-    break
+  }
+  break
 
       case 'kick': {
-      if (!isGroup) return reply(mess.group)
-      if (!isGroupAdmins) return reply(mess.admin)
-      if (!isBotGroupAdmins) return reply(mess.botAdmin)
-      let number;
-      if (q.length !== 0) {
-        number = q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'
-        ronzz.groupParticipantsUpdate(from, [number], "remove")
-          .then(res => reply('Sukses...'))
-          .catch((err) => reply(mess.error.api))
-      } else if (isQuotedMsg) {
-        number = m.quoted.sender
-        ronzz.groupParticipantsUpdate(from, [number], "remove")
-          .then(res => reply('Sukses...'))
-          .catch((err) => reply(mess.error.api))
-      } else {
-        reply('Tag atau balas pesan orang yang ingin dikeluarkan dari grup.')
-      }
+    if (!isGroup) return reply(mess.group)
+    if (!isGroupAdmins) return reply(mess.admin)
+    if (!isBotGroupAdmins) return reply(mess.botAdmin)
+    let number;
+    if (q.length !== 0) {
+      number = q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'
+      ronzz.groupParticipantsUpdate(from, [number], "remove")
+        .then(res => reply('Sukses...'))
+        .catch((err) => reply(mess.error.api))
+    } else if (isQuotedMsg) {
+      number = m.quoted.sender
+      ronzz.groupParticipantsUpdate(from, [number], "remove")
+        .then(res => reply('Sukses...'))
+        .catch((err) => reply(mess.error.api))
+    } else {
+      reply('Tag atau balas pesan orang yang ingin dikeluarkan dari grup.')
     }
-    break
+  }
+  break
 
       case 'blok': case 'block':
-    if (!isOwner && !fromMe) return reply(mess.owner)
-    if (!q) return reply(`Contoh: ${prefix + command} 628xxx`)
-    await ronzz.updateBlockStatus(q.replace(/[^0-9]/g, '') + '@s.whatsapp.net', "block") // Block user
-    reply('Sukses block nomor.')
-    break
+  if (!isOwner && !fromMe) return reply(mess.owner)
+  if (!q) return reply(`Contoh: ${prefix + command} 628xxx`)
+  await ronzz.updateBlockStatus(q.replace(/[^0-9]/g, '') + '@s.whatsapp.net', "block") // Block user
+  reply('Sukses block nomor.')
+  break
 
       case 'unblok': case 'unblock':
-    if (!isOwner && !fromMe) return reply(mess.owner)
-    if (!q) return reply(`Contoh: ${prefix + command} 628xxx`)
-    await ronzz.updateBlockStatus(q.replace(/[^0-9]/g, '') + '@s.whatsapp.net', "unblock") // Block user
-    reply('Sukses unblock nomor.')
-    break
+  if (!isOwner && !fromMe) return reply(mess.owner)
+  if (!q) return reply(`Contoh: ${prefix + command} 628xxx`)
+  await ronzz.updateBlockStatus(q.replace(/[^0-9]/g, '') + '@s.whatsapp.net', "unblock") // Block user
+  reply('Sukses unblock nomor.')
+  break
 
       case 'kirimulang': case 'resend': case 'sendagain':
-    try {
-      // Get user phone number
-      const userPhone = sender.split("@")[0]
+  try {
+    // Get user phone number
+    const userPhone = sender.split("@")[0]
 
-      // Check if transaksi exists
-      if (!db.data.transaksi || !Array.isArray(db.data.transaksi)) {
-        return reply('❌ Database transaksi tidak ditemukan.')
-      }
-
-      // Find user's last transaction
-      const userTransaksi = db.data.transaksi.filter(t =>
-        t.user === userPhone ||
-        t.buyer === userPhone ||
-        (t.targetNumber && t.targetNumber === userPhone)
-      )
-
-      if (userTransaksi.length === 0) {
-        return reply('❌ Anda belum memiliki riwayat transaksi.\n\n💡 *Tips:* Lakukan pembelian terlebih dahulu dengan command:\n• `.buy <kode> <jumlah>` - Bayar dengan saldo\n• `.buynow <kode> <jumlah>` - Bayar dengan QRIS')
-      }
-
-      // Get last transaction
-      const lastTransaksi = userTransaksi[userTransaksi.length - 1]
-
-      if (!lastTransaksi.reffId) {
-        return reply(`❌ Transaksi terakhir tidak memiliki Reference ID.\n\n📦 *Detail Transaksi:*\n• Produk: ${lastTransaksi.name || 'N/A'}\n• Tanggal: ${lastTransaksi.date || 'N/A'}\n\n💡 Silakan hubungi admin untuk bantuan.`)
-      }
-
-      // Get receipt from R2 or local storage
-      const { getReceipt } = require('./config/r2-storage');
-      const receiptResult = await getReceipt(lastTransaksi.reffId);
-
-      if (!receiptResult.success) {
-        // Receipt not found in R2 or local, send basic info
-        console.log(`⚠️ [RESEND] Receipt not found for ${lastTransaksi.reffId} (checked R2 and local)`)
-        let basicInfo = `*🔁 KIRIM ULANG TRANSAKSI TERAKHIR*\n\n`
-        basicInfo += `⚠️ File receipt tidak ditemukan, mengirim informasi dasar:\n\n`
-        basicInfo += `*╭────「 TRANSAKSI INFO 」────╮*\n`
-        basicInfo += `*┊・ 🆔 | Reff ID:* ${lastTransaksi.reffId}\n`
-        basicInfo += `*┊・ 📦 | Produk:* ${lastTransaksi.name || 'N/A'}\n`
-        basicInfo += `*┊・ 🛍️ | Jumlah:* ${lastTransaksi.jumlah || 1}\n`
-        basicInfo += `*┊・ 💰 | Total:* Rp${toRupiah(lastTransaksi.totalBayar || lastTransaksi.price || 0)}\n`
-        basicInfo += `*┊・ 💳 | Metode:* ${lastTransaksi.metodeBayar || 'N/A'}\n`
-        basicInfo += `*┊・ 📅 | Tanggal:* ${lastTransaksi.date || 'N/A'}\n`
-        basicInfo += `*╰┈┈┈┈┈┈┈┈*\n\n`
-        basicInfo += `⚠️ *PENTING:*\n`
-        basicInfo += `Detail akun tidak tersimpan dalam sistem.\n`
-        basicInfo += `Silakan hubungi admin @${ownerNomer} untuk mendapatkan detail akun Anda.\n\n`
-        basicInfo += `📝 *Berikan Reff ID:* \`${lastTransaksi.reffId}\` kepada admin untuk verifikasi.`
-
-        return ronzz.sendMessage(from, {
-          text: basicInfo,
-          mentions: [ownerNomer + "@s.whatsapp.net"]
-        }, { quoted: m })
-      }
-
-      // Receipt found (from R2 or local)
-      const receiptContent = receiptResult.content
-      console.log(`✅ [RESEND] Receipt found from ${receiptResult.storage || 'storage'} for ${lastTransaksi.reffId}`)
-
-      // Send receipt to private chat first
-      await ronzz.sendMessage(sender, { text: receiptContent }, { quoted: m })
-
-      // Wait a bit to ensure receipt is delivered first
-      await sleep(500)
-
-      // Send confirmation based on context
-      if (isGroup) {
-        // If in group, send confirmation to group
-        let confirmMsg = `✅ *Transaksi terakhir berhasil dikirim ulang!*\n\n`
-        confirmMsg += `*╭────「 DETAIL 」────╮*\n`
-        confirmMsg += `*┊・ 🆔 | Reff ID:* ${lastTransaksi.reffId}\n`
-        confirmMsg += `*┊・ 📦 | Produk:* ${lastTransaksi.name || 'N/A'}\n`
-        confirmMsg += `*┊・ 🛍️ | Jumlah:* ${lastTransaksi.jumlah || 1}\n`
-        confirmMsg += `*┊・ 📅 | Tanggal:* ${lastTransaksi.date || 'N/A'}\n`
-        confirmMsg += `*╰┈┈┈┈┈┈┈┈*\n\n`
-        confirmMsg += `📝 *Info:* Detail akun telah dikirim ke chat pribadi Anda.\n\n`
-        confirmMsg += `💡 *Tips:* Simpan detail akun dengan baik dan jangan bagikan ke orang lain!`
-        await reply(confirmMsg)
-      } else {
-        // If in private, send simple confirmation
-        let confirmMsg = `✅ *Berhasil mengirim ulang detail akun!*\n\n`
-        confirmMsg += `📦 *Produk:* ${lastTransaksi.name}\n`
-        confirmMsg += `📅 *Tanggal:* ${lastTransaksi.date}\n`
-        confirmMsg += `🆔 *Reff ID:* ${lastTransaksi.reffId}\n\n`
-        confirmMsg += `💡 *Tips:* Simpan detail akun dengan baik!`
-        await ronzz.sendMessage(from, { text: confirmMsg }, { quoted: m })
-      }
-
-      // Log for owner/admin tracking
-      console.log(`🔁 [RESEND] User ${userPhone} requested resend for transaction ${lastTransaksi.reffId}`)
-
-    } catch (err) {
-      console.error('❌ Error kirimulang:', err)
-      reply(`❌ Terjadi kesalahan saat mengirim ulang transaksi.\n\n*Error:* ${err.message}\n\n💡 Silakan hubungi admin @${ownerNomer} jika masalah berlanjut.`)
+    // Check if transaksi exists
+    if (!db.data.transaksi || !Array.isArray(db.data.transaksi)) {
+      return reply('❌ Database transaksi tidak ditemukan.')
     }
-    break
+
+    // Find user's last transaction
+    const userTransaksi = db.data.transaksi.filter(t =>
+      t.user === userPhone ||
+      t.buyer === userPhone ||
+      (t.targetNumber && t.targetNumber === userPhone)
+    )
+
+    if (userTransaksi.length === 0) {
+      return reply('❌ Anda belum memiliki riwayat transaksi.\n\n💡 *Tips:* Lakukan pembelian terlebih dahulu dengan command:\n• `.buy <kode> <jumlah>` - Bayar dengan saldo\n• `.buynow <kode> <jumlah>` - Bayar dengan QRIS')
+    }
+
+    // Get last transaction
+    const lastTransaksi = userTransaksi[userTransaksi.length - 1]
+
+    if (!lastTransaksi.reffId) {
+      return reply(`❌ Transaksi terakhir tidak memiliki Reference ID.\n\n📦 *Detail Transaksi:*\n• Produk: ${lastTransaksi.name || 'N/A'}\n• Tanggal: ${lastTransaksi.date || 'N/A'}\n\n💡 Silakan hubungi admin untuk bantuan.`)
+    }
+
+    // Get receipt from R2 or local storage
+    const { getReceipt } = require('./config/r2-storage');
+    const receiptResult = await getReceipt(lastTransaksi.reffId);
+
+    if (!receiptResult.success) {
+      // Receipt not found in R2 or local, send basic info
+      console.log(`⚠️ [RESEND] Receipt not found for ${lastTransaksi.reffId} (checked R2 and local)`)
+      let basicInfo = `*🔁 KIRIM ULANG TRANSAKSI TERAKHIR*\n\n`
+      basicInfo += `⚠️ File receipt tidak ditemukan, mengirim informasi dasar:\n\n`
+      basicInfo += `*╭────「 TRANSAKSI INFO 」────╮*\n`
+      basicInfo += `*┊・ 🆔 | Reff ID:* ${lastTransaksi.reffId}\n`
+      basicInfo += `*┊・ 📦 | Produk:* ${lastTransaksi.name || 'N/A'}\n`
+      basicInfo += `*┊・ 🛍️ | Jumlah:* ${lastTransaksi.jumlah || 1}\n`
+      basicInfo += `*┊・ 💰 | Total:* Rp${toRupiah(lastTransaksi.totalBayar || lastTransaksi.price || 0)}\n`
+      basicInfo += `*┊・ 💳 | Metode:* ${lastTransaksi.metodeBayar || 'N/A'}\n`
+      basicInfo += `*┊・ 📅 | Tanggal:* ${lastTransaksi.date || 'N/A'}\n`
+      basicInfo += `*╰┈┈┈┈┈┈┈┈*\n\n`
+      basicInfo += `⚠️ *PENTING:*\n`
+      basicInfo += `Detail akun tidak tersimpan dalam sistem.\n`
+      basicInfo += `Silakan hubungi admin @${ownerNomer} untuk mendapatkan detail akun Anda.\n\n`
+      basicInfo += `📝 *Berikan Reff ID:* \`${lastTransaksi.reffId}\` kepada admin untuk verifikasi.`
+
+      return ronzz.sendMessage(from, {
+        text: basicInfo,
+        mentions: [ownerNomer + "@s.whatsapp.net"]
+      }, { quoted: m })
+    }
+
+    // Receipt found (from R2 or local)
+    const receiptContent = receiptResult.content
+    console.log(`✅ [RESEND] Receipt found from ${receiptResult.storage || 'storage'} for ${lastTransaksi.reffId}`)
+
+    // Send receipt to private chat first
+    await ronzz.sendMessage(sender, { text: receiptContent }, { quoted: m })
+
+    // Wait a bit to ensure receipt is delivered first
+    await sleep(500)
+
+    // Send confirmation based on context
+    if (isGroup) {
+      // If in group, send confirmation to group
+      let confirmMsg = `✅ *Transaksi terakhir berhasil dikirim ulang!*\n\n`
+      confirmMsg += `*╭────「 DETAIL 」────╮*\n`
+      confirmMsg += `*┊・ 🆔 | Reff ID:* ${lastTransaksi.reffId}\n`
+      confirmMsg += `*┊・ 📦 | Produk:* ${lastTransaksi.name || 'N/A'}\n`
+      confirmMsg += `*┊・ 🛍️ | Jumlah:* ${lastTransaksi.jumlah || 1}\n`
+      confirmMsg += `*┊・ 📅 | Tanggal:* ${lastTransaksi.date || 'N/A'}\n`
+      confirmMsg += `*╰┈┈┈┈┈┈┈┈*\n\n`
+      confirmMsg += `📝 *Info:* Detail akun telah dikirim ke chat pribadi Anda.\n\n`
+      confirmMsg += `💡 *Tips:* Simpan detail akun dengan baik dan jangan bagikan ke orang lain!`
+      await reply(confirmMsg)
+    } else {
+      // If in private, send simple confirmation
+      let confirmMsg = `✅ *Berhasil mengirim ulang detail akun!*\n\n`
+      confirmMsg += `📦 *Produk:* ${lastTransaksi.name}\n`
+      confirmMsg += `📅 *Tanggal:* ${lastTransaksi.date}\n`
+      confirmMsg += `🆔 *Reff ID:* ${lastTransaksi.reffId}\n\n`
+      confirmMsg += `💡 *Tips:* Simpan detail akun dengan baik!`
+      await ronzz.sendMessage(from, { text: confirmMsg }, { quoted: m })
+    }
+
+    // Log for owner/admin tracking
+    console.log(`🔁 [RESEND] User ${userPhone} requested resend for transaction ${lastTransaksi.reffId}`)
+
+  } catch (err) {
+    console.error('❌ Error kirimulang:', err)
+    reply(`❌ Terjadi kesalahan saat mengirim ulang transaksi.\n\n*Error:* ${err.message}\n\n💡 Silakan hubungi admin @${ownerNomer} jika masalah berlanjut.`)
+  }
+  break
 
       case 'qristoday': {
-      try {
-        if (!db?.data?.transaksi) return reply('❌ Belum ada data transaksi')
-        const today = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
-        const transaksiQris = db.data.transaksi.filter(t =>
-          String(t.metodeBayar).toUpperCase() === 'QRIS' &&
-          String(t.date || '').startsWith(today)
-        )
-        if (transaksiQris.length === 0) {
-          return reply(`📊 Tidak ada transaksi QRIS pada ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`)
-        }
-
-        const totalAmount = transaksiQris.reduce((sum, t) => {
-          if (Number.isFinite(Number(t.totalBayar))) return sum + Number(t.totalBayar)
-          if (Number.isFinite(Number(t.price))) return sum + Number(t.price)
-          return sum
-        }, 0)
-
-        const message = [
-          `*📊 RINGKASAN TRANSAKSI QRIS HARI INI*`,
-          ``,
-          `*Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
-          `*Total Transaksi:* ${transaksiQris.length} kali`,
-          `*Total Nominal:* Rp${toRupiah(totalAmount)}`,
-          ``,
-          `_Data diambil dari transaksi dengan metode QRIS pada hari ini._`
-        ].join('\n')
-
-        reply(message)
-      } catch (err) {
-        console.error('❌ Error qristoday:', err)
-        reply('❌ Gagal mengambil data QRIS hari ini.')
+    try {
+      if (!db?.data?.transaksi) return reply('❌ Belum ada data transaksi')
+      const today = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
+      const transaksiQris = db.data.transaksi.filter(t =>
+        String(t.metodeBayar).toUpperCase() === 'QRIS' &&
+        String(t.date || '').startsWith(today)
+      )
+      if (transaksiQris.length === 0) {
+        return reply(`📊 Tidak ada transaksi QRIS pada ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`)
       }
+
+      const totalAmount = transaksiQris.reduce((sum, t) => {
+        if (Number.isFinite(Number(t.totalBayar))) return sum + Number(t.totalBayar)
+        if (Number.isFinite(Number(t.price))) return sum + Number(t.price)
+        return sum
+      }, 0)
+
+      const message = [
+        `*📊 RINGKASAN TRANSAKSI QRIS HARI INI*`,
+        ``,
+        `*Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
+        `*Total Transaksi:* ${transaksiQris.length} kali`,
+        `*Total Nominal:* Rp${toRupiah(totalAmount)}`,
+        ``,
+        `_Data diambil dari transaksi dengan metode QRIS pada hari ini._`
+      ].join('\n')
+
+      reply(message)
+    } catch (err) {
+      console.error('❌ Error qristoday:', err)
+      reply('❌ Gagal mengambil data QRIS hari ini.')
     }
-    break
+  }
+  break
 
       case 'saldotoday': {
-      try {
-        if (!db?.data?.transaksi) return reply('❌ Belum ada data transaksi')
-        const today = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
-        const transaksiSaldo = db.data.transaksi.filter(t =>
-          String(t.metodeBayar).toUpperCase() === 'SALDO' &&
-          String(t.date || '').startsWith(today)
-        )
-        if (transaksiSaldo.length === 0) {
-          return reply(`📊 Tidak ada transaksi saldo pada ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`)
-        }
-
-        const totalAmount = transaksiSaldo.reduce((sum, t) => {
-          if (Number.isFinite(Number(t.totalBayar))) return sum + Number(t.totalBayar)
-          if (Number.isFinite(Number(t.price))) return sum + Number(t.price)
-          return sum
-        }, 0)
-
-        const message = [
-          `*📊 RINGKASAN TRANSAKSI SALDO HARI INI*`,
-          ``,
-          `*Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
-          `*Total Transaksi:* ${transaksiSaldo.length} kali`,
-          `*Total Nominal:* Rp${toRupiah(totalAmount)}`,
-          ``,
-          `_Data diambil dari transaksi dengan metode Saldo pada hari ini._`
-        ].join('\n')
-
-        reply(message)
-      } catch (err) {
-        console.error('❌ Error saldotoday:', err)
-        reply('❌ Gagal mengambil data saldo hari ini.')
+    try {
+      if (!db?.data?.transaksi) return reply('❌ Belum ada data transaksi')
+      const today = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
+      const transaksiSaldo = db.data.transaksi.filter(t =>
+        String(t.metodeBayar).toUpperCase() === 'SALDO' &&
+        String(t.date || '').startsWith(today)
+      )
+      if (transaksiSaldo.length === 0) {
+        return reply(`📊 Tidak ada transaksi saldo pada ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`)
       }
+
+      const totalAmount = transaksiSaldo.reduce((sum, t) => {
+        if (Number.isFinite(Number(t.totalBayar))) return sum + Number(t.totalBayar)
+        if (Number.isFinite(Number(t.price))) return sum + Number(t.price)
+        return sum
+      }, 0)
+
+      const message = [
+        `*📊 RINGKASAN TRANSAKSI SALDO HARI INI*`,
+        ``,
+        `*Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
+        `*Total Transaksi:* ${transaksiSaldo.length} kali`,
+        `*Total Nominal:* Rp${toRupiah(totalAmount)}`,
+        ``,
+        `_Data diambil dari transaksi dengan metode Saldo pada hari ini._`
+      ].join('\n')
+
+      reply(message)
+    } catch (err) {
+      console.error('❌ Error saldotoday:', err)
+      reply('❌ Gagal mengambil data saldo hari ini.')
     }
-    break
+  }
+  break
 
       case 'tes': case 'runtime':
-    reply(`*STATUS : BOT ONLINE*\n_Runtime : ${runtime(process.uptime())}_`)
-    break
+  reply(`*STATUS : BOT ONLINE*\n_Runtime : ${runtime(process.uptime())}_`)
+  break
 
       case 'ping':
-    let timestamp = speed()
-    let latensi = speed() - timestamp
-    reply(`Kecepatan respon _${latensi.toFixed(4)} Second_\n\n*💻 INFO SERVER*\nHOSTNAME: ${os.hostname}\nRAM: ${formatp(os.totalmem() - os.freemem())} / ${formatp(os.totalmem())}\nCPUs: ${os.cpus().length} core`)
-    break
+  let timestamp = speed()
+  let latensi = speed() - timestamp
+  reply(`Kecepatan respon _${latensi.toFixed(4)} Second_\n\n*💻 INFO SERVER*\nHOSTNAME: ${os.hostname}\nRAM: ${formatp(os.totalmem() - os.freemem())} / ${formatp(os.totalmem())}\nCPUs: ${os.cpus().length} core`)
+  break
 
       case 'server': {
-      const cpus = os.cpus() || []
-      const cpuModel = cpus[0]?.model || 'Unknown'
-      const cpuSpeed = cpus[0]?.speed ? `${cpus[0].speed} MHz` : 'N/A'
-      const cpuCount = cpus.length || 1
-      const totalMem = os.totalmem()
-      const freeMem = os.freemem()
-      const usedMem = totalMem - freeMem
-      const memPercent = ((usedMem / totalMem) * 100).toFixed(2)
-      const osUptime = runtime(os.uptime())
+    const cpus = os.cpus() || []
+    const cpuModel = cpus[0]?.model || 'Unknown'
+    const cpuSpeed = cpus[0]?.speed ? `${cpus[0].speed} MHz` : 'N/A'
+    const cpuCount = cpus.length || 1
+    const totalMem = os.totalmem()
+    const freeMem = os.freemem()
+    const usedMem = totalMem - freeMem
+    const memPercent = ((usedMem / totalMem) * 100).toFixed(2)
+    const osUptime = runtime(os.uptime())
 
-      const info = [
-        `*🖥️ SERVER INFORMATION*`,
-        ``,
-        `*• Hostname:* ${os.hostname()}`,
-        `*• Platform:* ${os.platform()} ${os.release()} (${os.arch()})`,
-        `*• Uptime OS:* ${osUptime}`,
-        ``,
-        `*🧠 CPU*`,
-        `*• Model:* ${cpuModel}`,
-        `*• Speed:* ${cpuSpeed}`,
-        `*• Cores:* ${cpuCount}`,
-        ``,
-        `*💾 MEMORY*`,
-        `*• Total:* ${formatp(totalMem)}`,
-        `*• Used:* ${formatp(usedMem)} (${memPercent}%)`,
-        `*• Free:* ${formatp(freeMem)}`,
-        ``,
-        `*⚙️ Node.js:* ${process.version}`,
-        `*📦 Bot Uptime:* ${runtime(process.uptime())}`
-      ].join('\n')
+    const info = [
+      `*🖥️ SERVER INFORMATION*`,
+      ``,
+      `*• Hostname:* ${os.hostname()}`,
+      `*• Platform:* ${os.platform()} ${os.release()} (${os.arch()})`,
+      `*• Uptime OS:* ${osUptime}`,
+      ``,
+      `*🧠 CPU*`,
+      `*• Model:* ${cpuModel}`,
+      `*• Speed:* ${cpuSpeed}`,
+      `*• Cores:* ${cpuCount}`,
+      ``,
+      `*💾 MEMORY*`,
+      `*• Total:* ${formatp(totalMem)}`,
+      `*• Used:* ${formatp(usedMem)} (${memPercent}%)`,
+      `*• Free:* ${formatp(freeMem)}`,
+      ``,
+      `*⚙️ Node.js:* ${process.version}`,
+      `*📦 Bot Uptime:* ${runtime(process.uptime())}`
+    ].join('\n')
 
-      reply(info)
-    }
-    break
+    reply(info)
+  }
+  break
 
       case 'performa': {
-      const t1 = speed()
-      const latency = speed() - t1
-      const memUsage = process.memoryUsage()
-      const heapUsed = formatp(memUsage.heapUsed || 0)
-      const heapTotal = formatp(memUsage.heapTotal || 0)
-      const rss = formatp(memUsage.rss || 0)
-      const loadAvg = os.loadavg ? os.loadavg().map(n => n.toFixed(2)).join(', ') : 'N/A'
-      const uptimeBot = runtime(process.uptime())
+    const t1 = speed()
+    const latency = speed() - t1
+    const memUsage = process.memoryUsage()
+    const heapUsed = formatp(memUsage.heapUsed || 0)
+    const heapTotal = formatp(memUsage.heapTotal || 0)
+    const rss = formatp(memUsage.rss || 0)
+    const loadAvg = os.loadavg ? os.loadavg().map(n => n.toFixed(2)).join(', ') : 'N/A'
+    const uptimeBot = runtime(process.uptime())
 
-      const info = [
-        `*⚡ BOT PERFORMANCE REPORT*`,
-        ``,
-        `*• Latensi:* ${latency.toFixed(4)}s`,
-        `*• Uptime:* ${uptimeBot}`,
-        ``,
-        `*📊 MEMORY (process)*`,
-        `*• RSS:* ${rss}`,
-        `*• Heap:* ${heapUsed} / ${heapTotal}`,
-        ``,
-        `*⚙️ LOAD AVERAGE:* ${loadAvg}`,
-        `*• CPU cores:* ${os.cpus().length}`,
-        ``,
-        `*📝 Catatan:* Gunakan command ini saat Anda merasa bot lemot untuk melihat kondisi server.`
-      ].join('\n')
+    const info = [
+      `*⚡ BOT PERFORMANCE REPORT*`,
+      ``,
+      `*• Latensi:* ${latency.toFixed(4)}s`,
+      `*• Uptime:* ${uptimeBot}`,
+      ``,
+      `*📊 MEMORY (process)*`,
+      `*• RSS:* ${rss}`,
+      `*• Heap:* ${heapUsed} / ${heapTotal}`,
+      ``,
+      `*⚙️ LOAD AVERAGE:* ${loadAvg}`,
+      `*• CPU cores:* ${os.cpus().length}`,
+      ``,
+      `*📝 Catatan:* Gunakan command ini saat Anda merasa bot lemot untuk melihat kondisi server.`
+    ].join('\n')
 
-      reply(info)
-    }
-    break
+    reply(info)
+  }
+  break
 
       case 'done': {
-      if (!isGroup) return (mess.group)
-      if (!isGroupAdmins && !isOwner) return (mess.admin)
-      if (q.startsWith("@")) {
-        if (db.data.chat[from].sDone.length !== 0) {
-          let textDone = db.data.chat[from].sDone
-          ronzz.sendMessage(from, { text: textDone.replace('tag', q.replace(/[^0-9]/g, '')).replace('@jam', jamwib).replace('@tanggal', moment.tz('Asia/Jakarta').format('DD MMMM YYYY')).replace('@status', 'Berhasil'), mentions: [q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'] });
-        } else {
-          ronzz.sendMessage(from, { text: `「 *TRANSAKSI BERHASIL* 」\n\n\`\`\`📆 TANGGAL : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n⌚ JAM : ${jamwib}\n✨ STATUS: Berhasil\`\`\`\n\nTerimakasih @${q.replace(/[^0-9]/g, '')} next order yaa🙏`, mentions: [q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'] }, { quoted: m });
-        }
-      } else if (isQuotedMsg) {
-        if (db.data.chat[from].sDone.length !== 0) {
-          let textDone = db.data.chat[from].sDone
-          ronzz.sendMessage(from, { text: textDone.replace('tag', m.quoted.sender.split("@")[0]).replace('@jam', jamwib).replace('@tanggal', moment.tz('Asia/Jakarta').format('DD MMMM YYYY')).replace('@status', 'Berhasil'), mentions: [m.quoted.sender] }, { quoted: m })
-        } else {
-          ronzz.sendMessage(from, { text: `「 *TRANSAKSI BERHASIL* 」\n\n\`\`\`📆 TANGGAL : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n⌚ JAM : ${jamwib}\n✨ STATUS: Berhasil\`\`\`\n\nTerimakasih @${m.quoted.sender.split("@")[0]} next order yaa🙏`, mentions: [m.quoted.sender] })
-        }
+    if (!isGroup) return (mess.group)
+    if (!isGroupAdmins && !isOwner) return (mess.admin)
+    if (q.startsWith("@")) {
+      if (db.data.chat[from].sDone.length !== 0) {
+        let textDone = db.data.chat[from].sDone
+        ronzz.sendMessage(from, { text: textDone.replace('tag', q.replace(/[^0-9]/g, '')).replace('@jam', jamwib).replace('@tanggal', moment.tz('Asia/Jakarta').format('DD MMMM YYYY')).replace('@status', 'Berhasil'), mentions: [q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'] });
       } else {
-        reply('Reply atau tag orangnya')
+        ronzz.sendMessage(from, { text: `「 *TRANSAKSI BERHASIL* 」\n\n\`\`\`📆 TANGGAL : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n⌚ JAM : ${jamwib}\n✨ STATUS: Berhasil\`\`\`\n\nTerimakasih @${q.replace(/[^0-9]/g, '')} next order yaa🙏`, mentions: [q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'] }, { quoted: m });
       }
+    } else if (isQuotedMsg) {
+      if (db.data.chat[from].sDone.length !== 0) {
+        let textDone = db.data.chat[from].sDone
+        ronzz.sendMessage(from, { text: textDone.replace('tag', m.quoted.sender.split("@")[0]).replace('@jam', jamwib).replace('@tanggal', moment.tz('Asia/Jakarta').format('DD MMMM YYYY')).replace('@status', 'Berhasil'), mentions: [m.quoted.sender] }, { quoted: m })
+      } else {
+        ronzz.sendMessage(from, { text: `「 *TRANSAKSI BERHASIL* 」\n\n\`\`\`📆 TANGGAL : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n⌚ JAM : ${jamwib}\n✨ STATUS: Berhasil\`\`\`\n\nTerimakasih @${m.quoted.sender.split("@")[0]} next order yaa🙏`, mentions: [m.quoted.sender] })
+      }
+    } else {
+      reply('Reply atau tag orangnya')
     }
-    break
+  }
+  break
 
       case 'open':
-    if (!isGroup) return reply(mess.group)
-    if (!isGroupAdmins && !isOwner) return reply(mess.admin)
-    if (!isBotGroupAdmins) return reply(mess.botAdmin)
-    await ronzz.groupSettingUpdate(from, 'not_announcement')
-    await reply(`Sukses mengizinkan semua peserta dapat mengirim pesan ke grup ini.`)
-    break
+  if (!isGroup) return reply(mess.group)
+  if (!isGroupAdmins && !isOwner) return reply(mess.admin)
+  if (!isBotGroupAdmins) return reply(mess.botAdmin)
+  await ronzz.groupSettingUpdate(from, 'not_announcement')
+  await reply(`Sukses mengizinkan semua peserta dapat mengirim pesan ke grup ini.`)
+  break
 
       case 'close':
-    if (!isGroup) return reply(mess.group)
-    if (!isGroupAdmins && !isOwner) return reply(mess.admin)
-    if (!isBotGroupAdmins) return reply(mess.botAdmin)
-    await ronzz.groupSettingUpdate(from, 'announcement')
-    await reply(`Sukses mengizinkan hanya admin yang dapat mengirim pesan ke grup ini.`)
-    break
+  if (!isGroup) return reply(mess.group)
+  if (!isGroupAdmins && !isOwner) return reply(mess.admin)
+  if (!isBotGroupAdmins) return reply(mess.botAdmin)
+  await ronzz.groupSettingUpdate(from, 'announcement')
+  await reply(`Sukses mengizinkan hanya admin yang dapat mengirim pesan ke grup ini.`)
+  break
 
 
       case 'hidetag': case 'ht': case 'h': {
-      if (!isGroup) return reply(mess.group)
-      if (!isGroupAdmins && !isOwner) return reply(mess.admin)
-      let mem = groupMembers.map(i => i.id)
-      ronzz.sendMessage(from, { text: q ? q : '', mentions: mem })
-      if (isBotGroupAdmins) {
-        try {
-          const deleteKey = m.isGroup
-            ? { remoteJid: from, id: (mek && mek.key && mek.key.id) || (m.key && m.key.id), participant: (mek && (mek.key && mek.key.participant)) || mek.participant || sender, fromMe: false }
-            : { remoteJid: from, id: (mek && mek.key && mek.key.id) || (m.key && m.key.id), fromMe: false }
-          if (deleteKey && deleteKey.id) {
-            await ronzz.sendMessage(from, { delete: deleteKey })
-          }
-        } catch { }
-      }
-    }
-    break
-
-      case 'setdesc':
     if (!isGroup) return reply(mess.group)
     if (!isGroupAdmins && !isOwner) return reply(mess.admin)
-    if (!isBotGroupAdmins) return reply(mess.botAdmin)
-    if (!q) return reply(`Contoh: ${prefix + command} New Description by ${ownerName}`)
-    await ronzz.groupUpdateDescription(from, q)
-      .then(res => {
-        reply(`Sukses set deskripsi group.`)
-      }).catch(() => reply(mess.error.api))
-    break
-
-      case 'backup': {
-      if (!isOwner) return reply(mess.owner)
-      await reply('Mengumpulkan semua file ke folder...')
-
-      // Create backup directory if it doesn't exist
-      const backupDir = './backup';
-      if (!fs.existsSync(backupDir)) {
-        fs.mkdirSync(backupDir, { recursive: true });
-      }
-
-      let ls = (await execSync("ls")).toString().split("\n").filter((pe) =>
-        pe != "node_modules" &&
-        pe != "session" &&
-        pe != "package-lock.json" &&
-        pe != "yarn.lock" &&
-        pe != ".npm" &&
-        pe != ".cache" &&
-        pe != "backup" &&
-        pe != ""
-      )
-
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const backupFileName = `backup-bot-wa-${timestamp}.zip`;
-      const backupPath = `${backupDir}/${backupFileName}`;
-
-      await execSync(`zip -r ${backupPath} ${ls.join(" ")}`)
-
-      if (isGroup) {
-        reply(`✅ Backup berhasil dibuat: ${backupPath}`)
-      } else {
-        reply(`✅ Backup berhasil dibuat: ${backupPath}`)
-      }
-
-      // Hapus backup lama (lebih dari 7 hari)
-      const files = fs.readdirSync(backupDir);
-      const now = Date.now();
-      const sevenDays = 7 * 24 * 60 * 60 * 1000;
-
-      files.forEach(file => {
-        if (file.startsWith('backup-bot-wa-') && file.endsWith('.zip')) {
-          const filePath = `${backupDir}/${file}`;
-          const stats = fs.statSync(filePath);
-          if (now - stats.mtime.getTime() > sevenDays) {
-            fs.unlinkSync(filePath);
-            console.log(`🗑️ Backup lama dihapus: ${file}`);
-          }
-        }
-      });
-    }
-    break
-
-      case 'reloaddb': {
+    let mem = groupMembers.map(i => i.id)
+    ronzz.sendMessage(from, { text: q ? q : '', mentions: mem })
+    if (isBotGroupAdmins) {
       try {
-        if (!isOwner) return reply('❌ Command ini hanya untuk owner!')
-
-        await reply('🔄 Sedang reload database dari PostgreSQL...')
-
-        if (usePg && typeof db.load === 'function') {
-          await db.load()
-
-          // Clear saldo cache
-          saldoCache.clear()
-
-          // Emit reload event
-          process.emit('database:reloaded')
-
-          const productCount = Object.keys(db.data.produk || {}).length
-          const userCount = Object.keys(db.data.users || {}).length
-
-          await reply(`✅ Database berhasil di-reload!\n📊 Produk: ${productCount}\n👥 Users: ${userCount}\n🔄 Cache dibersihkan`)
-        } else {
-          await reply('❌ PostgreSQL tidak aktif atau database tidak mendukung reload')
+        const deleteKey = m.isGroup
+          ? { remoteJid: from, id: (mek && mek.key && mek.key.id) || (m.key && m.key.id), participant: (mek && (mek.key && mek.key.participant)) || mek.participant || sender, fromMe: false }
+          : { remoteJid: from, id: (mek && mek.key && mek.key.id) || (m.key && m.key.id), fromMe: false }
+        if (deleteKey && deleteKey.id) {
+          await ronzz.sendMessage(from, { delete: deleteKey })
         }
-
-      } catch (error) {
-        console.error('Reload database error:', error)
-        await reply('❌ Gagal reload database: ' + error.message)
-      }
-    }
-    break
-
-      default:
-    if (budy.startsWith('=>')) {
-      if (!isOwner) return
-      function Return(sul) {
-        sat = JSON.stringify(sul, null, 2)
-        bang = util.format(sat)
-        if (sat == undefined) {
-          bang = util.format(sul)
-        }
-        return reply(bang)
-      }
-      try {
-        reply(util.format(eval(`(async () => { ${budy.slice(3)} })()`)))
-      } catch (e) {
-        reply(String(e))
-      }
-    }
-    if (budy.startsWith('>')) {
-      if (!isOwner) return
-      try {
-        let evaled = await eval(budy.slice(2))
-        if (typeof evaled !== 'string') evaled = require('util').inspect(evaled)
-        await reply(evaled)
-      } catch (err) {
-        reply(String(err))
-      }
-    }
-    if (budy.startsWith('$')) {
-      if (!isOwner) return
-      let qur = budy.slice(2)
-      exec(qur, (err, stdout) => {
-        if (err) return reply(err)
-        if (stdout) {
-          reply(stdout)
-        }
-      })
+      } catch { }
     }
   }
+  break
+
+      case 'setdesc':
+  if (!isGroup) return reply(mess.group)
+  if (!isGroupAdmins && !isOwner) return reply(mess.admin)
+  if (!isBotGroupAdmins) return reply(mess.botAdmin)
+  if (!q) return reply(`Contoh: ${prefix + command} New Description by ${ownerName}`)
+  await ronzz.groupUpdateDescription(from, q)
+    .then(res => {
+      reply(`Sukses set deskripsi group.`)
+    }).catch(() => reply(mess.error.api))
+  break
+
+      case 'backup': {
+    if (!isOwner) return reply(mess.owner)
+    await reply('Mengumpulkan semua file ke folder...')
+
+    // Create backup directory if it doesn't exist
+    const backupDir = './backup';
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+
+    let ls = (await execSync("ls")).toString().split("\n").filter((pe) =>
+      pe != "node_modules" &&
+      pe != "session" &&
+      pe != "package-lock.json" &&
+      pe != "yarn.lock" &&
+      pe != ".npm" &&
+      pe != ".cache" &&
+      pe != "backup" &&
+      pe != ""
+    )
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupFileName = `backup-bot-wa-${timestamp}.zip`;
+    const backupPath = `${backupDir}/${backupFileName}`;
+
+    await execSync(`zip -r ${backupPath} ${ls.join(" ")}`)
+
+    if (isGroup) {
+      reply(`✅ Backup berhasil dibuat: ${backupPath}`)
+    } else {
+      reply(`✅ Backup berhasil dibuat: ${backupPath}`)
+    }
+
+    // Hapus backup lama (lebih dari 7 hari)
+    const files = fs.readdirSync(backupDir);
+    const now = Date.now();
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+
+    files.forEach(file => {
+      if (file.startsWith('backup-bot-wa-') && file.endsWith('.zip')) {
+        const filePath = `${backupDir}/${file}`;
+        const stats = fs.statSync(filePath);
+        if (now - stats.mtime.getTime() > sevenDays) {
+          fs.unlinkSync(filePath);
+          console.log(`🗑️ Backup lama dihapus: ${file}`);
+        }
+      }
+    });
+  }
+  break
+
+      case 'reloaddb': {
+    try {
+      if (!isOwner) return reply('❌ Command ini hanya untuk owner!')
+
+      await reply('🔄 Sedang reload database dari PostgreSQL...')
+
+      if (usePg && typeof db.load === 'function') {
+        await db.load()
+
+        // Clear saldo cache
+        saldoCache.clear()
+
+        // Emit reload event
+        process.emit('database:reloaded')
+
+        const productCount = Object.keys(db.data.produk || {}).length
+        const userCount = Object.keys(db.data.users || {}).length
+
+        await reply(`✅ Database berhasil di-reload!\n📊 Produk: ${productCount}\n👥 Users: ${userCount}\n🔄 Cache dibersihkan`)
+      } else {
+        await reply('❌ PostgreSQL tidak aktif atau database tidak mendukung reload')
+      }
+
+    } catch (error) {
+      console.error('Reload database error:', error)
+      await reply('❌ Gagal reload database: ' + error.message)
+    }
+  }
+  break
+
+      default:
+  if (budy.startsWith('=>')) {
+    if (!isOwner) return
+    function Return(sul) {
+      sat = JSON.stringify(sul, null, 2)
+      bang = util.format(sat)
+      if (sat == undefined) {
+        bang = util.format(sul)
+      }
+      return reply(bang)
+    }
+    try {
+      reply(util.format(eval(`(async () => { ${budy.slice(3)} })()`)))
+    } catch (e) {
+      reply(String(e))
+    }
+  }
+  if (budy.startsWith('>')) {
+    if (!isOwner) return
+    try {
+      let evaled = await eval(budy.slice(2))
+      if (typeof evaled !== 'string') evaled = require('util').inspect(evaled)
+      await reply(evaled)
+    } catch (err) {
+      reply(String(err))
+    }
+  }
+  if (budy.startsWith('$')) {
+    if (!isOwner) return
+    let qur = budy.slice(2)
+    exec(qur, (err, stdout) => {
+      if (err) return reply(err)
+      if (stdout) {
+        reply(stdout)
+      }
+    })
+  }
+}
   } catch (err) {
   console.log(color('[ERROR]', 'red'), err)
 }
