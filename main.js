@@ -202,19 +202,27 @@ async function startronzz() {
         password: process.env.REDIS_PASSWORD || undefined
       });
 
-      subscriber.subscribe('gowa:messages', (err, count) => {
+      subscriber.subscribe('gowa:messages', 'midtrans:events', (err, count) => {
         if (err) {
           console.error('[REDIS-SUB] Subscribe error:', err.message);
         } else {
-          console.log(`[REDIS-SUB] Subscribed to gowa:messages channel`);
+          console.log(`[REDIS-SUB] Subscribed to gowa:messages and midtrans:events`);
         }
       });
 
       subscriber.on('message', (channel, message) => {
         try {
-          const webhookData = JSON.parse(message);
-          console.log('[REDIS-SUB] Received message from webhook');
-          ronzz.handleWebhook(webhookData);
+          const parsedMessage = JSON.parse(message);
+
+          if (channel === 'gowa:messages') {
+            console.log('[REDIS-SUB] Received message from webhook');
+            ronzz.handleWebhook(parsedMessage);
+          } else if (channel === 'midtrans:events') {
+            console.log(`[REDIS-SUB] Received midtrans event: ${parsedMessage.event}`);
+            if (parsedMessage.event === 'payment-completed') {
+              process.emit('payment-completed', parsedMessage.data);
+            }
+          }
         } catch (error) {
           console.error('[REDIS-SUB] Error processing message:', error.message);
         }
