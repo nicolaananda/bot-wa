@@ -713,15 +713,17 @@ module.exports = async (ronzz, m, mek) => {
 
         if (isAllowedGroup) {
           console.log(`✅ [GROUP-WHITELIST] Allowed group by name: ${groupName}`)
+          checkMethod = 'name'
         } else {
-          console.log(`🚫 [GROUP-WHITELIST] BLOCKED - Group name not in whitelist:`)
-          console.log(`   Group: "${groupName}" (normalized: "${normalizedGroupName}")`)
+          console.log(`⚠️ [GROUP-WHITELIST] Group name '${groupName}' (normalized: "${normalizedGroupName}") not in whitelist.`)
           console.log(`   Allowed Names: ${global.groupNames.map(n => `"${n}"`).join(', ')}`)
-          return // Block jika tidak match nama
+          console.log(`   Proceeding to check invite link fallback...`)
+          // Don't return here! Fallthrough to link check
         }
       }
-      // Prioritas 2: Cek berdasarkan invite code (jika BOT_GROUP_LINKS di-set)
-      else if (global.linkGroup && global.linkGroup.length > 0) {
+
+      // Prioritas 2: Cek berdasarkan invite code (jika belum allowed via nama DAN BOT_GROUP_LINKS di-set)
+      if (!isAllowedGroup && global.linkGroup && global.linkGroup.length > 0) {
         try {
           // Ambil group invite code
           const groupInviteCode = await ronzz.groupInviteCode(from)
