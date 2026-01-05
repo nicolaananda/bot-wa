@@ -628,7 +628,9 @@ module.exports = async (ronzz, m, mek) => {
     const toJSON = j => JSON.stringify(j, null, '\t')
     const prefix = prefa ? /^[°•π÷×¶∆£¢€¥®=????+✓_=|~!?@#%^&.©^]/gi.test(chats) ? chats.match(/^[°•π÷×¶∆£¢€¥®=????+✓_=|~!?@#%^&.©^]/gi)[0] : "" : prefa ?? '#'
     const isGroup = m.isGroup
-    const sender = m.isGroup ? (mek.key.participant ? mek.key.participant : mek.participant) : mek.key.remoteJid
+    const rawSender = m.isGroup ? (mek.key.participant ? mek.key.participant : mek.participant) : mek.key.remoteJid
+    // Normalize sender: remove device ID suffix (e.g. :33@s.whatsapp.net -> @s.whatsapp.net)
+    const sender = rawSender.replace(/:[0-9]+@/, '@')
     const isOwner = [ronzz.user.id, ...owner].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(sender) ? true : false
     const pushname = m.pushName
     const budy = (typeof m.text == 'string' ? m.text : '')
