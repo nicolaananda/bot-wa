@@ -370,8 +370,8 @@ if (!global.midtransWebhookListenerSetup) {
 
         // Cek metode MIDTRANS
         const orderMetode = order.metode || '';
-        if (orderMetode !== 'MIDTRANS' && orderMetode !== 'QRIS') {
-          console.log(`  - Skipping order ${order.orderId || 'N/A'}: metode=${orderMetode} (not MIDTRANS/QRIS)`);
+        if (orderMetode !== 'MIDTRANS') {
+          console.log(`  - Skipping order ${order.orderId || 'N/A'}: metode=${orderMetode} (not MIDTRANS)`);
           continue;
         }
 
@@ -578,7 +578,7 @@ if (!global.midtransWebhookListenerSetup) {
         user: sender.split("@")[0],
         userRole: db.data.users[sender]?.role || 'bronze',
         reffId: reffId,
-        metodeBayar: orderMetode || "QRIS",
+        metodeBayar: "MIDTRANS",
         totalBayar: totalAmount
       });
 
@@ -2511,7 +2511,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
           const reffId = crypto.randomBytes(5).toString("hex").toUpperCase()
           const createdAtTs = Date.now()
-          db.data.order[sender] = { status: 'processing', reffId, idProduk: data[0], jumlah, metode: 'QRIS', startedAt: createdAtTs }
+          db.data.order[sender] = { status: 'processing', reffId, idProduk: data[0], jumlah, metode: 'MIDTRANS', startedAt: createdAtTs }
           requestPendingOrderSave()
 
           try {
@@ -2581,7 +2581,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               reffId,
               totalAmount,
               uniqueCode,
-              metode: 'QRIS', // Pastikan metode di-set untuk global listener
+              metode: 'MIDTRANS', // Pastikan metode di-set untuk global listener
               createdAt: createdAtTs
             };
             requestPendingOrderSave();
