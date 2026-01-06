@@ -578,7 +578,7 @@ if (!global.midtransWebhookListenerSetup) {
         user: sender.split("@")[0],
         userRole: db.data.users[sender]?.role || 'bronze',
         reffId: reffId,
-        metodeBayar: "MIDTRANS",
+        metodeBayar: "QRIS",
         totalBayar: totalAmount
       });
 
