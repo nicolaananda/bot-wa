@@ -30,6 +30,7 @@ const { qrisDinamis, qrisStatis, qrisStatisMidtrans } = require("./function/dina
 const { createPaymentLink, getPaymentLinkStatus, isPaymentCompleted, createQRISCore, createQRISPayment, getTransactionStatusByOrderId, getTransactionStatusByTransactionId, checkStaticQRISPayment } = require('./config/midtrans');
 const { acquireLock, releaseLock, checkRateLimit, getCache, setCache, invalidateCachePattern, cacheAside } = require('./function/redis-helper');
 const { saveReceipt } = require('./config/r2-storage');
+const { sendPaymentNotification } = require('./lib/telegram-notifier');
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 let pg; if (usePg) { pg = require('./config/postgres'); }
 const { core, isProduction } = require('./config/midtrans');
@@ -589,6 +590,18 @@ if (!global.midtransWebhookListenerSetup) {
       delete db.data.order[sender];
       await db.save();
       console.log(`✅ [MID-GLOBAL] Transaction completed: ${orderId} - ${reffId}`);
+
+      // Send Telegram notification
+      try {
+        await sendPaymentNotification({
+          amount: totalAmount,
+          phoneNumber: sender,
+          orderId: orderId,
+          type: 'buy-now'
+        });
+      } catch (telegramError) {
+        console.error(`⚠️ [MID-GLOBAL] Telegram notification failed:`, telegramError.message);
+      }
 
     } catch (error) {
       console.error(`❌ [MID-GLOBAL] Error processing webhook:`, error.message);
@@ -2336,6 +2349,18 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 }
 
                 await ronzz.sendMessage(from, { text: successText }, { quoted: m })
+
+                // Send Telegram notification
+                try {
+                  await sendPaymentNotification({
+                    amount: credit,
+                    phoneNumber: sender,
+                    orderId: orderId,
+                    type: 'deposit'
+                  });
+                } catch (telegramError) {
+                  console.error(`⚠️ [DEPOSIT] Telegram notification failed:`, telegramError.message);
+                }
 
                 delete db.data.orderDeposit[sender]
                 await db.save()
