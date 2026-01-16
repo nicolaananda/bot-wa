@@ -2378,30 +2378,36 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   // Query dari PostgreSQL
                   const orderAmount = Number(totalAmount);
                   const tolerance = 1; // Tolerance 1 rupiah untuk handle decimal
+                  const orderCreatedAt = new Date(createdAtTs);
 
                   const result = await pg.query(
-                    `SELECT id, order_id, transaction_id, transaction_status, payment_type, gross_amount, settlement_time, webhook_data
+                    `SELECT id, order_id, transaction_id, transaction_status, payment_type, gross_amount, settlement_time, webhook_data, created_at
                FROM midtrans_webhooks
                WHERE processed = false 
                  AND transaction_status IN ('settlement', 'capture')
                  AND ABS(gross_amount - $1) < $2
+                 AND created_at >= $3
+                 AND order_id LIKE 'DEP-%'
                ORDER BY created_at DESC
                LIMIT 10`,
-                    [orderAmount, tolerance]
+                    [orderAmount, tolerance, orderCreatedAt]
                   );
 
                   if (result.rows.length > 0) {
-                    console.log(`🔍 [DEPOSIT] Found ${result.rows.length} unprocessed webhooks from PostgreSQL, looking for amount Rp${orderAmount}`);
+                    console.log(`🔍 [DEPOSIT] Found ${result.rows.length} unprocessed webhooks from PostgreSQL, looking for amount Rp${orderAmount}, created after ${orderCreatedAt.toISOString()}`);
                   }
 
                   for (const row of result.rows) {
                     const webhookAmount = Number(row.gross_amount || 0);
                     const amountDiff = Math.abs(webhookAmount - orderAmount);
                     const isAmountMatch = amountDiff < tolerance;
+                    const webhookCreatedAt = new Date(row.created_at);
+                    const isTimeValid = webhookCreatedAt >= orderCreatedAt;
+                    const isOrderIdValid = String(row.order_id || '').startsWith('DEP-');
 
-                    console.log(`  - Webhook: Amount Rp${webhookAmount} (${typeof row.gross_amount}), Order Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+                    console.log(`  - Webhook: OrderID: ${row.order_id}, Amount Rp${webhookAmount}, Created: ${webhookCreatedAt.toISOString()}, AmountMatch: ${isAmountMatch}, TimeValid: ${isTimeValid}, OrderIDValid: ${isOrderIdValid}`);
 
-                    if (isAmountMatch) {
+                    if (isAmountMatch && isTimeValid && isOrderIdValid) {
                       console.log(`✅ [DEPOSIT] Payment detected via PostgreSQL webhook: Amount Rp${webhookAmount}, OrderID: ${row.order_id}`);
 
                       // Mark as processed di PostgreSQL
@@ -2429,7 +2435,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   const unprocessedWebhooks = webhooks.filter(w => !w.processed && w.gross_amount);
 
                   if (unprocessedWebhooks.length > 0) {
-                    console.log(`🔍 [DEPOSIT] Checking ${unprocessedWebhooks.length} unprocessed webhooks from JSON, looking for amount Rp${totalAmount}`);
+                    console.log(`🔍 [DEPOSIT] Checking ${unprocessedWebhooks.length} unprocessed webhooks from JSON, looking for amount Rp${totalAmount}, created after ${new Date(createdAtTs).toISOString()}`);
                   }
 
                   for (const webhook of unprocessedWebhooks) {
@@ -2437,10 +2443,13 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                     const amountDiff = Math.abs(webhookAmount - Number(totalAmount));
                     const isAmountMatch = amountDiff < 1;
                     const isStatusPaid = /(settlement|capture)/i.test(String(webhook.transactionStatus));
+                    const webhookTimestamp = webhook.timestamp || 0;
+                    const isTimeValid = webhookTimestamp >= createdAtTs;
+                    const isOrderIdValid = String(webhook.orderId || '').startsWith('DEP-');
 
-                    console.log(`  - Webhook: Amount Rp${webhookAmount}, Status: ${webhook.transactionStatus}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+                    console.log(`  - Webhook: OrderID: ${webhook.orderId}, Amount Rp${webhookAmount}, Status: ${webhook.transactionStatus}, Timestamp: ${new Date(webhookTimestamp).toISOString()}, AmountMatch: ${isAmountMatch}, TimeValid: ${isTimeValid}, OrderIDValid: ${isOrderIdValid}`);
 
-                    if (isAmountMatch && isStatusPaid) {
+                    if (isAmountMatch && isStatusPaid && isTimeValid && isOrderIdValid) {
                       console.log(`✅ [DEPOSIT] Payment detected via JSON webhook: Amount Rp${webhookAmount}, OrderID: ${webhook.orderId}`);
 
                       // Mark as processed
@@ -2669,30 +2678,36 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                     // Query dari PostgreSQL - cari webhook yang belum processed dengan amount yang match
                     const orderAmount = Number(totalAmount);
                     const tolerance = 1; // Tolerance 1 rupiah untuk handle decimal
+                    const orderCreatedAt = new Date(createdAtTs);
 
                     const result = await pg.query(
-                      `SELECT id, order_id, transaction_id, transaction_status, payment_type, gross_amount, settlement_time, webhook_data
+                      `SELECT id, order_id, transaction_id, transaction_status, payment_type, gross_amount, settlement_time, webhook_data, created_at
                    FROM midtrans_webhooks
                    WHERE processed = false 
                      AND transaction_status IN ('settlement', 'capture')
                      AND ABS(gross_amount - $1) < $2
+                     AND created_at >= $3
+                     AND order_id LIKE 'MID-%'
                    ORDER BY created_at DESC
                    LIMIT 10`,
-                      [orderAmount, tolerance]
+                      [orderAmount, tolerance, orderCreatedAt]
                     );
 
                     if (result.rows.length > 0) {
-                      console.log(`🔍 [MID] Found ${result.rows.length} unprocessed webhooks from PostgreSQL, looking for amount Rp${orderAmount}`);
+                      console.log(`🔍 [MID] Found ${result.rows.length} unprocessed webhooks from PostgreSQL, looking for amount Rp${orderAmount}, created after ${orderCreatedAt.toISOString()}`);
                     }
 
                     for (const row of result.rows) {
                       const webhookAmount = Number(row.gross_amount || 0);
                       const amountDiff = Math.abs(webhookAmount - orderAmount);
                       const isAmountMatch = amountDiff < tolerance;
+                      const webhookCreatedAt = new Date(row.created_at);
+                      const isTimeValid = webhookCreatedAt >= orderCreatedAt;
+                      const isOrderIdValid = String(row.order_id || '').startsWith('MID-');
 
-                      console.log(`  - Webhook: Amount Rp${webhookAmount} (${typeof row.gross_amount}), Order Amount Rp${orderAmount}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+                      console.log(`  - Webhook: OrderID: ${row.order_id}, Amount Rp${webhookAmount}, Created: ${webhookCreatedAt.toISOString()}, AmountMatch: ${isAmountMatch}, TimeValid: ${isTimeValid}, OrderIDValid: ${isOrderIdValid}`);
 
-                      if (isAmountMatch) {
+                      if (isAmountMatch && isTimeValid && isOrderIdValid) {
                         console.log(`✅ [MID] Payment detected via PostgreSQL webhook: Amount Rp${webhookAmount}, OrderID: ${row.order_id}`);
 
                         // Mark as processed di PostgreSQL
@@ -2720,7 +2735,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                     const unprocessedWebhooks = webhooks.filter(w => !w.processed && w.gross_amount);
 
                     if (unprocessedWebhooks.length > 0) {
-                      console.log(`🔍 [MID] Checking ${unprocessedWebhooks.length} unprocessed webhooks from JSON, looking for amount Rp${totalAmount}`);
+                      console.log(`🔍 [MID] Checking ${unprocessedWebhooks.length} unprocessed webhooks from JSON, looking for amount Rp${totalAmount}, created after ${new Date(createdAtTs).toISOString()}`);
                     }
 
                     for (const webhook of unprocessedWebhooks) {
@@ -2728,10 +2743,13 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                       const amountDiff = Math.abs(webhookAmount - Number(totalAmount));
                       const isAmountMatch = amountDiff < 1;
                       const isStatusPaid = /(settlement|capture)/i.test(String(webhook.transactionStatus));
+                      const webhookTimestamp = webhook.timestamp || 0;
+                      const isTimeValid = webhookTimestamp >= createdAtTs;
+                      const isOrderIdValid = String(webhook.orderId || '').startsWith('MID-');
 
-                      console.log(`  - Webhook: Amount Rp${webhookAmount}, Status: ${webhook.transactionStatus}, Diff: Rp${amountDiff.toFixed(2)}, Match: ${isAmountMatch}`);
+                      console.log(`  - Webhook: OrderID: ${webhook.orderId}, Amount Rp${webhookAmount}, Status: ${webhook.transactionStatus}, Timestamp: ${new Date(webhookTimestamp).toISOString()}, AmountMatch: ${isAmountMatch}, TimeValid: ${isTimeValid}, OrderIDValid: ${isOrderIdValid}`);
 
-                      if (isAmountMatch && isStatusPaid) {
+                      if (isAmountMatch && isStatusPaid && isTimeValid && isOrderIdValid) {
                         console.log(`✅ [MID] Payment detected via JSON webhook: Amount Rp${webhookAmount}, OrderID: ${webhook.orderId}`);
 
                         // Mark as processed
