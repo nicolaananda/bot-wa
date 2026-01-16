@@ -283,6 +283,7 @@ app.post('/webhook/midtrans', async (req, res) => {
     const orderId = notification.order_id || '';
     const isNalaTransaction = orderId.includes('CLASS-') ||
       orderId.includes('GG-') ||
+      orderId.includes('SKET-') ||
       orderId.includes('GRASP-');
 
     if (isNalaTransaction) {
