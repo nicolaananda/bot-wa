@@ -452,14 +452,71 @@ if (!global.midtransWebhookListenerSetup) {
         return;
       }
 
-      // Mark as processed immediately
+      console.log(`✅ [MID-GLOBAL] Processing payment for order: ${orderId}, RefId: ${reffId}`);
+
+      // 🔒 CRITICAL: Check stock availability BEFORE marking as processed
+      // This prevents race condition where customer pays but stock is empty
+      const currentStock = db.data.produk[productId].stok.length;
+      if (currentStock < jumlah) {
+        console.error(`❌ [MID-GLOBAL] Insufficient stock for product ${productId}: requested ${jumlah}, available ${currentStock}`);
+
+        // Notify customer about out-of-stock
+        try {
+          const outOfStockMessage = `⚠️ *STOK HABIS*\n\n` +
+            `Maaf, stok untuk produk *${db.data.produk[productId].name}* sudah habis.\n\n` +
+            `💰 *Pembayaran Anda:* Rp${totalAmount.toLocaleString('id-ID')}\n` +
+            `📝 *Order ID:* ${orderId}\n` +
+            `📋 *Ref ID:* ${reffId}\n\n` +
+            `🔄 *Refund otomatis akan diproses dalam 1x24 jam*\n\n` +
+            `Atau hubungi admin: wa.me/${ownerNomer}`;
+
+          await globalRonzz.sendMessage(sender, { text: outOfStockMessage });
+          console.log(`✅ [MID-GLOBAL] Out-of-stock notification sent to ${sender}`);
+
+          // Notify owner for manual refund
+          const ownerAlert = `🚨 *STOK HABIS - REFUND REQUIRED*\n\n` +
+            `👤 Customer: ${sender.split('@')[0]}\n` +
+            `📦 Product: ${db.data.produk[productId].name}\n` +
+            `💰 Amount: Rp${totalAmount.toLocaleString('id-ID')}\n` +
+            `📝 Order ID: ${orderId}\n` +
+            `📋 Ref ID: ${reffId}\n\n` +
+            `⚠️ *ACTION REQUIRED:* Process manual refund`;
+
+          await globalRonzz.sendMessage(ownerNomer + '@s.whatsapp.net', { text: ownerAlert });
+          console.log(`✅ [MID-GLOBAL] Refund alert sent to owner`);
+        } catch (notifError) {
+          console.error(`❌ [MID-GLOBAL] Error sending out-of-stock notification:`, notifError.message);
+        }
+
+        // Mark order as failed
+        order.processed = true;
+        order.status = 'failed_out_of_stock';
+        order.failedAt = Date.now();
+        db.data.order[sender] = order;
+        await db.save();
+
+        return;
+      }
+
+      // Reserve stock (atomic operation)
+      let dataStok = [];
+      for (let i = 0; i < jumlah; i++) {
+        dataStok.push(db.data.produk[productId].stok.shift());
+      }
+
+      // Update sold count
+      db.data.produk[productId].terjual += jumlah;
+
+      // Important: Delete old stock property to force recalculation from stok.length
+      delete db.data.produk[productId].stock;
+
+      // NOW mark as processed (stock already reserved)
       order.processed = true;
+      order.status = 'success';
       db.data.order[sender] = order;
       await db.save();
 
-      console.log(`✅ [MID-GLOBAL] Processing payment for order: ${orderId}, RefId: ${reffId}`);
-
-      // Delete message - use deleteMessage directly
+      // Delete QRIS message
       if (globalRonzz && messageKey) {
         try {
           console.log(`[DEBUG-DELETE] messageKey object:`, JSON.stringify(messageKey, null, 2));
@@ -471,23 +528,6 @@ if (!global.midtransWebhookListenerSetup) {
           console.error(`⚠️ [MID-GLOBAL] Error deleting message:`, e.message);
         }
       }
-
-      // Process purchase
-      db.data.produk[productId].terjual += jumlah;
-      let dataStok = [];
-      for (let i = 0; i < jumlah; i++) {
-        if (db.data.produk[productId].stok.length > 0) {
-          dataStok.push(db.data.produk[productId].stok.shift());
-        }
-      }
-
-      if (dataStok.length === 0) {
-        console.error(`❌ [MID-GLOBAL] No stock available for product ${productId}`);
-        return;
-      }
-
-      // Important: Delete old stock property to force recalculation from stok.length
-      delete db.data.produk[productId].stock;
 
       const moment = require('moment-timezone');
       const tanggal = moment.tz("Asia/Jakarta").format("DD/MM/YYYY");
