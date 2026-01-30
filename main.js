@@ -279,13 +279,13 @@ async function startronzz() {
   ronzz.on('messages.upsert', async chatUpdate => {
     try {
       for (let mek of chatUpdate.messages) {
-        if (!mek.message) return
+        if (!mek.message) continue // Changed from return to continue
 
         // 🔒 Prevent duplicate processing
         const messageId = mek.key?.id
         if (messageId && processedMessageIds.has(messageId)) {
           console.log(`⚠️ Duplicate message detected: ${messageId}, skipping...`)
-          return
+          continue // Changed from return to continue - don't stop entire batch!
         }
 
         // Mark as processed with timestamp
@@ -300,8 +300,8 @@ async function startronzz() {
 
         mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
         const m = smsg(ronzz, mek, store)
-        if (mek.key && mek.key.remoteJid === 'status@broadcast') return
-        if (mek.key.id.startsWith('BAE5') && mek.key.id.length === 16) return
+        if (mek.key && mek.key.remoteJid === 'status@broadcast') continue // Changed from return to continue
+        if (mek.key.id.startsWith('BAE5') && mek.key.id.length === 16) continue // Changed from return to continue
         require('./index')(ronzz, m, mek)
       }
     } catch (err) {
