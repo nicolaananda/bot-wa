@@ -69,7 +69,10 @@ function __wrapSendMessageOnce(ronzz) {
             const code = e && (e.status || e.statusCode || e.code);
             const transient =
               code === 429 ||
-              /rate|too many|retry|temporarily unavailable|timeout|timed out|flood/i.test(msg);
+              code === 'ECONNRESET' ||
+              code === 'ETIMEDOUT' ||
+              code === 'ENOTFOUND' ||
+              /rate|too many|retry|temporarily unavailable|timeout|timed out|flood|ECONNRESET|ETIMEDOUT|ENOTFOUND/i.test(msg);
             if (!transient || attempt > SEND_MAX_RETRIES) throw e;
             const backoff = Math.min(1000 * 2 ** (attempt - 1), 8000);
             try { console.warn('[WA] send retry', { attempt, backoff, code, message: msg }); } catch { }
