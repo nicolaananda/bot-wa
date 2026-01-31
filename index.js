@@ -696,9 +696,38 @@ module.exports = async (ronzz, m, mek) => {
     const botNumber = ronzz.user.id.split(':')[0] + '@s.whatsapp.net'
     let groupMetadata = ''
     try {
-      groupMetadata = isGroup ? await ronzz.groupMetadata(from) : ''
       if (isGroup) {
-        console.log(`[DEBUG-GROUP] Raw groupMetadata:`, JSON.stringify(groupMetadata, null, 2))
+        // Retry groupMetadata fetch on network errors (similar to sendMessage retry)
+        let attempt = 0;
+        const maxRetries = 3;
+        while (true) {
+          try {
+            groupMetadata = await ronzz.groupMetadata(from);
+            console.log(`[DEBUG-GROUP] Raw groupMetadata:`, JSON.stringify(groupMetadata, null, 2));
+            break;
+          } catch (e) {
+            attempt += 1;
+            const msg = String(e && e.message ? e.message : "");
+            const code = e && (e.status || e.statusCode || e.code);
+            const transient =
+              code === 'ECONNRESET' ||
+              code === 'ETIMEDOUT' ||
+              code === 'ENOTFOUND' ||
+              /ECONNRESET|ETIMEDOUT|ENOTFOUND|timeout|timed out/i.test(msg);
+
+            if (!transient || attempt > maxRetries) {
+              console.warn(`WARNING: Failed to fetch group metadata for ${from} after ${attempt} attempts: ${e.message}`);
+              groupMetadata = { subject: 'Unknown Group', id: from, participants: [] };
+              break;
+            }
+
+            const backoff = Math.min(1000 * 2 ** (attempt - 1), 4000);
+            console.warn(`[GROUP-META] Retry attempt ${attempt}/${maxRetries}, waiting ${backoff}ms...`);
+            await __delay(backoff);
+          }
+        }
+      } else {
+        groupMetadata = '';
       }
     } catch (e) {
       console.warn(`WARNING: Failed to fetch group metadata for ${from}: ${e.message}`)
