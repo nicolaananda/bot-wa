@@ -145,7 +145,7 @@ const { isRedisAvailable, closeRedis } = require('./config/redis')
     console.log('✅ [DB] Debounced save system initialized (10s inactivity delay)')
   })()
 
-async function startronzz() {
+async function startnicola() {
 
   console.log(chalk.bold.green(figlet.textSync('Velzzy', {
     font: 'Standard',
@@ -163,7 +163,7 @@ async function startronzz() {
   const store = null
 
   // Initialize Gowa adapter (replaces Baileys makeWASocket)
-  const ronzz = new GowaAdapter({
+  const nicola = new GowaAdapter({
     baseUrl: process.env.GOWA_API_URL || 'https://gowa2.nicola.id',
     username: process.env.GOWA_USERNAME || 'admin',
     password: process.env.GOWA_PASSWORD || '',
@@ -171,11 +171,11 @@ async function startronzz() {
   })
 
   // Store global reference for webhook access
-  global.gowaAdapter = ronzz
+  global.gowaAdapter = nicola
 
   // Connect to Gowa service
   console.log('[GOWA] Connecting to WhatsApp service...')
-  const connected = await ronzz.connect()
+  const connected = await nicola.connect()
 
   if (!connected) {
     console.error('[GOWA] Failed to connect. Please ensure:')
@@ -186,8 +186,8 @@ async function startronzz() {
   }
 
   console.log('[GOWA] Connected successfully!')
-  console.log('[GOWA] Bot Number:', ronzz.user?.id)
-  console.log('[GOWA] Bot Name:', ronzz.user?.name)
+  console.log('[GOWA] Bot Number:', nicola.user?.id)
+  console.log('[GOWA] Bot Name:', nicola.user?.name)
 
   // Dashboard-API runs as separate pm2 process
   // Communication via Redis pub/sub
@@ -216,7 +216,7 @@ async function startronzz() {
 
           if (channel === 'gowa:messages') {
             console.log('[REDIS-SUB] Received message from webhook');
-            ronzz.handleWebhook(parsedMessage);
+            nicola.handleWebhook(parsedMessage);
           } else if (channel === 'midtrans:events') {
             console.log(`[REDIS-SUB] Received midtrans event: ${parsedMessage.event}`);
             if (parsedMessage.event === 'payment-completed') {
@@ -241,17 +241,17 @@ async function startronzz() {
     console.log('[REDIS-SUB] Redis disabled - webhook messages will not be received');
   }
 
-  ronzz.on("connection.update", ({ connection }) => {
+  nicola.on("connection.update", ({ connection }) => {
     if (connection === "open") {
-      console.log("CONNECTION OPEN ( +" + ronzz.user?.id?.split(":")[0] + " || " + ronzz.user?.name + " )")
+      console.log("CONNECTION OPEN ( +" + nicola.user?.id?.split(":")[0] + " || " + nicola.user?.name + " )")
     }
     if (connection === "close") {
       console.log("Connection closed, reconnecting...");
-      setTimeout(() => startronzz(), 5000) // Reconnect after 5 seconds
+      setTimeout(() => startnicola(), 5000) // Reconnect after 5 seconds
     }
     if (connection === "connecting") {
-      if (ronzz.user) {
-        console.log("CONNECTION FOR ( +" + ronzz.user?.id?.split(":")[0] + " || " + ronzz.user?.name + " )")
+      if (nicola.user) {
+        console.log("CONNECTION FOR ( +" + nicola.user?.id?.split(":")[0] + " || " + nicola.user?.name + " )")
       }
     }
   })
@@ -276,7 +276,7 @@ async function startronzz() {
   // Periodic cleanup every 5 minutes (less frequent = less CPU usage)
   setInterval(cleanupOldMessages, MESSAGE_CACHE_TTL)
 
-  ronzz.on('messages.upsert', async chatUpdate => {
+  nicola.on('messages.upsert', async chatUpdate => {
     try {
       for (let mek of chatUpdate.messages) {
         if (!mek.message) continue // Changed from return to continue
@@ -299,10 +299,10 @@ async function startronzz() {
         }
 
         mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
-        const m = smsg(ronzz, mek, store)
+        const m = smsg(nicola, mek, store)
         if (mek.key && mek.key.remoteJid === 'status@broadcast') continue // Changed from return to continue
         if (mek.key.id.startsWith('BAE5') && mek.key.id.length === 16) continue // Changed from return to continue
-        require('./index')(ronzz, m, mek)
+        require('./index')(nicola, m, mek)
       }
     } catch (err) {
       console.log(err)
@@ -312,14 +312,14 @@ async function startronzz() {
   // Event processing not needed with Gowa (uses webhooks)
 
 
-  ronzz.ws.on('CB:call', async (json) => {
+  nicola.ws.on('CB:call', async (json) => {
     const callerId = json.content[0].attrs['call-creator']
-    if (db.data.setting[ronzz.user?.["id"]["split"](":")[0] + "@s.whatsapp.net"].anticall && json.content[0].tag == 'offer') {
-      ronzz.sendMessage(callerId, { text: `Kamu telah di blok oleh bot, karena kamu menelpon bot!!\n\nJika tidak sengaja silahkan hubungi owner agar dibuka blocknya!!\nNomor owner : wa.me/${ownerNomer}` })
+    if (db.data.setting[nicola.user?.["id"]["split"](":")[0] + "@s.whatsapp.net"].anticall && json.content[0].tag == 'offer') {
+      nicola.sendMessage(callerId, { text: `Kamu telah di blok oleh bot, karena kamu menelpon bot!!\n\nJika tidak sengaja silahkan hubungi owner agar dibuka blocknya!!\nNomor owner : wa.me/${ownerNomer}` })
 
       // Notify owner about auto-block
       const callerNumber = callerId.replace('@s.whatsapp.net', '')
-      ronzz.sendMessage(ownerNomer + '@s.whatsapp.net', {
+      nicola.sendMessage(ownerNomer + '@s.whatsapp.net', {
         text: `🚫 *AUTO-BLOCK NOTIFICATION*\n\n` +
           `📱 User @${callerNumber} telah di-block otomatis karena menelepon bot.\n\n` +
           `💡 *Untuk unblock:*\n` +
@@ -330,47 +330,47 @@ async function startronzz() {
       })
 
       setTimeout(() => {
-        ronzz.updateBlockStatus(callerId, 'block')
+        nicola.updateBlockStatus(callerId, 'block')
         console.log(`🚫 [AUTO-BLOCK] User ${callerNumber} blocked due to phone call`)
       }, 1000)
     }
   })
 
-  ronzz.ev.on('group-participants.update', async (update) => {
+  nicola.ev.on('group-participants.update', async (update) => {
     if (!db.data.chat[update.id]?.welcome) return
-    groupResponseDemote(ronzz, update)
-    groupResponsePromote(ronzz, update)
-    groupResponseWelcome(ronzz, update)
-    groupResponseRemove(ronzz, update)
+    groupResponseDemote(nicola, update)
+    groupResponsePromote(nicola, update)
+    groupResponseWelcome(nicola, update)
+    groupResponseRemove(nicola, update)
   })
 
-  ronzz.getName = (jid, withoutContact = false) => {
-    var id = ronzz.decodeJid(jid)
-    withoutContact = ronzz.withoutContact || withoutContact
+  nicola.getName = (jid, withoutContact = false) => {
+    var id = nicola.decodeJid(jid)
+    withoutContact = nicola.withoutContact || withoutContact
     let v
     if (id.endsWith("@g.us")) return new Promise(async (resolve) => {
       v = store.contacts[id] || {}
-      if (!(v.name || v.subject)) v = ronzz.groupMetadata(id) || {}
+      if (!(v.name || v.subject)) v = nicola.groupMetadata(id) || {}
       resolve(v.name || v.subject || PhoneNumber('+' + id.replace('@s.whatsapp.net', '')).getNumber('international'))
     })
-    else v = id === '0@s.whatsapp.net' ? { id, name: 'WhatsApp' } : id === ronzz.decodeJid(ronzz.user.id) ? ronzz.user : (store.contacts[id] || {})
+    else v = id === '0@s.whatsapp.net' ? { id, name: 'WhatsApp' } : id === nicola.decodeJid(nicola.user.id) ? nicola.user : (store.contacts[id] || {})
     return (withoutContact ? '' : v.name) || v.subject || v.verifiedName || PhoneNumber('+' + jid.replace('@s.whatsapp.net', '')).getNumber('international')
   }
 
-  ronzz.sendContact = async (jid, contact, quoted = '', opts = {}) => {
+  nicola.sendContact = async (jid, contact, quoted = '', opts = {}) => {
     let list = []
     for (let i of contact) {
       list.push({
-        lisplayName: owner.includes(i) ? ownerName : await ronzz.getName(i + '@s.whatsapp.net'),
-        vcard: `BEGIN:VCARD\nVERSION:3.0\nN:${owner.includes(i) ? ownerName : await ronzz.getName(i + '@s.whatsapp.net')}\nFN:${ownerNomer.includes(i) ? ownerName : await ronzz.getName(i + '@s.whatsapp.net')}\nitem1.TEL;waid=${i}:${i}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
+        lisplayName: owner.includes(i) ? ownerName : await nicola.getName(i + '@s.whatsapp.net'),
+        vcard: `BEGIN:VCARD\nVERSION:3.0\nN:${owner.includes(i) ? ownerName : await nicola.getName(i + '@s.whatsapp.net')}\nFN:${ownerNomer.includes(i) ? ownerName : await nicola.getName(i + '@s.whatsapp.net')}\nitem1.TEL;waid=${i}:${i}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
       })
     }
-    return ronzz.sendMessage(jid, { contacts: { displayName: `${list.length} Kontak`, contacts: list }, ...opts }, { quoted })
+    return nicola.sendMessage(jid, { contacts: { displayName: `${list.length} Kontak`, contacts: list }, ...opts }, { quoted })
   }
 
-  ronzz.sendImage = async (jid, path, caption = '', quoted = '', options) => {
+  nicola.sendImage = async (jid, path, caption = '', quoted = '', options) => {
     let buffer = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,`[1], 'base64') : /^https?:\/\//.test(path) ? await (await getBuffer(path)) : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
-    return await ronzz.sendMessage(jid, { image: buffer, caption: caption, ...options }, { quoted })
+    return await nicola.sendMessage(jid, { image: buffer, caption: caption, ...options }, { quoted })
   }
 
   const jidDecode = (jid) => {
@@ -385,7 +385,7 @@ async function startronzz() {
     }
   }
 
-  ronzz.decodeJid = (jid) => {
+  nicola.decodeJid = (jid) => {
     if (!jid) return jid
     if (/:\d+@/gi.test(jid)) {
       let decode = jidDecode(jid) || {}
@@ -393,7 +393,7 @@ async function startronzz() {
     } else return jid
   }
 
-  ronzz.sendImageAsSticker = async (jid, path, quoted, options = {}) => {
+  nicola.sendImageAsSticker = async (jid, path, quoted, options = {}) => {
     let buff = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,`[1], 'base64') : /^https?:\/\//.test(path) ? await (await getBuffer(path)) : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
     let buffer
     if (options && (options.packname || options.author)) {
@@ -401,13 +401,13 @@ async function startronzz() {
     } else {
       buffer = await imageToWebp(buff)
     }
-    await ronzz.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted }).then(response => {
+    await nicola.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted }).then(response => {
       fs.unlinkSync(buffer)
       return response
     })
   }
 
-  ronzz.sendVideoAsSticker = async (jid, path, quoted, options = {}) => {
+  nicola.sendVideoAsSticker = async (jid, path, quoted, options = {}) => {
     let buff = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,`[1], 'base64') : /^https?:\/\//.test(path) ? await (await getBuffer(path)) : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
     let buffer
     if (options && (options.packname || options.author)) {
@@ -415,13 +415,13 @@ async function startronzz() {
     } else {
       buffer = await videoToWebp(buff)
     }
-    await ronzz.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted }).then(response => {
+    await nicola.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted }).then(response => {
       fs.unlinkSync(buffer)
       return response
     })
   }
 
-  return ronzz
+  return nicola
 }
 
-startronzz()
+startnicola()

@@ -1,6 +1,6 @@
-const expiredCheck = (ronzz) => {
+const expiredCheck = (nicola) => {
   setInterval(() => {
-    const { groupLeave } = ronzz
+    const { groupLeave } = nicola
     let position = null
     Object.keys(db.data.sewa).forEach((i) => {
       if (Date.now() >= db.data.sewa[i].expired) {

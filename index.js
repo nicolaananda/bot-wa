@@ -1,5 +1,5 @@
 require("./setting.js")
-// Removed: downloadContentFromMessage - now using ronzz.downloadMedia() from Gowa adapter
+// Removed: downloadContentFromMessage - now using nicola.downloadMedia() from Gowa adapter
 const fs = require("fs");
 const speed = require("performance-now");
 const moment = require("moment-timezone");
@@ -46,11 +46,11 @@ function __delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function __wrapSendMessageOnce(ronzz) {
+function __wrapSendMessageOnce(nicola) {
   try {
-    if (ronzz.__sendWrapped) return;
-    const originalSend = ronzz.sendMessage.bind(ronzz);
-    ronzz.sendMessage = async function (jid, content, options) {
+    if (nicola.__sendWrapped) return;
+    const originalSend = nicola.sendMessage.bind(nicola);
+    nicola.sendMessage = async function (jid, content, options) {
       __sendQueue = __sendQueue.then(async () => {
         const now = Date.now();
         const wait = Math.max(0, SEND_MIN_INTERVAL_MS - (now - __lastSendAt));
@@ -82,7 +82,7 @@ function __wrapSendMessageOnce(ronzz) {
       });
       return __sendQueue;
     };
-    Object.defineProperty(ronzz, '__sendWrapped', { value: true, enumerable: false, configurable: false });
+    Object.defineProperty(nicola, '__sendWrapped', { value: true, enumerable: false, configurable: false });
   } catch { }
 }
 
@@ -101,7 +101,7 @@ try {
 const activeTimeouts = new Map();
 const autoDeleteState = {
   initialized: false,
-  ronzz: null
+  nicola: null
 };
 
 function getDatabaseInstance() {
@@ -160,8 +160,8 @@ function removeAutoDeleteEntry(entryId) {
 }
 
 async function performAutoDelete(entry) {
-  const ronzz = autoDeleteState.ronzz;
-  if (!ronzz) return;
+  const nicola = autoDeleteState.nicola;
+  if (!nicola) return;
   const deleteKey = {
     remoteJid: entry.remoteJid,
     id: entry.id,
@@ -170,7 +170,7 @@ async function performAutoDelete(entry) {
   };
 
   try {
-    await ronzz.sendMessage(entry.remoteJid, { delete: deleteKey });
+    await nicola.sendMessage(entry.remoteJid, { delete: deleteKey });
     console.log(`🗑️ Auto-deleted ${entry.description} after delay`);
   } catch (error) {
     console.error(`[Timeout] Failed to auto-delete ${entry.description}:`, error.message);
@@ -180,7 +180,7 @@ async function performAutoDelete(entry) {
 }
 
 function scheduleAutoDeleteEntry(entry) {
-  if (!autoDeleteState.ronzz) return;
+  if (!autoDeleteState.nicola) return;
   if (!entry || !entry.id) return;
   if (activeTimeouts.has(entry.id)) return;
 
@@ -237,9 +237,9 @@ function scheduleAutoDelete(messageKey, chatId, delayMs = 300000, description = 
   return entry;
 }
 
-function initializeAutoDeleteManager(ronzz) {
-  if (!ronzz) return;
-  autoDeleteState.ronzz = ronzz;
+function initializeAutoDeleteManager(nicola) {
+  if (!nicola) return;
+  autoDeleteState.nicola = nicola;
   if (autoDeleteState.initialized) return;
   autoDeleteState.initialized = true;
 
@@ -655,15 +655,15 @@ if (!global.midtransWebhookListenerSetup) {
   console.log('✅ [MID-GLOBAL] Global webhook listener registered');
 }
 
-module.exports = async (ronzz, m, mek) => {
+module.exports = async (nicola, m, mek) => {
   // Set global reference untuk webhook listener
-  globalRonzz = ronzz;
+  globalRonzz = nicola;
 
   try {
-    __wrapSendMessageOnce(ronzz)
+    __wrapSendMessageOnce(nicola)
     const { isQuotedMsg, fromMe } = m
     if (fromMe) return
-    initializeAutoDeleteManager(ronzz)
+    initializeAutoDeleteManager(nicola)
     const jamwib = moment.tz('Asia/Jakarta').format('HH:mm:ss')
     const dt = moment.tz('Asia/Jakarta').format('HH')
     const content = JSON.stringify(mek.message)
@@ -687,13 +687,13 @@ module.exports = async (ronzz, m, mek) => {
     const rawSender = m.isGroup ? (mek.key.participant ? mek.key.participant : mek.participant) : mek.key.remoteJid
     // Normalize sender: remove device ID suffix (e.g. :33@s.whatsapp.net -> @s.whatsapp.net)
     const sender = rawSender.replace(/:[0-9]+@/, '@')
-    const isOwner = [ronzz.user.id, ...owner].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(sender) ? true : false
+    const isOwner = [nicola.user.id, ...owner].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(sender) ? true : false
     const pushname = m.pushName
     const budy = (typeof m.text == 'string' ? m.text : '')
     const args = chats.split(/ +/).slice(1);
     const q = args.join(" ");
     const command = chats.replace(prefix, '').trim().split(/ +/).shift().toLowerCase()
-    const botNumber = ronzz.user.id.split(':')[0] + '@s.whatsapp.net'
+    const botNumber = nicola.user.id.split(':')[0] + '@s.whatsapp.net'
     let groupMetadata = ''
     try {
       if (isGroup) {
@@ -702,7 +702,7 @@ module.exports = async (ronzz, m, mek) => {
         const maxRetries = 3;
         while (true) {
           try {
-            groupMetadata = await ronzz.groupMetadata(from);
+            groupMetadata = await nicola.groupMetadata(from);
             console.log(`[DEBUG-GROUP] Raw groupMetadata:`, JSON.stringify(groupMetadata, null, 2));
             break;
           } catch (e) {
@@ -813,7 +813,7 @@ module.exports = async (ronzz, m, mek) => {
       if (!isAllowedGroup && global.linkGroup && global.linkGroup.length > 0) {
         try {
           // Ambil group invite code
-          const groupInviteCode = await ronzz.groupInviteCode(from)
+          const groupInviteCode = await nicola.groupInviteCode(from)
           const groupLink = `https://chat.whatsapp.com/${groupInviteCode}`
 
           // Extract invite code dari whitelist links
@@ -885,7 +885,7 @@ module.exports = async (ronzz, m, mek) => {
       return [...text.matchAll(/@([0-9]{5,16}|0)/g)].map(v => v[1] + '@s.whatsapp.net')
     }
 
-    const reply = (teks, options = {}) => { ronzz.sendMessage(from, { text: teks, ...options }, { quoted: m }) }
+    const reply = (teks, options = {}) => { nicola.sendMessage(from, { text: teks, ...options }, { quoted: m }) }
     let cachedThumbnailBuffer = null
     function getThumbnailBuffer() {
       if (!cachedThumbnailBuffer) {
@@ -897,7 +897,7 @@ module.exports = async (ronzz, m, mek) => {
       }
       return cachedThumbnailBuffer
     }
-    const Reply = (teks) => ronzz.sendMessage(from, { text: Styles(teks), contextInfo: { mentionedJid: parseMention(teks), externalAdReply: { showAdAttribution: true, title: `${botName} © ${ownerName}`, body: ownerName + botName, thumbnail: getThumbnailBuffer(), sourceUrl: linkGroup, mediaType: 1, renderLargerThumbnail: true } } }, { quoted: m })
+    const Reply = (teks) => nicola.sendMessage(from, { text: Styles(teks), contextInfo: { mentionedJid: parseMention(teks), externalAdReply: { showAdAttribution: true, title: `${botName} © ${ownerName}`, body: ownerName + botName, thumbnail: getThumbnailBuffer(), sourceUrl: linkGroup, mediaType: 1, renderLargerThumbnail: true } } }, { quoted: m })
 
     const mentionByTag = m.mtype == "extendedTextMessage" && m.message.extendedTextMessage.contextInfo != null ? m.message.extendedTextMessage.contextInfo.mentionedJid : []
     const mentionByReply = m.mtype == "extendedTextMessage" && m.message.extendedTextMessage.contextInfo != null ? m.message.extendedTextMessage.contextInfo.participant || "" : ""
@@ -905,7 +905,7 @@ module.exports = async (ronzz, m, mek) => {
     mention != undefined ? mention.push(mentionByReply) : []
 
     try {
-      var ppuser = await ronzz.profilePictureUrl(sender, "image")
+      var ppuser = await nicola.profilePictureUrl(sender, "image")
     } catch {
       var ppuser = "https://telegra.ph/file/8dcf2bc718248d2dd189b.jpg"
     }
@@ -929,7 +929,7 @@ module.exports = async (ronzz, m, mek) => {
         }
 
         // Use Gowa adapter's downloadMedia method
-        const buffer = await ronzz.downloadMedia(messageToDownload);
+        const buffer = await nicola.downloadMedia(messageToDownload);
         fs.writeFileSync(path_file, buffer);
         return path_file;
       } catch (error) {
@@ -1133,7 +1133,7 @@ module.exports = async (ronzz, m, mek) => {
       if (role == "silver") return db.data.produk[id].priceS
       if (role == "gold") return db.data.produk[id].priceG
     }
-    expiredCheck(ronzz, m, groupId)
+    expiredCheck(nicola, m, groupId)
 
     if (db.data.topup[sender]) {
       if (!fromMe) {
@@ -1153,7 +1153,7 @@ module.exports = async (ronzz, m, mek) => {
               }
 
               let teks = `*🧾 KONFIRMASI TOPUP 🧾*\n\n*Produk ID:* ${product.kode}\n*User Id:* ${chats.split(" ")[0]}\n*Zone Id:* ${chats.split(" ")[1]}\n*Nickname:* ${nickname}\n\n「  DETAIL PRODUCT ✅  」\n*Kategori:* ${product.kategori}\n*Produk:* ${product.keterangan}\n*Harga:* Rp${toRupiah(hargaSetelahProfit(product.harga, db.data.users[sender].role, product.kategori))}\n\nPeriksa apakah inputan sudah benar, jika salah maka akan gagal.`
-              ronzz.sendMessage(from, {
+              nicola.sendMessage(from, {
                 footer: `${botName} © ${ownerName}`,
                 buttons: [
                   {
@@ -1204,7 +1204,7 @@ module.exports = async (ronzz, m, mek) => {
               }
 
               let teks = `*🧾 KONFIRMASI TOPUP 🧾*\n\n*Produk ID:* ${product.kode}\n*User Id:* ${chats}\n*Nickname:* ${nickname}\n\n「  DETAIL PRODUCT ✅  」\n*Kategori:* ${product.kategori}\n*Produk:* ${product.keterangan}\n*Harga:* Rp${toRupiah(hargaSetelahProfit(product.harga, db.data.users[sender].role, product.kategori))}\n\nPeriksa apakah inputan sudah benar, jika salah maka akan gagal.`
-              ronzz.sendMessage(from, {
+              nicola.sendMessage(from, {
                 footer: `${botName} © ${ownerName}`,
                 buttons: [
                   {
@@ -1235,7 +1235,7 @@ module.exports = async (ronzz, m, mek) => {
               db.data.topup[sender].data.nickname = nickname
             } else {
               let teks = `*🧾 KONFIRMASI TOPUP 🧾*\n\n*Produk ID:* ${product.kode}\n*Tujuan:* ${chats}\n\n「  DETAIL PRODUCT ✅  」\n*Kategori:* ${product.kategori}\n*Produk:* ${product.keterangan}\n*Harga:* Rp${toRupiah(hargaSetelahProfit(product.harga, db.data.users[sender].role, product.kategori))}\n\nPeriksa apakah inputan sudah benar, jika salah maka akan gagal.`
-              ronzz.sendMessage(from, {
+              nicola.sendMessage(from, {
                 footer: `${botName} © ${ownerName}`,
                 buttons: [
                   {
@@ -1295,7 +1295,7 @@ module.exports = async (ronzz, m, mek) => {
                 } else {
                   cap = `*🧾 MENUNGGU PEMBAYARAN 🧾*\n\n*Produk ID:* ${product.kode}\n*Tujuan:* ${db.data.topup[sender].data.id}\n\n「  DETAIL PRODUCT ✅  」\n*Kategori:* ${product.kategori}\n*Produk:* ${product.keterangan}\n*Harga:* Rp${toRupiah(db.data.topup[sender].data.price)} + 2 digit acak\n*Total Harga:* Rp${toRupiah(amount)}\n*Waktu:* ${timeLeft} menit\n\nSilahkan scan Qris di atas sebelum ${formattedTime} untuk melakukan pembayaran.\n`;
                 }
-                let mess = await ronzz.sendMessage(from, { image: fs.readFileSync(pay), caption: Styles(cap) }, { quoted: m })
+                let mess = await nicola.sendMessage(from, { image: fs.readFileSync(pay), caption: Styles(cap) }, { quoted: m })
 
                 let statusPay = false;
 
@@ -1304,7 +1304,7 @@ module.exports = async (ronzz, m, mek) => {
                   if (Date.now() >= time) {
                     statusPay = true
 
-                    await ronzz.sendMessage(from, { delete: mess.key })
+                    await nicola.sendMessage(from, { delete: mess.key })
                     reply("Pembayaran dibatalkan karena telah melewati batas expired.")
                     delete db.data.topup[sender]
                   }
@@ -1316,10 +1316,10 @@ module.exports = async (ronzz, m, mek) => {
                     if (result !== undefined) {
                       statusPay = true;
 
-                      await ronzz.sendMessage(from, { delete: mess.key })
+                      await nicola.sendMessage(from, { delete: mess.key })
                       axios.get(`https://b2b.okeconnect.com/trx-v2?product=${product.kode}&dest=${db.data.topup[sender].data.id}${db.data.topup[sender].data.zone}&refID=${db.data.topup[sender].id}&memberID=${memberId}&pin=${pin}&password=${pw}`).then(async ress => {
                         if (ress.data.status == "GAGAL") {
-                          ronzz.sendMessage(from, {
+                          nicola.sendMessage(from, {
                             footer: `${botName} © ${ownerName}`,
                             buttons: [
                               {
@@ -1363,7 +1363,7 @@ module.exports = async (ronzz, m, mek) => {
                           status = responses.status
 
                           if (responses.status == "GAGAL") {
-                            ronzz.sendMessage(from, {
+                            nicola.sendMessage(from, {
                               footer: `${botName} © ${ownerName}`,
                               buttons: [
                                 {
@@ -1403,7 +1403,7 @@ module.exports = async (ronzz, m, mek) => {
                               }
                               let invoice = await generateInvoiceWithBackground(data, "./options/image/bg.jpg")
                               await sleep(200)
-                              await ronzz.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» User Id:* ${db.data.topup[sender].data.id}\n*» Zone Id:* ${db.data.topup[sender].data.zone}\n*» Nickname:* ${db.data.topup[sender].data.nickname}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n*» Fee Qris:* Rp${Number(amount) - Number(db.data.topup[sender].data.price)}\n*» Total Bayar:* Rp${toRupiah(amount)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
+                              await nicola.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» User Id:* ${db.data.topup[sender].data.id}\n*» Zone Id:* ${db.data.topup[sender].data.zone}\n*» Nickname:* ${db.data.topup[sender].data.nickname}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n*» Fee Qris:* Rp${Number(amount) - Number(db.data.topup[sender].data.price)}\n*» Total Bayar:* Rp${toRupiah(amount)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
                               fs.unlinkSync(invoice)
                             } else if (product.kategori == "DIGITAL") {
                               let data = {
@@ -1416,7 +1416,7 @@ module.exports = async (ronzz, m, mek) => {
                               }
                               let invoice = await generateInvoiceWithBackground(data, "./options/image/bg.jpg")
                               await sleep(200)
-                              await ronzz.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» User Id:* ${db.data.topup[sender].data.id}\n*» Nickname:* ${db.data.topup[sender].data.nickname}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n*» Fee Qris:* Rp${Number(amount) - Number(db.data.topup[sender].data.price)}\n*» Total Bayar:* Rp${toRupiah(amount)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
+                              await nicola.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» User Id:* ${db.data.topup[sender].data.id}\n*» Nickname:* ${db.data.topup[sender].data.nickname}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n*» Fee Qris:* Rp${Number(amount) - Number(db.data.topup[sender].data.price)}\n*» Total Bayar:* Rp${toRupiah(amount)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
                               fs.unlinkSync(invoice)
                             } else {
                               let data = {
@@ -1429,7 +1429,7 @@ module.exports = async (ronzz, m, mek) => {
                               }
                               let invoice = await generateInvoiceWithBackground(data, "./options/image/bg.jpg")
                               await sleep(200)
-                              await ronzz.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» Tujuan:* ${db.data.topup[sender].data.id}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n*» Fee Qris:* Rp${Number(amount) - Number(db.data.topup[sender].data.price)}\n*» Total Bayar:* Rp${toRupiah(amount)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
+                              await nicola.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» Tujuan:* ${db.data.topup[sender].data.id}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n*» Fee Qris:* Rp${Number(amount) - Number(db.data.topup[sender].data.price)}\n*» Total Bayar:* Rp${toRupiah(amount)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
                               fs.unlinkSync(invoice)
                             }
                             delete db.data.topup[sender]
@@ -1485,7 +1485,7 @@ module.exports = async (ronzz, m, mek) => {
                         }
                         let invoice = await generateInvoiceWithBackground(data, "./options/image/bg.jpg")
                         await sleep(200)
-                        await ronzz.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» User Id:* ${db.data.topup[sender].data.id}\n*» Zone Id:* ${db.data.topup[sender].data.zone}\n*» Nickname:* ${db.data.topup[sender].data.nickname}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
+                        await nicola.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» User Id:* ${db.data.topup[sender].data.id}\n*» Zone Id:* ${db.data.topup[sender].data.zone}\n*» Nickname:* ${db.data.topup[sender].data.nickname}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
                         fs.unlinkSync(invoice)
                       } else if (product.kategori == "DIGITAL") {
                         let data = {
@@ -1498,7 +1498,7 @@ module.exports = async (ronzz, m, mek) => {
                         }
                         let invoice = await generateInvoiceWithBackground(data, "./options/image/bg.jpg")
                         await sleep(200)
-                        await ronzz.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» User Id:* ${db.data.topup[sender].data.id}\n*» Nickname:* ${db.data.topup[sender].data.nickname}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
+                        await nicola.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» User Id:* ${db.data.topup[sender].data.id}\n*» Nickname:* ${db.data.topup[sender].data.nickname}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
                         fs.unlinkSync(invoice)
                       } else {
                         let data = {
@@ -1511,7 +1511,7 @@ module.exports = async (ronzz, m, mek) => {
                         }
                         let invoice = await generateInvoiceWithBackground(data, "./options/image/bg.jpg")
                         await sleep(200)
-                        await ronzz.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» Tujuan:* ${db.data.topup[sender].data.id}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
+                        await nicola.sendMessage(from, { image: fs.readFileSync(invoice), caption: `*✅「 TRANSAKSI SUKSES 」✅*\n*${product.keterangan}*\n\n*» Reff Id:* ${db.data.topup[sender].id}\n*» Tujuan:* ${db.data.topup[sender].data.id}\n*» Harga:* Rp${toRupiah(db.data.topup[sender].data.price)}\n\n*» SN:*\n${responses.sn}\n\n_Terimakasih kak sudah order.️_` }, { quoted: m })
                         fs.unlinkSync(invoice)
                       }
                       await dbHelper.updateUserSaldo(sender, db.data.topup[sender].data.price, 'subtract')
@@ -1580,7 +1580,7 @@ module.exports = async (ronzz, m, mek) => {
           db.data.deposit[sender].session = "konfirmasi_deposit";
 
           let teks = `*🧾 KONFIRMASI DEPOSIT 🧾*\n\n*ID:* ${db.data.deposit[sender].ID}\n*Nomor:* ${db.data.deposit[sender].number.split('@')[0]}\n*Payment:* ${db.data.deposit[sender].payment}\n*Jumlah Deposit:* Rp${toRupiah(db.data.deposit[sender].data.amount_deposit)}\n*Pajak:* Rp${toRupiah(Number(pajak2))}\n*Total Pembayaran:* Rp${toRupiah(db.data.deposit[sender].data.total_deposit)}\n\n_Deposit akan dibatalkan otomatis apabila terdapat kesalahan input._`
-          ronzz.sendMessage(from, {
+          nicola.sendMessage(from, {
             footer: `${botName} © ${ownerName}`,
             buttons: [
               {
@@ -1626,12 +1626,12 @@ module.exports = async (ronzz, m, mek) => {
 *A/N:* ${payment.qris.an}
 
 _Silahkan scan dan transfer dengan nominal yang benar, jika sudah bot akan otomatis konfirmasi deposit._`
-              let mess = await ronzz.sendMessage(from, { image: fs.readFileSync(pay), caption: pyqrs }, { quoted: m })
+              let mess = await nicola.sendMessage(from, { image: fs.readFileSync(pay), caption: pyqrs }, { quoted: m })
 
               while (db.data.deposit[sender] !== undefined) {
                 await sleep(10000)
                 if (Date.now() >= time) {
-                  await ronzz.sendMessage(from, { delete: mess.key })
+                  await nicola.sendMessage(from, { delete: mess.key })
                   reply("Deposit dibatalkan karena telah melewati batas expired.")
                   delete db.data.deposit[sender]
                 }
@@ -1641,7 +1641,7 @@ _Silahkan scan dan transfer dengan nominal yang benar, jika sudah bot akan otoma
                   let result = response.qris_history.results.find(i => i.status == "IN" && Number(i.kredit.replace(/[.]/g, '')) == parseInt(db.data.deposit[sender].data.total_deposit))
 
                   if (result !== undefined) {
-                    await ronzz.sendMessage(from, { delete: mess.key })
+                    await nicola.sendMessage(from, { delete: mess.key })
 
                     let text_sukses = `*✅「 DEPOSIT SUKSES 」✅*
 
@@ -1652,7 +1652,7 @@ Tanggal: ${db.data.deposit[sender].date.split(' ')[0]}
 Jumlah Deposit: Rp${toRupiah(db.data.deposit[sender].data.amount_deposit)}
 Pajak: Rp${toRupiah(Number(db.data.deposit[sender].data.total_deposit) - Number(db.data.deposit[sender].data.amount_deposit))}
 Total Bayar: Rp${toRupiah(db.data.deposit[sender].data.total_deposit)}`
-                    await ronzz.sendMessage(from, {
+                    await nicola.sendMessage(from, {
                       footer: `${botName} © ${ownerName}`,
                       buttons: [
                         {
@@ -1718,11 +1718,11 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
     if (isGroup && isAlreadyResponList(from, chats.toLowerCase())) {
       let get_data_respon = getDataResponList(from, chats.toLowerCase())
       if (get_data_respon.isImage === false) {
-        ronzz.sendMessage(from, { text: sendResponList(from, chats.toLowerCase()) }, {
+        nicola.sendMessage(from, { text: sendResponList(from, chats.toLowerCase()) }, {
           quoted: m
         })
       } else {
-        ronzz.sendMessage(from, { image: { url: get_data_respon.image_url }, caption: get_data_respon.response }, {
+        nicola.sendMessage(from, { image: { url: get_data_respon.image_url }, caption: get_data_respon.response }, {
           quoted: m
         })
       }
@@ -1730,38 +1730,38 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
     if (isAlreadyResponTesti(chats.toLowerCase())) {
       var get_data_respon = getDataResponTesti(chats.toLowerCase())
-      ronzz.sendMessage(from, { image: { url: get_data_respon.image_url }, caption: get_data_respon.response }, { quoted: m })
+      nicola.sendMessage(from, { image: { url: get_data_respon.image_url }, caption: get_data_respon.response }, { quoted: m })
     }
 
     if (isGroup && db.data.chat[from].antilink) {
-      let gc = await ronzz.groupInviteCode(from)
+      let gc = await nicola.groupInviteCode(from)
       if (chats.match(/(`https:\/\/chat.whatsapp.com\/${gc}`)/gi)) {
         if (!isBotGroupAdmins) return
         reply(`*GROUP LINK DETECTOR*\n\nAnda tidak akan dikick oleh bot, karena yang anda kirim adalah link group ini.`)
       } else if ((chats.match("http://") || chats.match("https://") || chats.match("wa.me") || chats.match("t.me")) && !chats.match(`https://chat.whatsapp.com/${gc}`)) {
         if (!isBotGroupAdmins) return
         if (!isOwner && !isGroupAdmins) {
-          await ronzz.sendMessage(from, { delete: m.key })
-          ronzz.sendMessage(from, { text: `*LINK DETECTOR*\n\nMaaf @${sender.split('@')[0]}, sepertinya kamu mengirimkan link, maaf kamu akan di kick.`, mentions: [sender] })
+          await nicola.sendMessage(from, { delete: m.key })
+          nicola.sendMessage(from, { text: `*LINK DETECTOR*\n\nMaaf @${sender.split('@')[0]}, sepertinya kamu mengirimkan link, maaf kamu akan di kick.`, mentions: [sender] })
           await sleep(500)
-          ronzz.groupParticipantsUpdate(from, [sender], "remove")
+          nicola.groupParticipantsUpdate(from, [sender], "remove")
         }
       }
     }
 
     if (isGroup && db.data.chat[from].antilink2) {
-      let gc = await ronzz.groupInviteCode(from)
+      let gc = await nicola.groupInviteCode(from)
       if ((chats.match("http://") || chats.match("https://") || chats.match("wa.me") || chats.match("t.me")) && !chats.match(`https://chat.whatsapp.com/${gc}`)) {
         if (!isBotGroupAdmins) return
         if (!isOwner && !isGroupAdmins) {
-          await ronzz.sendMessage(from, { delete: m.key })
-          ronzz.sendMessage(from, { text: `*LINK DETECTOR*\n\nMaaf @${sender.split('@')[0]}, sepertinya kamu mengirimkan link, lain kali jangan kirim link yaa.`, mentions: [sender] })
+          await nicola.sendMessage(from, { delete: m.key })
+          nicola.sendMessage(from, { text: `*LINK DETECTOR*\n\nMaaf @${sender.split('@')[0]}, sepertinya kamu mengirimkan link, lain kali jangan kirim link yaa.`, mentions: [sender] })
         }
       }
     }
 
-    if (db.data.setting[botNumber].autoread) ronzz.readMessages([m.key])
-    if (db.data.setting[botNumber].autoketik) ronzz.sendPresenceUpdate('composing', from)
+    if (db.data.setting[botNumber].autoread) nicola.readMessages([m.key])
+    if (db.data.setting[botNumber].autoketik) nicola.sendPresenceUpdate('composing', from)
     if (chats) console.log('->[\x1b[1;32mCMD\x1b[1;37m]', color(moment(m.messageTimestamp * 1000).format('DD/MM/YYYY HH:mm:ss'), 'yellow'), color(`${prefix + command} [${args.length}]`), 'from', color(pushname), isGroup ? 'in ' + color(groupName) : '')
 
     // 🔔 Auto-forward pesan yang mengandung kata "zoom" ke grup admin
@@ -1771,7 +1771,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
         // Jika ID grup admin tidak di-set, cari grup berdasarkan nama
         if (!targetGroupId && global.adminGroupName) {
-          const groups = await ronzz.groupFetchAllParticipating()
+          const groups = await nicola.groupFetchAllParticipating()
           const targetGroup = Object.values(groups).find(g =>
             g.subject && g.subject.toLowerCase().includes(global.adminGroupName.toLowerCase())
           )
@@ -1788,7 +1788,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
             `⏰ Waktu: ${moment(m.messageTimestamp * 1000).format('DD/MM/YYYY HH:mm:ss')}\n\n` +
             `📩 Pesan:\n${budy}`
 
-          await ronzz.sendMessage(targetGroupId, {
+          await nicola.sendMessage(targetGroupId, {
             text: forwardText,
             mentions: [sender]
           })
@@ -1813,7 +1813,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
         try {
           // Test 1: Simple message
-          await ronzz.sendMessage(testNumber, { text: '🧪 Test 1: Pesan sederhana - apakah sampai?' })
+          await nicola.sendMessage(testNumber, { text: '🧪 Test 1: Pesan sederhana - apakah sampai?' })
           console.log('✅ Test 1 sent')
 
           await sleep(2000)
@@ -1829,7 +1829,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
 Jika pesan ini sampai, sistem berfungsi normal.`
 
-          await ronzz.sendMessage(testNumber, { text: testMsg })
+          await nicola.sendMessage(testNumber, { text: testMsg })
           console.log('✅ Test 2 sent')
 
           reply(`✅ Test messages sent to ${q}. Check if received.`)
@@ -1885,7 +1885,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           })
 
           // Kirim ke customer
-          await ronzz.sendMessage(customerNumber, { text: accountDetails })
+          await nicola.sendMessage(customerNumber, { text: accountDetails })
           console.log('✅ Manual account resend successful')
 
           reply(`✅ Detail akun berhasil dikirim ulang ke ${customerNum}\n\nProduk: ${db.data.produk[productId].name}\nJumlah: ${qty} akun`)
@@ -1967,7 +1967,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           }
 
           // Send the message
-          const sentMessage = await ronzz.sendMessage(from, {
+          const sentMessage = await nicola.sendMessage(from, {
             text: teks,
             mentions: [ownerNomer + "@s.whatsapp.net"]
           }, { quoted: m })
@@ -2315,7 +2315,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
           // Improvement: Async file read
           const qrImage = await fs.promises.readFile(qrImagePath)
-          const message = await ronzz.sendMessage(from, {
+          const message = await nicola.sendMessage(from, {
             image: qrImage,
             caption: caption
           }, { quoted: m })
@@ -2359,7 +2359,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 // Remove listener setelah payment detected
                 process.removeListener('payment-completed', paymentListener);
 
-                await ronzz.sendMessage(from, { delete: message.key });
+                await nicola.sendMessage(from, { delete: message.key });
 
                 const credit = baseAmount + bonus + uniqueCode
                 const previousSaldo = Number(db.data.users[sender].saldo || 0)
@@ -2420,7 +2420,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   console.error('❌ [DEPOSIT] Failed to record deposit transaction:', transactionError.message)
                 }
 
-                await ronzz.sendMessage(from, { text: successText }, { quoted: m })
+                await nicola.sendMessage(from, { text: successText }, { quoted: m })
 
                 // Send Telegram notification
                 try {
@@ -2462,7 +2462,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             if (Date.now() >= expirationTime) {
               // Remove listener saat timeout
               process.removeListener('payment-completed', paymentListener);
-              await ronzz.sendMessage(from, { delete: message.key })
+              await nicola.sendMessage(from, { delete: message.key })
               reply("Deposit dibatalkan karena melewati batas waktu 30 menit.")
               delete db.data.orderDeposit[sender]
               break
@@ -2671,7 +2671,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               `Jika ingin membatalkan, ketik *${prefix}batal*`;
 
             const qrImage = await fs.promises.readFile(qrImagePath);
-            const message = await ronzz.sendMessage(from, {
+            const message = await nicola.sendMessage(from, {
               image: qrImage,
               caption: caption
             }, { quoted: m });
@@ -2761,7 +2761,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               if (Date.now() >= expirationTime) {
                 // Remove listener saat timeout
                 process.removeListener('payment-completed', paymentListener);
-                await ronzz.sendMessage(from, { delete: message.key });
+                await nicola.sendMessage(from, { delete: message.key });
                 reply("Pembayaran dibatalkan karena melewati batas waktu 30 menit.");
                 delete db.data.order[sender];
                 requestPendingOrderSave();
@@ -3092,7 +3092,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               console.log(`📤 ATTEMPT 1: Sending complete account details to ${recipientType}...`);
 
               await sleep(500)
-              const messageResult = await ronzz.sendMessage(recipientNumber, { text: detailAkunCustomer }, { quoted: m })
+              const messageResult = await nicola.sendMessage(recipientNumber, { text: detailAkunCustomer }, { quoted: m })
               console.log('📨 Message result:', JSON.stringify(messageResult?.key || 'no key'))
               console.log(`✅ SUCCESS: Complete account details sent to ${recipientType}!`)
               customerMessageSent = true;
@@ -3105,7 +3105,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               try {
                 console.log(`📤 ATTEMPT 2: Sending without quoted message to ${recipientType}...`);
                 await sleep(500)
-                const msg2 = await ronzz.sendMessage(recipientNumber, { text: detailAkunCustomer })
+                const msg2 = await nicola.sendMessage(recipientNumber, { text: detailAkunCustomer })
                 console.log('📨 Message result:', JSON.stringify(msg2?.key || 'no key'))
                 console.log(`✅ SUCCESS: Account details sent without quoted message to ${recipientType}!`)
                 customerMessageSent = true;
@@ -3133,7 +3133,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                     )
                   })
                   await sleep(500)
-                  const msg3 = await ronzz.sendMessage(recipientNumber, { text: simpleParts.join('\n') })
+                  const msg3 = await nicola.sendMessage(recipientNumber, { text: simpleParts.join('\n') })
                   console.log('📨 Message result:', JSON.stringify(msg3?.key || 'no key'))
                   console.log(`✅ SUCCESS: Simple account details sent to ${recipientType}!`)
                   customerMessageSent = true;
@@ -3280,7 +3280,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             // Admin membatalkan pesanan user lain
             if (db.data.order[quotedSender] !== undefined) {
               try {
-                await ronzz.sendMessage(db.data.order[quotedSender].from, { delete: db.data.order[quotedSender].key })
+                await nicola.sendMessage(db.data.order[quotedSender].from, { delete: db.data.order[quotedSender].key })
               } catch { }
               delete db.data.order[quotedSender]
               requestPendingOrderSave()
@@ -3289,7 +3289,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
             if (db.data.orderDeposit && db.data.orderDeposit[quotedSender] !== undefined) {
               try {
-                await ronzz.sendMessage(db.data.orderDeposit[quotedSender].from, { delete: db.data.orderDeposit[quotedSender].key })
+                await nicola.sendMessage(db.data.orderDeposit[quotedSender].from, { delete: db.data.orderDeposit[quotedSender].key })
               } catch { }
               delete db.data.orderDeposit[quotedSender]
               cancelled = true
@@ -3306,7 +3306,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
         // Logika: user membatalkan pesanan sendiri (dengan atau tanpa quote)
         if (db.data.order[sender] !== undefined) {
-          await ronzz.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
+          await nicola.sendMessage(db.data.order[sender].from, { delete: db.data.order[sender].key })
           delete db.data.order[sender]
           requestPendingOrderSave()
           cancelled = true
@@ -3314,7 +3314,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
         if (db.data.orderDeposit && db.data.orderDeposit[sender] !== undefined) {
           try {
-            await ronzz.sendMessage(db.data.orderDeposit[sender].from, { delete: db.data.orderDeposit[sender].key })
+            await nicola.sendMessage(db.data.orderDeposit[sender].from, { delete: db.data.orderDeposit[sender].key })
           } catch { }
           delete db.data.orderDeposit[sender]
           cancelled = true
@@ -3395,7 +3395,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           teks += `*📞 Kontak Admin:* @${ownerNomer}\n\n`
           teks += `_⏰ Pesan ini akan terhapus otomatis dalam 5 menit_`
 
-          const sentMessage = await ronzz.sendMessage(from, {
+          const sentMessage = await nicola.sendMessage(from, {
             text: teks,
             mentions: [ownerNomer + "@s.whatsapp.net"]
           }, { quoted: m })
@@ -3622,10 +3622,10 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         }
 
         // Notifikasi ke admin
-        ronzz.sendMessage(from, { text: `*SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
+        nicola.sendMessage(from, { text: `*SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
 
         // Notifikasi ke user yang ditambahkan saldonya
-        ronzz.sendMessage(nomorNya, { text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
+        nicola.sendMessage(nomorNya, { text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
       }
         break
 
@@ -3672,10 +3672,10 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         }
 
         // Notifikasi ke admin
-        ronzz.sendMessage(from, { text: `*SALDO BERHASIL DIKURANGI!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
+        nicola.sendMessage(from, { text: `*SALDO BERHASIL DIKURANGI!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`, mentions: [nomorNya] }, { quoted: m })
 
         // Notifikasi ke user yang dikurangi saldonya
-        ronzz.sendMessage(nomorNya, { text: `⚠️ *SALDO TELAH DIKURANGI!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
+        nicola.sendMessage(nomorNya, { text: `⚠️ *SALDO TELAH DIKURANGI!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`, mentions: [nomorNya, sender] })
       }
         break
 
@@ -3774,12 +3774,12 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         let number;
         if (q.length !== 0) {
           number = q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'
-          ronzz.groupParticipantsUpdate(from, [number], "remove")
+          nicola.groupParticipantsUpdate(from, [number], "remove")
             .then(res => reply('Sukses...'))
             .catch((err) => reply(mess.error.api))
         } else if (isQuotedMsg) {
           number = m.quoted.sender
-          ronzz.groupParticipantsUpdate(from, [number], "remove")
+          nicola.groupParticipantsUpdate(from, [number], "remove")
             .then(res => reply('Sukses...'))
             .catch((err) => reply(mess.error.api))
         } else {
@@ -3791,14 +3791,14 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       case 'blok': case 'block':
         if (!isOwner && !fromMe) return reply(mess.owner)
         if (!q) return reply(`Contoh: ${prefix + command} 628xxx`)
-        await ronzz.updateBlockStatus(q.replace(/[^0-9]/g, '') + '@s.whatsapp.net', "block") // Block user
+        await nicola.updateBlockStatus(q.replace(/[^0-9]/g, '') + '@s.whatsapp.net', "block") // Block user
         reply('Sukses block nomor.')
         break
 
       case 'unblok': case 'unblock':
         if (!isOwner && !fromMe) return reply(mess.owner)
         if (!q) return reply(`Contoh: ${prefix + command} 628xxx`)
-        await ronzz.updateBlockStatus(q.replace(/[^0-9]/g, '') + '@s.whatsapp.net', "unblock") // Block user
+        await nicola.updateBlockStatus(q.replace(/[^0-9]/g, '') + '@s.whatsapp.net', "unblock") // Block user
         reply('Sukses unblock nomor.')
         break
 
@@ -3852,7 +3852,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             basicInfo += `Silakan hubungi admin @${ownerNomer} untuk mendapatkan detail akun Anda.\n\n`
             basicInfo += `📝 *Berikan Reff ID:* \`${lastTransaksi.reffId}\` kepada admin untuk verifikasi.`
 
-            return ronzz.sendMessage(from, {
+            return nicola.sendMessage(from, {
               text: basicInfo,
               mentions: [ownerNomer + "@s.whatsapp.net"]
             }, { quoted: m })
@@ -3863,7 +3863,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           console.log(`✅ [RESEND] Receipt found from ${receiptResult.storage || 'storage'} for ${lastTransaksi.reffId}`)
 
           // Send receipt to private chat first
-          await ronzz.sendMessage(sender, { text: receiptContent }, { quoted: m })
+          await nicola.sendMessage(sender, { text: receiptContent }, { quoted: m })
 
           // Wait a bit to ensure receipt is delivered first
           await sleep(500)
@@ -3888,7 +3888,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             confirmMsg += `📅 *Tanggal:* ${lastTransaksi.date}\n`
             confirmMsg += `🆔 *Reff ID:* ${lastTransaksi.reffId}\n\n`
             confirmMsg += `💡 *Tips:* Simpan detail akun dengan baik!`
-            await ronzz.sendMessage(from, { text: confirmMsg }, { quoted: m })
+            await nicola.sendMessage(from, { text: confirmMsg }, { quoted: m })
           }
 
           // Log for owner/admin tracking
@@ -4054,16 +4054,16 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         if (q.startsWith("@")) {
           if (db.data.chat[from].sDone.length !== 0) {
             let textDone = db.data.chat[from].sDone
-            ronzz.sendMessage(from, { text: textDone.replace('tag', q.replace(/[^0-9]/g, '')).replace('@jam', jamwib).replace('@tanggal', moment.tz('Asia/Jakarta').format('DD MMMM YYYY')).replace('@status', 'Berhasil'), mentions: [q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'] });
+            nicola.sendMessage(from, { text: textDone.replace('tag', q.replace(/[^0-9]/g, '')).replace('@jam', jamwib).replace('@tanggal', moment.tz('Asia/Jakarta').format('DD MMMM YYYY')).replace('@status', 'Berhasil'), mentions: [q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'] });
           } else {
-            ronzz.sendMessage(from, { text: `「 *TRANSAKSI BERHASIL* 」\n\n\`\`\`📆 TANGGAL : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n⌚ JAM : ${jamwib}\n✨ STATUS: Berhasil\`\`\`\n\nTerimakasih @${q.replace(/[^0-9]/g, '')} next order yaa🙏`, mentions: [q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'] }, { quoted: m });
+            nicola.sendMessage(from, { text: `「 *TRANSAKSI BERHASIL* 」\n\n\`\`\`📆 TANGGAL : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n⌚ JAM : ${jamwib}\n✨ STATUS: Berhasil\`\`\`\n\nTerimakasih @${q.replace(/[^0-9]/g, '')} next order yaa🙏`, mentions: [q.replace(/[^0-9]/g, '') + '@s.whatsapp.net'] }, { quoted: m });
           }
         } else if (isQuotedMsg) {
           if (db.data.chat[from].sDone.length !== 0) {
             let textDone = db.data.chat[from].sDone
-            ronzz.sendMessage(from, { text: textDone.replace('tag', m.quoted.sender.split("@")[0]).replace('@jam', jamwib).replace('@tanggal', moment.tz('Asia/Jakarta').format('DD MMMM YYYY')).replace('@status', 'Berhasil'), mentions: [m.quoted.sender] }, { quoted: m })
+            nicola.sendMessage(from, { text: textDone.replace('tag', m.quoted.sender.split("@")[0]).replace('@jam', jamwib).replace('@tanggal', moment.tz('Asia/Jakarta').format('DD MMMM YYYY')).replace('@status', 'Berhasil'), mentions: [m.quoted.sender] }, { quoted: m })
           } else {
-            ronzz.sendMessage(from, { text: `「 *TRANSAKSI BERHASIL* 」\n\n\`\`\`📆 TANGGAL : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n⌚ JAM : ${jamwib}\n✨ STATUS: Berhasil\`\`\`\n\nTerimakasih @${m.quoted.sender.split("@")[0]} next order yaa🙏`, mentions: [m.quoted.sender] })
+            nicola.sendMessage(from, { text: `「 *TRANSAKSI BERHASIL* 」\n\n\`\`\`📆 TANGGAL : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n⌚ JAM : ${jamwib}\n✨ STATUS: Berhasil\`\`\`\n\nTerimakasih @${m.quoted.sender.split("@")[0]} next order yaa🙏`, mentions: [m.quoted.sender] })
           }
         } else {
           reply('Reply atau tag orangnya')
@@ -4075,7 +4075,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         if (!isGroup) return reply(mess.group)
         if (!isGroupAdmins && !isOwner) return reply(mess.admin)
         if (!isBotGroupAdmins) return reply(mess.botAdmin)
-        await ronzz.groupSettingUpdate(from, 'not_announcement')
+        await nicola.groupSettingUpdate(from, 'not_announcement')
         await reply(`Sukses mengizinkan semua peserta dapat mengirim pesan ke grup ini.`)
         break
 
@@ -4083,7 +4083,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         if (!isGroup) return reply(mess.group)
         if (!isGroupAdmins && !isOwner) return reply(mess.admin)
         if (!isBotGroupAdmins) return reply(mess.botAdmin)
-        await ronzz.groupSettingUpdate(from, 'announcement')
+        await nicola.groupSettingUpdate(from, 'announcement')
         await reply(`Sukses mengizinkan hanya admin yang dapat mengirim pesan ke grup ini.`)
         break
 
@@ -4100,7 +4100,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
 
         // Send message with mentions
-        await ronzz.sendMessage(from, { text: textToSay, mentions: mem })
+        await nicola.sendMessage(from, { text: textToSay, mentions: mem })
 
         // Delete command message
         if (isBotGroupAdmins) {
@@ -4108,7 +4108,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             // Use proper delete ID
             const keyId = (mek && mek.key && mek.key.id) || (m.key && m.key.id);
             if (keyId) {
-              await ronzz.deleteMessage(from, keyId);
+              await nicola.deleteMessage(from, keyId);
             }
           } catch (e) {
             console.warn('Failed to delete hidetag command:', e.message);
@@ -4122,7 +4122,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         if (!isGroupAdmins && !isOwner) return reply(mess.admin)
         if (!isBotGroupAdmins) return reply(mess.botAdmin)
         if (!q) return reply(`Contoh: ${prefix + command} New Description by ${ownerName}`)
-        await ronzz.groupUpdateDescription(from, q)
+        await nicola.groupUpdateDescription(from, q)
           .then(res => {
             reply(`Sukses set deskripsi group.`)
           }).catch(() => reply(mess.error.api))

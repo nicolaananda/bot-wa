@@ -25,7 +25,7 @@
     "lint:fix": "eslint --fix index.js",
     "format": "prettier --write index.js"
   },
-  "author": "Ronzz YT",
+  "author": "Nicola",
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.932.0",
