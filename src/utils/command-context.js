@@ -4,9 +4,9 @@
  */
 
 class CommandContext {
-    constructor(ronzz, m, mek, messageData) {
+    constructor(nicola, m, mek, messageData) {
         // Bot instance
-        this.ronzz = ronzz;
+        this.nicola = nicola;
         this.m = m;
         this.mek = mek;
 
@@ -22,7 +22,7 @@ class CommandContext {
      * Send a reply message
      */
     async reply(text, options = {}) {
-        return this.ronzz.sendMessage(this.from, {
+        return this.nicola.sendMessage(this.from, {
             text: text,
             ...options
         }, { quoted: this.m });
@@ -35,7 +35,7 @@ class CommandContext {
         const { Styles, parseMention } = require('../../function/myfunc');
         const fs = require('fs');
 
-        return this.ronzz.sendMessage(this.from, {
+        return this.nicola.sendMessage(this.from, {
             text: Styles(text),
             contextInfo: {
                 mentionedJid: parseMention(text),
@@ -56,7 +56,7 @@ class CommandContext {
      * Send message with interactive buttons
      */
     async sendInteractive(options) {
-        return this.ronzz.sendMessage(this.from, options, { quoted: this.m });
+        return this.nicola.sendMessage(this.from, options, { quoted: this.m });
     }
 
     /**
@@ -88,7 +88,7 @@ class CommandContext {
         }
 
         // Use Gowa adapter's downloadMedia method
-        const buffer = await this.ronzz.downloadMedia(messageToDownload);
+        const buffer = await this.nicola.downloadMedia(messageToDownload);
 
         if (filename) {
             fs.writeFileSync(filename, buffer);

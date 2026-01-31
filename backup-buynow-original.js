@@ -80,7 +80,7 @@ case 'buynow': {
 
     // Improvement #3: Async file read
     const qrImage = await fs.promises.readFile(qrImagePath);
-    const message = await ronzz.sendMessage(from, {
+    const message = await nicola.sendMessage(from, {
         image: qrImage,
         caption: caption
     }, { quoted: m });
@@ -113,7 +113,7 @@ case 'buynow': {
             pollCount++;
 
             if (Date.now() >= expirationTime) {
-                await ronzz.sendMessage(from, { delete: message.key });
+                await nicola.sendMessage(from, { delete: message.key });
                 reply("Pembayaran dibatalkan karena melewati batas waktu 30 menit.");
                 delete db.data.order[sender];
                 break;
@@ -138,7 +138,7 @@ case 'buynow': {
                 });
 
                 if (paid) {
-                    await ronzz.sendMessage(from, { delete: message.key });
+                    await nicola.sendMessage(from, { delete: message.key });
                     reply("Pembayaran berhasil, data akun akan segera diproses.");
 
                     // Proses pembelian langsung (sama seperti case 'buy')
@@ -189,7 +189,7 @@ case 'buynow': {
                     const detailAkunCustomer = detailParts.join('\n');
 
                     await sleep(1000);
-                    await ronzz.sendMessage(sender, { text: detailAkunCustomer });
+                    await nicola.sendMessage(sender, { text: detailAkunCustomer });
 
                     // Save receipt
                     try {
@@ -229,7 +229,7 @@ case 'buynow': {
             } catch (err) {
                 if (err.message?.includes("timeout")) continue;
 
-                await ronzz.sendMessage(from, { delete: message.key });
+                await nicola.sendMessage(from, { delete: message.key });
                 reply("Pembayaran dibatalkan karena error sistem.");
                 delete db.data.order[sender];
                 break;
