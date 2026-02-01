@@ -18,9 +18,9 @@
     "start-safe": "npm run backup && npm run start",
     "pg:schema": "node -e \"require('dotenv').config(); const fs=require('fs'); const sql=fs.readFileSync('./options/schema.sql','utf8'); require('./config/postgres').query(sql).then(()=>{console.log('Schema applied')}).catch(e=>{console.error(e);process.exit(1)})\"",
     "pg:dedup": "node ./options/dedup-transaksi.js",
-    "neon:setup": "node setup-neon.js",
+    "neon:setup": "node scripts/migrations/setup-neon.js",
     "neon:test": "node config/neon-test.js",
-    "neon:migrate": "node migrate-remote-to-neon.js",
+    "neon:migrate": "node scripts/migrations/migrate-remote-to-neon.js",
     "lint": "eslint index.js",
     "lint:fix": "eslint --fix index.js",
     "format": "prettier --write index.js"
