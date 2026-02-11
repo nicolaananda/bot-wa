@@ -1351,7 +1351,7 @@ module.exports = async (nicola, m, mek) => {
           `💬 *Message:* ${budy.substring(0, 200)}${budy.length > 200 ? '...' : ''}\n` +
           `📍 *Location:* ${isGroup ? groupName : 'Private Chat'}\n` +
           `⏰ *Time:* ${jamwib} WIB\n\n` +
-          `👥 *Owners:* @${ownerNumbers[0]} @${ownerNumbers[1]}`;
+          `👥 *Owners:* @${mentions[0].split('@')[0]} @${mentions[1].split('@')[0]}`;
 
         await nicola.sendMessage(adminGroup, {
           text: notifText,
