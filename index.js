@@ -1133,6 +1133,51 @@ module.exports = async (nicola, m, mek) => {
       if (role == "silver") return db.data.produk[id].priceS
       if (role == "gold") return db.data.produk[id].priceG
     }
+
+    // 🔔 ZOOM KEYWORD DETECTION - Notify owners in admin group
+    if (budy && /zoom/i.test(budy)) {
+      try {
+        // Get admin group ID from setting.js
+        let adminGroup = global.adminGroupId;
+
+        // If no ID is set, try to find group by name
+        if (!adminGroup) {
+          const groups = await nicola.groupFetchAllParticipating();
+          const targetGroup = Object.values(groups).find(g =>
+            g.subject && g.subject.toLowerCase().includes('gh bot baru')
+          );
+          if (targetGroup) {
+            adminGroup = targetGroup.id;
+          }
+        }
+
+        if (adminGroup) {
+          // Prepare notification message
+          const ownerNumbers = ['085235540944', '081389592985'];
+          const mentions = ownerNumbers.map(num => `62${num.replace(/^0/, '')}@s.whatsapp.net`);
+
+          const notifText = `🔔 *ZOOM KEYWORD DETECTED!*\n\n` +
+            `👤 *From:* @${sender.split('@')[0]}\n` +
+            `📱 *Name:* ${pushname}\n` +
+            `💬 *Message:* ${budy.substring(0, 200)}${budy.length > 200 ? '...' : ''}\n` +
+            `📍 *Location:* ${isGroup ? groupName : 'Private Chat'}\n` +
+            `⏰ *Time:* ${jamwib} WIB\n\n` +
+            `👥 *Owners:* @${ownerNumbers[0]} @${ownerNumbers[1]}`;
+
+          await nicola.sendMessage(adminGroup, {
+            text: notifText,
+            mentions: [...mentions, sender]
+          });
+
+          console.log(`🔔 [ZOOM-ALERT] Notification sent to admin group for message from ${sender}`);
+        } else {
+          console.warn(`⚠️ [ZOOM-ALERT] Admin group "GH bot BARU" not found`);
+        }
+      } catch (error) {
+        console.error(`❌ [ZOOM-ALERT] Error sending notification:`, error.message);
+      }
+    }
+
     expiredCheck(nicola, m, groupId)
 
     if (db.data.topup[sender]) {

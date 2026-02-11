@@ -1,45 +1,33 @@
-# 🤖 WhatsApp E-commerce Bot with Redis Integration
+# 🤖 WhatsApp Bot - Modern E-commerce Bot
 
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![Redis](https://img.shields.io/badge/Redis-6.0+-red.svg)](https://redis.io/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13+-blue.svg)](https://postgresql.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests](https://github.com/nicolaananda/bot-wa/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/nicolaananda/bot-wa/actions)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> A high-performance WhatsApp e-commerce bot with Redis-powered rate limiting, transaction locking, and caching for optimal user experience and system reliability.
+Modern WhatsApp bot untuk e-commerce dengan fitur lengkap: payment gateway, product management, user roles, dan monitoring.
 
 ## ✨ Features
 
-### 🔒 **Security & Reliability**
-- **Transaction Locking**: Prevents double purchases and race conditions
-- **Rate Limiting**: 3 transactions per minute per user to prevent spam
-- **Redis Health Monitoring**: Automatic failover and connection monitoring
-- **Input Validation**: Comprehensive sanitization and SQL injection prevention
-
-### 💰 **E-commerce Capabilities**
-- **Dual Payment System**: Saldo-based and QRIS payment options
-- **Product Catalog**: Real-time inventory management
-- **Order Management**: Complete order lifecycle management
-- **User Management**: Balance tracking and role-based access
-- **QRIS Integration**: Custom QRIS with unique codes and app listener
-
-### ⚡ **Performance Optimization**
-- **Redis Caching**: Sub-100ms response times
-- **Database Optimization**: Efficient queries with connection pooling
-- **Auto Backup**: Timestamped database backups
-- **Error Recovery**: Graceful error handling and logging
+- 🛒 **E-commerce**: Product management, stock tracking, automated ordering
+- 💳 **Payment Gateway**: Midtrans integration, saldo system, QRIS payment
+- 👥 **User Management**: Role-based pricing (Bronze/Silver/Gold), balance management
+- 🔒 **Security**: Rate limiting, transaction locking, circuit breaker
+- 📊 **Monitoring**: Health checks, metrics, structured logging
+- 🧪 **Testing**: 22 unit tests with Jest
+- 🚀 **CI/CD**: GitHub Actions pipeline with auto-deploy
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js 18+
 - Redis 6.0+
-- PostgreSQL 13+
+- PostgreSQL 13+ (optional)
 - WhatsApp account
 
 ### Installation
 
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/nicolaananda/bot-wa.git
 cd bot-wa
 
@@ -50,420 +38,218 @@ npm install
 cp .env.example .env
 # Edit .env with your configuration
 
-# Start Redis (macOS)
-brew install redis
-brew services start redis
+# Run tests
+npm test
 
-# Start Redis (Ubuntu/Debian)
-sudo apt install redis-server
-sudo systemctl start redis-server
-
-# Start the bot
+# Start bot
 npm start
 ```
 
-## 🛠️ Technology Stack
+## 📁 Project Structure
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| **Runtime** | Node.js 18+ | JavaScript runtime |
-| **Database** | PostgreSQL | Primary data storage |
-| **Cache** | Redis 6.0+ | Session management & caching |
-| **Payment** | Dual System | Saldo (PostgreSQL) + QRIS (Custom) |
-| **Messaging** | WhatsApp Web API | Real-time communication |
-| **Process Manager** | PM2/Systemctl | Production process management |
-
-## 📊 System Architecture
-
-```mermaid
-flowchart LR
-    subgraph "User Interface"
-        A[WhatsApp Client]
-    end
-    
-    subgraph "Bot Application"
-        B[Bot Server]
-    end
-    
-    subgraph "Data Layer"
-        C[Redis Cache]
-        D[PostgreSQL DB]
-    end
-    
-    subgraph "Payment System"
-        E[Saldo Payment]
-        F[QRIS Generator]
-        G[App Listener]
-    end
-    
-    A --> B
-    B --> C
-    B --> D
-    B --> E
-    B --> F
-    B --> G
-    
-    C --> H[Rate Limiting]
-    C --> I[Transaction Locking]
-    C --> J[Data Caching]
-    
-    D --> K[User Data]
-    D --> L[Product Catalog]
-    D --> M[Transaction History]
-    
-    style A fill:#e3f2fd
-    style B fill:#f3e5f5
-    style C fill:#fff3e0
-    style D fill:#e8f5e8
-    style E fill:#e1f5fe
-    style F fill:#fce4ec
-    style G fill:#f1f8e9
+```
+bot-wa/
+├── commands/          # Bot commands (to be extracted)
+├── config/            # Configuration files
+│   ├── logger.js      # Winston logger
+│   ├── env.js         # Environment validation
+│   ├── postgres.js    # PostgreSQL config
+│   └── redis.js       # Redis config
+├── services/          # Business logic layer
+│   ├── payment-service.js
+│   ├── product-service.js
+│   └── user-service.js
+├── middleware/        # Express/Bot middleware
+│   ├── rate-limit.js
+│   ├── transaction-lock.js
+│   └── error-handler.js
+├── repositories/      # Data access layer
+├── lib/               # External integrations
+│   ├── gowa-proto.js  # WhatsApp client
+│   └── circuit-breaker.js
+├── function/          # Helper functions
+├── routes/            # API routes
+│   └── health.js      # Health check endpoints
+├── tests/             # Test files
+│   ├── unit/
+│   ├── integration/
+│   └── e2e/
+└── index.js           # Main entry point
 ```
 
-## 🔄 Payment Methods Overview
+## 🧪 Testing
 
-### **💳 Saldo Payment (`.buy`)**
-```
-User Command → Rate Check → Lock → Balance Check → Stock Check → 
-Process Payment → Send Product → Release Lock
-```
-**⏱️ Processing Time**: 2-3 seconds  
-**✅ Success Rate**: 99.5%  
-**💰 Requirement**: Sufficient saldo balance
+```bash
+# Run all tests
+npm test
 
-### **📱 QRIS Payment (`.buynow`)**
-```
-User Command → Rate Check → Lock → Stock Check → Generate QRIS → 
-User Payment → App Detection → Process → Send Product → Release Lock
-```
-**⏱️ Processing Time**: 5-15 minutes  
-**✅ Success Rate**: 85%  
-**💰 Requirement**: External payment app
+# Run tests in watch mode
+npm run test:watch
 
-## 🔍 Detailed Payment Flow Analysis
+# Generate coverage report
+npm run test:coverage
 
-### **🏦 Saldo Payment Flow (`.buy`) - Professional Overview**
-
-```mermaid
-flowchart LR
-    A["User<br/>Sends .buy command"] --> B{"Bot<br/>Rate Check"}
-    B -->|"OK"| C{"Redis<br/>Lock Acquired"}
-    B -->|"Limit"| D["Bot<br/>Wait Message"]
-    C -->|"OK"| E{"PostgreSQL<br/>Balance OK?"}
-    C -->|"Busy"| F["Bot<br/>Busy Message"]
-    E -->|"OK"| G["PostgreSQL<br/>Deduct Saldo"]
-    E -->|"Low"| H["Bot<br/>Low Balance"]
-    G --> I["PostgreSQL<br/>Update Stock"]
-    I --> J["Bot<br/>Send Product"]
-    J --> K["Redis<br/>Release Lock"]
-    
-    style A fill:#2563eb,stroke:#1d4ed8,stroke-width:2px,color:#ffffff
-    style B fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
-    style C fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
-    style D fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
-    style E fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
-    style F fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
-    style G fill:#059669,stroke:#047857,stroke-width:3px,color:#ffffff
-    style H fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
-    style I fill:#0891b2,stroke:#0e7490,stroke-width:2px,color:#ffffff
-    style J fill:#2563eb,stroke:#1d4ed8,stroke-width:3px,color:#ffffff
-    style K fill:#6b7280,stroke:#4b5563,stroke-width:2px,color:#ffffff
+# Run specific test suite
+npm run test:unit
+npm run test:integration
+npm run test:e2e
 ```
 
-### **📱 QRIS Payment Flow (`.buynow`) - Professional Overview**
+## 📊 Monitoring
 
-```mermaid
-flowchart LR
-    A["User<br/>Sends .buynow command"] --> B{"Bot<br/>Rate Check"}
-    B -->|"OK"| C{"Redis<br/>Lock Acquired"}
-    B -->|"Limit"| D["Bot<br/>Wait Message"]
-    C -->|"OK"| E{"PostgreSQL<br/>Stock OK?"}
-    C -->|"Busy"| F["Bot<br/>Busy Message"]
-    E -->|"OK"| G["QRIS Generator<br/>Generate QRIS"]
-    E -->|"Low"| H["Bot<br/>Low Stock"]
-    G --> I["Bot<br/>Send QR Code"]
-    I --> J["App Listener<br/>Monitor Payment"]
-    J -->|"Paid"| K["Bot<br/>Send Product"]
-    J -->|"Timeout"| L["Bot<br/>Cancel Order"]
-    K --> M["Redis<br/>Release Lock"]
-    L --> M
-    
-    style A fill:#2563eb,stroke:#1d4ed8,stroke-width:2px,color:#ffffff
-    style B fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
-    style C fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
-    style D fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
-    style E fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
-    style F fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
-    style G fill:#db2777,stroke:#be185d,stroke-width:3px,color:#ffffff
-    style H fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
-    style I fill:#0891b2,stroke:#0e7490,stroke-width:2px,color:#ffffff
-    style J fill:#ea580c,stroke:#c2410c,stroke-width:2px,color:#ffffff
-    style K fill:#2563eb,stroke:#1d4ed8,stroke-width:3px,color:#ffffff
-    style L fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
-    style M fill:#6b7280,stroke:#4b5563,stroke-width:2px,color:#ffffff
+### Health Check
+
+```bash
+curl http://localhost:3000/health
 ```
 
-### **🔍 Component Legend**
+Response:
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-02-01T12:00:00.000Z",
+  "uptime": 3600,
+  "checks": {
+    "redis": { "status": "ok" },
+    "postgres": { "status": "ok" },
+    "gowa": { "status": "ok" }
+  }
+}
+```
 
-| Component | Description |
-|-----------|-------------|
-| **User** | WhatsApp user sending commands |
-| **Bot** | WhatsApp bot processing requests |
-| **Redis** | Cache & locking system |
-| **PostgreSQL** | Database for data storage |
-| **QRIS Generator** | QR code generation service |
-| **App Listener** | Payment detection service |
+### Metrics
 
-### **🏦 Saldo Payment (`.buy`) - Step by Step**
-
-#### **1. Input Validation**
-- Parse command: `.buy idproduk jumlah`
-- Validate product ID exists
-- Validate quantity is positive number
-- Check product stock availability
-
-#### **2. Security Checks**
-- **Rate Limiting**: Max 3 transactions per minute per user
-- **Transaction Locking**: Prevent concurrent transactions
-- **Balance Validation**: Ensure sufficient saldo
-
-#### **3. Payment Processing**
-- Calculate total price based on user role (bronze/silver/gold)
-- Deduct saldo from user account
-- Update product stock
-- Create transaction record with reference ID
-
-#### **4. Product Delivery**
-- Generate product details message
-- Send account credentials to user
-- Include terms and conditions
-- Log transaction completion
-
-### **📱 QRIS Payment (`.buynow`) - Step by Step**
-
-#### **1. Input Validation**
-- Parse command: `.buynow idproduk jumlah`
-- Validate product ID exists
-- Validate quantity is positive number
-- Check product stock availability
-
-#### **2. Security Checks**
-- **Rate Limiting**: Max 3 transactions per minute per user
-- **Transaction Locking**: Prevent concurrent transactions
-- **Stock Validation**: Ensure sufficient inventory
-
-#### **3. QRIS Generation**
-- Calculate total price based on user role
-- Generate unique code (1-99) to prevent confusion
-- Create QRIS image with final amount
-- Set 30-minute expiration time
-
-#### **4. Payment Monitoring**
-- Save pending order to database
-- Start Livin Merchant listener for payment detection
-- Monitor for payment with matching unique code
-- Handle timeout scenarios
-
-#### **5. Payment Processing**
-- Detect payment completion via Livin Merchant listener
-- Update order status to 'paid'
-- Process product delivery
-- Clean up pending orders and locks
-
-## 🔄 Payment Method Comparison
-
-| Aspect | Saldo Payment (`.buy`) | QRIS Payment (`.buynow`) |
-|--------|------------------------|---------------------------|
-| **Speed** | Instant (immediate) | Delayed (wait for payment) |
-| **User Requirement** | Must have sufficient saldo | No saldo required |
-| **Processing Time** | < 5 seconds | 30 minutes max |
-| **Risk Level** | Low (internal balance) | Medium (external payment) |
-| **User Experience** | Seamless | Requires QRIS scan |
-| **Conversion Rate** | Higher (instant) | Lower (abandonment risk) |
-| **Technical Complexity** | Simple | Complex (monitoring) |
-
-## 🛡️ Security Features
-
-### **Both Payment Methods**
-- **Rate Limiting**: 3 transactions per minute per user
-- **Transaction Locking**: Prevent double purchases
-- **Input Validation**: Comprehensive sanitization
-- **Stock Validation**: Prevent overselling
-- **Error Handling**: Graceful failure recovery
-
-### **Saldo Payment Specific**
-- **Balance Validation**: Real-time saldo checking
-- **Atomic Transactions**: Database consistency
-- **Role-based Pricing**: Bronze/Silver/Gold tiers
-
-### **QRIS Payment Specific**
-- **Unique Codes**: Prevent payment confusion
-- **Timeout Handling**: 30-minute expiration
-- **App Listener**: Automatic payment detection
-- **Pending Order Management**: Track incomplete transactions
-
-## 📊 Performance Metrics
-
-### **Saldo Payment**
-- **Average Processing Time**: 2-3 seconds
-- **Success Rate**: 99.5%
-- **User Satisfaction**: High (instant delivery)
-
-### **QRIS Payment**
-- **Average Processing Time**: 5-15 minutes
-- **Success Rate**: 85%
-- **Abandonment Rate**: 15%
-- **User Satisfaction**: Medium (requires external app)
+```bash
+curl http://localhost:3000/metrics
+```
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
-```env
-# Database
-PG_HOST=localhost
-PG_PORT=5432
-PG_DATABASE=bot_wa
-PG_USER=bot_wa
-PG_PASSWORD=your_password
+See [.env.example](.env.example) for all available configuration options.
 
-# Redis
-REDIS_URL=redis://localhost:6379
+**Required**:
+- `GOWA_API_URL` - WhatsApp API endpoint
+- `GOWA_USERNAME` - WhatsApp API username
+- `GOWA_PASSWORD` - WhatsApp API password
+- `OWNER_NUMBER` - Bot owner phone number
+- `REDIS_URL` - Redis connection URL
 
-# Payment System (Optional - for QRIS)
-# QRIS configuration can be added here if needed
-```
+**Optional**:
+- `USE_PG` - Enable PostgreSQL (default: false)
+- `MIDTRANS_SERVER_KEY` - Midtrans payment gateway
+- `TELEGRAM_BOT_TOKEN` - Telegram notifications
+- `LOG_LEVEL` - Logging level (default: info)
 
-## 📈 Performance Metrics
+## 📝 Available Commands
 
-| Metric | Before Redis | After Redis | Improvement |
-|--------|-------------|-------------|-------------|
-| **Response Time** | 500-1000ms | 50-100ms | **5x faster** |
-| **Concurrent Users** | 10-20 | 100+ | **5x more** |
-| **Error Rate** | 5-10% | <1% | **10x better** |
-| **Cache Hit Rate** | 0% | 85%+ | **New feature** |
+### User Commands
+- `stok` - View available products
+- `buy <product> <qty>` - Purchase with saldo
+- `buynow <product> <qty>` - Purchase with payment gateway
+- `saldo` - Check balance
+- `profile` - View user profile
 
-## 🎯 Use Cases
+### Admin Commands
+- `addproduk` - Add new product
+- `delproduk` - Delete product
+- `addsaldo` - Add user balance
+- `setrole` - Set user role
+- `broadcast` - Send broadcast message
 
-### **E-commerce Businesses**
-- Online stores selling through WhatsApp
-- Digital product distribution with dual payment options
-- Service booking with instant saldo or QRIS payment
+## 🏗️ Architecture
 
-### **Small to Medium Enterprises**
-- Customer service automation
-- Order processing and tracking
-- Inventory management
+### Services Layer
+Business logic separated into services:
+- **PaymentService**: Payment calculations, saldo processing
+- **ProductService**: Product operations, stock management
+- **UserService**: User management, balance operations
 
-### **Developers**
-- WhatsApp bot development reference
-- Redis integration examples
-- E-commerce system architecture
+### Middleware Layer
+Reusable middleware for common operations:
+- **RateLimit**: Redis-based rate limiting
+- **TransactionLock**: Prevent concurrent transactions
+- **ErrorHandler**: Centralized error handling
 
-## 🔍 Key Features Deep Dive
-
-### **Redis Integration**
-```javascript
-// Transaction Locking
-const lockAcquired = await acquireLock(sender, 'buy', 30);
-if (!lockAcquired) {
-  return reply('⚠️ Transaction sedang diproses...');
-}
-
-// Rate Limiting
-const rateLimit = await checkRateLimit(sender, 'buy', 3, 60);
-if (!rateLimit.allowed) {
-  return reply(`⚠️ Terlalu banyak request! Tunggu ${rateLimit.resetIn}s`);
-}
-
-// Caching
-const products = await cacheAside('produk:list', loadProducts, 300);
-```
-
-### **Dual Payment System**
-- **Saldo Payment (`.buy`)**: Instant purchase using user balance
-- **QRIS Payment (`.buynow`)**: Custom QRIS with unique codes
-- **App Listener**: Automatic payment detection and processing
-- **Transaction Tracking**: Complete order lifecycle management
-
-### **User Management**
-- Role-based access control
-- Balance management
-- Transaction history
-- User analytics
+### Circuit Breaker
+API resilience with Opossum:
+- Automatic fallback on failures
+- Configurable thresholds
+- Event logging and stats
 
 ## 🚀 Deployment
 
-### **Production Deployment**
+### Using PM2
 
 ```bash
-# VPS Setup
-sudo apt update
-sudo apt install redis-server postgresql nodejs npm
+# Install PM2
+npm install -g pm2
 
-# Start services
-sudo systemctl start redis-server
-sudo systemctl start postgresql
-sudo systemctl enable redis-server
-sudo systemctl enable postgresql
+# Start bot
+pm2 start npm --name "bot-wa" -- start
 
-# Deploy application
-git pull origin main
-npm install --production
-sudo systemctl restart bot-wa
+# View logs
+pm2 logs bot-wa
+
+# Restart
+pm2 restart bot-wa
 ```
 
-### **Docker Deployment**
+### Using Docker
 
 ```bash
-# Build and run with Docker Compose
-docker-compose up -d
+# Build image
+docker build -t bot-wa .
+
+# Run container
+docker run -d \
+  --name bot-wa \
+  --env-file .env \
+  -p 3000:3000 \
+  bot-wa
 ```
-
-## 📱 Screenshots
-
-### Bot Interface
-- Product browsing through WhatsApp
-- Dual payment system (Saldo + QRIS)
-- Instant purchase with saldo
-- QRIS payment with unique codes
-- Order confirmation and tracking
-- User balance management
-
-### Admin Features
-- Real-time transaction monitoring
-- Product inventory management
-- User analytics dashboard
-- System health monitoring
 
 ## 🤝 Contributing
 
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Development Workflow
+
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
+
+### Code Quality
+
+- Pre-commit hooks run ESLint and Prettier
+- All tests must pass
+- Maintain test coverage above 30%
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 👨‍💻 Author
-
-**Nicola Ananda**
-- Portfolio: [nicola.id](https://nicola.id)
-- GitHub: [@nicolaananda](https://github.com/nicolaananda)
-- LinkedIn: [Nicola Ananda](https://linkedin.com/in/nicolaananda)
+This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- WhatsApp Web API for messaging capabilities
-- Redis team for excellent caching solution
-- PostgreSQL community for robust database system
-- QRIS integration for seamless payment processing
+- [Baileys](https://github.com/WhiskeySockets/Baileys) - WhatsApp Web API
+- [Winston](https://github.com/winstonjs/winston) - Logging
+- [Jest](https://jestjs.io/) - Testing framework
+- [Opossum](https://github.com/nodeshift/opossum) - Circuit breaker
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/nicolaananda/bot-wa/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/nicolaananda/bot-wa/discussions)
+
+## 🔗 Links
+
+- [Documentation](docs/)
+- [API Reference](docs/api.md)
+- [Changelog](CHANGELOG.md)
 
 ---
 
-⭐ **Star this repository if you found it helpful!**
-
-*Built with ❤️ for the developer community*
+**Made with ❤️ by Nicola**

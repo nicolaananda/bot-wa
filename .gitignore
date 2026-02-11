@@ -45,3 +45,4 @@ Thumbs.db
 
 # Database backups (may contain sensitive data)
 database_backup_*.json
+logs/
