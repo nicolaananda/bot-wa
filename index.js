@@ -2677,6 +2677,103 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         }
         break
 
+      case 'cek':
+        {
+          if (!isOwner) return reply(mess.owner)
+          if (!q) return reply(`Contoh: ${prefix + command} idproduk\nContoh: ${prefix}cek net1u`)
+
+          const idProdukCek = q.trim().toLowerCase()
+          const produkCek = db.data.produk[idProdukCek]
+
+          if (!produkCek) {
+            return reply(`❌ Produk dengan ID *${idProdukCek}* tidak ditemukan\n\n💡 Gunakan ${prefix}stok untuk melihat daftar produk`)
+          }
+
+          const stokList = produkCek.stok || []
+
+          if (stokList.length === 0) {
+            return reply(`📦 Stok produk *${produkCek.name || idProdukCek}* kosong`)
+          }
+
+          let teks = `*╭────〔 CEK STOK AKUN 〕─*\n`
+          teks += `*┊・ 📦 Produk:* ${produkCek.name || idProdukCek}\n`
+          teks += `*┊・ 🔐 ID:* ${idProdukCek}\n`
+          teks += `*┊・ 📊 Total:* ${stokList.length} akun\n`
+          teks += `*╰┈┈┈┈┈┈┈┈*\n\n`
+
+          stokList.forEach((item, index) => {
+            const parts = item.split('|')
+            teks += `*${index + 1}.* `
+            teks += `📧 ${parts[0] || '-'}`
+            if (parts[1]) teks += ` | 🔐 ${parts[1]}`
+            if (parts[2]) teks += ` | 👤 ${parts[2]}`
+            if (parts[3]) teks += ` | 🔢 ${parts[3]}`
+            if (parts[4]) teks += ` | 🔒 ${parts[4]}`
+            teks += `\n`
+          })
+
+          teks += `\n_Gunakan ${prefix}pick ${idProdukCek} <nomor> untuk mengambil akun_`
+
+          await nicola.sendMessage(from, { text: teks }, { quoted: m })
+        }
+        break
+
+      case 'pick':
+        {
+          if (!isOwner) return reply(mess.owner)
+          if (!q) return reply(`Contoh: ${prefix + command} idproduk nomor\nContoh: ${prefix}pick net1u 2`)
+
+          const pickArgs = q.trim().split(' ')
+          const idProdukPick = pickArgs[0]?.toLowerCase()
+          const nomorPick = parseInt(pickArgs[1])
+
+          if (!idProdukPick) return reply(`❌ Masukkan ID produk\nContoh: ${prefix}pick net1u 2`)
+          if (!nomorPick || isNaN(nomorPick) || nomorPick < 1) {
+            return reply(`❌ Masukkan nomor akun yang valid\nContoh: ${prefix}pick ${idProdukPick} 1\n\n💡 Lihat daftar akun dengan: ${prefix}cek ${idProdukPick}`)
+          }
+
+          const produkPick = db.data.produk[idProdukPick]
+          if (!produkPick) {
+            return reply(`❌ Produk dengan ID *${idProdukPick}* tidak ditemukan`)
+          }
+
+          const stokPick = produkPick.stok || []
+          if (stokPick.length === 0) {
+            return reply(`📦 Stok produk *${produkPick.name || idProdukPick}* kosong`)
+          }
+
+          if (nomorPick > stokPick.length) {
+            return reply(`❌ Nomor *${nomorPick}* tidak valid. Stok tersedia: *${stokPick.length}* akun\n\n💡 Gunakan ${prefix}cek ${idProdukPick} untuk melihat daftar`)
+          }
+
+          const akunIndex = nomorPick - 1
+          const akunData = stokPick[akunIndex]
+          const parts = akunData.split('|')
+
+          // Hapus akun dari stok
+          db.data.produk[idProdukPick].stok.splice(akunIndex, 1)
+          const sisaStok = db.data.produk[idProdukPick].stok.length
+
+          // Simpan perubahan
+          if (typeof global.scheduleSave === 'function') {
+            global.scheduleSave()
+          }
+
+          let teks = `*╭────〔 AKUN PICK #${nomorPick} 〕─*\n`
+          teks += `*┊・ 📦 Produk:* ${produkPick.name || idProdukPick}\n`
+          teks += `*┊・ 📧 Email:* ${parts[0] || '-'}\n`
+          if (parts[1]) teks += `*┊・ 🔐 Password:* ${parts[1]}\n`
+          if (parts[2]) teks += `*┊・ 👤 Profil:* ${parts[2]}\n`
+          if (parts[3]) teks += `*┊・ 🔢 Pin:* ${parts[3]}\n`
+          if (parts[4]) teks += `*┊・ 🔒 2FA:* ${parts[4]}\n`
+          teks += `*╰┈┈┈┈┈┈┈┈*\n\n`
+          teks += `*♻️ Sisa stok ${produkPick.name || idProdukPick}:* ${sisaStok} akun\n`
+          teks += `_✅ Akun ini telah dihapus dari stok_`
+
+          await nicola.sendMessage(from, { text: teks }, { quoted: m })
+        }
+        break
+
         // ====== CONFIG & IMPORT ======
         // using top-level fs and axios imports
 
