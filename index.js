@@ -717,6 +717,7 @@ if (!global.midtransWebhookListenerSetup) {
         reffId: reffId,
         metodeBayar: 'QRIS',
         totalBayar: totalAmount,
+        akun: dataStok,
       })
 
       if (typeof global.scheduleSave === 'function') {
@@ -2779,6 +2780,60 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         }
         break
 
+      case 'riwayat':
+        {
+          if (!isOwner) return reply(mess.owner)
+          if (!q) return reply(`Contoh: ${prefix}riwayat net1u\nUntuk lihat semua produk: ${prefix}riwayat all`)
+
+          const idTarget = q.trim().toLowerCase()
+          const hariIni = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
+
+          // Filter transaksi hari ini, hanya tipe 'buy' (bukan deposit)
+          const transaksiHariIni = (db.data.transaksi || []).filter((t) => {
+            if (!t.date) return false
+            const tglTransaksi = t.date.split(' ')[0]
+            if (tglTransaksi !== hariIni) return false
+            if (t.metodeBayar === 'Deposit' || t.type === 'deposit') return false
+            if (idTarget === 'all') return true
+            return t.id === idTarget
+          })
+
+          if (transaksiHariIni.length === 0) {
+            const label = idTarget === 'all' ? 'semua produk' : `produk *${idTarget}*`
+            return reply(`📭 Belum ada pembeli ${label} hari ini (${moment.tz('Asia/Jakarta').format('DD/MM/YYYY')})`)
+          }
+
+          let teks = `*╭────〔 RIWAYAT PEMBELIAN 〕─*\n`
+          teks += `*┊・ 📅 Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n`
+          if (idTarget !== 'all') teks += `*┊・ 📦 Produk:* ${idTarget}\n`
+          teks += `*┊・ 🧾 Total:* ${transaksiHariIni.length} transaksi\n`
+          teks += `*╰┈┈┈┈┈┈┈┈*\n\n`
+
+          transaksiHariIni.forEach((t, idx) => {
+            const jam = t.date?.split(' ')[1]?.slice(0, 5) || '-'
+            teks += `*${idx + 1}. [${jam}] ${t.name || t.id}*\n`
+            teks += `• Pembeli: ${t.user || '-'}\n`
+            teks += `• Bayar: ${t.metodeBayar || '-'} | Rp${toRupiah(t.totalBayar || 0)}\n`
+            if (t.akun && t.akun.length > 0) {
+              t.akun.forEach((akun, i) => {
+                const parts = akun.split('|')
+                teks += `• Akun ${i + 1}: ${parts[0] || '-'}`
+                if (parts[1]) teks += ` | ${parts[1]}`
+                if (parts[2]) teks += ` | ${parts[2]}`
+                if (parts[3]) teks += ` | ${parts[3]}`
+                teks += `\n`
+              })
+            }
+            teks += `\n`
+          })
+
+          const sentMsg = await nicola.sendMessage(from, { text: teks }, { quoted: m })
+          if (typeof scheduleAutoDelete === 'function') {
+            scheduleAutoDelete(sentMsg.key, from, 300000, 'riwayat message')
+          }
+        }
+        break
+
         // ====== CONFIG & IMPORT ======
         // using top-level fs and axios imports
 
@@ -3985,6 +4040,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   ? cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '')
                   : null,
                 ownerNumber: isOwnerBuy ? sender.split('@')[0] : null,
+                akun: dataStok,
               })
 
               // Schedule save after transaction (debounced)
