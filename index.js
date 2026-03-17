@@ -2704,17 +2704,22 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           stokList.forEach((item, index) => {
             const parts = item.split('|')
             teks += `*${index + 1}.* `
-            teks += `📧 ${parts[0] || '-'}`
-            if (parts[1]) teks += ` | 🔐 ${parts[1]}`
-            if (parts[2]) teks += ` | 👤 ${parts[2]}`
-            if (parts[3]) teks += ` | 🔢 ${parts[3]}`
-            if (parts[4]) teks += ` | 🔒 ${parts[4]}`
+            teks += `${parts[0] || '-'}`
+            if (parts[1]) teks += ` | ${parts[1]}`
+            if (parts[2]) teks += ` | ${parts[2]}`
+            if (parts[3]) teks += ` | ${parts[3]}`
+            if (parts[4]) teks += ` | ${parts[4]}`
             teks += `\n`
           })
 
-          teks += `\n_Gunakan ${prefix}pick ${idProdukCek} <nomor> untuk mengambil akun_`
+          teks += `\n_Gunakan ${prefix}pick ${idProdukCek} <nomor> untuk mengambil akun_\n`
+          teks += `_⏰ Pesan ini akan terhapus otomatis dalam 5 menit_`
 
-          await nicola.sendMessage(from, { text: teks }, { quoted: m })
+          const sentMessage = await nicola.sendMessage(from, { text: teks }, { quoted: m })
+          
+          if (typeof scheduleAutoDelete === 'function') {
+            scheduleAutoDelete(sentMessage.key, from, 300000, 'cek stok message')
+          }
         }
         break
 
