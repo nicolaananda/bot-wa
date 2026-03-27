@@ -600,6 +600,21 @@ if (!global.midtransWebhookListenerSetup) {
       // Important: Delete old stock property to force recalculation from stok.length
       delete db.data.produk[productId].stock
 
+      // Low stock alert to owner
+      const sisaStokAfterBuy = db.data.produk[productId].stok.length
+      const LOW_STOCK_THRESHOLD = Number(process.env.LOW_STOCK_THRESHOLD || 3)
+      if (sisaStokAfterBuy <= LOW_STOCK_THRESHOLD && sisaStokAfterBuy > 0) {
+        try {
+          const alertMsg = `⚠️ *STOK HAMPIR HABIS*\n\n📦 Produk: *${db.data.produk[productId].name || productId}*\n📊 Sisa stok: *${sisaStokAfterBuy} akun*\n\n💡 Segera tambah stok dengan: .addstok ${productId}`
+          await globalRonzz.sendMessage(ownerNomer + '@s.whatsapp.net', { text: alertMsg })
+        } catch (_) {}
+      } else if (sisaStokAfterBuy === 0) {
+        try {
+          const alertMsg = `🚨 *STOK HABIS*\n\n📦 Produk: *${db.data.produk[productId].name || productId}*\n📊 Sisa stok: *0 akun*\n\n💡 Tambah stok segera: .addstok ${productId}`
+          await globalRonzz.sendMessage(ownerNomer + '@s.whatsapp.net', { text: alertMsg })
+        } catch (_) {}
+      }
+
       // NOW mark as processed (stock already reserved)
       order.processed = true
       order.status = 'success'
@@ -2669,21 +2684,37 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       case 'delstok':
         {
           if (!isOwner) return reply(mess.owner)
-          if (!q) return reply(`Contoh: ${prefix + command} idproduk`)
-          if (!db.data.produk[q]) return reply(`Produk dengan ID *${q}* tidak ada`)
+          if (!q) return reply(`Contoh: ${prefix + command} idproduk confirm`)
 
-          db.data.produk[q].stok = []
+          const delStokArgs = q.trim().split(' ')
+          const idDelStok = delStokArgs[0].toLowerCase()
+          const konfirmasiDel = delStokArgs[1]
 
-          reply(`Berhasil delete stok produk *${q}*`)
+          if (!db.data.produk[idDelStok]) return reply(`Produk dengan ID *${idDelStok}* tidak ada`)
+
+          const jumlahStokDel = db.data.produk[idDelStok].stok?.length || 0
+
+          if (konfirmasiDel !== 'confirm') {
+            return reply(`⚠️ Kamu akan menghapus *${jumlahStokDel} akun* dari produk *${idDelStok}*.\n\nIni tidak bisa dibatalkan!\n\nKetik: ${prefix}delstok ${idDelStok} confirm`)
+          }
+
+          db.data.produk[idDelStok].stok = []
+
+          if (typeof global.scheduleSave === 'function') global.scheduleSave()
+
+          reply(`✅ Berhasil hapus *${jumlahStokDel} akun* dari stok produk *${idDelStok}*`)
         }
         break
 
       case 'cek':
         {
           if (!isOwner) return reply(mess.owner)
-          if (!q) return reply(`Contoh: ${prefix + command} idproduk\nContoh: ${prefix}cek net1u`)
+          if (!q) return reply(`Contoh: ${prefix + command} idproduk\nTampil semua detail: ${prefix}cek net1u full`)
 
-          const idProdukCek = q.trim().toLowerCase()
+          const cekArgs = q.trim().split(' ')
+          const idProdukCek = cekArgs[0].toLowerCase()
+          const fullMode = cekArgs[1]?.toLowerCase() === 'full'
+
           const produkCek = db.data.produk[idProdukCek]
 
           if (!produkCek) {
@@ -2700,20 +2731,24 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           teks += `*┊・ 📦 Produk:* ${produkCek.name || idProdukCek}\n`
           teks += `*┊・ 🔐 ID:* ${idProdukCek}\n`
           teks += `*┊・ 📊 Total:* ${stokList.length} akun\n`
+          teks += `*┊・ 👁 Mode:* ${fullMode ? 'Full detail' : 'Email only'}\n`
           teks += `*╰┈┈┈┈┈┈┈┈*\n\n`
 
           stokList.forEach((item, index) => {
             const parts = item.split('|')
-            teks += `*${index + 1}.* `
-            teks += `${parts[0] || '-'}`
-            if (parts[1]) teks += ` | ${parts[1]}`
-            if (parts[2]) teks += ` | ${parts[2]}`
-            if (parts[3]) teks += ` | ${parts[3]}`
-            if (parts[4]) teks += ` | ${parts[4]}`
-            teks += `\n`
+            if (fullMode) {
+              teks += `*${index + 1}.* ${parts[0] || '-'}`
+              if (parts[1]) teks += ` | ${parts[1]}`
+              if (parts[2]) teks += ` | ${parts[2]}`
+              if (parts[3]) teks += ` | ${parts[3]}`
+              if (parts[4]) teks += ` | ${parts[4]}`
+              teks += `\n`
+            } else {
+              teks += `*${index + 1}.* ${parts[0] || '-'}\n`
+            }
           })
 
-          teks += `\n_Gunakan ${prefix}pick ${idProdukCek} <nomor> untuk mengambil akun_\n`
+          teks += `\n_Gunakan ${prefix}pick ${idProdukCek} <nomor> untuk mengambil akun (bisa multiple: 1 3 5)_\n`
           teks += `_⏰ Pesan ini akan terhapus otomatis dalam 5 menit_`
 
           const sentMessage = await nicola.sendMessage(from, { text: teks }, { quoted: m })
@@ -2727,14 +2762,14 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       case 'pick':
         {
           if (!isOwner) return reply(mess.owner)
-          if (!q) return reply(`Contoh: ${prefix + command} idproduk nomor\nContoh: ${prefix}pick net1u 2`)
+          if (!q) return reply(`Contoh: ${prefix + command} idproduk nomor\nContoh: ${prefix}pick net1u 2\nMultiple: ${prefix}pick net1u 1 3 5`)
 
           const pickArgs = q.trim().split(' ')
           const idProdukPick = pickArgs[0]?.toLowerCase()
-          const nomorPick = parseInt(pickArgs[1])
+          const nomorList = pickArgs.slice(1).map((n) => parseInt(n)).filter((n) => !isNaN(n) && n >= 1)
 
           if (!idProdukPick) return reply(`❌ Masukkan ID produk\nContoh: ${prefix}pick net1u 2`)
-          if (!nomorPick || isNaN(nomorPick) || nomorPick < 1) {
+          if (nomorList.length === 0) {
             return reply(`❌ Masukkan nomor akun yang valid\nContoh: ${prefix}pick ${idProdukPick} 1\n\n💡 Lihat daftar akun dengan: ${prefix}cek ${idProdukPick}`)
           }
 
@@ -2748,16 +2783,22 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             return reply(`📦 Stok produk *${produkPick.name || idProdukPick}* kosong`)
           }
 
-          if (nomorPick > stokPick.length) {
-            return reply(`❌ Nomor *${nomorPick}* tidak valid. Stok tersedia: *${stokPick.length}* akun\n\n💡 Gunakan ${prefix}cek ${idProdukPick} untuk melihat daftar`)
+          // Validasi semua nomor
+          const invalidNomor = nomorList.filter((n) => n > stokPick.length)
+          if (invalidNomor.length > 0) {
+            return reply(`❌ Nomor *${invalidNomor.join(', ')}* tidak valid. Stok tersedia: *${stokPick.length}* akun\n\n💡 Gunakan ${prefix}cek ${idProdukPick} untuk melihat daftar`)
           }
 
-          const akunIndex = nomorPick - 1
-          const akunData = stokPick[akunIndex]
-          const parts = akunData.split('|')
+          // Hapus duplikat dan urutkan dari terbesar ke terkecil agar index tidak bergeser
+          const uniqueNomor = [...new Set(nomorList)].sort((a, b) => b - a)
+          const akunDipick = []
 
-          // Hapus akun dari stok
-          db.data.produk[idProdukPick].stok.splice(akunIndex, 1)
+          for (const nomor of uniqueNomor) {
+            const idx = nomor - 1
+            akunDipick.unshift({ nomor, data: stokPick[idx] })
+            db.data.produk[idProdukPick].stok.splice(idx, 1)
+          }
+
           const sisaStok = db.data.produk[idProdukPick].stok.length
 
           // Simpan perubahan
@@ -2765,16 +2806,23 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             global.scheduleSave()
           }
 
-          let teks = `*╭────〔 AKUN PICK #${nomorPick} 〕─*\n`
+          let teks = `*╭────〔 AKUN PICK 〕─*\n`
           teks += `*┊・ 📦 Produk:* ${produkPick.name || idProdukPick}\n`
-          teks += `*┊・ 📧 Email:* ${parts[0] || '-'}\n`
-          if (parts[1]) teks += `*┊・ 🔐 Password:* ${parts[1]}\n`
-          if (parts[2]) teks += `*┊・ 👤 Profil:* ${parts[2]}\n`
-          if (parts[3]) teks += `*┊・ 🔢 Pin:* ${parts[3]}\n`
-          if (parts[4]) teks += `*┊・ 🔒 2FA:* ${parts[4]}\n`
-          teks += `*╰┈┈┈┈┈┈┈┈*\n\n`
-          teks += `*♻️ Sisa stok ${produkPick.name || idProdukPick}:* ${sisaStok} akun\n`
-          teks += `_✅ Akun ini telah dihapus dari stok_`
+          teks += `*┊・ 🔢 Jumlah:* ${akunDipick.length} akun\n`
+          teks += `*╰┈┈┈┈┈┈┈┈*\n`
+
+          for (const { nomor, data } of akunDipick) {
+            const parts = data.split('|')
+            teks += `\n*#${nomor}*\n`
+            teks += `📧 ${parts[0] || '-'}\n`
+            if (parts[1]) teks += `🔐 ${parts[1]}\n`
+            if (parts[2]) teks += `👤 ${parts[2]}\n`
+            if (parts[3]) teks += `🔢 ${parts[3]}\n`
+            if (parts[4]) teks += `🔒 ${parts[4]}\n`
+          }
+
+          teks += `\n*♻️ Sisa stok ${produkPick.name || idProdukPick}:* ${sisaStok} akun\n`
+          teks += `_✅ Akun telah dihapus dari stok_`
 
           await nicola.sendMessage(from, { text: teks }, { quoted: m })
         }
@@ -2783,16 +2831,33 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       case 'riwayat':
         {
           if (!isOwner) return reply(mess.owner)
-          if (!q) return reply(`Contoh: ${prefix}riwayat net1u\nUntuk lihat semua produk: ${prefix}riwayat all`)
+          if (!q) return reply(`Contoh: ${prefix}riwayat net1u\nFilter tanggal: ${prefix}riwayat net1u 7d\nTanggal spesifik: ${prefix}riwayat net1u 2026-03-20\nSemua produk: ${prefix}riwayat all`)
 
-          const idTarget = q.trim().toLowerCase()
-          const hariIni = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
+          const riwayatArgs = q.trim().split(' ')
+          const idTarget = riwayatArgs[0].toLowerCase()
+          const dateArg = riwayatArgs[1] || null
 
-          // Filter transaksi hari ini, hanya tipe 'buy' (bukan deposit)
+          let startDate, endDate, labelPeriode
+          if (!dateArg) {
+            startDate = endDate = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
+            labelPeriode = moment.tz('Asia/Jakarta').format('DD MMMM YYYY')
+          } else if (/^\d+d$/i.test(dateArg)) {
+            const days = parseInt(dateArg)
+            endDate = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
+            startDate = moment.tz('Asia/Jakarta').subtract(days - 1, 'days').format('YYYY-MM-DD')
+            labelPeriode = `${days} hari terakhir`
+          } else if (/^\d{4}-\d{2}-\d{2}$/.test(dateArg)) {
+            startDate = endDate = dateArg
+            labelPeriode = moment(dateArg).format('DD MMMM YYYY')
+          } else {
+            return reply(`❌ Format tanggal tidak valid.\nContoh: ${prefix}riwayat net1u 7d atau ${prefix}riwayat net1u 2026-03-20`)
+          }
+
+          // Filter transaksi sesuai range, hanya tipe 'buy' (bukan deposit)
           const transaksiHariIni = (db.data.transaksi || []).filter((t) => {
             if (!t.date) return false
             const tglTransaksi = t.date.split(' ')[0]
-            if (tglTransaksi !== hariIni) return false
+            if (tglTransaksi < startDate || tglTransaksi > endDate) return false
             if (t.metodeBayar === 'Deposit' || t.type === 'deposit') return false
             if (idTarget === 'all') return true
             return t.id === idTarget
@@ -2800,11 +2865,11 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
           if (transaksiHariIni.length === 0) {
             const label = idTarget === 'all' ? 'semua produk' : `produk *${idTarget}*`
-            return reply(`📭 Belum ada pembeli ${label} hari ini (${moment.tz('Asia/Jakarta').format('DD/MM/YYYY')})`)
+            return reply(`📭 Belum ada pembeli ${label} pada periode *${labelPeriode}*`)
           }
 
           let teks = `*╭────〔 RIWAYAT PEMBELIAN 〕─*\n`
-          teks += `*┊・ 📅 Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}\n`
+          teks += `*┊・ 📅 Periode:* ${labelPeriode}\n`
           if (idTarget !== 'all') teks += `*┊・ 📦 Produk:* ${idTarget}\n`
           teks += `*┊・ 🧾 Total:* ${transaksiHariIni.length} transaksi\n`
           teks += `*╰┈┈┈┈┈┈┈┈*\n\n`
@@ -2831,6 +2896,87 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           if (typeof scheduleAutoDelete === 'function') {
             scheduleAutoDelete(sentMsg.key, from, 300000, 'riwayat message')
           }
+        }
+        break
+
+      case 'rekap':
+        {
+          if (!isOwner) return reply(mess.owner)
+
+          const rekapArgs = (q || '').trim().split(' ')
+          const rekapDateArg = rekapArgs[0] || null
+
+          let rekapStart, rekapEnd, rekapLabel
+          if (!rekapDateArg) {
+            rekapStart = rekapEnd = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
+            rekapLabel = `Hari ini (${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')})`
+          } else if (/^\d+d$/i.test(rekapDateArg)) {
+            const days = parseInt(rekapDateArg)
+            rekapEnd = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
+            rekapStart = moment.tz('Asia/Jakarta').subtract(days - 1, 'days').format('YYYY-MM-DD')
+            rekapLabel = `${days} hari terakhir`
+          } else if (/^\d{4}-\d{2}-\d{2}$/.test(rekapDateArg)) {
+            rekapStart = rekapEnd = rekapDateArg
+            rekapLabel = moment(rekapDateArg).format('DD MMMM YYYY')
+          } else {
+            return reply(`❌ Format tidak valid.\nContoh: ${prefix}rekap | ${prefix}rekap 7d | ${prefix}rekap 2026-03-20`)
+          }
+
+          const transaksiRekap = (db.data.transaksi || []).filter((t) => {
+            if (!t.date) return false
+            const tgl = t.date.split(' ')[0]
+            return tgl >= rekapStart && tgl <= rekapEnd && t.metodeBayar !== 'Deposit' && t.type !== 'deposit'
+          })
+
+          if (transaksiRekap.length === 0) {
+            return reply(`📭 Tidak ada transaksi pada periode *${rekapLabel}*`)
+          }
+
+          let totalOmzet = 0
+          let totalProfit = 0
+          const perProduk = {}
+          const perMetode = {}
+
+          for (const t of transaksiRekap) {
+            const bayar = Number(t.totalBayar || t.price || 0)
+            const profit = Number(t.profit || 0)
+            const qty = Number(t.qty || t.jumlah || 1)
+            totalOmzet += bayar
+            totalProfit += profit
+
+            const pid = t.id || 'unknown'
+            if (!perProduk[pid]) perProduk[pid] = { name: t.name || pid, omzet: 0, profit: 0, terjual: 0 }
+            perProduk[pid].omzet += bayar
+            perProduk[pid].profit += profit
+            perProduk[pid].terjual += qty
+
+            const metode = t.metodeBayar || 'Unknown'
+            if (!perMetode[metode]) perMetode[metode] = { count: 0, total: 0 }
+            perMetode[metode].count++
+            perMetode[metode].total += bayar
+          }
+
+          // Sort produk by omzet
+          const topProduk = Object.entries(perProduk).sort((a, b) => b[1].omzet - a[1].omzet)
+
+          let teks = `*╭────〔 REKAP PENJUALAN 〕─*\n`
+          teks += `*┊・ 📅 Periode:* ${rekapLabel}\n`
+          teks += `*┊・ 🧾 Transaksi:* ${transaksiRekap.length}x\n`
+          teks += `*┊・ 💰 Omzet:* Rp${toRupiah(totalOmzet)}\n`
+          teks += `*┊・ 📈 Profit:* Rp${toRupiah(totalProfit)}\n`
+          teks += `*╰┈┈┈┈┈┈┈┈*\n`
+
+          teks += `\n*📦 Per Produk:*\n`
+          for (const [, p] of topProduk) {
+            teks += `• *${p.name}*: ${p.terjual}x | Rp${toRupiah(p.omzet)} | profit Rp${toRupiah(p.profit)}\n`
+          }
+
+          teks += `\n*💳 Per Metode Bayar:*\n`
+          for (const [metode, data] of Object.entries(perMetode)) {
+            teks += `• *${metode}*: ${data.count}x | Rp${toRupiah(data.total)}\n`
+          }
+
+          await nicola.sendMessage(from, { text: teks }, { quoted: m })
         }
         break
 
@@ -3866,6 +4012,21 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
               // Important: Delete old stock property to force recalculation from stok.length
               delete db.data.produk[data[0]].stock
+
+              // Low stock alert to owner
+              const sisaStokBuy = db.data.produk[data[0]].stok.length
+              const LOW_STOCK_THRESHOLD_BUY = Number(process.env.LOW_STOCK_THRESHOLD || 1)
+              if (sisaStokBuy <= LOW_STOCK_THRESHOLD_BUY && sisaStokBuy > 0) {
+                try {
+                  const alertMsg = `⚠️ *STOK HAMPIR HABIS*\n\n📦 Produk: *${db.data.produk[data[0]].name || data[0]}*\n📊 Sisa stok: *${sisaStokBuy} akun*\n\n💡 Segera tambah stok dengan: .addstok ${data[0]}`
+                  await nicola.sendMessage(ownerNomer + '@s.whatsapp.net', { text: alertMsg })
+                } catch (_) {}
+              } else if (sisaStokBuy === 0) {
+                try {
+                  const alertMsg = `🚨 *STOK HABIS*\n\n📦 Produk: *${db.data.produk[data[0]].name || data[0]}*\n📊 Sisa stok: *0 akun*\n\n💡 Tambah stok segera: .addstok ${data[0]}`
+                  await nicola.sendMessage(ownerNomer + '@s.whatsapp.net', { text: alertMsg })
+                } catch (_) {}
+              }
 
               // Improvement: Optimize string building dengan array.join()
               const detailParts = [
