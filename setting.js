@@ -118,7 +118,7 @@ const chalk = require('chalk');
 const moment = require("moment-timezone");
 const { runtime } = require("./function/myfunc");
 
-const d = new Date(new Date + 3600000)
+const d = new Date(Date.now() + 3600000)
 const dateIslam = Intl.DateTimeFormat('id' + '-TN-u-ca-islamic', { day: 'numeric', month: 'long', year: 'numeric' }).format(d)
 
 //Tampilan menu

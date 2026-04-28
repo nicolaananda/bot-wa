@@ -71,7 +71,7 @@ function createRedisClient() {
         enableReadyCheck: true,
         lazyConnect: false,
         retryStrategy: (times) => {
-          const delay = Math.min(times * 50, 2000);
+          const delay = Math.min(times * 500, 30000);
           return delay;
         }
       };
@@ -161,9 +161,8 @@ async function closeRedis() {
   }
 }
 
-// Export functions
 module.exports = {
-  redis,
+  get redis() { return redis; },
   getRedis,
   isRedisAvailable,
   closeRedis

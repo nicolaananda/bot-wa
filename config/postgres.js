@@ -20,6 +20,7 @@ const pool = new Pool({
   database: process.env.PG_DATABASE || 'bot_wa',
   user: process.env.PG_USER || 'bot_wa',
   password: process.env.PG_PASSWORD || 'bot_wa',
+  min: Math.min(PG_WARMUP_CONNECTIONS, PG_MAX),
   max: PG_MAX,
   idleTimeoutMillis: PG_IDLE_TIMEOUT,
   connectionTimeoutMillis: PG_CONN_TIMEOUT,

@@ -17,15 +17,7 @@ const { color } = require('./function/console.js')
 const { groupResponseWelcome, groupResponseRemove, groupResponsePromote, groupResponseDemote } = require('./function/respon-group.js')
 const { nocache } = require('./function/chache.js')
 
-const question = (text) => {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  })
-  return new Promise((resolve) => {
-    rl.question(text, resolve)
-  })
-}
+
 
 //DATABASE
 global.opts = new Object(yargs(process.argv.slice(2)).exitProcess(false).parse())
@@ -199,7 +191,10 @@ async function startnicola() {
       const subscriber = new Redis({
         host: process.env.REDIS_HOST || 'localhost',
         port: process.env.REDIS_PORT || 6379,
-        password: process.env.REDIS_PASSWORD || undefined
+        password: process.env.REDIS_PASSWORD || undefined,
+        retryStrategy: (times) => {
+          return Math.min(times * 500, 30000);
+        }
       });
 
       subscriber.subscribe('gowa:messages', 'midtrans:events', (err, count) => {
@@ -313,8 +308,11 @@ async function startnicola() {
 
 
   nicola.ws.on('CB:call', async (json) => {
+    try {
     const callerId = json.content[0].attrs['call-creator']
-    if (db.data.setting[nicola.user?.["id"]["split"](":")[0] + "@s.whatsapp.net"].anticall && json.content[0].tag == 'offer') {
+    const botJid = nicola.user?.id?.split(":")[0] + "@s.whatsapp.net"
+    const settingData = db.data.setting?.[botJid]
+    if (settingData?.anticall && json.content[0].tag == 'offer') {
       nicola.sendMessage(callerId, { text: `Kamu telah di blok oleh bot, karena kamu menelpon bot!!\n\nJika tidak sengaja silahkan hubungi owner agar dibuka blocknya!!\nNomor owner : wa.me/${ownerNomer}` })
 
       // Notify owner about auto-block
@@ -333,6 +331,9 @@ async function startnicola() {
         nicola.updateBlockStatus(callerId, 'block')
         console.log(`🚫 [AUTO-BLOCK] User ${callerNumber} blocked due to phone call`)
       }, 1000)
+    }
+    } catch (err) {
+      console.error('[CB:call] Error handling call event:', err.message)
     }
   })
 

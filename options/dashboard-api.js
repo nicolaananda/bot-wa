@@ -7,7 +7,7 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 const { exec, spawn } = require('child_process');
-const { getDashboardData, getDailyChartData, getMonthlyChartData, getUserActivityData } = require('./dashboard-helper');
+const { getDashboardData, getDailyChartData, getMonthlyChartData } = require('./dashboard-helper');
 // Midtrans webhook integration
 const crypto = require('crypto');
 const axios = require('axios');
@@ -16,33 +16,8 @@ envValidator.validateOrExit();
 const { clearCachedPaymentData } = require('../config/midtrans');
 const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
 
-// Initialize Redis client for webhook message queue
-let redisClient = null;
-if (process.env.REDIS !== 'OFF') {
-  try {
-    const Redis = require('ioredis');
-    redisClient = new Redis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: process.env.REDIS_PORT || 6379,
-      password: process.env.REDIS_PASSWORD || undefined,
-      retryStrategy: (times) => {
-        return Math.min(times * 500, 30000);
-      }
-    });
-
-    redisClient.on('connect', () => {
-      console.log('[REDIS-API] Connected to Redis');
-    });
-
-    redisClient.on('error', (err) => {
-      console.error('[REDIS-API] Error:', err.message);
-    });
-  } catch (error) {
-    console.error('[REDIS-API] Failed to initialize:', error.message);
-  }
-} else {
-  console.log('[REDIS-API] Redis disabled by REDIS=OFF');
-}
+// Use shared Redis client from config/redis.js
+const { getRedis } = require('../config/redis');
 
 // Import stock helper functions
 const stockHelper = require('./stock-helper');
@@ -199,7 +174,7 @@ app.post('/webhook/midtrans', async (req, res) => {
     console.log(`📋 [Webhook] Order: ${order_id}, Status: ${transaction_status}, Payment: ${payment_type}, Amount: ${gross_amount}`);
 
     // Clear any cached status to avoid stale reads
-    try { clearCachedPaymentData(order_id); } catch { }
+      try { clearCachedPaymentData(order_id); } catch { /* ignored */ }
 
     if (/(settlement|capture)/i.test(String(transaction_status))) {
       console.log(`✅ [Webhook] Payment successful for ${order_id}`);
@@ -215,10 +190,10 @@ app.post('/webhook/midtrans', async (req, res) => {
       // Emit event untuk process yang sama
       process.emit('payment-completed', webhookData);
 
-      // Publish ke Redis untuk inter-process communication (penting jika bot-wa & dashboard-api beda process)
-      if (redisClient) {
+      const midtransRedis = getRedis();
+      if (midtransRedis) {
         try {
-          redisClient.publish('midtrans:events', JSON.stringify({
+          midtransRedis.publish('midtrans:events', JSON.stringify({
             event: 'payment-completed',
             data: webhookData
           }));
@@ -303,9 +278,9 @@ app.post('/webhook/midtrans', async (req, res) => {
     }
 
     return res.status(200).json({ status: 'ok' });
-  } catch (e) {
-    console.error('❌ [Webhook] Error:', e);
-    return res.status(500).json({ status: 'error', message: e.message });
+  } catch (err) {
+    console.error('❌ [Webhook] Error:', err);
+    return res.status(500).json({ status: 'error', message: err.message });
   }
 });
 
@@ -313,13 +288,18 @@ app.post('/webhook/midtrans', async (req, res) => {
 // Webhook endpoint for incoming WhatsApp messages from Gowa service
 app.post('/webhook/gowa', async (req, res) => {
   try {
+    const secret = process.env.GOWA_WEBHOOK_SECRET;
+    if (secret && req.headers['x-webhook-secret'] !== secret) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
     const webhookData = req.body;
     console.log('[GOWA-WEBHOOK] Received:', JSON.stringify(webhookData).substring(0, 200));
 
     // Publish to Redis for bot to consume
     // Check if redisClient exists and is ready (ioredis uses .status, but we can check existence too)
+    const redisClient = getRedis();
     if (redisClient) {
-      // Use the global redisClient initialized at start of file
       await redisClient.publish('gowa:messages', JSON.stringify(webhookData));
       console.log('[GOWA-WEBHOOK] Published to Redis');
     } else {
@@ -328,7 +308,7 @@ app.post('/webhook/gowa', async (req, res) => {
 
     return res.status(200).json({ success: true, status: 'ok' });
   } catch (error) {
-    console.error('[GOWA-WEBHOOK] Error:', error.message);
+    console.error('[GOWA-WEBHOOK] Error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -401,7 +381,7 @@ async function parseDeliveredAccountFromFile(reffId) {
       profile: acc.profile || null,
       notes: acc.twofa ? `2FA: ${acc.twofa}` : null
     };
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -472,7 +452,7 @@ app.post('/api/pos/transactions', async (req, res) => {
             [refId, uid, amt, status, JSON.stringify(t)]
           );
           saved++;
-        } catch (e) {
+        } catch {
           console.error('[POS] Failed to save transaction:', e.message);
         }
       }
@@ -546,20 +526,20 @@ app.post('/api/pos/save-database', async (req, res) => {
                 'INSERT INTO transaksi(ref_id, user_id, amount, status, meta) VALUES ($1,$2,$3,$4,$5)',
                 [refId, uid, amt, status, JSON.stringify(t)]
               );
-            } catch (e) {
+            } catch {
               // best-effort; continue with others
-              try { console.error('[POS save-database PG] insert transaksi failed:', e.message) } catch { }
+              console.error('[POS save-database PG] insert transaksi failed')
             }
           }
         }
 
         return res.json({ success: true, mode: 'postgres', updatedAt: new Date().toISOString() });
-      } catch (e) {
-        console.error('[POS save-database PG] Error:', e);
-        return res.status(500).json({ success: false, error: 'Failed to apply to Postgres: ' + e.message });
-      }
+  } catch {
+    console.error('[POS save-database PG] Error occurred while applying to Postgres');
+    return res.status(500).json({ success: false, error: 'Failed to apply to Postgres' });
+  }
     }
-  } catch (e) {
+  } catch {
     console.error('[POS save-database] Error:', e);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
@@ -693,7 +673,7 @@ function posAdminAuth(req, res) {
   return true;
 }
 
-function findUserRecord(db, userId) {
+function _findUserRecord(db, userId) {
   // Accept both formats
   const idNoSuffix = userId.replace(/[^0-9]/g, '');
   const idWithSuffix = idNoSuffix + '@s.whatsapp.net';
@@ -708,7 +688,7 @@ function writeAudit(entry) {
     const filePath = path.join(__dirname, 'audit-admin.log');
     const line = JSON.stringify(entry) + '\n';
     fs.appendFileSync(filePath, line, 'utf8');
-  } catch { }
+  } catch { /* ignored */ }
 }
 
 function generateAuditId() {
@@ -789,7 +769,7 @@ app.get('/api/admin/users', async (req, res) => {
         }
       }
     });
-  } catch (e) {
+  } catch {
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
@@ -824,7 +804,7 @@ app.patch('/api/admin/users/:userId/saldo', async (req, res) => {
       return res.json({ success: true, data: { userId, before, after, delta: amount, auditId } });
     }
     return res.status(500).json({ success: false, error: 'PostgreSQL mode is required' });
-  } catch (e) {
+  } catch {
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
@@ -849,7 +829,7 @@ app.post('/api/admin/users/:userId/pin', async (req, res) => {
       return res.json({ success: true, data: { userId, updatedAt: new Date().toISOString() } });
     }
     return res.status(500).json({ success: false, error: 'PostgreSQL mode is required' });
-  } catch (e) {
+  } catch {
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
@@ -881,7 +861,7 @@ app.patch('/api/admin/users/:userId/role', async (req, res) => {
       return res.json({ success: true, data: { userId, oldRole, newRole: role } });
     }
     return res.status(500).json({ success: false, error: 'PostgreSQL mode is required' });
-  } catch (e) {
+  } catch {
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
@@ -927,18 +907,18 @@ app.get('/api/admin/audit', async (req, res) => {
 
     const { items, currentPage, totalPages, total } = paginate(filtered, pg, lim);
     return res.json({ success: true, data: { logs: items, pagination: { currentPage, totalPages, total } } });
-  } catch (e) {
+  } catch {
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
 // ===== ADMIN USER MANAGEMENT (END) =====
 
-function validateRole(role) {
+function _validateRole(role) {
   const validRoles = ['user', 'admin', 'moderator', 'superadmin'];
   return validRoles.includes(role);
 }
 
-function hasPermission(userRole, requiredRole) {
+function _hasPermission(userRole, requiredRole) {
   const roleHierarchy = {
     'user': 1,
     'moderator': 2,
@@ -949,7 +929,7 @@ function hasPermission(userRole, requiredRole) {
   return roleHierarchy[userRole] >= roleHierarchy[requiredRole];
 }
 
-function generateUserId() {
+function _generateUserId() {
   return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
@@ -1047,7 +1027,6 @@ app.get('/api/dashboard/users/activity', async (req, res) => {
 
     // Get user activity data
     const users = db.data.users || {};
-    const transaksi = db.data.transaksi || [];
 
     // Calculate active users
     const activeUsers = Object.keys(users).filter(userId => {
@@ -1160,7 +1139,6 @@ app.get('/api/dashboard/users/all', async (req, res) => {
     }
 
     const users = db.data.users || {};
-    const transaksi = db.data.transaksi || [];
 
     // Parse pagination parameters
     const currentPage = parseInt(page);
@@ -1526,7 +1504,6 @@ app.get('/api/dashboard/users/stats', async (req, res) => {
     }
 
     const users = db.data.users || {};
-    const transaksi = db.data.transaksi || [];
 
     // Calculate total users
     const totalUsers = Object.keys(users).filter(userId => {
@@ -1747,7 +1724,7 @@ app.get('/api/dashboard/transactions/recent', async (req, res) => {
 // Stock Management API Endpoints
 
 // Use stock helper functions instead of local duplicates
-const { getStockStatus, getProductCategory, parseStockItem, calculateStockMetrics } = stockHelper;
+const { getProductCategory, calculateStockMetrics } = stockHelper;
 
 // Calculate stock utilization percentage
 function calculateUtilization(terjual, stockCount) {
@@ -1769,7 +1746,7 @@ app.get('/api/dashboard/products/stock', async (req, res) => {
     const products = [];
     let totalSold = 0;
 
-    for (const [productId, product] of Object.entries(produkMap)) {
+    for (const [_productId, product] of Object.entries(produkMap)) {
       const stockCount = product.stok ? product.stok.length : 0;
       totalSold += product.terjual || 0;
 
@@ -1979,20 +1956,18 @@ app.put('/api/dashboard/products/:productId/stock', async (req, res) => {
     if (usePg) {
       // PG mode
       const result = await updateProdukStockPg(productId, async (prod) => {
-        const previousStockCount = Array.isArray(prod.stok) ? prod.stok.length : 0;
-        let newStockCount = previousStockCount;
         if (action === 'add') {
           if (!Array.isArray(prod.stok)) prod.stok = [];
           const validStockItems = (stockItems || []).filter(item => typeof item === 'string' && item.includes('|') && item.split('|').length >= 4);
           if (validStockItems.length === 0) throw new Error('Invalid stock item format. Expected: "email|password|profile|pin|notes"');
           prod.stok.push(...validStockItems);
-          newStockCount = prod.stok.length;
+          // stock count updated for this operation (not used beyond this scope)
           prod.lastRestock = new Date().toISOString();
         } else if (action === 'remove') {
           if (!Array.isArray(prod.stok) || prod.stok.length === 0) throw new Error('No stock available to remove');
           const itemsToRemove = Math.min(stockItems.length, prod.stok.length);
           prod.stok.splice(0, itemsToRemove);
-          newStockCount = prod.stok.length;
+          // newStockCount is not used here; stockCount will be derived from result in the response
         }
         if (notes) prod.notes = notes;
         return prod;
@@ -2310,7 +2285,6 @@ app.post('/api/dashboard/products/stock/bulk-update', async (req, res) => {
         const { productId, action, stockItems, notes } = update;
         try {
           const r = await updateProdukStockPg(productId, async (prod) => {
-            const previousStockCount = Array.isArray(prod.stok) ? prod.stok.length : 0;
             if (action === 'add') {
               if (!Array.isArray(prod.stok)) prod.stok = [];
               const validItems = (stockItems || []).filter(item => stockHelper.validateStockItem ? stockHelper.validateStockItem(item) : (typeof item === 'string'));
@@ -2431,7 +2405,6 @@ app.get('/api/dashboard/analytics/advanced', async (req, res) => {
 
     const users = db.data.users || {};
     const transaksi = db.data.transaksi || [];
-    const profit = db.data.profit || {};
     const persentase = db.data.persentase || {};
 
     // Calculate comprehensive metrics
@@ -2523,7 +2496,7 @@ app.get('/api/dashboard/analytics/advanced', async (req, res) => {
           if (!isNaN(hour)) {
             hourlyActivity[hour]++;
           }
-        } catch (e) {
+        } catch {
           // Handle invalid date format
           const timeMatch = t.date.match(/(\d{2}):(\d{2}):(\d{2})/);
           if (timeMatch) {
@@ -2804,7 +2777,7 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
             if (!isNaN(hour)) {
               hourlyPurchases[hour]++;
             }
-          } catch (e) {
+          } catch {
             const timeMatch = t.date.match(/(\d{2}):(\d{2}):(\d{2})/);
             if (timeMatch) {
               const hour = parseInt(timeMatch[1]);
@@ -2903,7 +2876,7 @@ app.get('/api/dashboard/users/behavior', async (req, res) => {
                 if (!isNaN(hour)) {
                   hourCounts[hour] = (hourCounts[hour] || 0) + 1;
                 }
-              } catch (e) {
+              } catch {
                 const timeMatch = t.date.match(/(\d{2}):(\d{2}):(\d{2})/);
                 if (timeMatch) {
                   const hour = parseInt(timeMatch[1]);
@@ -3147,7 +3120,7 @@ app.get('/api/dashboard/realtime', async (req, res) => {
       if (!t.date) return false;
       try {
         return new Date(t.date) >= last24Hours;
-      } catch (e) {
+      } catch {
         return t.date.startsWith(today);
       }
     });
@@ -3170,7 +3143,7 @@ app.get('/api/dashboard/realtime', async (req, res) => {
           hourlyData[hour].transactions++;
           hourlyData[hour].revenue += parseInt(t.totalBayar) || 0;
         }
-      } catch (e) {
+      } catch {
         const timeMatch = t.date.match(/(\d{2}):(\d{2}):(\d{2})/);
         if (timeMatch) {
           const hour = parseInt(timeMatch[1]);
@@ -3191,7 +3164,7 @@ app.get('/api/dashboard/realtime', async (req, res) => {
           if (new Date(t.date) >= sevenDaysAgo) {
             activeUsers.add(t.user);
           }
-        } catch (e) {
+        } catch {
           // Handle date parsing error
         }
       }
@@ -3284,8 +3257,8 @@ app.get("/logs", (req, res) => {
       }
       res.type("text/plain").send(stdout);
     });
-  } catch (e) {
-    res.status(500).send(`Exception: ${e.message}`);
+  } catch {
+    res.status(500).send(`Exception: /dashboard-api`);
   }
 });
 
@@ -3309,13 +3282,13 @@ app.get("/logs/stream", (req, res) => {
     journal.on("error", (err) => {
       res.write(`Process error: ${err.message}\n`);
     });
-    const keepAlive = setInterval(() => { try { res.write("\n"); } catch { } }, 15000);
-    req.on("close", () => {
+    const keepAlive = setInterval(() => { try { res.write("\n"); } catch { /* ignored */ } }, 15000);
+      req.on("close", () => {
       clearInterval(keepAlive);
-      try { journal.kill(); } catch { }
-    });
-  } catch (e) {
-    res.status(500).send(`Exception: ${e.message}`);
+      try { journal.kill(); } catch { /* ignored */ }
+      });
+  } catch (err) {
+    res.status(500).send(`Exception: ${err.message}`);
   }
 });
 
@@ -3328,7 +3301,7 @@ app.get("/logs/sse", (req, res) => {
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no' // avoid buffering in some proxies
     });
-    if (res.flushHeaders) try { res.flushHeaders(); } catch { }
+    if (res.flushHeaders) try { res.flushHeaders(); } catch { /* ignored */ }
     res.write('retry: 2000\n\n');
 
     const journal = spawn("journalctl", ["-u", "bot-wa", "-f", "--no-pager"]);
@@ -3353,14 +3326,14 @@ app.get("/logs/sse", (req, res) => {
       send(`Process error: ${err.message}`);
     });
 
-    const keepAlive = setInterval(() => { try { res.write(': ping\n\n'); } catch { } }, 15000);
+    const keepAlive = setInterval(() => { try { res.write(': ping\n\n'); } catch { /* ignored */ } }, 15000);
     const cleanup = () => {
       clearInterval(keepAlive);
-      try { journal.kill(); } catch { }
+      try { journal.kill(); } catch { /* ignored */ }
     };
     req.on("close", cleanup);
-  } catch (e) {
-    res.status(500).send(`Exception: ${e.message}`);
+  } catch {
+    res.status(500).send(`Exception: dashboard-api`);
   }
 });
 
@@ -3639,7 +3612,7 @@ app.get('/api/dashboard/predictions', async (req, res) => {
 });
 
 // Error handling middleware
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error(err.stack);
   res.status(500).json({
     success: false,
@@ -3694,9 +3667,9 @@ if (require.main === module) {
         console.log(`ðŸ”’ Dashboard API HTTPS server running on port ${HTTPS_PORT}`);
         console.log(`ðŸŒ Access via: https://dash.nicola.id:${HTTPS_PORT}`);
       });
-    } catch (error) {
-      console.log(`âš ï¸  HTTPS server not started: SSL certificates not found`);
-      console.log(`ðŸ’¡ To enable HTTPS, ensure SSL certificates are available at /etc/letsencrypt/live/dash.nicola.id/`);
+    } catch {
+      console.log(`HTTPS server not started: SSL certificates not found`);
+      console.log(`To enable HTTPS, ensure SSL certificates are available at /etc/letsencrypt/live/dash.nicola.id/`);
     }
   } else {
     console.log(`âš ï¸  HTTPS server not started: Windows platform detected`);
