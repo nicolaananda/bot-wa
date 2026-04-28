@@ -37,27 +37,6 @@
       "merge_logs": true,
       "autorestart": true,
       "watch": false
-    },
-    {
-      "name": "web-pos",
-      "script": "web-pos.js",
-      "instances": 1,
-      "exec_mode": "fork",
-      "max_memory_restart": "512M",
-      "node_args": "--max-old-space-size=512",
-      "env": {
-        "NODE_ENV": "production"
-      },
-      "error_file": "./logs/webpos-error.log",
-      "out_file": "./logs/webpos-out.log",
-      "log_date_format": "YYYY-MM-DD HH:mm:ss Z",
-      "merge_logs": true,
-      "autorestart": true,
-      "watch": false
     }
   ]
 }
-
-
-
-
