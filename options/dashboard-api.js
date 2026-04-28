@@ -289,8 +289,15 @@ app.post('/webhook/midtrans', async (req, res) => {
 app.post('/webhook/gowa', async (req, res) => {
   try {
     const secret = process.env.GOWA_WEBHOOK_SECRET;
-    if (secret && req.headers['x-webhook-secret'] !== secret) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (secret) {
+      const signature = req.headers['x-hub-signature-256'];
+      if (!signature) {
+        return res.status(401).json({ success: false, error: 'Missing signature' });
+      }
+      const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex');
+      if (signature !== expected) {
+        return res.status(401).json({ success: false, error: 'Invalid signature' });
+      }
     }
 
     const webhookData = req.body;
