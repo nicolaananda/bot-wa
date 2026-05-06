@@ -779,7 +779,6 @@ module.exports = async (nicola, m, mek) => {
 
       console.log(`📱 [FROM-ME] Allowing fromMe message in group: ${m.chat}`)
     }
-    console.log(`📨 [MSG-FLOW] Processing: chat=${m.chat}, sender=${m.sender || 'unknown'}, fromMe=${fromMe}, text="${(m.text || '').substring(0, 30)}"`)
     initializeAutoDeleteManager(nicola)
     const jamwib = moment.tz('Asia/Jakarta').format('HH:mm:ss')
     const dt = moment.tz('Asia/Jakarta').format('HH')
@@ -2259,15 +2258,18 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
     if (db.data.setting[botNumber].autoread) nicola.readMessages([m.key])
     if (db.data.setting[botNumber].autoketik) nicola.sendPresenceUpdate('composing', from)
-    if (chats)
+    if (chats) {
+      const ts = m.messageTimestamp
+      const tsMs = ts && ts > 1e12 ? ts : ts ? ts * 1000 : Date.now()
       console.log(
         '->[\x1b[1;32mCMD\x1b[1;37m]',
-        color(moment(m.messageTimestamp * 1000).format('DD/MM/YYYY HH:mm:ss'), 'yellow'),
+        color(moment(tsMs).format('DD/MM/YYYY HH:mm:ss'), 'yellow'),
         color(`${prefix + command} [${args.length}]`),
         'from',
         color(pushname),
         isGroup ? 'in ' + color(groupName) : ''
       )
+    }
 
     // 🔔 Auto-forward pesan yang mengandung kata "zoom" ke grup admin
     if (!fromMe && budy.toLowerCase().includes('zoom')) {
@@ -2292,7 +2294,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
             `👤 Dari: @${sender.split('@')[0]}\n` +
             `📝 Nama: ${pushname}\n` +
             `💬 Chat: ${isGroup ? `Grup "${groupName}"` : 'Private Chat'}\n` +
-            `⏰ Waktu: ${moment(m.messageTimestamp * 1000).format('DD/MM/YYYY HH:mm:ss')}\n\n` +
+            `⏰ Waktu: ${moment(m.messageTimestamp && m.messageTimestamp > 1e12 ? m.messageTimestamp : (m.messageTimestamp || 0) * 1000 || Date.now()).format('DD/MM/YYYY HH:mm:ss')}\n\n` +
             `📩 Pesan:\n${budy}`
 
           await nicola.sendMessage(targetGroupId, {
