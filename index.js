@@ -624,9 +624,7 @@ if (!global.midtransWebhookListenerSetup) {
       // Delete QRIS message
       if (globalRonzz && messageKey) {
         try {
-          console.log(`[DEBUG-DELETE] messageKey object:`, JSON.stringify(messageKey, null, 2))
           const keyId = messageKey.id || messageKey
-          console.log(`[DEBUG-DELETE] Extracted keyId:`, keyId)
           await globalRonzz.deleteMessage(from, keyId)
           console.log(`✅ [MID-GLOBAL] QRIS bubble deleted: ${keyId}`)
         } catch (e) {
@@ -844,7 +842,6 @@ module.exports = async (nicola, m, mek) => {
         while (true) {
           try {
             groupMetadata = await nicola.groupMetadata(from)
-            console.log(`[DEBUG-GROUP] Raw groupMetadata:`, JSON.stringify(groupMetadata, null, 2))
             break
           } catch (e) {
             attempt += 1
@@ -3590,10 +3587,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 { quoted: m }
               )
 
-              console.log(
-                `[DEBUG-QRIS] Message key after send:`,
-                JSON.stringify(message.key, null, 2)
-              )
+
 
               db.data.order[sender] = {
                 id: data[0],
