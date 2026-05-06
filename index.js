@@ -768,7 +768,18 @@ module.exports = async (nicola, m, mek) => {
   try {
     __wrapSendMessageOnce(nicola)
     const { isQuotedMsg, fromMe } = m
-    if (fromMe) return
+    // Allow fromMe messages in whitelisted groups (admin restok from same device)
+    // but block bot-generated responses (message IDs starting with 'GOWA' are adapter-generated)
+    if (fromMe) {
+      const isGroup = m.chat?.endsWith('@g.us') || m.isGroup
+      if (!isGroup) return
+
+      const msgId = m.key?.id || ''
+      if (msgId.startsWith('GOWA') || msgId.startsWith('BAE5')) return
+
+      console.log(`📱 [FROM-ME] Allowing fromMe message in group: ${m.chat}`)
+    }
+    console.log(`📨 [MSG-FLOW] Processing: chat=${m.chat}, sender=${m.sender || 'unknown'}, fromMe=${fromMe}, text="${(m.text || '').substring(0, 30)}"`)
     initializeAutoDeleteManager(nicola)
     const jamwib = moment.tz('Asia/Jakarta').format('HH:mm:ss')
     const dt = moment.tz('Asia/Jakarta').format('HH')
@@ -5430,6 +5441,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         }
     }
   } catch (err) {
-    console.log(color('[ERROR]', 'red'), err)
+    console.log(color('[ERROR]', 'red'), `Handler error for ${m?.chat || 'unknown'} from ${m?.sender || 'unknown'}:`, err?.message || err)
+    if (err?.stack) console.log(err.stack)
   }
 }
