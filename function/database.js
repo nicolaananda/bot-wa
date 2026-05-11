@@ -7,9 +7,10 @@ if (!usePg) {
 
 const { query } = require('../config/postgres')
 const UPSERT_CHUNK = Math.max(1, Number(process.env.PG_UPSERT_CHUNK || 100))
-const KV_SYNC_KEYS = ['order']
+const KV_SYNC_KEYS = ['order', 'zoomFlow']
 const KV_DEFAULTS = {
-    order: {}
+    order: {},
+    zoomFlow: {}
 }
 
 function cloneJson(value) {

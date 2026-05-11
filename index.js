@@ -78,6 +78,7 @@ const {
 } = require('./function/redis-helper')
 const { saveReceipt } = require('./config/r2-storage')
 const { sendPaymentNotification } = require('./lib/telegram-notifier')
+const zoomClient = require('./lib/zoom-client')
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 let pg
 if (usePg) {
@@ -129,7 +130,7 @@ function __wrapSendMessageOnce(nicola) {
             const backoff = Math.min(1000 * 2 ** (attempt - 1), 8000)
             try {
               console.warn('[WA] send retry', { attempt, backoff, code, message: msg })
-            } catch { }
+            } catch {}
             await __delay(backoff)
           }
         }
@@ -141,7 +142,7 @@ function __wrapSendMessageOnce(nicola) {
       enumerable: false,
       configurable: false,
     })
-  } catch { }
+  } catch {}
 }
 
 // Performance optimization: Cache for user saldo
@@ -153,7 +154,7 @@ try {
   process.on('database:reloaded', () => {
     saldoCache.clear()
   })
-} catch { }
+} catch {}
 
 // Timeout tracking system for memory leak prevention
 const activeTimeouts = new Map()
@@ -200,13 +201,13 @@ function requestPendingOrderSave() {
       global.db.save().catch((error) => {
         try {
           console.error('[DB] Failed to persist pending orders:', error.message)
-        } catch { }
+        } catch {}
       })
     }
   } catch (error) {
     try {
       console.error('[DB] Failed to schedule pending order save:', error.message)
-    } catch { }
+    } catch {}
   }
 }
 
@@ -395,6 +396,172 @@ function clearExpiredCache() {
 
 // Clear expired cache every 10 minutes
 setInterval(clearExpiredCache, 10 * 60 * 1000)
+
+// ===============================================================
+// ZOOM HELPERS
+// ===============================================================
+
+/**
+ * Parse fleksibel durasi: "60", "60 menit", "2 jam", "1 hari", "1h", "2j", "1d"
+ * @returns {{ minutes: number, raw: string } | null}
+ */
+function parseZoomDuration(input) {
+  if (!input) return null
+  const raw = String(input).trim()
+  if (!raw) return null
+
+  const m = raw
+    .toLowerCase()
+    .match(
+      /^(\d+(?:[.,]\d+)?)\s*(menit|minute|minutes|min|m|jam|hour|hours|h|j|hari|day|days|d)?$/i
+    )
+  if (!m) return null
+  const n = parseFloat(m[1].replace(',', '.'))
+  if (!Number.isFinite(n) || n <= 0) return null
+  const unit = (m[2] || 'menit').toLowerCase()
+
+  let minutes
+  if (['menit', 'minute', 'minutes', 'min', 'm'].includes(unit)) minutes = n
+  else if (['jam', 'hour', 'hours', 'h', 'j'].includes(unit)) minutes = n * 60
+  else if (['hari', 'day', 'days', 'd'].includes(unit)) minutes = n * 60 * 24
+  else minutes = n
+
+  minutes = Math.round(minutes)
+  if (minutes <= 0) return null
+  return { minutes, raw }
+}
+
+/**
+ * Parse form multi-line untuk pembuatan Zoom meeting.
+ * Field yang didukung (case-insensitive): Nama Meet, Tgl, Jam, Durasi, Password, Timezone
+ * @param {string} text
+ */
+function parseZoomForm(text) {
+  const result = {
+    topic: '',
+    password: '',
+    timezone: process.env.ZOOM_DEFAULT_TIMEZONE || 'Asia/Jakarta',
+    durationMinutes: 0,
+    durationRaw: '',
+    startTimeIso: '',
+    startTimeHuman: '',
+    _errors: [],
+  }
+  const safeText = String(text || '')
+
+  // Map label variants -> canonical key
+  const labelMap = [
+    [/^(nama\s*meet|nama|topik|topic|title|meeting)\s*[:=]\s*(.+)$/i, 'topic'],
+    [/^(tgl|tanggal|date)\s*[:=]\s*(.+)$/i, 'date'],
+    [/^(jam|waktu|time|start|mulai)\s*[:=]\s*(.+)$/i, 'time'],
+    [/^(durasi|duration|lama)\s*[:=]\s*(.+)$/i, 'duration'],
+    [/^(password|passcode|pass|sandi)\s*[:=]\s*(.+)$/i, 'password'],
+    [/^(timezone|tz|zona)\s*[:=]\s*(.+)$/i, 'timezone'],
+  ]
+
+  const fields = {}
+  for (const line of safeText.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    for (const [re, key] of labelMap) {
+      const mm = trimmed.match(re)
+      if (mm) {
+        fields[key] = mm[2].trim()
+        break
+      }
+    }
+  }
+
+  if (!fields.topic) result._errors.push('Nama Meet wajib diisi')
+  if (!fields.date) result._errors.push('Tgl wajib diisi (contoh: 2026-05-20 atau 20/05/2026)')
+  if (!fields.time) result._errors.push('Jam wajib diisi (contoh: 14:00)')
+  if (!fields.duration)
+    result._errors.push('Durasi wajib diisi (contoh: 60 menit / 2 jam / 1 hari)')
+
+  if (result._errors.length) return result
+
+  result.topic = fields.topic.slice(0, 200)
+  result.password = (fields.password || '').trim()
+  if (fields.timezone) result.timezone = fields.timezone
+
+  // Parse tanggal
+  const dateStr = fields.date
+  let y, mo, d
+  let match = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/) // YYYY-MM-DD
+  if (match) {
+    y = +match[1]
+    mo = +match[2]
+    d = +match[3]
+  } else if ((match = dateStr.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/))) {
+    // DD/MM/YYYY or DD-MM-YYYY
+    d = +match[1]
+    mo = +match[2]
+    y = +match[3]
+  } else if ((match = dateStr.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2})$/))) {
+    // DD/MM/YY
+    d = +match[1]
+    mo = +match[2]
+    y = 2000 + +match[3]
+  } else {
+    result._errors.push('Format tanggal tidak dikenali. Pakai YYYY-MM-DD atau DD/MM/YYYY')
+    return result
+  }
+
+  // Parse jam
+  const timeMatch = fields.time.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/)
+  if (!timeMatch) {
+    result._errors.push('Format jam tidak dikenali. Pakai HH:mm, contoh: 14:00')
+    return result
+  }
+  const hh = +timeMatch[1]
+  const mm = +timeMatch[2]
+  const ss = +(timeMatch[3] || 0)
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59) {
+    result._errors.push('Jam di luar jangkauan (00:00 - 23:59)')
+    return result
+  }
+
+  // Build moment in the chosen timezone, format sebagai local ISO tanpa offset
+  // (Zoom API menerima format "YYYY-MM-DDTHH:mm:ss" + field timezone terpisah)
+  const mom = moment.tz(
+    { year: y, month: mo - 1, day: d, hour: hh, minute: mm, second: ss },
+    result.timezone
+  )
+  if (!mom.isValid()) {
+    result._errors.push('Kombinasi tanggal/jam tidak valid')
+    return result
+  }
+
+  result.startTimeIso = mom.format('YYYY-MM-DDTHH:mm:ss')
+  result.startTimeHuman = mom.format('DD MMM YYYY HH:mm')
+
+  // Parse durasi
+  const dur = parseZoomDuration(fields.duration)
+  if (!dur) {
+    result._errors.push('Durasi tidak valid. Contoh: 60 menit / 2 jam / 1 hari')
+    return result
+  }
+  result.durationMinutes = dur.minutes
+  result.durationRaw = dur.raw
+
+  // Sanity: Zoom max 43200 menit (30 hari)
+  if (result.durationMinutes > 43200) {
+    result._errors.push('Durasi melebihi batas Zoom (maks 30 hari / 43200 menit)')
+    return result
+  }
+
+  return result
+}
+
+function buildZoomFormTemplate() {
+  return [
+    'Nama Meet: Rapat Koordinasi',
+    'Tgl: 2026-05-20',
+    'Jam: 14:00',
+    'Durasi: 60 menit',
+    'Password: rahasia1',
+  ].join('\n')
+}
 
 global.prefa = ['', '.']
 
@@ -795,25 +962,25 @@ module.exports = async (nicola, m, mek) => {
             : m.mtype == 'extendedTextMessage'
               ? m.message.extendedTextMessage.text
               : m.mtype == 'buttonsResponseMessage' &&
-                m.message.buttonsResponseMessage.selectedButtonId
+                  m.message.buttonsResponseMessage.selectedButtonId
                 ? m.message.buttonsResponseMessage.selectedButtonId
                 : m.mtype == 'listResponseMessage' &&
-                  m.message.listResponseMessage.singleSelectReply.selectedRowId
+                    m.message.listResponseMessage.singleSelectReply.selectedRowId
                   ? m.message.listResponseMessage.singleSelectReply.selectedRowId
                   : m.mtype == 'templateButtonReplyMessage' &&
-                    m.message.templateButtonReplyMessage.selectedId
+                      m.message.templateButtonReplyMessage.selectedId
                     ? m.message.templateButtonReplyMessage.selectedId
                     : m.mtype == 'interactiveResponseMessage' &&
-                      JSON.parse(
-                        m.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson
-                      ).id
+                        JSON.parse(
+                          m.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson
+                        ).id
                       ? JSON.parse(
-                        m.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson
-                      ).id
+                          m.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson
+                        ).id
                       : m.mtype == 'messageContextInfo'
                         ? m.message.buttonsResponseMessage?.selectedButtonId ||
-                        m.message.listResponseMessage?.singleSelectReply.selectedRowId ||
-                        m.text
+                          m.message.listResponseMessage?.singleSelectReply.selectedRowId ||
+                          m.text
                         : ''
     const chats = (
       typeof rawChats === 'string' ? rawChats : ((rawChats ?? '')?.toString() ?? '')
@@ -1361,11 +1528,11 @@ module.exports = async (nicola, m, mek) => {
     if (budy && /zoom/i.test(budy)) {
       try {
         // Use hardcoded admin group ID for "GH bot BARU"
-        const adminGroup = '120363419470324991@g.us';
+        const adminGroup = '120363419470324991@g.us'
 
         // Hardcoded owner numbers
-        const ownerNumbers = ['085235540944', '081389592985'];
-        const mentions = ownerNumbers.map((num) => `62${num.replace(/^0/, '')}@s.whatsapp.net`);
+        const ownerNumbers = ['085235540944', '081389592985']
+        const mentions = ownerNumbers.map((num) => `62${num.replace(/^0/, '')}@s.whatsapp.net`)
 
         const notifText =
           `🔔 *ZOOM KEYWORD DETECTED!*\n\n` +
@@ -1374,20 +1541,124 @@ module.exports = async (nicola, m, mek) => {
           `💬 *Message:* ${budy.substring(0, 200)}${budy.length > 200 ? '...' : ''}\n` +
           `📍 *Location:* ${isGroup ? groupName : 'Private Chat'}\n` +
           `⏰ *Time:* ${jamwib} WIB\n\n` +
-          `👥 *Owners:* @${mentions[0].split('@')[0]} @${mentions[1].split('@')[0]}`;
+          `👥 *Owners:* @${mentions[0].split('@')[0]} @${mentions[1].split('@')[0]}`
 
         await nicola.sendMessage(adminGroup, {
           text: notifText,
           mentions: [...mentions, sender],
-        });
+        })
 
-        console.log(`🔔 [ZOOM-ALERT] Notification sent to admin group for message from ${sender}`);
+        console.log(`🔔 [ZOOM-ALERT] Notification sent to admin group for message from ${sender}`)
       } catch (error) {
-        console.error(`❌ [ZOOM-ALERT] Error sending notification:`, error.message);
+        console.error(`❌ [ZOOM-ALERT] Error sending notification:`, error.message)
       }
     }
 
     expiredCheck(nicola, m, groupId)
+
+    // ==============================================================
+    // ZOOM LARGE MEETING FLOW — owner only
+    // State: db.data.zoomFlow[sender] = { session: 'WAIT-FORM', startedAt }
+    // ==============================================================
+    if (!db.data.zoomFlow) db.data.zoomFlow = {}
+    if (db.data.zoomFlow[sender] && !fromMe && isOwner) {
+      const flow = db.data.zoomFlow[sender]
+
+      // Auto-expire flow setelah 15 menit tanpa aktivitas
+      if (flow.startedAt && Date.now() - flow.startedAt > 15 * 60 * 1000) {
+        delete db.data.zoomFlow[sender]
+        reply('⌛ Sesi pembuatan Zoom meeting kadaluarsa. Ketik `#zoomlarge` lagi untuk memulai.')
+        return
+      }
+
+      // User ketik batal atau re-trigger command zoom -> biarkan handler di bawah
+      const lowered = (chats || '').trim().toLowerCase()
+      const cmdOnly = (command || '').toLowerCase()
+      const skipFlow =
+        ['batal', prefix + 'batal', 'cancel', prefix + 'cancel'].includes(lowered) ||
+        ['zoom', 'zoomlarge', 'zoomscheduled'].includes(cmdOnly)
+
+      if (!skipFlow) {
+        if (flow.session === 'WAIT-FORM') {
+          try {
+            const parsed = parseZoomForm(chats)
+            if (parsed._errors.length) {
+              return reply(
+                '❌ Form belum lengkap / formatnya kurang tepat:\n- ' +
+                  parsed._errors.join('\n- ') +
+                  '\n\nContoh format:\n' +
+                  buildZoomFormTemplate()
+              )
+            }
+
+            reply('⏳ Mengecek jadwal & membuat Zoom meeting...')
+
+            // Pre-flight: cek bentrok dengan meeting existing di akun host.
+            // Zoom sendiri tidak menolak overlap, jadi kita enforce di sisi bot.
+            try {
+              // startTimeIso adalah waktu LOKAL di timezone terpilih. Convert
+              // ke UTC epoch agar comparison konsisten dengan start_time dari API (UTC).
+              const startUtcMs = moment.tz(parsed.startTimeIso, parsed.timezone).valueOf()
+              const conflicts = await zoomClient.findMeetingConflicts({
+                startAt: startUtcMs,
+                durationMinutes: parsed.durationMinutes,
+              })
+              if (conflicts.length) {
+                const lines = conflicts.map((c) => {
+                  const s = moment(c.start_time).tz(parsed.timezone).format('DD MMM YYYY HH:mm')
+                  return `• ${c.topic} — ${s} (${c.duration} menit, ID: ${c.id})`
+                })
+                delete db.data.zoomFlow[sender]
+                return reply(
+                  `⚠️ *Jadwal bentrok!*\n\n` +
+                    `Akun host sudah punya meeting yang overlap dengan jadwal yang kamu minta:\n` +
+                    lines.join('\n') +
+                    '\n\n' +
+                    `Silakan pilih jam lain. Ketik \`${prefix}zoomlarge\` untuk mulai ulang.`
+                )
+              }
+            } catch (preErr) {
+              // Kalau check gagal (mis. token/permission), jangan block create —
+              // log warning & lanjut. User masih dapat info kalau gagal di langkah berikutnya.
+              console.warn('[ZOOM] conflict check skipped:', preErr && preErr.message)
+            }
+
+            const meeting = await zoomClient.createMeeting({
+              topic: parsed.topic,
+              startTime: parsed.startTimeIso,
+              durationMinutes: parsed.durationMinutes,
+              password: parsed.password,
+              timezone: parsed.timezone,
+            })
+
+            delete db.data.zoomFlow[sender]
+
+            const durText = parsed.durationRaw || parsed.durationMinutes + ' menit'
+
+            const out =
+              `✅ *ZOOM MEETING DIBUAT*\n\n` +
+              `*Topik:* ${meeting.topic}\n` +
+              `*Meeting ID:* ${String(meeting.id).replace(/(\d{3})(\d{4})(\d+)/, '$1 $2 $3')}\n` +
+              `*Password:* ${meeting.password || '(tidak di-set)'}\n` +
+              `*Mulai:* ${parsed.startTimeHuman} (${parsed.timezone})\n` +
+              `*Durasi:* ${durText}\n\n` +
+              `*Join URL:*\n${meeting.join_url}\n\n` +
+              `_Start URL (khusus host, jangan disebar):_\n${meeting.start_url || '-'}`
+
+            return reply(out)
+          } catch (e) {
+            const errMsg = e && e.message ? e.message : String(e)
+            console.error('[ZOOM] createMeeting error:', errMsg, e && e.response)
+            // Jangan hapus flow kalau error parsing — biarkan user re-input.
+            // Tapi kalau error dari Zoom API, reset supaya tidak loop.
+            if (e && e.status) {
+              delete db.data.zoomFlow[sender]
+            }
+            return reply(`❌ Gagal membuat meeting: ${errMsg}`)
+          }
+        }
+      }
+    }
 
     if (db.data.topup[sender]) {
       if (!fromMe) {
@@ -2092,7 +2363,7 @@ _Silahkan scan dan transfer dengan nominal yang benar, jika sudah bot akan otoma
                     (i) =>
                       i.status == 'IN' &&
                       Number(i.kredit.replace(/[.]/g, '')) ==
-                      parseInt(db.data.deposit[sender].data.total_deposit)
+                        parseInt(db.data.deposit[sender].data.total_deposit)
                   )
 
                   if (result !== undefined) {
@@ -2312,6 +2583,49 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
     }
 
     switch (command) {
+      case 'zoomlarge':
+      case 'zoomscheduled':
+      case 'zoom': {
+        if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
+
+        // Cek env wajib sebelum mulai flow supaya user cepat tahu kalau belum siap
+        const missingEnv = ['ZOOM_ACCOUNT_ID', 'ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET'].filter(
+          (k) => !process.env[k] || !String(process.env[k]).trim()
+        )
+        if (missingEnv.length) {
+          return reply(
+            `❌ Konfigurasi Zoom belum lengkap. Isi di .env dulu:\n` +
+              missingEnv.map((k) => `- ${k}`).join('\n')
+          )
+        }
+
+        if (!db.data.zoomFlow) db.data.zoomFlow = {}
+        if (db.data.zoomFlow[sender]) {
+          return reply(
+            `Kamu masih ada sesi Zoom aktif. Ketik \`${prefix}batal\` untuk membatalkan, ` +
+              `atau kirim form lengkap sesuai template.`
+          )
+        }
+
+        db.data.zoomFlow[sender] = { session: 'WAIT-FORM', startedAt: Date.now() }
+
+        const template = buildZoomFormTemplate()
+        return reply(
+          `📹 *ZOOM LARGE MEETING*\n\n` +
+            `Balas pesan ini dengan form berikut (edit value-nya):\n\n` +
+            '```\n' +
+            template +
+            '\n```\n\n' +
+            `_Catatan:_\n` +
+            `• Durasi boleh dalam menit / jam / hari (contoh: \`60 menit\`, \`2 jam\`, \`1 hari\`).\n` +
+            `• Format tanggal: \`YYYY-MM-DD\` atau \`DD/MM/YYYY\`.\n` +
+            `• Timezone default: ${process.env.ZOOM_DEFAULT_TIMEZONE || 'Asia/Jakarta'} ` +
+            `(tambah baris \`Timezone: ...\` untuk override).\n` +
+            `• Password opsional (disarankan) — maks 10 karakter.\n` +
+            `• Ketik \`${prefix}batal\` untuk membatalkan.\n` +
+            `• Sesi hangus otomatis setelah 15 menit tanpa aktivitas.`
+        )
+      }
       case 'testmsg':
         if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
 
@@ -2705,7 +3019,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           const jumlahStokDel = db.data.produk[idDelStok].stok?.length || 0
 
           if (konfirmasiDel !== 'confirm') {
-            return reply(`⚠️ Kamu akan menghapus *${jumlahStokDel} akun* dari produk *${idDelStok}*.\n\nIni tidak bisa dibatalkan!\n\nKetik: ${prefix}delstok ${idDelStok} confirm`)
+            return reply(
+              `⚠️ Kamu akan menghapus *${jumlahStokDel} akun* dari produk *${idDelStok}*.\n\nIni tidak bisa dibatalkan!\n\nKetik: ${prefix}delstok ${idDelStok} confirm`
+            )
           }
 
           db.data.produk[idDelStok].stok = []
@@ -2719,7 +3035,10 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       case 'cek':
         {
           if (!isOwner) return reply(mess.owner)
-          if (!q) return reply(`Contoh: ${prefix + command} idproduk\nTampil semua detail: ${prefix}cek net1u full`)
+          if (!q)
+            return reply(
+              `Contoh: ${prefix + command} idproduk\nTampil semua detail: ${prefix}cek net1u full`
+            )
 
           const cekArgs = q.trim().split(' ')
           const idProdukCek = cekArgs[0].toLowerCase()
@@ -2728,7 +3047,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           const produkCek = db.data.produk[idProdukCek]
 
           if (!produkCek) {
-            return reply(`❌ Produk dengan ID *${idProdukCek}* tidak ditemukan\n\n💡 Gunakan ${prefix}stok untuk melihat daftar produk`)
+            return reply(
+              `❌ Produk dengan ID *${idProdukCek}* tidak ditemukan\n\n💡 Gunakan ${prefix}stok untuk melihat daftar produk`
+            )
           }
 
           const stokList = produkCek.stok || []
@@ -2762,7 +3083,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           teks += `_⏰ Pesan ini akan terhapus otomatis dalam 5 menit_`
 
           const sentMessage = await nicola.sendMessage(from, { text: teks }, { quoted: m })
-          
+
           if (typeof scheduleAutoDelete === 'function') {
             scheduleAutoDelete(sentMessage.key, from, 300000, 'cek stok message')
           }
@@ -2772,15 +3093,23 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       case 'pick':
         {
           if (!isOwner) return reply(mess.owner)
-          if (!q) return reply(`Contoh: ${prefix + command} idproduk nomor\nContoh: ${prefix}pick net1u 2\nMultiple: ${prefix}pick net1u 1 3 5`)
+          if (!q)
+            return reply(
+              `Contoh: ${prefix + command} idproduk nomor\nContoh: ${prefix}pick net1u 2\nMultiple: ${prefix}pick net1u 1 3 5`
+            )
 
           const pickArgs = q.trim().split(' ')
           const idProdukPick = pickArgs[0]?.toLowerCase()
-          const nomorList = pickArgs.slice(1).map((n) => parseInt(n)).filter((n) => !isNaN(n) && n >= 1)
+          const nomorList = pickArgs
+            .slice(1)
+            .map((n) => parseInt(n))
+            .filter((n) => !isNaN(n) && n >= 1)
 
           if (!idProdukPick) return reply(`❌ Masukkan ID produk\nContoh: ${prefix}pick net1u 2`)
           if (nomorList.length === 0) {
-            return reply(`❌ Masukkan nomor akun yang valid\nContoh: ${prefix}pick ${idProdukPick} 1\n\n💡 Lihat daftar akun dengan: ${prefix}cek ${idProdukPick}`)
+            return reply(
+              `❌ Masukkan nomor akun yang valid\nContoh: ${prefix}pick ${idProdukPick} 1\n\n💡 Lihat daftar akun dengan: ${prefix}cek ${idProdukPick}`
+            )
           }
 
           const produkPick = db.data.produk[idProdukPick]
@@ -2796,7 +3125,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           // Validasi semua nomor
           const invalidNomor = nomorList.filter((n) => n > stokPick.length)
           if (invalidNomor.length > 0) {
-            return reply(`❌ Nomor *${invalidNomor.join(', ')}* tidak valid. Stok tersedia: *${stokPick.length}* akun\n\n💡 Gunakan ${prefix}cek ${idProdukPick} untuk melihat daftar`)
+            return reply(
+              `❌ Nomor *${invalidNomor.join(', ')}* tidak valid. Stok tersedia: *${stokPick.length}* akun\n\n💡 Gunakan ${prefix}cek ${idProdukPick} untuk melihat daftar`
+            )
           }
 
           // Hapus duplikat dan urutkan dari terbesar ke terkecil agar index tidak bergeser
@@ -2841,7 +3172,10 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       case 'riwayat':
         {
           if (!isOwner) return reply(mess.owner)
-          if (!q) return reply(`Contoh: ${prefix}riwayat net1u\nFilter tanggal: ${prefix}riwayat net1u 7d\nTanggal spesifik: ${prefix}riwayat net1u 2026-03-20\nSemua produk: ${prefix}riwayat all`)
+          if (!q)
+            return reply(
+              `Contoh: ${prefix}riwayat net1u\nFilter tanggal: ${prefix}riwayat net1u 7d\nTanggal spesifik: ${prefix}riwayat net1u 2026-03-20\nSemua produk: ${prefix}riwayat all`
+            )
 
           const riwayatArgs = q.trim().split(' ')
           const idTarget = riwayatArgs[0].toLowerCase()
@@ -2854,13 +3188,18 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           } else if (/^\d+d$/i.test(dateArg)) {
             const days = parseInt(dateArg)
             endDate = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
-            startDate = moment.tz('Asia/Jakarta').subtract(days - 1, 'days').format('YYYY-MM-DD')
+            startDate = moment
+              .tz('Asia/Jakarta')
+              .subtract(days - 1, 'days')
+              .format('YYYY-MM-DD')
             labelPeriode = `${days} hari terakhir`
           } else if (/^\d{4}-\d{2}-\d{2}$/.test(dateArg)) {
             startDate = endDate = dateArg
             labelPeriode = moment(dateArg).format('DD MMMM YYYY')
           } else {
-            return reply(`❌ Format tanggal tidak valid.\nContoh: ${prefix}riwayat net1u 7d atau ${prefix}riwayat net1u 2026-03-20`)
+            return reply(
+              `❌ Format tanggal tidak valid.\nContoh: ${prefix}riwayat net1u 7d atau ${prefix}riwayat net1u 2026-03-20`
+            )
           }
 
           // Filter transaksi sesuai range, hanya tipe 'buy' (bukan deposit)
@@ -2923,19 +3262,29 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           } else if (/^\d+d$/i.test(rekapDateArg)) {
             const days = parseInt(rekapDateArg)
             rekapEnd = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
-            rekapStart = moment.tz('Asia/Jakarta').subtract(days - 1, 'days').format('YYYY-MM-DD')
+            rekapStart = moment
+              .tz('Asia/Jakarta')
+              .subtract(days - 1, 'days')
+              .format('YYYY-MM-DD')
             rekapLabel = `${days} hari terakhir`
           } else if (/^\d{4}-\d{2}-\d{2}$/.test(rekapDateArg)) {
             rekapStart = rekapEnd = rekapDateArg
             rekapLabel = moment(rekapDateArg).format('DD MMMM YYYY')
           } else {
-            return reply(`❌ Format tidak valid.\nContoh: ${prefix}rekap | ${prefix}rekap 7d | ${prefix}rekap 2026-03-20`)
+            return reply(
+              `❌ Format tidak valid.\nContoh: ${prefix}rekap | ${prefix}rekap 7d | ${prefix}rekap 2026-03-20`
+            )
           }
 
           const transaksiRekap = (db.data.transaksi || []).filter((t) => {
             if (!t.date) return false
             const tgl = t.date.split(' ')[0]
-            return tgl >= rekapStart && tgl <= rekapEnd && t.metodeBayar !== 'Deposit' && t.type !== 'deposit'
+            return (
+              tgl >= rekapStart &&
+              tgl <= rekapEnd &&
+              t.metodeBayar !== 'Deposit' &&
+              t.type !== 'deposit'
+            )
           })
 
           if (transaksiRekap.length === 0) {
@@ -2955,7 +3304,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             totalProfit += profit
 
             const pid = t.id || 'unknown'
-            if (!perProduk[pid]) perProduk[pid] = { name: t.name || pid, omzet: 0, profit: 0, terjual: 0 }
+            if (!perProduk[pid])
+              perProduk[pid] = { name: t.name || pid, omzet: 0, profit: 0, terjual: 0 }
             perProduk[pid].omzet += bayar
             perProduk[pid].profit += profit
             perProduk[pid].terjual += qty
@@ -3003,7 +3353,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         function toRupiahLocal(num) {
           try {
             if (typeof toRupiah === 'function') return toRupiah(num)
-          } catch { }
+          } catch {}
           const n = Number(num) || 0
           return n.toLocaleString('id-ID')
         }
@@ -3240,7 +3590,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   db.data.users[sender].saldo = previousSaldo + credit
                   try {
                     setCachedSaldo(sender, db.data.users[sender].saldo)
-                  } catch { }
+                  } catch {}
 
                   const newSaldo = db.data.users[sender].saldo
 
@@ -3479,7 +3829,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             // Remove listener jika loop selesai (timeout atau payment detected)
             try {
               process.removeListener('payment-completed', paymentListener)
-            } catch { }
+            } catch {}
           } catch (error) {
             console.error(`Error creating QRIS DEPOSIT for ${sender}:`, error)
             reply('Gagal membuat QR Code deposit. Silakan coba lagi.')
@@ -3599,8 +3949,6 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 },
                 { quoted: m }
               )
-
-
 
               db.data.order[sender] = {
                 id: data[0],
@@ -4196,8 +4544,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 jumlah: jumlah,
                 user: isOwnerBuy
                   ? cleanedNumber ||
-                  targetNumber?.replace('@s.whatsapp.net', '') ||
-                  sender.split('@')[0]
+                    targetNumber?.replace('@s.whatsapp.net', '') ||
+                    sender.split('@')[0]
                   : sender.split('@')[0],
                 userRole: db.data.users[sender].role,
                 reffId: reffId,
@@ -4300,6 +4648,13 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           // Initialize if not exists
           if (!db.data.order) db.data.order = {}
           if (!db.data.orderDeposit) db.data.orderDeposit = {}
+          if (!db.data.zoomFlow) db.data.zoomFlow = {}
+
+          // Jika user sendiri sedang dalam flow zoom, batalkan flow-nya
+          if (db.data.zoomFlow[sender]) {
+            delete db.data.zoomFlow[sender]
+            cancelled = true
+          }
 
           // Jika admin/owner quote pesan user LAIN, batalkan pesanan user yang di-quote
           if (m.quoted && (isOwner || isGroupAdmins)) {
@@ -4311,7 +4666,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   await nicola.sendMessage(db.data.order[quotedSender].from, {
                     delete: db.data.order[quotedSender].key,
                   })
-                } catch { }
+                } catch {}
                 delete db.data.order[quotedSender]
                 requestPendingOrderSave()
                 cancelled = true
@@ -4322,7 +4677,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   await nicola.sendMessage(db.data.orderDeposit[quotedSender].from, {
                     delete: db.data.orderDeposit[quotedSender].key,
                   })
-                } catch { }
+                } catch {}
                 delete db.data.orderDeposit[quotedSender]
                 cancelled = true
               }
@@ -4356,7 +4711,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               await nicola.sendMessage(db.data.orderDeposit[sender].from, {
                 delete: db.data.orderDeposit[sender].key,
               })
-            } catch { }
+            } catch {}
             delete db.data.orderDeposit[sender]
             cancelled = true
           }
@@ -4416,7 +4771,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   harga = `Rp${toRupiah(hargaValue)}`
                 }
               }
-            } catch { }
+            } catch {}
 
             teks += `*${index + 1}. ${name}*\n`
             teks += `   🔐 Kode: ${productId}\n`
@@ -5178,9 +5533,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           const rss = formatp(memUsage.rss || 0)
           const loadAvg = os.loadavg
             ? os
-              .loadavg()
-              .map((n) => n.toFixed(2))
-              .join(', ')
+                .loadavg()
+                .map((n) => n.toFixed(2))
+                .join(', ')
             : 'N/A'
           const uptimeBot = runtime(process.uptime())
 
@@ -5443,7 +5798,11 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         }
     }
   } catch (err) {
-    console.log(color('[ERROR]', 'red'), `Handler error for ${m?.chat || 'unknown'} from ${m?.sender || 'unknown'}:`, err?.message || err)
+    console.log(
+      color('[ERROR]', 'red'),
+      `Handler error for ${m?.chat || 'unknown'} from ${m?.sender || 'unknown'}:`,
+      err?.message || err
+    )
     if (err?.stack) console.log(err.stack)
   }
 }
