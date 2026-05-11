@@ -1633,19 +1633,43 @@ module.exports = async (nicola, m, mek) => {
 
             delete db.data.zoomFlow[sender]
 
-            const durText = parsed.durationRaw || parsed.durationMinutes + ' menit'
+            // Fetch host info (first_name for invite, host_key if scope granted)
+            let hostName = ''
+            let hostKey = ''
+            try {
+              const u = await zoomClient.getUser()
+              hostName = (u && (u.first_name || u.display_name || u.email || '')).toString()
+              hostKey = (u && u.host_key) ? String(u.host_key) : ''
+            } catch (uErr) {
+              // Scope user:read:* belum ada -> lanjut tanpa host info
+              console.warn('[ZOOM] getUser skipped:', uErr && uErr.message)
+            }
 
-            const out =
-              `✅ *ZOOM MEETING DIBUAT*\n\n` +
-              `*Topik:* ${meeting.topic}\n` +
-              `*Meeting ID:* ${String(meeting.id).replace(/(\d{3})(\d{4})(\d+)/, '$1 $2 $3')}\n` +
-              `*Password:* ${meeting.password || '(tidak di-set)'}\n` +
-              `*Mulai:* ${parsed.startTimeHuman} (${parsed.timezone})\n` +
-              `*Durasi:* ${durText}\n\n` +
-              `*Join URL:*\n${meeting.join_url}\n\n` +
-              `_Start URL (khusus host, jangan disebar):_\n${meeting.start_url || '-'}`
+            const meetingIdFmt = String(meeting.id).replace(/(\d{3})(\d{4})(\d+)/, '$1 $2 $3')
+            const timeZoneShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(/_/g, ' ')
+            const timeHuman = moment
+              .tz(parsed.startTimeIso, parsed.timezone)
+              .locale('en')
+              .format('MMM D, YYYY H:mm')
 
-            return reply(out)
+            const lines = []
+            if (hostName) lines.push(`${hostName} is inviting you to a scheduled Zoom meeting.`)
+            else lines.push('You are invited to a scheduled Zoom meeting.')
+            lines.push('')
+            lines.push(`Topic: ${meeting.topic}`)
+            lines.push(`Time: ${timeHuman} ${timeZoneShort}`)
+            lines.push('')
+            lines.push('Join Zoom Meeting')
+            lines.push(meeting.join_url)
+            lines.push('')
+            lines.push(`Meeting ID: ${meetingIdFmt}`)
+            if (meeting.password) lines.push(`Passcode: ${meeting.password}`)
+            if (hostKey) {
+              lines.push('')
+              lines.push(`Hostkey: ${hostKey}`)
+            }
+
+            return reply(lines.join('\n'))
           } catch (e) {
             const errMsg = e && e.message ? e.message : String(e)
             console.error('[ZOOM] createMeeting error:', errMsg, e && e.response)
@@ -2624,6 +2648,120 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
             `• Password opsional (disarankan) — maks 10 karakter.\n` +
             `• Ketik \`${prefix}batal\` untuk membatalkan.\n` +
             `• Sesi hangus otomatis setelah 15 menit tanpa aktivitas.`
+        )
+      }
+      case 'largelist':
+      case 'zoomlist': {
+        if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
+        const missingEnvList = ['ZOOM_ACCOUNT_ID', 'ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET'].filter(
+          (k) => !process.env[k] || !String(process.env[k]).trim()
+        )
+        if (missingEnvList.length) {
+          return reply(
+            `❌ Konfigurasi Zoom belum lengkap. Isi di .env:\n` +
+              missingEnvList.map((k) => `- ${k}`).join('\n')
+          )
+        }
+
+        try {
+          const meetings = await zoomClient.listUpcomingMeetings()
+          const tz = process.env.ZOOM_DEFAULT_TIMEZONE || 'Asia/Jakarta'
+
+          // Urutkan dari waktu terdekat ke depan
+          const scheduled = meetings
+            .filter((mt) => mt && mt.start_time)
+            .sort(
+              (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+            )
+
+          if (!db.data.zoomList) db.data.zoomList = {}
+          if (!scheduled.length) {
+            db.data.zoomList[sender] = { items: [], createdAt: Date.now() }
+            return reply('📋 Tidak ada meeting Zoom yang terjadwal di akun ini.')
+          }
+
+          // Simpan mapping index -> meeting id, TTL 10 menit dicek saat delzoom
+          const items = scheduled.map((mt) => ({
+            id: String(mt.id),
+            topic: mt.topic || '(tanpa topik)',
+            start_time: mt.start_time,
+            duration: Number(mt.duration || 0),
+          }))
+          db.data.zoomList[sender] = { items, createdAt: Date.now() }
+
+          const header = `📋 *DAFTAR ZOOM MEETING* (${items.length})\n`
+          const lines = items.map((mt, i) => {
+            const idFmt = mt.id.replace(/(\d{3})(\d{4})(\d+)/, '$1 $2 $3')
+            const t = moment(mt.start_time).tz(tz).format('DD MMM YYYY HH:mm')
+            return `${i + 1}. *${mt.topic}*\n   🕑 ${t} • ${mt.duration} menit\n   🔢 ${idFmt}`
+          })
+          const footer =
+            `\n\n_Hapus meeting: \`${prefix}delzoom <nomor>\`_\n` +
+            `_Contoh: \`${prefix}delzoom 1\` atau \`${prefix}delzoom 1 3\`_`
+
+          return reply(header + '\n' + lines.join('\n\n') + footer)
+        } catch (e) {
+          const msg = e && e.message ? e.message : String(e)
+          console.error('[ZOOM] listUpcomingMeetings error:', msg)
+          return reply(`❌ Gagal mengambil daftar meeting: ${msg}`)
+        }
+      }
+      case 'delzoom':
+      case 'zoomdel':
+      case 'delzoommeeting': {
+        if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
+        if (!db.data.zoomList) db.data.zoomList = {}
+        const state = db.data.zoomList[sender]
+
+        // TTL list 10 menit
+        if (!state || !state.items || !state.items.length || Date.now() - (state.createdAt || 0) > 10 * 60 * 1000) {
+          return reply(
+            `❌ Daftar meeting sudah tidak valid / kadaluarsa.\nJalankan \`${prefix}largelist\` dulu untuk refresh.`
+          )
+        }
+
+        const raw = String(q || '').trim()
+        if (!raw) {
+          return reply(
+            `❌ Masukkan nomor meeting yang mau dihapus.\n` +
+              `Contoh: \`${prefix}delzoom 1\` atau multi: \`${prefix}delzoom 1 3\``
+          )
+        }
+
+        const nums = raw
+          .split(/[\s,]+/)
+          .filter(Boolean)
+          .map((s) => parseInt(s, 10))
+          .filter((n) => Number.isFinite(n) && n > 0)
+
+        if (!nums.length) return reply('❌ Nomor tidak valid.')
+
+        const invalid = nums.filter((n) => n > state.items.length)
+        if (invalid.length) {
+          return reply(
+            `❌ Nomor ${invalid.join(', ')} di luar jangkauan. Daftar hanya ${state.items.length} meeting.`
+          )
+        }
+
+        const targets = Array.from(new Set(nums)).map((n) => state.items[n - 1])
+        const results = []
+        for (const mt of targets) {
+          try {
+            await zoomClient.deleteMeeting({ meetingId: mt.id })
+            results.push(`✅ ${mt.topic} (${mt.id})`)
+          } catch (delErr) {
+            const msg = delErr && delErr.message ? delErr.message : String(delErr)
+            results.push(`❌ ${mt.topic} (${mt.id}) — ${msg}`)
+          }
+        }
+
+        // Bersihkan state supaya index lama tidak nabrak jika user jalankan delzoom lagi
+        delete db.data.zoomList[sender]
+
+        return reply(
+          `🗑️ *HASIL HAPUS ZOOM*\n\n` +
+            results.join('\n') +
+            `\n\n_Jalankan \`${prefix}largelist\` untuk lihat daftar terbaru._`
         )
       }
       case 'testmsg':
