@@ -50,3 +50,6 @@ logs/
 # Runtime-generated sticker/QRIS/invoice artifacts (regenerated per transaction)
 options/sticker/*
 !options/sticker/.gitkeep
+
+# Zoom host pool (multi-account credentials — never commit)
+config/zoom-pool.json

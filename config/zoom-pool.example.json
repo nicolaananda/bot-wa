@@ -1,0 +1,20 @@
+[
+  {
+    "label": "Client A",
+    "accountId": "PASTE_ACCOUNT_ID_HERE",
+    "clientId": "PASTE_CLIENT_ID_HERE",
+    "clientSecret": "PASTE_CLIENT_SECRET_HERE",
+    "userId": "me",
+    "timezone": "Asia/Jakarta",
+    "notes": "Akun Zoom 100p milik client A"
+  },
+  {
+    "label": "Client B",
+    "accountId": "PASTE_ACCOUNT_ID_HERE",
+    "clientId": "PASTE_CLIENT_ID_HERE",
+    "clientSecret": "PASTE_CLIENT_SECRET_HERE",
+    "userId": "me",
+    "timezone": "Asia/Jakarta",
+    "notes": "Akun Zoom 100p milik client B"
+  }
+]
