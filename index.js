@@ -421,14 +421,24 @@ function parseZoomDuration(input) {
   const unit = (m[2] || 'menit').toLowerCase()
 
   let minutes
-  if (['menit', 'minute', 'minutes', 'min', 'm'].includes(unit)) minutes = n
-  else if (['jam', 'hour', 'hours', 'h', 'j'].includes(unit)) minutes = n * 60
-  else if (['hari', 'day', 'days', 'd'].includes(unit)) minutes = n * 60 * 24
-  else minutes = n
+  let unitKind // 'minute' | 'hour' | 'day'
+  if (['menit', 'minute', 'minutes', 'min', 'm'].includes(unit)) {
+    minutes = n
+    unitKind = 'minute'
+  } else if (['jam', 'hour', 'hours', 'h', 'j'].includes(unit)) {
+    minutes = n * 60
+    unitKind = 'hour'
+  } else if (['hari', 'day', 'days', 'd'].includes(unit)) {
+    minutes = n * 60 * 24
+    unitKind = 'day'
+  } else {
+    minutes = n
+    unitKind = 'minute'
+  }
 
   minutes = Math.round(minutes)
   if (minutes <= 0) return null
-  return { minutes, raw }
+  return { minutes, raw, unitKind }
 }
 
 /**
@@ -474,7 +484,6 @@ function parseZoomForm(text) {
 
   if (!fields.topic) result._errors.push('Nama Meet wajib diisi')
   if (!fields.date) result._errors.push('Tgl wajib diisi (contoh: 2026-05-20 atau 20/05/2026)')
-  if (!fields.time) result._errors.push('Jam wajib diisi (contoh: 14:00)')
   if (!fields.duration)
     result._errors.push('Durasi wajib diisi (contoh: 60 menit / 2 jam / 1 hari)')
 
@@ -483,6 +492,28 @@ function parseZoomForm(text) {
   result.topic = fields.topic.slice(0, 200)
   result.password = (fields.password || '').trim()
   if (fields.timezone) result.timezone = fields.timezone
+
+  // Parse durasi DULU — kalau pakai satuan hari, mode full-day aktif
+  // dan field Jam tidak wajib (otomatis 00:00).
+  const dur = parseZoomDuration(fields.duration)
+  if (!dur) {
+    result._errors.push('Durasi tidak valid. Contoh: 60 menit / 2 jam / 1 hari')
+    return result
+  }
+  result.durationMinutes = dur.minutes
+  result.durationRaw = dur.raw
+
+  const isFullDay = dur.unitKind === 'day'
+  if (!isFullDay && !fields.time) {
+    result._errors.push('Jam wajib diisi (contoh: 14:00)')
+    return result
+  }
+
+  // Sanity: Zoom max 43200 menit (30 hari)
+  if (result.durationMinutes > 43200) {
+    result._errors.push('Durasi melebihi batas Zoom (maks 30 hari / 43200 menit)')
+    return result
+  }
 
   // Parse tanggal
   const dateStr = fields.date
@@ -507,18 +538,25 @@ function parseZoomForm(text) {
     return result
   }
 
-  // Parse jam
-  const timeMatch = fields.time.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/)
-  if (!timeMatch) {
-    result._errors.push('Format jam tidak dikenali. Pakai HH:mm, contoh: 14:00')
-    return result
-  }
-  const hh = +timeMatch[1]
-  const mm = +timeMatch[2]
-  const ss = +(timeMatch[3] || 0)
-  if (hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59) {
-    result._errors.push('Jam di luar jangkauan (00:00 - 23:59)')
-    return result
+  // Jam: kalau full-day, paksa 00:00. Kalau tidak, parse dari field Jam.
+  let hh, mm, ss
+  if (isFullDay) {
+    hh = 0
+    mm = 0
+    ss = 0
+  } else {
+    const timeMatch = fields.time.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/)
+    if (!timeMatch) {
+      result._errors.push('Format jam tidak dikenali. Pakai HH:mm, contoh: 14:00')
+      return result
+    }
+    hh = +timeMatch[1]
+    mm = +timeMatch[2]
+    ss = +(timeMatch[3] || 0)
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59) {
+      result._errors.push('Jam di luar jangkauan (00:00 - 23:59)')
+      return result
+    }
   }
 
   // Build moment in the chosen timezone, format sebagai local ISO tanpa offset
@@ -534,21 +572,7 @@ function parseZoomForm(text) {
 
   result.startTimeIso = mom.format('YYYY-MM-DDTHH:mm:ss')
   result.startTimeHuman = mom.format('DD MMM YYYY HH:mm')
-
-  // Parse durasi
-  const dur = parseZoomDuration(fields.duration)
-  if (!dur) {
-    result._errors.push('Durasi tidak valid. Contoh: 60 menit / 2 jam / 1 hari')
-    return result
-  }
-  result.durationMinutes = dur.minutes
-  result.durationRaw = dur.raw
-
-  // Sanity: Zoom max 43200 menit (30 hari)
-  if (result.durationMinutes > 43200) {
-    result._errors.push('Durasi melebihi batas Zoom (maks 30 hari / 43200 menit)')
-    return result
-  }
+  result.isFullDay = isFullDay
 
   return result
 }
@@ -561,6 +585,12 @@ function buildZoomFormTemplate() {
     'Durasi: 60 menit',
     'Password: rahasia1',
   ].join('\n')
+}
+
+function buildZoomFormFullDayTemplate() {
+  return ['Nama Meet: Acara Satu Hari', 'Tgl: 2026-05-14', 'Durasi: 1 hari', 'Password: rahasia1'].join(
+    '\n'
+  )
 }
 
 global.prefa = ['', '.']
@@ -1646,18 +1676,31 @@ module.exports = async (nicola, m, mek) => {
             }
 
             const meetingIdFmt = String(meeting.id).replace(/(\d{3})(\d{4})(\d+)/, '$1 $2 $3')
-            const timeZoneShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(/_/g, ' ')
-            const timeHuman = moment
-              .tz(parsed.startTimeIso, parsed.timezone)
-              .locale('en')
-              .format('MMM D, YYYY H:mm')
+            const timeZoneShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(
+              /_/g,
+              ' '
+            )
+            const startMom = moment.tz(parsed.startTimeIso, parsed.timezone).locale('en')
+            let timeLine
+            if (parsed.isFullDay) {
+              // Durasi dalam satuan hari -> full-day, jam di-skip
+              const days = Math.max(1, Math.round(parsed.durationMinutes / (60 * 24)))
+              if (days === 1) {
+                timeLine = `${startMom.format('MMM D, YYYY')} (full day) ${timeZoneShort}`
+              } else {
+                const endMom = startMom.clone().add(days, 'days').subtract(1, 'day')
+                timeLine = `${startMom.format('MMM D')} – ${endMom.format('MMM D, YYYY')} (${days} days) ${timeZoneShort}`
+              }
+            } else {
+              timeLine = `${startMom.format('MMM D, YYYY H:mm')} ${timeZoneShort}`
+            }
 
             const lines = []
             if (hostName) lines.push(`${hostName} is inviting you to a scheduled Zoom meeting.`)
             else lines.push('You are invited to a scheduled Zoom meeting.')
             lines.push('')
             lines.push(`Topic: ${meeting.topic}`)
-            lines.push(`Time: ${timeHuman} ${timeZoneShort}`)
+            lines.push(`Time: ${timeLine}`)
             lines.push('')
             lines.push('Join Zoom Meeting')
             lines.push(meeting.join_url)
@@ -2634,14 +2677,20 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         db.data.zoomFlow[sender] = { session: 'WAIT-FORM', startedAt: Date.now() }
 
         const template = buildZoomFormTemplate()
+        const templateFullDay = buildZoomFormFullDayTemplate()
         return reply(
           `📹 *ZOOM LARGE MEETING*\n\n` +
             `Balas pesan ini dengan form berikut (edit value-nya):\n\n` +
             '```\n' +
             template +
             '\n```\n\n' +
+            `Atau untuk _meeting 1 hari penuh_ (jam otomatis 00:00):\n\n` +
+            '```\n' +
+            templateFullDay +
+            '\n```\n\n' +
             `_Catatan:_\n` +
             `• Durasi boleh dalam menit / jam / hari (contoh: \`60 menit\`, \`2 jam\`, \`1 hari\`).\n` +
+            `• Kalau durasi pakai satuan *hari*, field \`Jam\` boleh dikosongkan — otomatis mulai 00:00 di tanggal itu.\n` +
             `• Format tanggal: \`YYYY-MM-DD\` atau \`DD/MM/YYYY\`.\n` +
             `• Timezone default: ${process.env.ZOOM_DEFAULT_TIMEZONE || 'Asia/Jakarta'} ` +
             `(tambah baris \`Timezone: ...\` untuk override).\n` +
