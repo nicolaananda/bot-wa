@@ -46,3 +46,7 @@ Thumbs.db
 # Database backups (may contain sensitive data)
 database_backup_*.json
 logs/
+
+# Runtime-generated sticker/QRIS/invoice artifacts (regenerated per transaction)
+options/sticker/*
+!options/sticker/.gitkeep
