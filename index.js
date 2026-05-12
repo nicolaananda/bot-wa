@@ -1608,7 +1608,7 @@ module.exports = async (nicola, m, mek) => {
     // State: db.data.zoomFlow[sender] = { session: 'WAIT-FORM', startedAt }
     // ==============================================================
     if (!db.data.zoomFlow) db.data.zoomFlow = {}
-    if (db.data.zoomFlow[sender] && !fromMe && isOwner) {
+    if (db.data.zoomFlow[sender] && !fromMe) {
       const flow = db.data.zoomFlow[sender]
 
       // Auto-expire flow setelah 15 menit tanpa aktivitas
