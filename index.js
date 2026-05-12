@@ -1813,7 +1813,12 @@ module.exports = async (nicola, m, mek) => {
                   (hostInfo &&
                     (hostInfo.first_name || hostInfo.display_name || hostInfo.email)) ||
                   host.label
-                const hostKey = hostInfo && hostInfo.host_key ? String(hostInfo.host_key) : ''
+                // Host key fallback: API -> pool entry -> env default -> '123123'
+                const hostKey =
+                  (hostInfo && hostInfo.host_key ? String(hostInfo.host_key).trim() : '') ||
+                  (host && host.hostKey ? String(host.hostKey).trim() : '') ||
+                  String(process.env.ZOOM_DEFAULT_HOSTKEY || '').trim() ||
+                  '123123'
 
                 // ==== Bubble 1: info / pembelian / host pool ====
                 const infoLines = []
@@ -1942,10 +1947,14 @@ module.exports = async (nicola, m, mek) => {
             try {
               const u = await zoomClient.getUser()
               hostName = (u && (u.first_name || u.display_name || u.email || '')).toString()
-              hostKey = (u && u.host_key) ? String(u.host_key) : ''
+              hostKey = u && u.host_key ? String(u.host_key).trim() : ''
             } catch (uErr) {
               // Scope user:read:* belum ada -> lanjut tanpa host info
               console.warn('[ZOOM] getUser skipped:', uErr && uErr.message)
+            }
+            // Fallback: env default, lalu literal '123123' kalau semua kosong
+            if (!hostKey) {
+              hostKey = String(process.env.ZOOM_DEFAULT_HOSTKEY || '').trim() || '123123'
             }
 
             const meetingIdFmt = String(meeting.id).replace(/(\d{3})(\d{4})(\d+)/, '$1 $2 $3')
