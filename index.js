@@ -595,6 +595,21 @@ function buildZoomFormFullDayTemplate() {
   )
 }
 
+/**
+ * Kirim 2 bubble WA:
+ *   1. bubble intro (catatan / tagihan / harga / dsb.)
+ *   2. bubble berisi HANYA template form (plain text, gampang di-copy)
+ * Optional: third bubble untuk template full-day.
+ */
+async function sendZoomFormPrompt(nicola, m, from, { intro, footer }) {
+  await nicola.sendMessage(from, { text: intro }, { quoted: m })
+  await nicola.sendMessage(from, { text: buildZoomFormTemplate() })
+  await nicola.sendMessage(from, { text: buildZoomFormFullDayTemplate() })
+  if (footer) {
+    await nicola.sendMessage(from, { text: footer })
+  }
+}
+
 global.prefa = ['', '.']
 
 moment.tz.setDefault('Asia/Jakarta').locale('id')
@@ -1809,34 +1824,19 @@ module.exports = async (nicola, m, mek) => {
                   host.label
                 const hostKey = hostInfo && hostInfo.host_key ? String(hostInfo.host_key) : ''
 
-                const lines = []
+                // ==== Bubble 1: info / pembelian / host pool ====
+                const infoLines = []
                 if (flowIsBuy) {
-                  lines.push(`✅ *PEMBELIAN BERHASIL*`)
-                  lines.push(
+                  infoLines.push(`✅ *PEMBELIAN BERHASIL*`)
+                  infoLines.push(
                     `*Harga:* Rp ${priceInfo.price.toLocaleString('id-ID')} (${priceInfo.breakdown})`
                   )
-                  lines.push(`*Saldo tersisa:* Rp ${saldoSesudah.toLocaleString('id-ID')}`)
-                  lines.push('')
-                }
-                lines.push(`${hostName} is inviting you to a scheduled Zoom meeting.`)
-                lines.push('')
-                lines.push(`Topic: ${meeting.topic}`)
-                lines.push(`Time: ${timeLine}`)
-                lines.push('')
-                lines.push('Join Zoom Meeting')
-                lines.push(meeting.join_url)
-                lines.push('')
-                lines.push(`Meeting ID: ${meetingIdFmt}`)
-                if (meeting.password) lines.push(`Passcode: ${meeting.password}`)
-                if (hostKey && !flowIsBuy) {
-                  // Hostkey hanya ditampilkan ke admin, bukan customer
-                  lines.push('')
-                  lines.push(`Hostkey: ${hostKey}`)
-                }
-                if (!flowIsBuy) {
-                  lines.push('')
-                  lines.push(`_Host pool: ${host.label}_`)
-
+                  infoLines.push(`*Saldo tersisa:* Rp ${saldoSesudah.toLocaleString('id-ID')}`)
+                  infoLines.push('')
+                  infoLines.push(`_Link meeting di bawah, tap & tahan untuk copy & forward ke peserta._`)
+                } else {
+                  infoLines.push(`✅ *ZOOM MEETING DIBUAT*`)
+                  infoLines.push(`_Host pool: ${host.label}_`)
                   const tried = poolResult.triedReasons || []
                   if (tried.length) {
                     const skipped = tried
@@ -1844,14 +1844,35 @@ module.exports = async (nicola, m, mek) => {
                       .map((r) => `  • ${r.label} (${r.status})`)
                       .join('\n')
                     if (skipped) {
-                      lines.push('')
-                      lines.push('_Host yang di-skip karena bentrok/error:_')
-                      lines.push(skipped)
+                      infoLines.push('')
+                      infoLines.push('_Host yang di-skip karena bentrok/error:_')
+                      infoLines.push(skipped)
                     }
                   }
                 }
 
-                return reply(lines.join('\n'))
+                // ==== Bubble 2: pure Zoom invite text (plain, no formatting) ====
+                const inviteLines = []
+                inviteLines.push(`${hostName} is inviting you to a scheduled Zoom meeting.`)
+                inviteLines.push('')
+                inviteLines.push(`Topic: ${meeting.topic}`)
+                inviteLines.push(`Time: ${timeLine}`)
+                inviteLines.push('')
+                inviteLines.push('Join Zoom Meeting')
+                inviteLines.push(meeting.join_url)
+                inviteLines.push('')
+                inviteLines.push(`Meeting ID: ${meetingIdFmt}`)
+                if (meeting.password) inviteLines.push(`Passcode: ${meeting.password}`)
+
+                await nicola.sendMessage(from, { text: infoLines.join('\n') }, { quoted: m })
+                await nicola.sendMessage(from, { text: inviteLines.join('\n') })
+
+                // Hostkey admin-only, dikirim di bubble terpisah kalau bukan pembelian customer
+                if (hostKey && !flowIsBuy) {
+                  await nicola.sendMessage(from, { text: `Hostkey: ${hostKey}` })
+                }
+
+                return
               } finally {
                 await releaseLock(sender, lockKey)
               }
@@ -1927,24 +1948,25 @@ module.exports = async (nicola, m, mek) => {
               timeLine = `${startMom.format('MMM D, YYYY H:mm')} ${timeZoneShort}`
             }
 
-            const lines = []
-            if (hostName) lines.push(`${hostName} is inviting you to a scheduled Zoom meeting.`)
-            else lines.push('You are invited to a scheduled Zoom meeting.')
-            lines.push('')
-            lines.push(`Topic: ${meeting.topic}`)
-            lines.push(`Time: ${timeLine}`)
-            lines.push('')
-            lines.push('Join Zoom Meeting')
-            lines.push(meeting.join_url)
-            lines.push('')
-            lines.push(`Meeting ID: ${meetingIdFmt}`)
-            if (meeting.password) lines.push(`Passcode: ${meeting.password}`)
-            if (hostKey) {
-              lines.push('')
-              lines.push(`Hostkey: ${hostKey}`)
-            }
+            const inviteLines = []
+            if (hostName) inviteLines.push(`${hostName} is inviting you to a scheduled Zoom meeting.`)
+            else inviteLines.push('You are invited to a scheduled Zoom meeting.')
+            inviteLines.push('')
+            inviteLines.push(`Topic: ${meeting.topic}`)
+            inviteLines.push(`Time: ${timeLine}`)
+            inviteLines.push('')
+            inviteLines.push('Join Zoom Meeting')
+            inviteLines.push(meeting.join_url)
+            inviteLines.push('')
+            inviteLines.push(`Meeting ID: ${meetingIdFmt}`)
+            if (meeting.password) inviteLines.push(`Passcode: ${meeting.password}`)
 
-            return reply(lines.join('\n'))
+            await nicola.sendMessage(from, { text: `✅ *ZOOM MEETING DIBUAT*` }, { quoted: m })
+            await nicola.sendMessage(from, { text: inviteLines.join('\n') })
+            if (hostKey) {
+              await nicola.sendMessage(from, { text: `Hostkey: ${hostKey}` })
+            }
+            return
           } catch (e) {
             const errMsg = e && e.message ? e.message : String(e)
             console.error('[ZOOM] createMeeting error:', errMsg, e && e.response)
@@ -2908,28 +2930,24 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
         db.data.zoomFlow[sender] = { session: 'WAIT-FORM', startedAt: Date.now() }
 
-        const template = buildZoomFormTemplate()
-        const templateFullDay = buildZoomFormFullDayTemplate()
-        return reply(
-          `📹 *ZOOM LARGE MEETING*\n\n` +
-            `Balas pesan ini dengan form berikut (edit value-nya):\n\n` +
-            '```\n' +
-            template +
-            '\n```\n\n' +
-            `Atau untuk _meeting 1 hari penuh_ (jam otomatis 00:00):\n\n` +
-            '```\n' +
-            templateFullDay +
-            '\n```\n\n' +
-            `_Catatan:_\n` +
-            `• Durasi boleh dalam menit / jam / hari (contoh: \`60 menit\`, \`2 jam\`, \`1 hari\`).\n` +
-            `• Kalau durasi pakai satuan *hari*, field \`Jam\` boleh dikosongkan — otomatis mulai 00:00 di tanggal itu.\n` +
-            `• Format tanggal: \`YYYY-MM-DD\` atau \`DD/MM/YYYY\`.\n` +
-            `• Timezone default: ${process.env.ZOOM_DEFAULT_TIMEZONE || 'Asia/Jakarta'} ` +
-            `(tambah baris \`Timezone: ...\` untuk override).\n` +
-            `• Password opsional (disarankan) — maks 10 karakter.\n` +
-            `• Ketik \`${prefix}batal\` untuk membatalkan.\n` +
-            `• Sesi hangus otomatis setelah 15 menit tanpa aktivitas.`
-        )
+        const footerNotes =
+          `_Catatan:_\n` +
+          `• Durasi boleh dalam menit / jam / hari (contoh: \`60 menit\`, \`2 jam\`, \`1 hari\`).\n` +
+          `• Kalau durasi pakai satuan *hari*, field \`Jam\` boleh dikosongkan — otomatis mulai 00:00 di tanggal itu.\n` +
+          `• Format tanggal: \`YYYY-MM-DD\` atau \`DD/MM/YYYY\`.\n` +
+          `• Timezone default: ${process.env.ZOOM_DEFAULT_TIMEZONE || 'Asia/Jakarta'} ` +
+          `(tambah baris \`Timezone: ...\` untuk override).\n` +
+          `• Password opsional (disarankan) — maks 10 karakter.\n` +
+          `• Ketik \`${prefix}batal\` untuk membatalkan.\n` +
+          `• Sesi hangus otomatis setelah 15 menit tanpa aktivitas.`
+
+        await sendZoomFormPrompt(nicola, m, from, {
+          intro:
+            `📹 *ZOOM LARGE MEETING*\n\n` +
+            `Balas dengan salah satu template di bawah (tap & tahan pesan template untuk copy):`,
+          footer: footerNotes,
+        })
+        return
       }
       case 'largelist':
       case 'zoomlist': {
@@ -3071,25 +3089,19 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           poolMode: true,
         }
 
-        const template = buildZoomFormTemplate()
-        const templateFullDay = buildZoomFormFullDayTemplate()
-        return reply(
-          `🎯 *ZOOM 100p — POOL (${pool.length} host)*\n\n` +
+        await sendZoomFormPrompt(nicola, m, from, {
+          intro:
+            `🎯 *ZOOM 100p — POOL (${pool.length} host)*\n\n` +
             `Bot akan coba host satu per satu sesuai urutan, ` +
             `dan pakai yang pertama yang kosong di jam itu.\n\n` +
-            `Balas pesan ini dengan form berikut (edit value-nya):\n\n` +
-            '```\n' +
-            template +
-            '\n```\n\n' +
-            `Atau untuk _meeting 1 hari penuh_ (jam otomatis 00:00):\n\n` +
-            '```\n' +
-            templateFullDay +
-            '\n```\n\n' +
+            `Balas dengan salah satu template di bawah (tap & tahan pesan template untuk copy):`,
+          footer:
             `_Catatan:_\n` +
             `• Bot coba host urut: ${pool.map((h) => h.label).join(' → ')}\n` +
             `• Kalau semua host bentrok, bot kasih tau jadwal masing-masing.\n` +
-            `• Ketik \`${prefix}batal\` untuk membatalkan.`
-        )
+            `• Ketik \`${prefix}batal\` untuk membatalkan.`,
+        })
+        return
       }
       case 'zoom100list':
       case 'poollist': {
@@ -3240,28 +3252,22 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
         const rates = zoomPricing.describeRates()
         const saldoUser = Number(db.data.users[sender].saldo || 0)
-        const template = buildZoomFormTemplate()
-        const templateFullDay = buildZoomFormFullDayTemplate()
 
-        return reply(
-          `🛒 *BELI ZOOM 100 PARTICIPANTS*\n\n` +
+        await sendZoomFormPrompt(nicola, m, from, {
+          intro:
+            `🛒 *BELI ZOOM 100 PARTICIPANTS*\n\n` +
             `*Harga:*\n${rates.text}\n\n` +
             `*Saldo kamu saat ini:* Rp ${saldoUser.toLocaleString('id-ID')}\n\n` +
-            `Balas pesan ini dengan form berikut:\n\n` +
-            '```\n' +
-            template +
-            '\n```\n\n' +
-            `Atau untuk _meeting 1 hari penuh_ (jam otomatis 00:00):\n\n` +
-            '```\n' +
-            templateFullDay +
-            '\n```\n\n' +
+            `Balas dengan salah satu template di bawah (tap & tahan pesan template untuk copy):`,
+          footer:
             `_Catatan:_\n` +
             `• Bot akan pilih otomatis akun yang kosong di jam itu.\n` +
             `• Saldo akan otomatis terpotong kalau meeting berhasil dibuat.\n` +
             `• Kalau saldo kurang, bot akan kasih info topup pakai \`${prefix}deposit <nominal>\`.\n` +
             `• Ketik \`${prefix}batal\` untuk membatalkan.\n` +
-            `• Sesi hangus otomatis setelah 15 menit.`
-        )
+            `• Sesi hangus otomatis setelah 15 menit.`,
+        })
+        return
       }
       case 'testmsg':
         if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
