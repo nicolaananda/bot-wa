@@ -1854,13 +1854,42 @@ module.exports = async (nicola, m, mek) => {
                 inviteLines.push('')
                 inviteLines.push(`Meeting ID: ${meetingIdFmt}`)
                 if (meeting.password) inviteLines.push(`Passcode: ${meeting.password}`)
+                if (hostKey) inviteLines.push(`Hostkey: ${hostKey}`)
 
                 await nicola.sendMessage(from, { text: infoLines.join('\n') }, { quoted: m })
                 await nicola.sendMessage(from, { text: inviteLines.join('\n') })
 
-                // Hostkey admin-only, dikirim di bubble terpisah kalau bukan pembelian customer
-                if (hostKey && !flowIsBuy) {
-                  await nicola.sendMessage(from, { text: `Hostkey: ${hostKey}` })
+                // === Save receipt (pool mode) ===
+                // Pakai format text yang sama dengan invite yang dikirim ke user +
+                // metadata transaksi, supaya bisa di-retrieve nanti.
+                try {
+                  const receiptParts = []
+                  const reffIdSave = `ZOOM-${meeting.id}`
+                  receiptParts.push('=== ZOOM MEETING RECEIPT ===')
+                  receiptParts.push(`Ref ID     : ${reffIdSave}`)
+                  receiptParts.push(`Tanggal    : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY HH:mm')} WIB`)
+                  if (flowIsBuy) {
+                    receiptParts.push(`User       : ${sender.split('@')[0]}`)
+                    receiptParts.push(
+                      `Harga      : Rp ${priceInfo.price.toLocaleString('id-ID')} (${priceInfo.breakdown})`
+                    )
+                    receiptParts.push(`Metode     : Saldo`)
+                  }
+                  receiptParts.push(`Host Akun  : ${host.label}`)
+                  receiptParts.push('')
+                  receiptParts.push('--- INVITE TEXT ---')
+                  receiptParts.push(inviteLines.join('\n'))
+                  const receiptText = receiptParts.join('\n')
+                  const result = await saveReceipt(reffIdSave, receiptText)
+                  if (result && result.success) {
+                    console.log(
+                      `✅ [ZOOM] Receipt saved to ${result.storage}: ${result.url || result.path || reffIdSave}`
+                    )
+                  } else {
+                    console.error('❌ [ZOOM] Receipt save failed:', result && result.error)
+                  }
+                } catch (saveErr) {
+                  console.error('❌ [ZOOM] Error saving receipt:', saveErr.message)
                 }
 
                 return
@@ -1951,12 +1980,36 @@ module.exports = async (nicola, m, mek) => {
             inviteLines.push('')
             inviteLines.push(`Meeting ID: ${meetingIdFmt}`)
             if (meeting.password) inviteLines.push(`Passcode: ${meeting.password}`)
+            if (hostKey) inviteLines.push(`Hostkey: ${hostKey}`)
 
             await nicola.sendMessage(from, { text: `✅ *ZOOM MEETING DIBUAT*` }, { quoted: m })
             await nicola.sendMessage(from, { text: inviteLines.join('\n') })
-            if (hostKey) {
-              await nicola.sendMessage(from, { text: `Hostkey: ${hostKey}` })
+
+            // === Save receipt (single-account mode / #zoomlarge) ===
+            try {
+              const reffIdSave = `ZOOM-${meeting.id}`
+              const receiptParts = [
+                '=== ZOOM MEETING RECEIPT ===',
+                `Ref ID  : ${reffIdSave}`,
+                `Tanggal : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY HH:mm')} WIB`,
+                `Mode    : Admin (#zoomlarge)`,
+                '',
+                '--- INVITE TEXT ---',
+                inviteLines.join('\n'),
+              ]
+              const receiptText = receiptParts.join('\n')
+              const result = await saveReceipt(reffIdSave, receiptText)
+              if (result && result.success) {
+                console.log(
+                  `✅ [ZOOM] Receipt saved to ${result.storage}: ${result.url || result.path || reffIdSave}`
+                )
+              } else {
+                console.error('❌ [ZOOM] Receipt save failed:', result && result.error)
+              }
+            } catch (saveErr) {
+              console.error('❌ [ZOOM] Error saving receipt:', saveErr.message)
             }
+
             return
           } catch (e) {
             const errMsg = e && e.message ? e.message : String(e)
