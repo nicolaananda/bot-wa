@@ -80,6 +80,7 @@ const { saveReceipt } = require('./config/r2-storage')
 const { sendPaymentNotification } = require('./lib/telegram-notifier')
 const zoomClient = require('./lib/zoom-client')
 const zoomPool = require('./lib/zoom-pool')
+const zoomPricing = require('./lib/zoom-pricing')
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 let pg
 if (usePg) {
@@ -1607,7 +1608,7 @@ module.exports = async (nicola, m, mek) => {
       const cmdOnly = (command || '').toLowerCase()
       const skipFlow =
         ['batal', prefix + 'batal', 'cancel', prefix + 'cancel'].includes(lowered) ||
-        ['zoom', 'zoomlarge', 'zoomscheduled', 'zoom100', 'zoompool'].includes(cmdOnly)
+        ['zoom', 'zoomlarge', 'zoomscheduled', 'zoom100', 'zoompool', 'belizoom100', 'belizoom'].includes(cmdOnly)
 
       if (!skipFlow) {
         if (flow.session === 'WAIT-FORM') {
@@ -1623,131 +1624,237 @@ module.exports = async (nicola, m, mek) => {
             }
 
             const flowIsPool = !!db.data.zoomFlow[sender].poolMode
+            const flowIsBuy = !!db.data.zoomFlow[sender].buyMode
             reply(
-              flowIsPool
-                ? '⏳ Mengecek ketersediaan host di pool...'
-                : '⏳ Mengecek jadwal & membuat Zoom meeting...'
+              flowIsBuy
+                ? '⏳ Mengecek ketersediaan & memproses pembelian...'
+                : flowIsPool
+                  ? '⏳ Mengecek ketersediaan host di pool...'
+                  : '⏳ Mengecek jadwal & membuat Zoom meeting...'
             )
 
             const startUtcMs = moment.tz(parsed.startTimeIso, parsed.timezone).valueOf()
 
-            // ====== MODE POOL (#zoom100) ======
+            // ====== MODE POOL (#zoom100) / BUY (beli zoom100) ======
             if (flowIsPool) {
-              let poolResult
-              try {
-                poolResult = await zoomPool.createMeetingOnFirstAvailable({
-                  topic: parsed.topic,
-                  startTimeIso: parsed.startTimeIso,
-                  durationMinutes: parsed.durationMinutes,
-                  password: parsed.password,
-                  timezone: parsed.timezone,
-                  startAtUtcMs,
-                })
-              } catch (pErr) {
-                delete db.data.zoomFlow[sender]
-                return reply(`❌ Gagal proses pool: ${pErr && pErr.message ? pErr.message : pErr}`)
-              }
+              // Hitung harga dulu kalau buy mode, dan cek saldo.
+              let priceInfo = null
+              if (flowIsBuy) {
+                priceInfo = zoomPricing.calculatePrice(parsed.durationMinutes, parsed.isFullDay)
 
-              if (!poolResult.ok) {
-                delete db.data.zoomFlow[sender]
-                if (poolResult.error === 'POOL_EMPTY') {
+                if (!db.data.users[sender]) db.data.users[sender] = { saldo: 0, role: 'bronze' }
+                const saldoUser = Number(db.data.users[sender].saldo || 0)
+                if (saldoUser < priceInfo.price) {
+                  delete db.data.zoomFlow[sender]
+                  const kurang = priceInfo.price - saldoUser
                   return reply(
-                    '❌ Host pool kosong. Isi `config/zoom-pool.json` di server.'
+                    `❌ *Saldo kamu tidak cukup*\n\n` +
+                      `*Harga:* Rp ${priceInfo.price.toLocaleString('id-ID')}\n` +
+                      `*Saldo kamu:* Rp ${saldoUser.toLocaleString('id-ID')}\n` +
+                      `*Kurang:* Rp ${kurang.toLocaleString('id-ID')}\n\n` +
+                      `Silakan topup saldo dulu, ketik:\n` +
+                      `\`${prefix}deposit ${kurang}\`\n\n` +
+                      `Atau nominal lain sesuai kebutuhan, misalnya:\n` +
+                      `\`${prefix}deposit ${Math.max(kurang, 10000)}\``
                   )
                 }
-                const tzShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(
+              }
+
+              // Lock untuk mencegah double-process (kalau user nge-spam form)
+              const lockKey = flowIsBuy ? 'buy-zoom' : 'zoom-pool'
+              const gotLock = await acquireLock(sender, lockKey, 60)
+              if (!gotLock) {
+                return reply(
+                  `⚠️ Transaksi lain sedang diproses. Tunggu sebentar atau ketik \`${prefix}batal\`.`
+                )
+              }
+
+              let poolResult
+              try {
+                try {
+                  poolResult = await zoomPool.createMeetingOnFirstAvailable({
+                    topic: parsed.topic,
+                    startTimeIso: parsed.startTimeIso,
+                    durationMinutes: parsed.durationMinutes,
+                    password: parsed.password,
+                    timezone: parsed.timezone,
+                    startAtUtcMs,
+                  })
+                } catch (pErr) {
+                  delete db.data.zoomFlow[sender]
+                  return reply(`❌ Gagal proses pool: ${pErr && pErr.message ? pErr.message : pErr}`)
+                }
+
+                if (!poolResult.ok) {
+                  delete db.data.zoomFlow[sender]
+                  if (poolResult.error === 'POOL_EMPTY') {
+                    return reply(
+                      flowIsBuy
+                        ? '❌ Layanan Zoom sedang tidak tersedia. Hubungi admin.'
+                        : '❌ Host pool kosong. Isi `config/zoom-pool.json` di server.'
+                    )
+                  }
+                  const tzShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(
+                    /_/g,
+                    ' '
+                  )
+                  const summary = poolResult.reasons
+                    .map((r) => {
+                      if (r.status === 'busy') {
+                        const conflictLines = r.detail
+                          .map((c) => {
+                            const t = moment(c.start_time)
+                              .tz(parsed.timezone)
+                              .format('DD MMM HH:mm')
+                            return `    • ${c.topic} — ${t} (${c.duration} menit)`
+                          })
+                          .join('\n')
+                        return `❌ [${r.label}] bentrok:\n${conflictLines}`
+                      }
+                      if (r.status === 'error') {
+                        return `⚠️ [${r.label}] error: ${r.detail}`
+                      }
+                      return `? [${r.label}] ${r.status}`
+                    })
+                    .join('\n')
+                  const retryCmd = flowIsBuy ? `${prefix}belizoom100` : `${prefix}zoom100`
+                  return reply(
+                    `❌ *Semua akun Zoom tidak tersedia* di jam yang kamu minta (${tzShort}).\n\n` +
+                      (flowIsBuy
+                        ? 'Saldo kamu *tidak dipotong*.\n\n'
+                        : '') +
+                      summary +
+                      `\n\nSilakan pilih jam lain. Ketik \`${retryCmd}\` untuk mulai ulang.`
+                  )
+                }
+
+                // === SUCCESS — create meeting berhasil ===
+                delete db.data.zoomFlow[sender]
+
+                const { host, meeting, hostInfo } = poolResult
+
+                // Debit saldo + log transaksi kalau buy mode
+                let saldoSesudah = 0
+                if (flowIsBuy && priceInfo) {
+                  const prev = Number(db.data.users[sender].saldo || 0)
+                  saldoSesudah = Math.max(0, prev - priceInfo.price)
+                  db.data.users[sender].saldo = saldoSesudah
+                  try {
+                    setCachedSaldo(sender, saldoSesudah)
+                  } catch {
+                    /* ignore cache errors */
+                  }
+
+                  // Log transaksi — mirror structure pada buy flow existing
+                  if (!db.data.transaksi) db.data.transaksi = []
+                  db.data.transaksi.push({
+                    id: 'zoom100',
+                    name: `Zoom 100p — ${meeting.topic}`,
+                    price: priceInfo.price,
+                    date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
+                    profit: priceInfo.price,
+                    jumlah: 1,
+                    user: sender.split('@')[0],
+                    userRole: db.data.users[sender].role || 'bronze',
+                    reffId: `ZOOM-${meeting.id}`,
+                    metodeBayar: 'Saldo',
+                    totalBayar: priceInfo.price,
+                    akun: {
+                      meetingId: String(meeting.id),
+                      topic: meeting.topic,
+                      join_url: meeting.join_url,
+                      password: meeting.password || '',
+                      start_time: meeting.start_time,
+                      duration: meeting.duration,
+                      hostLabel: host.label,
+                      billedUnit: priceInfo.billedUnit,
+                      billedQty: priceInfo.billedQty,
+                    },
+                  })
+
+                  if (typeof global.scheduleSave === 'function') {
+                    global.scheduleSave()
+                  } else if (db && typeof db.save === 'function') {
+                    try {
+                      await db.save()
+                    } catch { /* ignore */ }
+                  }
+                }
+
+                const meetingIdFmt = String(meeting.id).replace(
+                  /(\d{3})(\d{4})(\d+)/,
+                  '$1 $2 $3'
+                )
+                const timeZoneShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(
                   /_/g,
                   ' '
                 )
-                const summary = poolResult.reasons
-                  .map((r) => {
-                    if (r.status === 'busy') {
-                      const conflictLines = r.detail
-                        .map((c) => {
-                          const t = moment(c.start_time)
-                            .tz(parsed.timezone)
-                            .format('DD MMM HH:mm')
-                          return `    • ${c.topic} — ${t} (${c.duration} menit)`
-                        })
-                        .join('\n')
-                      return `❌ [${r.label}] bentrok:\n${conflictLines}`
-                    }
-                    if (r.status === 'error') {
-                      return `⚠️ [${r.label}] error: ${r.detail}`
-                    }
-                    return `? [${r.label}] ${r.status}`
-                  })
-                  .join('\n')
-                return reply(
-                  `❌ *Semua host pool tidak tersedia* di jam yang kamu minta (${tzShort}).\n\n` +
-                    summary +
-                    `\n\nSilakan pilih jam lain. Ketik \`${prefix}zoom100\` untuk mulai ulang.`
-                )
-              }
-
-              delete db.data.zoomFlow[sender]
-
-              const { host, meeting, hostInfo } = poolResult
-              const meetingIdFmt = String(meeting.id).replace(
-                /(\d{3})(\d{4})(\d+)/,
-                '$1 $2 $3'
-              )
-              const timeZoneShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(
-                /_/g,
-                ' '
-              )
-              const startMom = moment.tz(parsed.startTimeIso, parsed.timezone).locale('en')
-              let timeLine
-              if (parsed.isFullDay) {
-                const days = Math.max(1, Math.round(parsed.durationMinutes / (60 * 24)))
-                if (days === 1) {
-                  timeLine = `${startMom.format('MMM D, YYYY')} (full day) ${timeZoneShort}`
+                const startMom = moment.tz(parsed.startTimeIso, parsed.timezone).locale('en')
+                let timeLine
+                if (parsed.isFullDay) {
+                  const days = Math.max(1, Math.round(parsed.durationMinutes / (60 * 24)))
+                  if (days === 1) {
+                    timeLine = `${startMom.format('MMM D, YYYY')} (full day) ${timeZoneShort}`
+                  } else {
+                    const endMom = startMom.clone().add(days, 'days').subtract(1, 'day')
+                    timeLine = `${startMom.format('MMM D')} – ${endMom.format('MMM D, YYYY')} (${days} days) ${timeZoneShort}`
+                  }
                 } else {
-                  const endMom = startMom.clone().add(days, 'days').subtract(1, 'day')
-                  timeLine = `${startMom.format('MMM D')} – ${endMom.format('MMM D, YYYY')} (${days} days) ${timeZoneShort}`
+                  timeLine = `${startMom.format('MMM D, YYYY H:mm')} ${timeZoneShort}`
                 }
-              } else {
-                timeLine = `${startMom.format('MMM D, YYYY H:mm')} ${timeZoneShort}`
-              }
 
-              const hostName =
-                (hostInfo && (hostInfo.first_name || hostInfo.display_name || hostInfo.email)) ||
-                host.label
-              const hostKey = hostInfo && hostInfo.host_key ? String(hostInfo.host_key) : ''
+                const hostName =
+                  (hostInfo &&
+                    (hostInfo.first_name || hostInfo.display_name || hostInfo.email)) ||
+                  host.label
+                const hostKey = hostInfo && hostInfo.host_key ? String(hostInfo.host_key) : ''
 
-              const lines = []
-              lines.push(`${hostName} is inviting you to a scheduled Zoom meeting.`)
-              lines.push('')
-              lines.push(`Topic: ${meeting.topic}`)
-              lines.push(`Time: ${timeLine}`)
-              lines.push('')
-              lines.push('Join Zoom Meeting')
-              lines.push(meeting.join_url)
-              lines.push('')
-              lines.push(`Meeting ID: ${meetingIdFmt}`)
-              if (meeting.password) lines.push(`Passcode: ${meeting.password}`)
-              if (hostKey) {
-                lines.push('')
-                lines.push(`Hostkey: ${hostKey}`)
-              }
-              lines.push('')
-              lines.push(`_Host pool: ${host.label}_`)
-
-              // Kalau ada host yang dicoba dan bentrok sebelum akhirnya dapat slot, kasih tau.
-              const tried = poolResult.triedReasons || []
-              if (tried.length) {
-                const skipped = tried
-                  .filter((r) => r.status === 'busy' || r.status === 'error')
-                  .map((r) => `  • ${r.label} (${r.status})`)
-                  .join('\n')
-                if (skipped) {
+                const lines = []
+                if (flowIsBuy) {
+                  lines.push(`✅ *PEMBELIAN BERHASIL*`)
+                  lines.push(
+                    `*Harga:* Rp ${priceInfo.price.toLocaleString('id-ID')} (${priceInfo.breakdown})`
+                  )
+                  lines.push(`*Saldo tersisa:* Rp ${saldoSesudah.toLocaleString('id-ID')}`)
                   lines.push('')
-                  lines.push('_Host yang di-skip karena bentrok/error:_')
-                  lines.push(skipped)
                 }
-              }
+                lines.push(`${hostName} is inviting you to a scheduled Zoom meeting.`)
+                lines.push('')
+                lines.push(`Topic: ${meeting.topic}`)
+                lines.push(`Time: ${timeLine}`)
+                lines.push('')
+                lines.push('Join Zoom Meeting')
+                lines.push(meeting.join_url)
+                lines.push('')
+                lines.push(`Meeting ID: ${meetingIdFmt}`)
+                if (meeting.password) lines.push(`Passcode: ${meeting.password}`)
+                if (hostKey && !flowIsBuy) {
+                  // Hostkey hanya ditampilkan ke admin, bukan customer
+                  lines.push('')
+                  lines.push(`Hostkey: ${hostKey}`)
+                }
+                if (!flowIsBuy) {
+                  lines.push('')
+                  lines.push(`_Host pool: ${host.label}_`)
 
-              return reply(lines.join('\n'))
+                  const tried = poolResult.triedReasons || []
+                  if (tried.length) {
+                    const skipped = tried
+                      .filter((r) => r.status === 'busy' || r.status === 'error')
+                      .map((r) => `  • ${r.label} (${r.status})`)
+                      .join('\n')
+                    if (skipped) {
+                      lines.push('')
+                      lines.push('_Host yang di-skip karena bentrok/error:_')
+                      lines.push(skipped)
+                    }
+                  }
+                }
+
+                return reply(lines.join('\n'))
+              } finally {
+                await releaseLock(sender, lockKey)
+              }
             }
 
             // ====== MODE ENV SINGLE-ACCOUNT (#zoomlarge) ======
@@ -3102,6 +3209,58 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           `🗑️ *HASIL HAPUS ZOOM POOL*\n\n` +
             results.join('\n') +
             `\n\n_Jalankan \`${prefix}zoom100list\` untuk lihat daftar terbaru._`
+        )
+      }
+      case 'belizoom100':
+      case 'belizoom':
+      case 'buyzoom100':
+      case 'buyzoom': {
+        // Open for ALL users (reseller flow). No isOwner guard.
+        const pool = zoomPool.loadPool()
+        if (!pool.length) {
+          return reply('❌ Layanan Zoom sedang tidak tersedia. Hubungi admin.')
+        }
+
+        // Init user record kalau belum ada (mirror pattern di case 'deposit')
+        if (!db.data.users[sender]) db.data.users[sender] = { saldo: 0, role: 'bronze' }
+
+        if (!db.data.zoomFlow) db.data.zoomFlow = {}
+        if (db.data.zoomFlow[sender]) {
+          return reply(
+            `Kamu masih ada sesi pembelian Zoom aktif. Ketik \`${prefix}batal\` untuk membatalkan.`
+          )
+        }
+
+        db.data.zoomFlow[sender] = {
+          session: 'WAIT-FORM',
+          startedAt: Date.now(),
+          poolMode: true,
+          buyMode: true,
+        }
+
+        const rates = zoomPricing.describeRates()
+        const saldoUser = Number(db.data.users[sender].saldo || 0)
+        const template = buildZoomFormTemplate()
+        const templateFullDay = buildZoomFormFullDayTemplate()
+
+        return reply(
+          `🛒 *BELI ZOOM 100 PARTICIPANTS*\n\n` +
+            `*Harga:*\n${rates.text}\n\n` +
+            `*Saldo kamu saat ini:* Rp ${saldoUser.toLocaleString('id-ID')}\n\n` +
+            `Balas pesan ini dengan form berikut:\n\n` +
+            '```\n' +
+            template +
+            '\n```\n\n' +
+            `Atau untuk _meeting 1 hari penuh_ (jam otomatis 00:00):\n\n` +
+            '```\n' +
+            templateFullDay +
+            '\n```\n\n' +
+            `_Catatan:_\n` +
+            `• Bot akan pilih otomatis akun yang kosong di jam itu.\n` +
+            `• Saldo akan otomatis terpotong kalau meeting berhasil dibuat.\n` +
+            `• Kalau saldo kurang, bot akan kasih info topup pakai \`${prefix}deposit <nominal>\`.\n` +
+            `• Ketik \`${prefix}batal\` untuk membatalkan.\n` +
+            `• Sesi hangus otomatis setelah 15 menit.`
         )
       }
       case 'testmsg':
