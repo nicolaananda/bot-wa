@@ -584,30 +584,20 @@ function buildZoomFormTemplate() {
     'Nama Meet: Rapat Koordinasi',
     'Tgl: 2026-05-20',
     'Jam: 14:00',
-    'Durasi: 60 menit',
+    'Durasi: 1 jam / 2 jam / 3 jam / 1 hari',
     'Password: rahasia1',
   ].join('\n')
 }
 
-function buildZoomFormFullDayTemplate() {
-  return ['Nama Meet: Acara Satu Hari', 'Tgl: 2026-05-14', 'Durasi: 1 hari', 'Password: rahasia1'].join(
-    '\n'
-  )
-}
-
 /**
  * Kirim 2 bubble WA:
- *   1. bubble intro (catatan / tagihan / harga / dsb.)
+ *   1. bubble intro + catatan (digabung)
  *   2. bubble berisi HANYA template form (plain text, gampang di-copy)
- * Optional: third bubble untuk template full-day.
  */
 async function sendZoomFormPrompt(nicola, m, from, { intro, footer }) {
-  await nicola.sendMessage(from, { text: intro }, { quoted: m })
+  const head = footer ? `${intro}\n\n${footer}` : intro
+  await nicola.sendMessage(from, { text: head }, { quoted: m })
   await nicola.sendMessage(from, { text: buildZoomFormTemplate() })
-  await nicola.sendMessage(from, { text: buildZoomFormFullDayTemplate() })
-  if (footer) {
-    await nicola.sendMessage(from, { text: footer })
-  }
 }
 
 global.prefa = ['', '.']
@@ -1693,7 +1683,7 @@ module.exports = async (nicola, m, mek) => {
                     durationMinutes: parsed.durationMinutes,
                     password: parsed.password,
                     timezone: parsed.timezone,
-                    startAtUtcMs,
+                    startAtUtcMs: startUtcMs,
                   })
                 } catch (pErr) {
                   delete db.data.zoomFlow[sender]
@@ -1807,12 +1797,13 @@ module.exports = async (nicola, m, mek) => {
                 const startMom = moment.tz(parsed.startTimeIso, parsed.timezone).locale('en')
                 let timeLine
                 if (parsed.isFullDay) {
+                  // Full-day: format like Zoom email -> "Oct 10, 2025 0:00 Jakarta"
                   const days = Math.max(1, Math.round(parsed.durationMinutes / (60 * 24)))
                   if (days === 1) {
-                    timeLine = `${startMom.format('MMM D, YYYY')} (full day) ${timeZoneShort}`
+                    timeLine = `${startMom.format('MMM D, YYYY')} 0:00 ${timeZoneShort}`
                   } else {
                     const endMom = startMom.clone().add(days, 'days').subtract(1, 'day')
-                    timeLine = `${startMom.format('MMM D')} – ${endMom.format('MMM D, YYYY')} (${days} days) ${timeZoneShort}`
+                    timeLine = `${startMom.format('MMM D')} – ${endMom.format('MMM D, YYYY')} 0:00 ${timeZoneShort}`
                   }
                 } else {
                   timeLine = `${startMom.format('MMM D, YYYY H:mm')} ${timeZoneShort}`
@@ -1936,13 +1927,13 @@ module.exports = async (nicola, m, mek) => {
             const startMom = moment.tz(parsed.startTimeIso, parsed.timezone).locale('en')
             let timeLine
             if (parsed.isFullDay) {
-              // Durasi dalam satuan hari -> full-day, jam di-skip
+              // Full-day: format like Zoom email -> "Oct 10, 2025 0:00 Jakarta"
               const days = Math.max(1, Math.round(parsed.durationMinutes / (60 * 24)))
               if (days === 1) {
-                timeLine = `${startMom.format('MMM D, YYYY')} (full day) ${timeZoneShort}`
+                timeLine = `${startMom.format('MMM D, YYYY')} 0:00 ${timeZoneShort}`
               } else {
                 const endMom = startMom.clone().add(days, 'days').subtract(1, 'day')
-                timeLine = `${startMom.format('MMM D')} – ${endMom.format('MMM D, YYYY')} (${days} days) ${timeZoneShort}`
+                timeLine = `${startMom.format('MMM D')} – ${endMom.format('MMM D, YYYY')} 0:00 ${timeZoneShort}`
               }
             } else {
               timeLine = `${startMom.format('MMM D, YYYY H:mm')} ${timeZoneShort}`
