@@ -7,6 +7,7 @@
     "userId": "me",
     "timezone": "Asia/Jakarta",
     "hostKey": "",
-    "notes": "Akun Zoom 300p"
+    "concurrentMeetings": 2,
+    "notes": "Akun Zoom 300p. Lisensi Business mendukung 2 concurrent meetings per host."
   }
 ]

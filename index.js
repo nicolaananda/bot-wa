@@ -641,11 +641,11 @@ if (!global.midtransWebhookListenerSetup) {
       for (const [sender, order] of Object.entries(orders)) {
         if (!order) continue
 
-        // Cek metode MIDTRANS
+        // Cek metode MIDTRANS atau MIDTRANS-ZOOM
         const orderMetode = order.metode || ''
-        if (orderMetode !== 'MIDTRANS') {
+        if (orderMetode !== 'MIDTRANS' && orderMetode !== 'MIDTRANS-ZOOM') {
           console.log(
-            `  - Skipping order ${order.orderId || 'N/A'}: metode=${orderMetode} (not MIDTRANS)`
+            `  - Skipping order ${order.orderId || 'N/A'}: metode=${orderMetode} (not MIDTRANS/MIDTRANS-ZOOM)`
           )
           continue
         }
@@ -728,6 +728,251 @@ if (!global.midtransWebhookListenerSetup) {
       const sender = matchedSender
       const { id: productId, jumlah, from, key: messageKey, orderId, reffId, totalAmount } = order
 
+      // ============================================================
+      // BRANCH: Zoom QRIS purchase — order.metode === 'MIDTRANS-ZOOM'
+      // ============================================================
+      if (order.metode === 'MIDTRANS-ZOOM') {
+        if (order.processed) {
+          console.log(
+            `⚠️ [MID-GLOBAL-ZOOM] Order ${orderId} already processed, skipping duplicate event.`
+          )
+          return
+        }
+        try {
+          const zoomPool = require('./lib/zoom-pool')
+          const zoomClient = require('./lib/zoom-client')
+          const { saveReceipt } = require('./config/r2-storage')
+
+          const tier = Number(order.tier || 100)
+          const zoomDetail = order.zoom || {}
+          const earmarkedHost = zoomDetail.earmarkedHost
+          if (!earmarkedHost) {
+            console.error(`❌ [MID-GLOBAL-ZOOM] Order ${orderId} has no earmarkedHost`)
+            order.processed = true
+            order.status = 'failed_no_host'
+            order.failedAt = Date.now()
+            db.data.order[sender] = order
+            await db.save()
+            try {
+              await globalRonzz.sendMessage(sender, {
+                text:
+                  `⚠️ Pembayaran kamu sudah masuk untuk order ${orderId}, tapi data host hilang. ` +
+                  `Hubungi admin untuk refund.`,
+              })
+            } catch (_) { /* ignore */ }
+            return
+          }
+
+          // Mark as processed BEFORE creating to prevent duplicate webhook race
+          order.processed = true
+          db.data.order[sender] = order
+          await db.save()
+
+          // Re-validate slot availability and create on the earmarked host.
+          // allowFallback=true: kalau host yang di-earmark sudah penuh,
+          // failover ke host lain di tier yang sama.
+          let createResult
+          try {
+            createResult = await zoomPool.createMeetingOnHost({
+              tier,
+              host: earmarkedHost,
+              topic: zoomDetail.topic,
+              startTimeIso: zoomDetail.startTimeIso,
+              durationMinutes: zoomDetail.durationMinutes,
+              password: zoomDetail.password,
+              timezone: zoomDetail.timezone,
+              startAtUtcMs: zoomDetail.startAtUtcMs,
+              allowFallback: true,
+            })
+          } catch (createErr) {
+            console.error(
+              `❌ [MID-GLOBAL-ZOOM] createMeetingOnHost failed for ${orderId}:`,
+              createErr.message
+            )
+            createResult = { ok: false, error: 'CREATE_EXCEPTION', detail: createErr.message }
+          }
+
+          if (!createResult || !createResult.ok) {
+            order.status = 'failed_create_meeting'
+            order.failedAt = Date.now()
+            order.failureReason = createResult ? createResult.error : 'unknown'
+            db.data.order[sender] = order
+            await db.save()
+            // Notify customer + owner — refund manual
+            const failMsg =
+              `⚠️ *PEMBAYARAN BERHASIL TAPI MEETING GAGAL DIBUAT*\n\n` +
+              `Order ID: ${orderId}\n` +
+              `RefId: ${reffId}\n` +
+              `Tier: Zoom ${tier}p\n` +
+              `Reason: ${createResult ? createResult.error : 'unknown'}\n\n` +
+              `Silakan hubungi admin untuk refund. Saldo / nominal QRIS akan dikembalikan.`
+            try {
+              await globalRonzz.sendMessage(sender, { text: failMsg })
+            } catch (_) { /* ignore */ }
+            try {
+              await globalRonzz.sendMessage(ownerNomer + '@s.whatsapp.net', {
+                text:
+                  `🚨 *ZOOM-QRIS REFUND REQUIRED*\n\n` +
+                  `Customer: ${sender.split('@')[0]}\n` +
+                  `Tier: ${tier}p\nAmount: Rp${Number(totalAmount).toLocaleString('id-ID')}\n` +
+                  `Order ID: ${orderId}\nRefId: ${reffId}\nReason: ${createResult ? createResult.error : 'unknown'}`,
+              })
+            } catch (_) { /* ignore */ }
+            return
+          }
+
+          const meeting = createResult.meeting
+          const usedHost = createResult.host
+          const hostInfo = createResult.hostInfo
+
+          // Delete QRIS bubble if present
+          if (globalRonzz && messageKey) {
+            try {
+              const keyId = messageKey.id || messageKey
+              await globalRonzz.deleteMessage(from, keyId)
+            } catch (e) {
+              console.error(`⚠️ [MID-GLOBAL-ZOOM] Error deleting QR bubble:`, e.message)
+            }
+          }
+
+          // Build invite + receipt (re-using the same format as saldo path)
+          const tzShort = (zoomDetail.timezone.split('/').pop() || zoomDetail.timezone).replace(
+            /_/g,
+            ' '
+          )
+          const startMom = moment.tz(zoomDetail.startTimeIso, zoomDetail.timezone).locale('en')
+          let timeLine
+          if (zoomDetail.isFullDay) {
+            const days = Math.max(1, Math.round(zoomDetail.durationMinutes / (60 * 24)))
+            timeLine =
+              days === 1
+                ? `${startMom.format('MMM D, YYYY')} 0:00 ${tzShort}`
+                : `${startMom.format('MMM D')} – ${startMom
+                  .clone()
+                  .add(days, 'days')
+                  .subtract(1, 'day')
+                  .format('MMM D, YYYY')} 0:00 ${tzShort}`
+          } else {
+            timeLine = `${startMom.format('MMM D, YYYY H:mm')} ${tzShort}`
+          }
+
+          const meetingIdFmt = String(meeting.id).replace(/(\d{3})(\d{4})(\d+)/, '$1 $2 $3')
+          const hostName =
+            (hostInfo && (hostInfo.first_name || hostInfo.display_name || hostInfo.email)) ||
+            usedHost.label
+          const hostKey =
+            (hostInfo && hostInfo.host_key ? String(hostInfo.host_key).trim() : '') ||
+            (usedHost && usedHost.hostKey ? String(usedHost.hostKey).trim() : '') ||
+            String(process.env.ZOOM_DEFAULT_HOSTKEY || '').trim() ||
+            '123123'
+
+          const inviteLines = [
+            `${hostName} is inviting you to a scheduled Zoom meeting.`,
+            '',
+            `Topic: ${meeting.topic}`,
+            `Time: ${timeLine}`,
+            '',
+            'Join Zoom Meeting',
+            meeting.join_url,
+            '',
+            `Meeting ID: ${meetingIdFmt}`,
+          ]
+          if (meeting.password) inviteLines.push(`Passcode: ${meeting.password}`)
+          if (hostKey) inviteLines.push(`Hostkey: ${hostKey}`)
+
+          const infoText =
+            `✅ *PEMBELIAN BERHASIL — QRIS*\n` +
+            `*Tier:* Zoom ${tier}p\n` +
+            `*Harga:* Rp ${Number(totalAmount).toLocaleString('id-ID')}\n` +
+            `*RefId:* ${reffId}\n\n` +
+            `_Link meeting di bawah, tap & tahan untuk copy & forward ke peserta._`
+
+          if (globalRonzz) {
+            try {
+              await globalRonzz.sendMessage(sender, { text: infoText })
+              await sleep(500)
+              await globalRonzz.sendMessage(sender, { text: inviteLines.join('\n') })
+            } catch (sendErr) {
+              console.error(`❌ [MID-GLOBAL-ZOOM] Error sending invite:`, sendErr.message)
+            }
+          }
+
+          // Save receipt
+          try {
+            const receiptText = [
+              '=== ZOOM MEETING RECEIPT ===',
+              `Ref ID     : ${reffId}`,
+              `Order ID   : ${orderId}`,
+              `Tanggal    : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY HH:mm')} WIB`,
+              `User       : ${sender.split('@')[0]}`,
+              `Tier       : Zoom ${tier}p`,
+              `Harga      : Rp ${Number(totalAmount).toLocaleString('id-ID')}`,
+              `Metode     : QRIS`,
+              `Host Akun  : ${usedHost.label}`,
+              '',
+              '--- INVITE TEXT ---',
+              inviteLines.join('\n'),
+            ].join('\n')
+            await saveReceipt(reffId, receiptText)
+          } catch (recErr) {
+            console.error(`❌ [MID-GLOBAL-ZOOM] Error saving receipt:`, recErr.message)
+          }
+
+          // Log transaksi
+          if (!db.data.transaksi) db.data.transaksi = []
+          db.data.transaksi.push({
+            id: `zoom${tier}`,
+            name: `Zoom ${tier}p — ${meeting.topic}`,
+            price: Number(totalAmount),
+            date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
+            profit: Number(totalAmount),
+            jumlah: 1,
+            user: sender.split('@')[0],
+            userRole: db.data.users[sender]?.role || 'bronze',
+            reffId,
+            metodeBayar: 'QRIS',
+            totalBayar: Number(totalAmount),
+            akun: {
+              tier,
+              meetingId: String(meeting.id),
+              topic: meeting.topic,
+              join_url: meeting.join_url,
+              password: meeting.password || '',
+              start_time: meeting.start_time,
+              duration: meeting.duration,
+              hostLabel: usedHost.label,
+            },
+          })
+
+          order.status = 'success'
+          db.data.order[sender] = order
+          await db.save()
+          if (typeof global.scheduleSave === 'function') global.scheduleSave()
+          delete db.data.order[sender]
+          await db.save()
+
+          console.log(`✅ [MID-GLOBAL-ZOOM] Zoom-QRIS completed: ${orderId} - ${reffId}`)
+
+          // Telegram notification
+          try {
+            await sendPaymentNotification({
+              amount: totalAmount,
+              phoneNumber: sender,
+              orderId,
+              type: `zoom${tier}-qris`,
+            })
+          } catch (telErr) {
+            console.error(`⚠️ [MID-GLOBAL-ZOOM] Telegram notify failed:`, telErr.message)
+          }
+        } catch (err) {
+          console.error(`❌ [MID-GLOBAL-ZOOM] Unhandled error:`, err.message, err.stack)
+        }
+        return
+      }
+
+      // ============================================================
+      // (continues) BRANCH: regular product purchase — existing logic
+      // ============================================================
       if (!db.data.produk[productId]) {
         console.error(`❌ [MID-GLOBAL] Product ${productId} not found`)
         return
@@ -1622,6 +1867,8 @@ module.exports = async (nicola, m, mek) => {
           'pool100del', 'pool300del', 'pool500del', 'pool1000del',
           // user-facing buy via saldo (per tier)
           'zoom100', 'zoom300', 'zoom500', 'zoom1000',
+          // user-facing buy via QRIS (per tier)
+          'zoom100qris', 'zoom300qris', 'zoom500qris', 'zoom1000qris',
           // legacy user aliases (backwards compat)
           'belizoom', 'belizoom100', 'buyzoom', 'buyzoom100',
         ].includes(cmdOnly)
@@ -1655,7 +1902,216 @@ module.exports = async (nicola, m, mek) => {
             if (flowIsPool) {
               // Tier dari state (default 100 untuk backwards-compat)
               const tier = Number(db.data.zoomFlow[sender].tier || 100)
+              const paymentMode = db.data.zoomFlow[sender].paymentMode || 'saldo'
 
+              // ====== QRIS PATH ======
+              if (flowIsBuy && paymentMode === 'qris') {
+                const priceInfo = zoomPricing.calculatePrice(
+                  parsed.durationMinutes,
+                  parsed.isFullDay,
+                  tier
+                )
+
+                // Pre-flight: scan pool, pick first available host. Kalau semua bentrok,
+                // batalin tanpa generate QRIS (tidak ambil pembayaran kalau tidak bisa deliver).
+                let preCheck
+                try {
+                  preCheck = await zoomPool.findFirstAvailableHost({
+                    tier,
+                    durationMinutes: parsed.durationMinutes,
+                    startAtUtcMs: startUtcMs,
+                  })
+                } catch (preErr) {
+                  delete db.data.zoomFlow[sender]
+                  return reply(
+                    `❌ Gagal cek ketersediaan pool: ${preErr && preErr.message ? preErr.message : preErr}`
+                  )
+                }
+
+                if (!preCheck.ok) {
+                  delete db.data.zoomFlow[sender]
+                  if (preCheck.error === 'POOL_EMPTY') {
+                    return reply(`❌ Layanan Zoom ${tier}p sedang tidak tersedia. Hubungi admin.`)
+                  }
+                  const tzShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(
+                    /_/g,
+                    ' '
+                  )
+                  const summary = (preCheck.reasons || [])
+                    .map((r) => {
+                      if (r.status === 'busy') {
+                        const conflictLines = r.detail
+                          .map((c) => {
+                            const t = moment(c.start_time)
+                              .tz(parsed.timezone)
+                              .format('DD MMM HH:mm')
+                            return `    • ${c.topic} — ${t} (${c.duration} menit)`
+                          })
+                          .join('\n')
+                        return `❌ [${r.label}] penuh (limit ${r.allowed || 1}):\n${conflictLines}`
+                      }
+                      if (r.status === 'error') return `⚠️ [${r.label}] error: ${r.detail}`
+                      return `? [${r.label}] ${r.status}`
+                    })
+                    .join('\n')
+                  return reply(
+                    `❌ *Semua akun Zoom ${tier}p tidak tersedia* di jam yang kamu minta (${tzShort}).\n\n` +
+                      `QRIS *tidak* digenerate karena meeting tidak bisa dibuat.\n\n` +
+                      summary +
+                      `\n\nSilakan pilih jam lain. Ketik \`${prefix}zoom${tier}qris\` untuk mulai ulang.`
+                  )
+                }
+
+                const earmarkedHost = preCheck.host
+
+                // Acquire lock supaya user tidak men-spam form QRIS sambil tunggu
+                const gotLock = await acquireLock(sender, 'mid', 30)
+                if (!gotLock) {
+                  return reply(
+                    `⚠️ Transaksi lain sedang diproses. Tunggu sebentar atau ketik \`${prefix}batal\`.`
+                  )
+                }
+
+                try {
+                  // Init order shell early so global webhook listener can find it
+                  if (!db.data.order) db.data.order = {}
+                  if (db.data.order[sender]) {
+                    return reply(
+                      `Kamu sedang melakukan order, tunggu sampai selesai atau ketik \`${prefix}batal\`.`
+                    )
+                  }
+
+                  const reffId = crypto.randomBytes(5).toString('hex').toUpperCase()
+                  const uniqueCode = Math.floor(1 + Math.random() * 99)
+                  const totalAmount = Number(priceInfo.price) + uniqueCode
+                  const createdAtTs = Date.now()
+                  const orderId = `ZOOM-${tier}-${reffId}-${createdAtTs}`
+
+                  await reply('⏳ Membuat QR Code pembayaran ...')
+
+                  let qrImagePath
+                  try {
+                    qrImagePath = await qrisDinamis(
+                      `${totalAmount}`,
+                      './options/sticker/qris.jpg'
+                    )
+                  } catch (qrErr) {
+                    delete db.data.zoomFlow[sender]
+                    return reply(
+                      `❌ Gagal generate QRIS: ${qrErr && qrErr.message ? qrErr.message : qrErr}`
+                    )
+                  }
+
+                  const expirationTime = Date.now() + toMs('30m')
+                  const expireDate = new Date(expirationTime)
+                  const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000))
+                  const currentTime = new Date().toLocaleString('en-US', {
+                    timeZone: 'Asia/Jakarta',
+                  })
+                  const expireTimeJakarta = new Date(
+                    new Date(currentTime).getTime() + timeLeft * 60000
+                  )
+                  const formattedTime = `${expireTimeJakarta.getHours().toString().padStart(2, '0')}:${expireTimeJakarta.getMinutes().toString().padStart(2, '0')}`
+
+                  const caption =
+                    `*🧾 MENUNGGU PEMBAYARAN — ZOOM ${tier}p 🧾*\n\n` +
+                    `*Topik:* ${parsed.topic}\n` +
+                    `*Durasi:* ${priceInfo.breakdown}\n` +
+                    `*Subtotal:* Rp${Number(priceInfo.price).toLocaleString('id-ID')}\n` +
+                    `*Kode Unik:* *${uniqueCode}*\n` +
+                    `*Total:* *Rp${Number(totalAmount).toLocaleString('id-ID')}*\n` +
+                    `*Order ID:* ${orderId}\n` +
+                    `*Waktu:* ${timeLeft} menit\n\n` +
+                    `📱 *Cara Bayar:*\n` +
+                    `1. Scan QRIS di atas dengan aplikasi pembayaran kamu.\n` +
+                    `2. *Nominal sudah ter-set otomatis: Rp${Number(totalAmount).toLocaleString('id-ID')}*\n` +
+                    `   (Rp${Number(priceInfo.price).toLocaleString('id-ID')} + *kode unik ${uniqueCode}*)\n` +
+                    `3. Setelah bayar, bot otomatis bikin meeting & kirim invite.\n\n` +
+                    `⏰ Batas waktu: sebelum ${formattedTime}\n` +
+                    `Jika ingin membatalkan, ketik *${prefix}batal*`
+
+                  const qrImage = await fs.promises.readFile(qrImagePath)
+                  const message = await nicola.sendMessage(
+                    from,
+                    { image: qrImage, caption },
+                    { quoted: m }
+                  )
+
+                  // Register order. metode = 'MIDTRANS-ZOOM' supaya webhook listener
+                  // mengarahkannya ke Zoom branch, bukan product branch.
+                  db.data.order[sender] = {
+                    status: 'awaiting_payment',
+                    metode: 'MIDTRANS-ZOOM',
+                    tier,
+                    orderId,
+                    reffId,
+                    totalAmount,
+                    uniqueCode,
+                    createdAt: createdAtTs,
+                    from,
+                    key: message.key,
+                    zoom: {
+                      tier,
+                      topic: parsed.topic,
+                      startTimeIso: parsed.startTimeIso,
+                      durationMinutes: parsed.durationMinutes,
+                      password: parsed.password,
+                      timezone: parsed.timezone,
+                      isFullDay: !!parsed.isFullDay,
+                      startAtUtcMs: startUtcMs,
+                      // Earmarked host snapshot (credentials & label/timezone)
+                      earmarkedHost: {
+                        label: earmarkedHost.label,
+                        accountId: earmarkedHost.accountId,
+                        clientId: earmarkedHost.clientId,
+                        clientSecret: earmarkedHost.clientSecret,
+                        userId: earmarkedHost.userId,
+                        timezone: earmarkedHost.timezone,
+                        hostKey: earmarkedHost.hostKey || '',
+                        concurrentMeetings: earmarkedHost.concurrentMeetings,
+                      },
+                    },
+                  }
+                  requestPendingOrderSave()
+
+                  // Clear flow state — order tracking kini di db.data.order[sender]
+                  delete db.data.zoomFlow[sender]
+
+                  console.log(
+                    `📝 [ZOOM-QRIS] Order created tier=${tier} ${orderId} amount=Rp${totalAmount} sender=${sender}`
+                  )
+
+                  // Polling timeout — kalau tidak ada webhook dalam 30 menit, batalkan
+                  ;(async () => {
+                    while (db.data.order[sender]) {
+                      await sleep(5000)
+                      const ord = db.data.order[sender]
+                      if (!ord || ord.status !== 'awaiting_payment') break
+                      if (Date.now() >= expirationTime) {
+                        try {
+                          await nicola.sendMessage(from, { delete: message.key })
+                        } catch (_) { /* ignore */ }
+                        try {
+                          await nicola.sendMessage(from, {
+                            text: '⏰ QRIS expired. Pembayaran dibatalkan karena melewati batas waktu 30 menit.',
+                          })
+                        } catch (_) { /* ignore */ }
+                        delete db.data.order[sender]
+                        requestPendingOrderSave()
+                        break
+                      }
+                    }
+                  })().catch((e) =>
+                    console.error('[ZOOM-QRIS] timeout poller error:', e.message)
+                  )
+
+                  return
+                } finally {
+                  await releaseLock(sender, 'mid')
+                }
+              }
+
+              // ====== SALDO PATH (existing) ======
               // Hitung harga dulu kalau buy mode, dan cek saldo.
               let priceInfo = null
               if (flowIsBuy) {
@@ -3378,6 +3834,63 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
             `• Kalau saldo kurang, bot akan kasih info topup pakai \`${prefix}deposit <nominal>\`.\n` +
             `• Ketik \`${prefix}batal\` untuk membatalkan.\n` +
             `• Sesi hangus otomatis setelah 15 menit.`,
+        })
+        return
+      }
+      // ===== USER-FACING: BELI ZOOM via QRIS (per tier) =====
+      case 'zoom100qris':
+      case 'zoom300qris':
+      case 'zoom500qris':
+      case 'zoom1000qris': {
+        // Open for ALL users
+        const tierMatch = (command || '').match(/^zoom(\d+)qris$/i)
+        const tier = tierMatch ? Number(tierMatch[1]) : 100
+        if (!zoomPool.isValidTier(tier)) {
+          return reply(`❌ Tier tidak valid: ${tier}.`)
+        }
+
+        const pool = zoomPool.loadPool(tier)
+        if (!pool.length) {
+          return reply(`❌ Layanan Zoom ${tier}p sedang tidak tersedia. Hubungi admin.`)
+        }
+
+        if (!db.data.users[sender]) db.data.users[sender] = { saldo: 0, role: 'bronze' }
+
+        if (!db.data.zoomFlow) db.data.zoomFlow = {}
+        if (db.data.zoomFlow[sender]) {
+          return reply(
+            `Kamu masih ada sesi pembelian Zoom aktif. Ketik \`${prefix}batal\` untuk membatalkan.`
+          )
+        }
+        if (db.data.order && db.data.order[sender]) {
+          return reply(
+            `Kamu masih ada order pembayaran aktif. Tunggu selesai atau ketik \`${prefix}batal\`.`
+          )
+        }
+
+        db.data.zoomFlow[sender] = {
+          session: 'WAIT-FORM',
+          startedAt: Date.now(),
+          poolMode: true,
+          buyMode: true,
+          paymentMode: 'qris',
+          tier,
+        }
+
+        const rates = zoomPricing.describeRates(tier)
+        await sendZoomFormPrompt(nicola, m, from, {
+          intro:
+            `🛒 *BELI ZOOM ${tier} PARTICIPANTS — QRIS*\n\n` +
+            `*Harga:*\n${rates.text}\n\n` +
+            `Bayar via QRIS Midtrans. Setelah QR muncul, bayar dalam 30 menit. ` +
+            `Setelah pembayaran terdeteksi, bot otomatis bikin meeting & kirim invite.\n\n` +
+            `Balas dengan template di bawah (tap & tahan untuk copy):`,
+          footer:
+            `_Catatan:_\n` +
+            `• Bot cek dulu apakah ada akun yang kosong di jam itu sebelum kirim QRIS.\n` +
+            `• Kalau semua akun bentrok, bot tolak dan tidak generate QRIS.\n` +
+            `• QRIS expired dalam 30 menit kalau belum dibayar.\n` +
+            `• Ketik \`${prefix}batal\` untuk membatalkan.`,
         })
         return
       }
