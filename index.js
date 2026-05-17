@@ -892,6 +892,26 @@ if (!global.midtransWebhookListenerSetup) {
               await globalRonzz.sendMessage(sender, { text: infoText })
               await sleep(500)
               await globalRonzz.sendMessage(sender, { text: inviteLines.join('\n') })
+
+              // Kalau order datang dari grup, kirim notifikasi sukses publik
+              // tanpa bocorin link/password — link cuma dikirim ke PM customer.
+              if (from && from.endsWith('@g.us') && from !== sender) {
+                try {
+                  const groupNote =
+                    `🎉 Pembayaran QRIS berhasil! @${sender.split('@')[0]} telah menerima ` +
+                    `link Zoom ${tier}p di chat pribadi. Terima kasih!`
+                  await globalRonzz.sendMessage(
+                    from,
+                    { text: groupNote, mentions: [sender] },
+                    { quoted: messageKey ? { key: messageKey } : undefined }
+                  )
+                } catch (groupNotifErr) {
+                  console.error(
+                    `❌ [MID-GLOBAL-ZOOM] Error sending group confirmation:`,
+                    groupNotifErr.message
+                  )
+                }
+              }
             } catch (sendErr) {
               console.error(`❌ [MID-GLOBAL-ZOOM] Error sending invite:`, sendErr.message)
             }
