@@ -1081,7 +1081,6 @@ if (!global.midtransWebhookListenerSetup) {
         }
       }
 
-      const moment = require('moment-timezone')
       const tanggal = moment.tz('Asia/Jakarta').format('DD/MM/YYYY')
       const jamwib = moment.tz('Asia/Jakarta').format('HH:mm:ss')
 
