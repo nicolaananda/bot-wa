@@ -1,0 +1,12 @@
+[
+  {
+    "label": "Akun 300p A",
+    "accountId": "PASTE_ACCOUNT_ID_HERE",
+    "clientId": "PASTE_CLIENT_ID_HERE",
+    "clientSecret": "PASTE_CLIENT_SECRET_HERE",
+    "userId": "me",
+    "timezone": "Asia/Jakarta",
+    "hostKey": "",
+    "notes": "Akun Zoom 300p"
+  }
+]

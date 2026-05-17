@@ -53,3 +53,7 @@ options/sticker/*
 
 # Zoom host pool (multi-account credentials — never commit)
 config/zoom-pool.json
+config/zoom-pool-100.json
+config/zoom-pool-300.json
+config/zoom-pool-500.json
+config/zoom-pool-1000.json

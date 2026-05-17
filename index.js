@@ -1613,7 +1613,18 @@ module.exports = async (nicola, m, mek) => {
       const cmdOnly = (command || '').toLowerCase()
       const skipFlow =
         ['batal', prefix + 'batal', 'cancel', prefix + 'cancel'].includes(lowered) ||
-        ['zoom', 'zoomlarge', 'zoomscheduled', 'zoom100', 'zoompool', 'belizoom100', 'belizoom'].includes(cmdOnly)
+        [
+          // admin single-account
+          'zoom', 'zoomlarge', 'zoomscheduled',
+          // admin pool management (per tier)
+          'pool100', 'pool300', 'pool500', 'pool1000',
+          'pool100list', 'pool300list', 'pool500list', 'pool1000list',
+          'pool100del', 'pool300del', 'pool500del', 'pool1000del',
+          // user-facing buy via saldo (per tier)
+          'zoom100', 'zoom300', 'zoom500', 'zoom1000',
+          // legacy user aliases (backwards compat)
+          'belizoom', 'belizoom100', 'buyzoom', 'buyzoom100',
+        ].includes(cmdOnly)
 
       if (!skipFlow) {
         if (flow.session === 'WAIT-FORM') {
@@ -1640,12 +1651,19 @@ module.exports = async (nicola, m, mek) => {
 
             const startUtcMs = moment.tz(parsed.startTimeIso, parsed.timezone).valueOf()
 
-            // ====== MODE POOL (#zoom100) / BUY (beli zoom100) ======
+            // ====== MODE POOL (#poolXXX admin / zoomXXX user buy) ======
             if (flowIsPool) {
+              // Tier dari state (default 100 untuk backwards-compat)
+              const tier = Number(db.data.zoomFlow[sender].tier || 100)
+
               // Hitung harga dulu kalau buy mode, dan cek saldo.
               let priceInfo = null
               if (flowIsBuy) {
-                priceInfo = zoomPricing.calculatePrice(parsed.durationMinutes, parsed.isFullDay)
+                priceInfo = zoomPricing.calculatePrice(
+                  parsed.durationMinutes,
+                  parsed.isFullDay,
+                  tier
+                )
 
                 if (!db.data.users[sender]) db.data.users[sender] = { saldo: 0, role: 'bronze' }
                 const saldoUser = Number(db.data.users[sender].saldo || 0)
@@ -1654,6 +1672,7 @@ module.exports = async (nicola, m, mek) => {
                   const kurang = priceInfo.price - saldoUser
                   return reply(
                     `❌ *Saldo kamu tidak cukup*\n\n` +
+                      `*Tier:* Zoom ${tier}p\n` +
                       `*Harga:* Rp ${priceInfo.price.toLocaleString('id-ID')}\n` +
                       `*Saldo kamu:* Rp ${saldoUser.toLocaleString('id-ID')}\n` +
                       `*Kurang:* Rp ${kurang.toLocaleString('id-ID')}\n\n` +
@@ -1678,6 +1697,7 @@ module.exports = async (nicola, m, mek) => {
               try {
                 try {
                   poolResult = await zoomPool.createMeetingOnFirstAvailable({
+                    tier,
                     topic: parsed.topic,
                     startTimeIso: parsed.startTimeIso,
                     durationMinutes: parsed.durationMinutes,
@@ -1695,8 +1715,8 @@ module.exports = async (nicola, m, mek) => {
                   if (poolResult.error === 'POOL_EMPTY') {
                     return reply(
                       flowIsBuy
-                        ? '❌ Layanan Zoom sedang tidak tersedia. Hubungi admin.'
-                        : '❌ Host pool kosong. Isi `config/zoom-pool.json` di server.'
+                        ? `❌ Layanan Zoom ${tier}p sedang tidak tersedia. Hubungi admin.`
+                        : `❌ Host pool tier ${tier} kosong. Isi \`config/zoom-pool-${tier}.json\` di server.`
                     )
                   }
                   const tzShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(
@@ -1722,7 +1742,7 @@ module.exports = async (nicola, m, mek) => {
                       return `? [${r.label}] ${r.status}`
                     })
                     .join('\n')
-                  const retryCmd = flowIsBuy ? `${prefix}belizoom100` : `${prefix}zoom100`
+                  const retryCmd = flowIsBuy ? `${prefix}zoom${tier}` : `${prefix}pool${tier}`
                   return reply(
                     `❌ *Semua akun Zoom tidak tersedia* di jam yang kamu minta (${tzShort}).\n\n` +
                       (flowIsBuy
@@ -1753,8 +1773,8 @@ module.exports = async (nicola, m, mek) => {
                   // Log transaksi — mirror structure pada buy flow existing
                   if (!db.data.transaksi) db.data.transaksi = []
                   db.data.transaksi.push({
-                    id: 'zoom100',
-                    name: `Zoom 100p — ${meeting.topic}`,
+                    id: `zoom${tier}`,
+                    name: `Zoom ${tier}p — ${meeting.topic}`,
                     price: priceInfo.price,
                     date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
                     profit: priceInfo.price,
@@ -1765,6 +1785,7 @@ module.exports = async (nicola, m, mek) => {
                     metodeBayar: 'Saldo',
                     totalBayar: priceInfo.price,
                     akun: {
+                      tier,
                       meetingId: String(meeting.id),
                       topic: meeting.topic,
                       join_url: meeting.join_url,
@@ -3116,15 +3137,25 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
             `\n\n_Jalankan \`${prefix}largelist\` untuk lihat daftar terbaru._`
         )
       }
-      case 'zoom100':
-      case 'zoompool': {
+      // ===== ADMIN POOL MANAGEMENT (per tier) =====
+      case 'pool100':
+      case 'pool300':
+      case 'pool500':
+      case 'pool1000': {
         if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
 
-        const pool = zoomPool.loadPool()
+        // Resolve tier from command name
+        const tierMatch = (command || '').match(/^pool(\d+)$/i)
+        const tier = tierMatch ? Number(tierMatch[1]) : 100
+        if (!zoomPool.isValidTier(tier)) {
+          return reply(`❌ Tier tidak valid: ${tier}. Pakai 100 / 300 / 500 / 1000.`)
+        }
+
+        const pool = zoomPool.loadPool(tier)
         if (!pool.length) {
           return reply(
-            `❌ Host pool kosong. Isi dulu \`config/zoom-pool.json\` di server ` +
-              `(contoh: \`config/zoom-pool.example.json\`).`
+            `❌ Host pool tier ${tier} kosong. Isi dulu \`config/zoom-pool-${tier}.json\` di server ` +
+              `(contoh: \`config/zoom-pool-${tier}.example.json\`).`
           )
         }
 
@@ -3140,11 +3171,12 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           session: 'WAIT-FORM',
           startedAt: Date.now(),
           poolMode: true,
+          tier,
         }
 
         await sendZoomFormPrompt(nicola, m, from, {
           intro:
-            `🎯 *ZOOM 100p — POOL (${pool.length} host)*\n\n` +
+            `🎯 *ZOOM ${tier}p — POOL (${pool.length} host)*\n\n` +
             `Bot akan coba host satu per satu sesuai urutan, ` +
             `dan pakai yang pertama yang kosong di jam itu.\n\n` +
             `Balas dengan salah satu template di bawah (tap & tahan pesan template untuk copy):`,
@@ -3156,15 +3188,24 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         })
         return
       }
-      case 'zoom100list':
-      case 'poollist': {
+      case 'pool100list':
+      case 'pool300list':
+      case 'pool500list':
+      case 'pool1000list': {
         if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
-        const pool = zoomPool.loadPool()
-        if (!pool.length) return reply('❌ Host pool kosong. Isi `config/zoom-pool.json`.')
+        const tierMatch = (command || '').match(/^pool(\d+)list$/i)
+        const tier = tierMatch ? Number(tierMatch[1]) : 100
+        if (!zoomPool.isValidTier(tier)) {
+          return reply(`❌ Tier tidak valid: ${tier}.`)
+        }
+
+        const pool = zoomPool.loadPool(tier)
+        if (!pool.length)
+          return reply(`❌ Host pool tier ${tier} kosong. Isi \`config/zoom-pool-${tier}.json\`.`)
 
         try {
-          await reply(`⏳ Mengambil jadwal dari ${pool.length} host...`)
-          const { meetings, errors } = await zoomPool.listAllUpcoming()
+          await reply(`⏳ Mengambil jadwal dari ${pool.length} host (tier ${tier}p)...`)
+          const { meetings, errors } = await zoomPool.listAllUpcoming(tier)
           const tz = process.env.ZOOM_DEFAULT_TIMEZONE || 'Asia/Jakarta'
 
           const sorted = meetings
@@ -3173,15 +3214,16 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
           if (!db.data.zoomPoolList) db.data.zoomPoolList = {}
           if (!sorted.length) {
-            db.data.zoomPoolList[sender] = { items: [], createdAt: Date.now() }
+            db.data.zoomPoolList[sender] = { items: [], tier, createdAt: Date.now() }
             const errText = errors.length
               ? '\n\n⚠️ Error di sebagian host:\n' +
                 errors.map((e) => `• ${e.label}: ${e.error}`).join('\n')
               : ''
-            return reply('📋 Tidak ada meeting terjadwal di pool.' + errText)
+            return reply(`📋 Tidak ada meeting terjadwal di pool tier ${tier}.` + errText)
           }
 
           const items = sorted.map((mt) => ({
+            tier,
             hostLabel: mt.hostLabel,
             hostAccountId: mt.hostAccountId,
             id: String(mt.id),
@@ -3189,9 +3231,9 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
             start_time: mt.start_time,
             duration: Number(mt.duration || 0),
           }))
-          db.data.zoomPoolList[sender] = { items, createdAt: Date.now() }
+          db.data.zoomPoolList[sender] = { items, tier, createdAt: Date.now() }
 
-          const header = `📋 *DAFTAR ZOOM POOL* (${items.length} meeting di ${pool.length} host)\n`
+          const header = `📋 *DAFTAR ZOOM POOL ${tier}p* (${items.length} meeting di ${pool.length} host)\n`
           const lines = items.map((mt, i) => {
             const idFmt = mt.id.replace(/(\d{3})(\d{4})(\d+)/, '$1 $2 $3')
             const t = moment(mt.start_time).tz(tz).format('DD MMM YYYY HH:mm')
@@ -3202,8 +3244,8 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
               errors.map((e) => `• ${e.label}: ${e.error}`).join('\n')
             : ''
           const footer =
-            `\n\n_Hapus meeting: \`${prefix}zoom100del <nomor>\`_\n` +
-            `_Contoh: \`${prefix}zoom100del 1\` atau \`${prefix}zoom100del 1 3\`_`
+            `\n\n_Hapus meeting: \`${prefix}pool${tier}del <nomor>\`_\n` +
+            `_Contoh: \`${prefix}pool${tier}del 1\` atau \`${prefix}pool${tier}del 1 3\`_`
 
           return reply(header + '\n' + lines.join('\n\n') + errText + footer)
         } catch (e) {
@@ -3212,8 +3254,10 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           return reply(`❌ Gagal mengambil daftar meeting pool: ${msg}`)
         }
       }
-      case 'zoom100del':
-      case 'pooldel': {
+      case 'pool100del':
+      case 'pool300del':
+      case 'pool500del':
+      case 'pool1000del': {
         if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
         if (!db.data.zoomPoolList) db.data.zoomPoolList = {}
         const state = db.data.zoomPoolList[sender]
@@ -3224,16 +3268,18 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           !state.items.length ||
           Date.now() - (state.createdAt || 0) > 10 * 60 * 1000
         ) {
+          const tier = state && state.tier ? state.tier : 100
           return reply(
             `❌ Daftar meeting pool tidak valid / kadaluarsa.\n` +
-              `Jalankan \`${prefix}zoom100list\` dulu untuk refresh.`
+              `Jalankan \`${prefix}pool${tier}list\` dulu untuk refresh.`
           )
         }
 
+        const stateTier = state.tier || 100
         const raw = String(q || '').trim()
         if (!raw) {
           return reply(
-            `❌ Masukkan nomor meeting.\nContoh: \`${prefix}zoom100del 1\` atau \`${prefix}zoom100del 1 3\``
+            `❌ Masukkan nomor meeting.\nContoh: \`${prefix}pool${stateTier}del 1\` atau \`${prefix}pool${stateTier}del 1 3\``
           )
         }
 
@@ -3257,6 +3303,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         for (const mt of targets) {
           try {
             await zoomPool.deleteMeetingOn({
+              tier: mt.tier || stateTier,
               hostAccountId: mt.hostAccountId,
               hostLabel: mt.hostLabel,
               meetingId: mt.id,
@@ -3271,22 +3318,33 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         delete db.data.zoomPoolList[sender]
 
         return reply(
-          `🗑️ *HASIL HAPUS ZOOM POOL*\n\n` +
+          `🗑️ *HASIL HAPUS ZOOM POOL ${stateTier}p*\n\n` +
             results.join('\n') +
-            `\n\n_Jalankan \`${prefix}zoom100list\` untuk lihat daftar terbaru._`
+            `\n\n_Jalankan \`${prefix}pool${stateTier}list\` untuk lihat daftar terbaru._`
         )
       }
+      // ===== USER-FACING: BELI ZOOM via SALDO (per tier) =====
+      case 'zoom100':
+      case 'zoom300':
+      case 'zoom500':
+      case 'zoom1000':
       case 'belizoom100':
       case 'belizoom':
       case 'buyzoom100':
       case 'buyzoom': {
         // Open for ALL users (reseller flow). No isOwner guard.
-        const pool = zoomPool.loadPool()
-        if (!pool.length) {
-          return reply('❌ Layanan Zoom sedang tidak tersedia. Hubungi admin.')
+        const tierMatch = (command || '').match(/^zoom(\d+)$/i)
+        const tier = tierMatch ? Number(tierMatch[1]) : 100
+        if (!zoomPool.isValidTier(tier)) {
+          return reply(`❌ Tier tidak valid: ${tier}. Pakai 100 / 300 / 500 / 1000.`)
         }
 
-        // Init user record kalau belum ada (mirror pattern di case 'deposit')
+        const pool = zoomPool.loadPool(tier)
+        if (!pool.length) {
+          return reply(`❌ Layanan Zoom ${tier}p sedang tidak tersedia. Hubungi admin.`)
+        }
+
+        // Init user record kalau belum ada
         if (!db.data.users[sender]) db.data.users[sender] = { saldo: 0, role: 'bronze' }
 
         if (!db.data.zoomFlow) db.data.zoomFlow = {}
@@ -3301,14 +3359,15 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           startedAt: Date.now(),
           poolMode: true,
           buyMode: true,
+          tier,
         }
 
-        const rates = zoomPricing.describeRates()
+        const rates = zoomPricing.describeRates(tier)
         const saldoUser = Number(db.data.users[sender].saldo || 0)
 
         await sendZoomFormPrompt(nicola, m, from, {
           intro:
-            `🛒 *BELI ZOOM 100 PARTICIPANTS*\n\n` +
+            `🛒 *BELI ZOOM ${tier} PARTICIPANTS*\n\n` +
             `*Harga:*\n${rates.text}\n\n` +
             `*Saldo kamu saat ini:* Rp ${saldoUser.toLocaleString('id-ID')}\n\n` +
             `Balas dengan salah satu template di bawah (tap & tahan pesan template untuk copy):`,

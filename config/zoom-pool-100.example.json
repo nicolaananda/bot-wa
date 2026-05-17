@@ -6,7 +6,7 @@
     "clientSecret": "PASTE_CLIENT_SECRET_HERE",
     "userId": "me",
     "timezone": "Asia/Jakarta",
-    "hostKey": "123456",
+    "hostKey": "123123",
     "notes": "Akun Zoom 100p milik client A. hostKey opsional; kalau kosong bot pakai ZOOM_DEFAULT_HOSTKEY."
   },
   {
