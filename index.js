@@ -1363,7 +1363,7 @@ module.exports = async (nicola, m, mek) => {
     const budy = typeof m.text == 'string' ? m.text : ''
     const args = chats.split(/ +/).slice(1)
     const q = args.join(' ')
-    const command = chats.replace(prefix, '').trim().split(/ +/).shift().toLowerCase()
+    const command = (chats.replace(prefix, '').trim().match(/^\S+/) || [''])[0].toLowerCase()
     const botNumber = nicola.user.id.split(':')[0] + '@s.whatsapp.net'
     let groupMetadata = ''
     try {
@@ -3915,10 +3915,18 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           return reply(helpText)
         }
 
-        // Parser: accept newline OR ` | ` separators, key=value pairs.
+        // Parse from raw `chats` (preserves newlines + case for secrets).
+        // `q` collapses newlines into spaces, so we can't rely on it here.
+        const rawBody = chats.replace(prefix, '').replace(/^\S+\s*/, '').trim()
+        if (!rawBody) {
+          return reply(helpText)
+        }
+
+        // Parser: terima newline ATAU `|` (dengan/tanpa spasi) sebagai separator,
+        // key=value pairs.
         const fields = {}
-        const parts = String(q || '')
-          .split(/\r?\n|\s\|\s/)
+        const parts = rawBody
+          .split(/\r?\n|\s*\|\s*/)
           .map((s) => s.trim())
           .filter(Boolean)
         for (const p of parts) {
@@ -3929,8 +3937,23 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           if (key) fields[key] = val
         }
 
-        const required = ['accountId', 'clientId', 'clientSecret']
-        const missing = required.filter((k) => !fields[k])
+        // Normalise common case-insensitive aliases (user might type `accountid=` or `accountId=`)
+        const lookup = {}
+        for (const [k, v] of Object.entries(fields)) lookup[k.toLowerCase()] = v
+        const pick = (...keys) => {
+          for (const k of keys) {
+            if (lookup[k.toLowerCase()] != null) return lookup[k.toLowerCase()]
+          }
+          return undefined
+        }
+
+        const accountIdVal = pick('accountId', 'accountid', 'account_id')
+        const clientIdVal = pick('clientId', 'clientid', 'client_id')
+        const clientSecretVal = pick('clientSecret', 'clientsecret', 'client_secret')
+        const required = { accountId: accountIdVal, clientId: clientIdVal, clientSecret: clientSecretVal }
+        const missing = Object.entries(required)
+          .filter(([, v]) => !v)
+          .map(([k]) => k)
         if (missing.length) {
           return reply(
             `❌ Field wajib hilang: *${missing.join(', ')}*.\n\n` +
@@ -3939,17 +3962,18 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         }
 
         const entry = {
-          accountId: fields.accountId,
-          clientId: fields.clientId,
-          clientSecret: fields.clientSecret,
-          label: fields.label || `Host ${fields.accountId.slice(0, 6)}`,
-          userId: fields.userId || 'me',
-          timezone: fields.timezone || null,
-          hostKey: fields.hostKey || '',
-          notes: fields.notes || '',
+          accountId: accountIdVal,
+          clientId: clientIdVal,
+          clientSecret: clientSecretVal,
+          label: pick('label') || `Host ${String(accountIdVal).slice(0, 6)}`,
+          userId: pick('userId', 'userid', 'user_id') || 'me',
+          timezone: pick('timezone') || null,
+          hostKey: pick('hostKey', 'hostkey', 'host_key') || '',
+          notes: pick('notes', 'note') || '',
         }
-        if (fields.concurrentMeetings) {
-          const n = Number(fields.concurrentMeetings)
+        const concurrentRaw = pick('concurrentMeetings', 'concurrentmeetings', 'concurrent', 'concurrent_meetings')
+        if (concurrentRaw) {
+          const n = Number(concurrentRaw)
           if (Number.isFinite(n) && n >= 1) entry.concurrentMeetings = Math.floor(n)
         }
 
