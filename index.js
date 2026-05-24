@@ -81,6 +81,7 @@ const { sendPaymentNotification } = require('./lib/telegram-notifier')
 const zoomClient = require('./lib/zoom-client')
 const zoomPool = require('./lib/zoom-pool')
 const zoomPricing = require('./lib/zoom-pricing')
+const zoomLicense = require('./lib/zoom-license')
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 let pg
 if (usePg) {
@@ -608,6 +609,53 @@ moment.tz.setDefault('Asia/Jakarta').locale('id')
 // Global listener untuk webhook Midtrans (harus di luar module.exports agar bisa akses global)
 let globalRonzz = null
 
+// Setup once: notify owner whenever a Zoom host transitions disabled<->enabled.
+// Fired by lib/zoom-pool.js when license check auto-marks a host.
+if (!global.zoomHealthListenerSetup) {
+  global.zoomHealthListenerSetup = true
+  zoomPool.onHealthChange(async ({ tier, host, type, reason, detail, previousReason }) => {
+    try {
+      if (!globalRonzz) return // socket not ready yet; first transition after boot is rare
+      const target = (global.ownerNomer || '') + '@s.whatsapp.net'
+      if (!target.startsWith('@') === false) {
+        // ownerNomer empty -> skip
+      }
+      if (!global.ownerNomer) return
+
+      let body
+      if (type === 'disabled') {
+        body =
+          `🚨 *ZOOM HOST AUTO-DISABLED*\n\n` +
+          `• Tier: ${tier}p\n` +
+          `• Label: ${host.label}\n` +
+          `• Account: ${host.accountId}\n` +
+          `• Reason: \`${reason}\`\n` +
+          `• Detail: ${detail || '-'}\n\n` +
+          `Bot akan auto-skip host ini saat user beli Zoom ${tier}p.\n` +
+          `Setelah lisensi diperbaiki, jalankan \`.zoomenable${tier} ${host.label}\` ` +
+          `atau bot akan auto-recover saat next pembelian.`
+      } else if (type === 'enabled') {
+        body =
+          `✅ *ZOOM HOST RECOVERED*\n\n` +
+          `• Tier: ${tier}p\n` +
+          `• Label: ${host.label}\n` +
+          `• Account: ${host.accountId}\n` +
+          (previousReason ? `• Sebelumnya: \`${previousReason}\`\n` : '') +
+          `\nHost kembali aktif di pool.`
+      } else {
+        return
+      }
+      await globalRonzz.sendMessage(target, { text: body })
+    } catch (notifyErr) {
+      console.error(
+        '[ZOOM-HEALTH] Failed to notify owner:',
+        notifyErr && notifyErr.message ? notifyErr.message : notifyErr
+      )
+    }
+  })
+  console.log('✅ [ZOOM-HEALTH] Pool health listener registered')
+}
+
 // Setup global payment-completed listener untuk Midtrans webhook
 if (!global.midtransWebhookListenerSetup) {
   global.midtransWebhookListenerSetup = true
@@ -759,7 +807,9 @@ if (!global.midtransWebhookListenerSetup) {
                   `⚠️ Pembayaran kamu sudah masuk untuk order ${orderId}, tapi data host hilang. ` +
                   `Hubungi admin untuk refund.`,
               })
-            } catch (_) { /* ignore */ }
+            } catch (_) {
+              /* ignore */
+            }
             return
           }
 
@@ -808,7 +858,9 @@ if (!global.midtransWebhookListenerSetup) {
               `Silakan hubungi admin untuk refund. Saldo / nominal QRIS akan dikembalikan.`
             try {
               await globalRonzz.sendMessage(sender, { text: failMsg })
-            } catch (_) { /* ignore */ }
+            } catch (_) {
+              /* ignore */
+            }
             try {
               await globalRonzz.sendMessage(ownerNomer + '@s.whatsapp.net', {
                 text:
@@ -817,7 +869,9 @@ if (!global.midtransWebhookListenerSetup) {
                   `Tier: ${tier}p\nAmount: Rp${Number(totalAmount).toLocaleString('id-ID')}\n` +
                   `Order ID: ${orderId}\nRefId: ${reffId}\nReason: ${createResult ? createResult.error : 'unknown'}`,
               })
-            } catch (_) { /* ignore */ }
+            } catch (_) {
+              /* ignore */
+            }
             return
           }
 
@@ -848,10 +902,10 @@ if (!global.midtransWebhookListenerSetup) {
               days === 1
                 ? `${startMom.format('MMM D, YYYY')} 0:00 ${tzShort}`
                 : `${startMom.format('MMM D')} – ${startMom
-                  .clone()
-                  .add(days, 'days')
-                  .subtract(1, 'day')
-                  .format('MMM D, YYYY')} 0:00 ${tzShort}`
+                    .clone()
+                    .add(days, 'days')
+                    .subtract(1, 'day')
+                    .format('MMM D, YYYY')} 0:00 ${tzShort}`
           } else {
             timeLine = `${startMom.format('MMM D, YYYY H:mm')} ${tzShort}`
           }
@@ -1879,17 +1933,37 @@ module.exports = async (nicola, m, mek) => {
         ['batal', prefix + 'batal', 'cancel', prefix + 'cancel'].includes(lowered) ||
         [
           // admin single-account
-          'zoom', 'zoomlarge', 'zoomscheduled',
+          'zoom',
+          'zoomlarge',
+          'zoomscheduled',
           // admin pool management (per tier)
-          'pool100', 'pool300', 'pool500', 'pool1000',
-          'pool100list', 'pool300list', 'pool500list', 'pool1000list',
-          'pool100del', 'pool300del', 'pool500del', 'pool1000del',
+          'pool100',
+          'pool300',
+          'pool500',
+          'pool1000',
+          'pool100list',
+          'pool300list',
+          'pool500list',
+          'pool1000list',
+          'pool100del',
+          'pool300del',
+          'pool500del',
+          'pool1000del',
           // user-facing buy via saldo (per tier)
-          'zoom100', 'zoom300', 'zoom500', 'zoom1000',
+          'zoom100',
+          'zoom300',
+          'zoom500',
+          'zoom1000',
           // user-facing buy via QRIS (per tier)
-          'zoom100qris', 'zoom300qris', 'zoom500qris', 'zoom1000qris',
+          'zoom100qris',
+          'zoom300qris',
+          'zoom500qris',
+          'zoom1000qris',
           // legacy user aliases (backwards compat)
-          'belizoom', 'belizoom100', 'buyzoom', 'buyzoom100',
+          'belizoom',
+          'belizoom100',
+          'buyzoom',
+          'buyzoom100',
         ].includes(cmdOnly)
 
       if (!skipFlow) {
@@ -2010,10 +2084,7 @@ module.exports = async (nicola, m, mek) => {
 
                   let qrImagePath
                   try {
-                    qrImagePath = await qrisDinamis(
-                      `${totalAmount}`,
-                      './options/sticker/qris.jpg'
-                    )
+                    qrImagePath = await qrisDinamis(`${totalAmount}`, './options/sticker/qris.jpg')
                   } catch (qrErr) {
                     delete db.data.zoomFlow[sender]
                     return reply(
@@ -2109,20 +2180,22 @@ module.exports = async (nicola, m, mek) => {
                       if (Date.now() >= expirationTime) {
                         try {
                           await nicola.sendMessage(from, { delete: message.key })
-                        } catch (_) { /* ignore */ }
+                        } catch (_) {
+                          /* ignore */
+                        }
                         try {
                           await nicola.sendMessage(from, {
                             text: '⏰ QRIS expired. Pembayaran dibatalkan karena melewati batas waktu 30 menit.',
                           })
-                        } catch (_) { /* ignore */ }
+                        } catch (_) {
+                          /* ignore */
+                        }
                         delete db.data.order[sender]
                         requestPendingOrderSave()
                         break
                       }
                     }
-                  })().catch((e) =>
-                    console.error('[ZOOM-QRIS] timeout poller error:', e.message)
-                  )
+                  })().catch((e) => console.error('[ZOOM-QRIS] timeout poller error:', e.message))
 
                   return
                 } finally {
@@ -2182,7 +2255,9 @@ module.exports = async (nicola, m, mek) => {
                   })
                 } catch (pErr) {
                   delete db.data.zoomFlow[sender]
-                  return reply(`❌ Gagal proses pool: ${pErr && pErr.message ? pErr.message : pErr}`)
+                  return reply(
+                    `❌ Gagal proses pool: ${pErr && pErr.message ? pErr.message : pErr}`
+                  )
                 }
 
                 if (!poolResult.ok) {
@@ -2220,9 +2295,7 @@ module.exports = async (nicola, m, mek) => {
                   const retryCmd = flowIsBuy ? `${prefix}zoom${tier}` : `${prefix}pool${tier}`
                   return reply(
                     `❌ *Semua akun Zoom tidak tersedia* di jam yang kamu minta (${tzShort}).\n\n` +
-                      (flowIsBuy
-                        ? 'Saldo kamu *tidak dipotong*.\n\n'
-                        : '') +
+                      (flowIsBuy ? 'Saldo kamu *tidak dipotong*.\n\n' : '') +
                       summary +
                       `\n\nSilakan pilih jam lain. Ketik \`${retryCmd}\` untuk mulai ulang.`
                   )
@@ -2278,14 +2351,13 @@ module.exports = async (nicola, m, mek) => {
                   } else if (db && typeof db.save === 'function') {
                     try {
                       await db.save()
-                    } catch { /* ignore */ }
+                    } catch {
+                      /* ignore */
+                    }
                   }
                 }
 
-                const meetingIdFmt = String(meeting.id).replace(
-                  /(\d{3})(\d{4})(\d+)/,
-                  '$1 $2 $3'
-                )
+                const meetingIdFmt = String(meeting.id).replace(/(\d{3})(\d{4})(\d+)/, '$1 $2 $3')
                 const timeZoneShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(
                   /_/g,
                   ' '
@@ -2306,8 +2378,7 @@ module.exports = async (nicola, m, mek) => {
                 }
 
                 const hostName =
-                  (hostInfo &&
-                    (hostInfo.first_name || hostInfo.display_name || hostInfo.email)) ||
+                  (hostInfo && (hostInfo.first_name || hostInfo.display_name || hostInfo.email)) ||
                   host.label
                 // Host key fallback: API -> pool entry -> env default -> '123123'
                 const hostKey =
@@ -2325,7 +2396,9 @@ module.exports = async (nicola, m, mek) => {
                   )
                   infoLines.push(`*Saldo tersisa:* Rp ${saldoSesudah.toLocaleString('id-ID')}`)
                   infoLines.push('')
-                  infoLines.push(`_Link meeting di bawah, tap & tahan untuk copy & forward ke peserta._`)
+                  infoLines.push(
+                    `_Link meeting di bawah, tap & tahan untuk copy & forward ke peserta._`
+                  )
                 } else {
                   infoLines.push(`✅ *ZOOM MEETING DIBUAT*`)
                   infoLines.push(`_Host pool: ${host.label}_`)
@@ -2368,7 +2441,9 @@ module.exports = async (nicola, m, mek) => {
                   const reffIdSave = `ZOOM-${meeting.id}`
                   receiptParts.push('=== ZOOM MEETING RECEIPT ===')
                   receiptParts.push(`Ref ID     : ${reffIdSave}`)
-                  receiptParts.push(`Tanggal    : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY HH:mm')} WIB`)
+                  receiptParts.push(
+                    `Tanggal    : ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY HH:mm')} WIB`
+                  )
                   if (flowIsBuy) {
                     receiptParts.push(`User       : ${sender.split('@')[0]}`)
                     receiptParts.push(
@@ -2474,7 +2549,8 @@ module.exports = async (nicola, m, mek) => {
             }
 
             const inviteLines = []
-            if (hostName) inviteLines.push(`${hostName} is inviting you to a scheduled Zoom meeting.`)
+            if (hostName)
+              inviteLines.push(`${hostName} is inviting you to a scheduled Zoom meeting.`)
             else inviteLines.push('You are invited to a scheduled Zoom meeting.')
             inviteLines.push('')
             inviteLines.push(`Topic: ${meeting.topic}`)
@@ -3518,9 +3594,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           // Urutkan dari waktu terdekat ke depan
           const scheduled = meetings
             .filter((mt) => mt && mt.start_time)
-            .sort(
-              (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-            )
+            .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
 
           if (!db.data.zoomList) db.data.zoomList = {}
           if (!scheduled.length) {
@@ -3562,7 +3636,12 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         const state = db.data.zoomList[sender]
 
         // TTL list 10 menit
-        if (!state || !state.items || !state.items.length || Date.now() - (state.createdAt || 0) > 10 * 60 * 1000) {
+        if (
+          !state ||
+          !state.items ||
+          !state.items.length ||
+          Date.now() - (state.createdAt || 0) > 10 * 60 * 1000
+        ) {
           return reply(
             `❌ Daftar meeting sudah tidak valid / kadaluarsa.\nJalankan \`${prefix}largelist\` dulu untuk refresh.`
           )
@@ -3796,6 +3875,273 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           `🗑️ *HASIL HAPUS ZOOM POOL ${stateTier}p*\n\n` +
             results.join('\n') +
             `\n\n_Jalankan \`${prefix}pool${stateTier}list\` untuk lihat daftar terbaru._`
+        )
+      }
+      // ===== ADMIN: ADD HOST KE POOL via CHAT =====
+      case 'addzoom100':
+      case 'addzoom300':
+      case 'addzoom500':
+      case 'addzoom1000': {
+        if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
+        const tierMatch = (command || '').match(/^addzoom(\d+)$/i)
+        const tier = tierMatch ? Number(tierMatch[1]) : 100
+        if (!zoomPool.isValidTier(tier)) {
+          return reply(`❌ Tier tidak valid: ${tier}. Pakai 100 / 300 / 500 / 1000.`)
+        }
+
+        const helpText =
+          `📥 *TAMBAH HOST ZOOM ${tier}p*\n\n` +
+          `Format (urutkan key=value, pisah dengan baris atau \` | \`):\n\n` +
+          '```\n' +
+          `${prefix}addzoom${tier}\n` +
+          `accountId=AAA-bbb-CCC\n` +
+          `clientId=xxxxxxxxxxxx\n` +
+          `clientSecret=yyyyyyyyyyyy\n` +
+          `label=Akun Utama\n` +
+          `userId=me\n` +
+          `timezone=Asia/Jakarta\n` +
+          `concurrentMeetings=1\n` +
+          `hostKey=123456\n` +
+          `notes=catatan opsional\n` +
+          '```\n\n' +
+          `*Wajib:* accountId, clientId, clientSecret\n` +
+          `*Opsional:* label (auto), userId (default: me), timezone, concurrentMeetings ` +
+          `(default tier ${tier} = ${zoomPool.TIER_DEFAULT_CONCURRENT[tier] || 1}), hostKey, notes\n\n` +
+          `Setelah submit, bot otomatis cek lisensi via Zoom API.\n` +
+          `Kalau Basic / capacity kurang, host tetap disimpan tapi bot kasih warning.\n\n` +
+          `_Tip:_ pakai satu baris per field, lebih aman dari typo.`
+
+        if (!q || !q.trim()) {
+          return reply(helpText)
+        }
+
+        // Parser: accept newline OR ` | ` separators, key=value pairs.
+        const fields = {}
+        const parts = String(q || '')
+          .split(/\r?\n|\s\|\s/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+        for (const p of parts) {
+          const eq = p.indexOf('=')
+          if (eq < 0) continue
+          const key = p.slice(0, eq).trim()
+          const val = p.slice(eq + 1).trim()
+          if (key) fields[key] = val
+        }
+
+        const required = ['accountId', 'clientId', 'clientSecret']
+        const missing = required.filter((k) => !fields[k])
+        if (missing.length) {
+          return reply(
+            `❌ Field wajib hilang: *${missing.join(', ')}*.\n\n` +
+              `Ketik \`${prefix}addzoom${tier}\` (tanpa argumen) untuk lihat format.`
+          )
+        }
+
+        const entry = {
+          accountId: fields.accountId,
+          clientId: fields.clientId,
+          clientSecret: fields.clientSecret,
+          label: fields.label || `Host ${fields.accountId.slice(0, 6)}`,
+          userId: fields.userId || 'me',
+          timezone: fields.timezone || null,
+          hostKey: fields.hostKey || '',
+          notes: fields.notes || '',
+        }
+        if (fields.concurrentMeetings) {
+          const n = Number(fields.concurrentMeetings)
+          if (Number.isFinite(n) && n >= 1) entry.concurrentMeetings = Math.floor(n)
+        }
+
+        const addRes = zoomPool.addHostToPool(tier, entry)
+        if (!addRes.ok) {
+          return reply(`❌ Gagal tambah host: ${addRes.error}`)
+        }
+
+        // Verify license immediately so owner tahu apakah host benar-benar bisa dipakai.
+        let licenseLine = ''
+        try {
+          const verdict = await zoomLicense.checkHostForTier(addRes.host, tier, {
+            forceRefresh: true,
+          })
+          if (verdict.ok) {
+            licenseLine = `\n✅ Lisensi: ${verdict.plan}, kapasitas ${verdict.capacity}p`
+          } else {
+            licenseLine =
+              `\n⚠️ Lisensi: *belum memenuhi syarat tier ${tier}p*\n` +
+              `   ${zoomLicense.reasonText(verdict, tier)}\n` +
+              `   Host disimpan, tapi auto-skip saat user beli sampai diperbaiki.`
+          }
+        } catch (licErr) {
+          licenseLine = `\n⚠️ Tidak bisa cek lisensi: ${licErr && licErr.message ? licErr.message : licErr}`
+        }
+
+        return reply(
+          `✅ *Host ditambah ke pool ${tier}p*\n\n` +
+            `• Label: ${addRes.host.label}\n` +
+            `• Account ID: ${addRes.host.accountId}\n` +
+            `• User ID: ${addRes.host.userId}\n` +
+            `• Concurrent: ${addRes.host.concurrentMeetings}\n` +
+            `• Total host di pool: ${addRes.pool.length}` +
+            licenseLine
+        )
+      }
+      // ===== ADMIN: HAPUS HOST DARI POOL =====
+      case 'delzoom100':
+      case 'delzoom300':
+      case 'delzoom500':
+      case 'delzoom1000': {
+        if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
+        const tierMatch = (command || '').match(/^delzoom(\d+)$/i)
+        const tier = tierMatch ? Number(tierMatch[1]) : 100
+        if (!zoomPool.isValidTier(tier)) {
+          return reply(`❌ Tier tidak valid: ${tier}.`)
+        }
+
+        const target = String(q || '').trim()
+        if (!target) {
+          return reply(
+            `❌ Format: \`${prefix}delzoom${tier} <label-atau-accountId>\`\n\n` +
+              `Lihat label/accountId via \`${prefix}zoomlicense${tier}\`.`
+          )
+        }
+
+        // Try as accountId first, then as label.
+        let res = zoomPool.removeHostFromPool(tier, { accountId: target })
+        if (!res.ok) {
+          res = zoomPool.removeHostFromPool(tier, { label: target })
+        }
+        if (!res.ok) {
+          return reply(`❌ ${res.error}`)
+        }
+
+        zoomLicense.clearCache(res.removed.accountId)
+        return reply(
+          `🗑️ *Host dihapus dari pool ${tier}p*\n\n` +
+            `• Label: ${res.removed.label}\n` +
+            `• Account ID: ${res.removed.accountId}\n` +
+            `• Sisa host: ${res.pool.length}`
+        )
+      }
+      // ===== ADMIN: AUDIT LISENSI POOL =====
+      case 'zoomlicense100':
+      case 'zoomlicense300':
+      case 'zoomlicense500':
+      case 'zoomlicense1000': {
+        if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
+        const tierMatch = (command || '').match(/^zoomlicense(\d+)$/i)
+        const tier = tierMatch ? Number(tierMatch[1]) : 100
+        if (!zoomPool.isValidTier(tier)) return reply(`❌ Tier tidak valid: ${tier}.`)
+
+        const pool = zoomPool.loadPool(tier)
+        if (!pool.length) {
+          return reply(`❌ Pool tier ${tier}p kosong. Tambah dulu via \`${prefix}addzoom${tier}\`.`)
+        }
+
+        const force = /(refresh|force)/i.test(String(q || ''))
+        await reply(
+          `⏳ Cek lisensi ${pool.length} host di pool ${tier}p${force ? ' (force refresh)' : ''}...`
+        )
+
+        const lines = []
+        let okCount = 0
+        let badCount = 0
+        let disabledCount = 0
+        for (const host of pool) {
+          // Show disabled flag explicitly even before hitting Zoom API.
+          const disabledTag = host.disabledAt
+            ? `\n   ⛔ DISABLED sejak ${host.disabledAt}: ${host.disabledReason || '?'}`
+            : ''
+
+          const verdict = await zoomLicense.checkHostForTier(host, tier, {
+            forceRefresh: force,
+          })
+          if (host.disabledAt) disabledCount++
+
+          if (verdict.ok) {
+            okCount++
+            lines.push(
+              `✅ [${host.label}] ${verdict.plan}, ${verdict.capacity}p ` +
+                `(${verdict.source})${disabledTag}` +
+                (host.disabledAt
+                  ? `\n   ↳ lisensi ok sekarang — \`${prefix}zoomenable${tier} ${host.label}\` untuk re-enable`
+                  : '')
+            )
+          } else {
+            badCount++
+            lines.push(`❌ [${host.label}] ${zoomLicense.reasonText(verdict, tier)}${disabledTag}`)
+          }
+        }
+
+        return reply(
+          `📋 *AUDIT LISENSI ZOOM ${tier}p*\n\n` +
+            `Total: ${pool.length} host (${okCount} OK, ${badCount} bermasalah, ${disabledCount} disabled)\n\n` +
+            lines.join('\n') +
+            `\n\n_Refresh manual:_ \`${prefix}zoomlicense${tier} refresh\`` +
+            `\n_Re-enable host:_ \`${prefix}zoomenable${tier} <label>\``
+        )
+      }
+      // ===== ADMIN: RE-ENABLE HOST YANG DI-DISABLE =====
+      case 'zoomenable100':
+      case 'zoomenable300':
+      case 'zoomenable500':
+      case 'zoomenable1000': {
+        if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
+        const tierMatch = (command || '').match(/^zoomenable(\d+)$/i)
+        const tier = tierMatch ? Number(tierMatch[1]) : 100
+        if (!zoomPool.isValidTier(tier)) return reply(`❌ Tier tidak valid: ${tier}.`)
+
+        const target = String(q || '').trim()
+        if (!target) {
+          return reply(
+            `❌ Format: \`${prefix}zoomenable${tier} <label-atau-accountId>\`\n\n` +
+              `Lihat label/accountId via \`${prefix}zoomlicense${tier}\`.`
+          )
+        }
+
+        // Try as accountId first, then as label.
+        let res = zoomPool.enableHost(tier, { accountId: target })
+        if (!res.ok) {
+          res = zoomPool.enableHost(tier, { label: target })
+        }
+        if (!res.ok) {
+          return reply(`❌ ${res.error}`)
+        }
+        if (!res.transitioned) {
+          return reply(`ℹ️ Host \`${res.host.label}\` tidak dalam status disabled.`)
+        }
+
+        // Bust license cache + force re-check supaya owner tau hasil aktual.
+        zoomLicense.clearCache(res.host.accountId)
+        let licenseLine = ''
+        try {
+          const verdict = await zoomLicense.checkHostForTier(res.host, tier, {
+            forceRefresh: true,
+          })
+          if (verdict.ok) {
+            licenseLine = `\n✅ Lisensi sekarang: ${verdict.plan}, ${verdict.capacity}p`
+          } else {
+            licenseLine =
+              `\n⚠️ Lisensi *masih bermasalah*: ${zoomLicense.reasonText(verdict, tier)}\n` +
+              `   Bot akan auto-disable lagi saat user beli berikutnya.`
+          }
+        } catch (licErr) {
+          licenseLine = `\n⚠️ Tidak bisa cek lisensi: ${licErr && licErr.message ? licErr.message : licErr}`
+        }
+
+        return reply(
+          `✅ *Host re-enabled di pool ${tier}p*\n\n` +
+            `• Label: ${res.host.label}\n` +
+            `• Account: ${res.host.accountId}` +
+            licenseLine
+        )
+      }
+      // ===== ADMIN: BUST CACHE LISENSI =====
+      case 'zoomlicenserefresh': {
+        if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
+        zoomLicense.clearCache()
+        return reply(
+          `♻️ Cache lisensi Zoom dibersihkan.\n` + `Cek berikutnya akan hit Zoom API langsung.`
         )
       }
       // ===== USER-FACING: BELI ZOOM via SALDO (per tier) =====
