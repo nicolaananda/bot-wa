@@ -7416,6 +7416,92 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         }
         break
 
+      // ===== ADMIN COMMAND LIST =====
+      case 'adminmenu':
+      case 'menuadmin':
+      case 'cmdadmin':
+      case 'helpadmin': {
+        if (!isOwner) return reply('❌ Command ini hanya untuk owner!')
+
+        const p = prefix || '.'
+        const text =
+          `📋 *DAFTAR COMMAND ADMIN*\n` +
+          `_Owner only. Pakai prefix \`${p}\`_\n\n` +
+
+          `*🎯 ZOOM POOL — HOST MANAGEMENT*\n` +
+          `• \`${p}addzoom<tier>\` — tambah host (multi-line key=value)\n` +
+          `• \`${p}delzoom<tier> <label|accountId>\` — hapus host\n` +
+          `• \`${p}zoomlicense<tier>\` — audit lisensi semua host\n` +
+          `• \`${p}zoomlicense<tier> refresh\` — force re-fetch dari Zoom\n` +
+          `• \`${p}zoomenable<tier> <label|accountId>\` — re-enable host disabled\n` +
+          `• \`${p}zoomlicenserefresh\` — bust seluruh cache lisensi\n` +
+          `_Tier: 100, 300, 500, 1000_\n\n` +
+
+          `*📅 ZOOM POOL — JADWAL*\n` +
+          `• \`${p}pool<tier>\` — buat meeting via pool (admin)\n` +
+          `• \`${p}pool<tier>list\` — list semua jadwal aktif di pool\n` +
+          `• \`${p}pool<tier>del <nomor>\` — hapus meeting by index\n\n` +
+
+          `*🎬 ZOOM LEGACY (single host)*\n` +
+          `• \`${p}zoomlarge\` / \`${p}zoom\` — bikin meeting Zoom Large\n` +
+          `• \`${p}zoomlist\` / \`${p}largelist\` — list meeting\n` +
+          `• \`${p}delzoom <id>\` — hapus meeting Zoom Large\n\n` +
+
+          `*📦 PRODUK*\n` +
+          `• \`${p}stok\` — list semua produk + stok\n` +
+          `• \`${p}addproduk\` — tambah produk baru\n` +
+          `• \`${p}delproduk <id>\` — hapus produk\n` +
+          `• \`${p}setharga <id> <bronze> <silver> <gold>\` — set harga\n` +
+          `• \`${p}setjudul <id> <judul>\` — ubah nama produk\n` +
+          `• \`${p}setdesk <id> <desc>\` — ubah deskripsi\n` +
+          `• \`${p}setsnk <id> <snk>\` — ubah syarat & ketentuan\n` +
+          `• \`${p}setprofit <kategori> <persen|nominal>\` — set profit\n` +
+          `• \`${p}setkode <id> <kode>\` — set kode produk\n\n` +
+
+          `*🗃️ STOK*\n` +
+          `• \`${p}addstok <id>,<email>|<pass>|<profil>|<pin>|<2fa>\` — add\n` +
+          `• \`${p}delstok <id> <jumlah>\` — hapus stok dari atas\n` +
+          `• \`${p}cek <id>\` / \`${p}cek <id> full\` — cek stok\n` +
+          `• \`${p}pick <id>\` — ambil 1 stok manual\n` +
+          `• \`${p}riwayat <id>\` — riwayat transaksi produk\n\n` +
+
+          `*👥 USER & SALDO*\n` +
+          `• \`${p}addsaldo @user <nominal>\` — tambah saldo manual\n` +
+          `• \`${p}minsaldo @user <nominal>\` — kurangi saldo\n` +
+          `• \`${p}isi @user <nominal>\` — set saldo absolut\n` +
+          `• \`${p}rekap\` — rekap transaksi\n` +
+          `• \`${p}qristoday\` — rekap QRIS hari ini\n` +
+          `• \`${p}saldotoday\` — rekap saldo hari ini\n\n` +
+
+          `*✉️ DELIVERY MANUAL*\n` +
+          `• \`${p}testmsg <nomor>\` — test kirim pesan\n` +
+          `• \`${p}resendakun <nomor> <id> <jumlah>\` — kirim ulang akun\n` +
+          `• \`${p}kirimulang\` / \`${p}resend\` / \`${p}sendagain\` — re-send\n\n` +
+
+          `*🛡️ MODERASI GROUP*\n` +
+          `• \`${p}antilink on|off\` — toggle anti-link\n` +
+          `• \`${p}antilinkv2 on|off\` — anti-link v2\n` +
+          `• \`${p}anticall on|off\` — auto-block caller\n` +
+          `• \`${p}kick @user\` — kick dari group\n` +
+          `• \`${p}blok\` / \`${p}block\` — block contact\n` +
+          `• \`${p}unblok\` / \`${p}unblock\` — unblock\n` +
+          `• \`${p}open\` / \`${p}close\` — buka/tutup group\n` +
+          `• \`${p}hidetag\` / \`${p}ht\` / \`${p}h\` — hidetag all\n` +
+          `• \`${p}setdesc <text>\` — set deskripsi group\n\n` +
+
+          `*🔧 SISTEM*\n` +
+          `• \`${p}ping\` / \`${p}runtime\` / \`${p}tes\` — health check\n` +
+          `• \`${p}server\` / \`${p}performa\` — info server\n` +
+          `• \`${p}done\` — selesaikan transaksi pending\n` +
+          `• \`${p}backup\` — backup database\n` +
+          `• \`${p}reloaddb\` — reload database dari PostgreSQL\n` +
+          `• \`${p}batal\` — cancel sesi aktif\n\n` +
+
+          `_Total command admin: lihat di atas. Untuk command user-facing (zoom100/300/500/1000, deposit, buy, dll) — itu publik, tidak butuh owner._`
+
+        return reply(text)
+      }
+
       default:
         if (budy.startsWith('=>')) {
           if (!isOwner) return
