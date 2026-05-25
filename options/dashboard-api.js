@@ -254,28 +254,24 @@ app.post('/webhook/midtrans', async (req, res) => {
     }
 
     // Forward ke server Nala jika order_id untuk Nala
-    const orderId = notification.order_id || '';
-    const isNalaTransaction = orderId.includes('CLASS-') ||
-      orderId.includes('GG-') ||
-      orderId.includes('SKET-') ||
-      orderId.includes('GRASP-') ||
-      orderId.includes('BELAJAR-');
+  const orderId = notification.order_id || '';
+const NALA_PREFIXES = ['BOOK-', 'BELAJAR-', 'SKET-', 'BAJU-', 'GG-', 'GRASP-', 'CLASS-'];
+const isNalaTransaction = NALA_PREFIXES.some(prefix => orderId.startsWith(prefix));
 
-    if (isNalaTransaction) {
-      try {
-        await axios.post('https://api.artstudionala.com/api/midtrans/notification', notification, {
-          headers: { 'Content-Type': 'application/json' },
-          timeout: 10000,
-        });
-        console.log(`✅ [Webhook] Forwarded to nala: ${orderId}`);
-      } catch (error) {
-        console.error(`❌ [Webhook] Failed to forward to nala: ${error.message}`);
-        // Log lebih detail untuk debugging
-        if (error.response) {
-          console.error(`   Status: ${error.response.status}, Data:`, JSON.stringify(error.response.data));
-        }
-      }
+if (isNalaTransaction) {
+  try {
+    await axios.post('https://api.artstudionala.com/api/midtrans/notification', notification, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 10000,
+    });
+    console.log(`✅ [Webhook] Forwarded to nala: ${orderId}`);
+  } catch (error) {
+    console.error(`❌ [Webhook] Failed to forward to nala: ${error.message}`);
+    if (error.response) {
+      console.error(`   Status: ${error.response.status}, Data:`, JSON.stringify(error.response.data));
     }
+  }
+}
 
     return res.status(200).json({ status: 'ok' });
   } catch (err) {
