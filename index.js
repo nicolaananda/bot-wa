@@ -2030,28 +2030,12 @@ module.exports = async (nicola, m, mek) => {
                     /_/g,
                     ' '
                   )
-                  const summary = (preCheck.reasons || [])
-                    .map((r) => {
-                      if (r.status === 'busy') {
-                        const conflictLines = r.detail
-                          .map((c) => {
-                            const t = moment(c.start_time)
-                              .tz(parsed.timezone)
-                              .format('DD MMM HH:mm')
-                            return `    • ${c.topic} — ${t} (${c.duration} menit)`
-                          })
-                          .join('\n')
-                        return `❌ [${r.label}] penuh (limit ${r.allowed || 1}):\n${conflictLines}`
-                      }
-                      if (r.status === 'error') return `⚠️ [${r.label}] error: ${r.detail}`
-                      return `? [${r.label}] ${r.status}`
-                    })
-                    .join('\n')
+                  // QRIS path = customer-facing. Jangan bocorkan detail meeting
+                  // (topik/jam) maupun label/akun internal milik customer lain.
                   return reply(
-                    `❌ *Semua akun Zoom ${tier}p tidak tersedia* di jam yang kamu minta (${tzShort}).\n\n` +
+                    `❌ *Semua slot Zoom ${tier}p penuh* di jam yang kamu minta (${tzShort}).\n\n` +
                       `QRIS *tidak* digenerate karena meeting tidak bisa dibuat.\n\n` +
-                      summary +
-                      `\n\nSilakan pilih jam lain. Ketik \`${prefix}zoom${tier}qris\` untuk mulai ulang.`
+                      `Silakan pilih jam lain. Ketik \`${prefix}zoom${tier}qris\` untuk mulai ulang.`
                   )
                 }
 
@@ -2273,6 +2257,19 @@ module.exports = async (nicola, m, mek) => {
                     /_/g,
                     ' '
                   )
+                  // Untuk customer (buy mode), JANGAN bocorkan detail meeting milik
+                  // orang lain (topik/jam). Cukup status per host. Detail bentrok
+                  // Untuk customer (buy mode), JANGAN bocorkan detail meeting
+                  // milik orang lain (topik/jam) maupun label/akun internal.
+                  // Detail per host hanya ditampilkan ke admin (pool mode).
+                  const retryCmd = flowIsBuy ? `${prefix}zoom${tier}` : `${prefix}pool${tier}`
+                  if (flowIsBuy) {
+                    return reply(
+                      `❌ *Semua slot Zoom ${tier}p penuh* di jam yang kamu minta (${tzShort}).\n\n` +
+                        `Saldo kamu *tidak dipotong*.\n\n` +
+                        `Silakan pilih jam lain. Ketik \`${retryCmd}\` untuk mulai ulang.`
+                    )
+                  }
                   const summary = poolResult.reasons
                     .map((r) => {
                       if (r.status === 'busy') {
@@ -2292,10 +2289,8 @@ module.exports = async (nicola, m, mek) => {
                       return `? [${r.label}] ${r.status}`
                     })
                     .join('\n')
-                  const retryCmd = flowIsBuy ? `${prefix}zoom${tier}` : `${prefix}pool${tier}`
                   return reply(
                     `❌ *Semua akun Zoom tidak tersedia* di jam yang kamu minta (${tzShort}).\n\n` +
-                      (flowIsBuy ? 'Saldo kamu *tidak dipotong*.\n\n' : '') +
                       summary +
                       `\n\nSilakan pilih jam lain. Ketik \`${retryCmd}\` untuk mulai ulang.`
                   )
