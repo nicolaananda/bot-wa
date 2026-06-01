@@ -1012,8 +1012,11 @@ if (!global.midtransWebhookListenerSetup) {
               topic: meeting.topic,
               join_url: meeting.join_url,
               password: meeting.password || '',
-              start_time: meeting.start_time,
-              duration: meeting.duration,
+              // Simpan JAM ASLI customer (bukan window backdated yang dikirim ke
+              // Zoom). startAtUtcMs/durationMinutes berasal dari order.zoom.
+              start_time: zoomDetail.startTimeIso || meeting.start_time,
+              duration: Number(zoomDetail.durationMinutes || meeting.duration || 0),
+              timezone: zoomDetail.timezone || null,
               hostLabel: usedHost.label,
             },
           })
@@ -2333,8 +2336,10 @@ module.exports = async (nicola, m, mek) => {
                       topic: meeting.topic,
                       join_url: meeting.join_url,
                       password: meeting.password || '',
-                      start_time: meeting.start_time,
-                      duration: meeting.duration,
+                      // Simpan JAM ASLI customer (bukan window backdated Zoom).
+                      start_time: parsed.startTimeIso || meeting.start_time,
+                      duration: Number(parsed.durationMinutes || meeting.duration || 0),
+                      timezone: parsed.timezone || null,
                       hostLabel: host.label,
                       billedUnit: priceInfo.billedUnit,
                       billedQty: priceInfo.billedQty,
@@ -3754,7 +3759,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
         try {
           await reply(`⏳ Mengambil jadwal dari ${pool.length} host (tier ${tier}p)...`)
-          const { meetings, errors } = await zoomPool.listAllUpcoming(tier)
+          const { meetings, errors, source } = await zoomPool.listBookings(tier)
           const tz = process.env.ZOOM_DEFAULT_TIMEZONE || 'Asia/Jakarta'
 
           const sorted = meetings
@@ -3768,7 +3773,13 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
               ? '\n\n⚠️ Error di sebagian host:\n' +
                 errors.map((e) => `• ${e.label}: ${e.error}`).join('\n')
               : ''
-            return reply(`📋 Tidak ada meeting terjadwal di pool tier ${tier}.` + errText)
+            const srcNote =
+              source === 'local'
+                ? '\n\n_Sumber: catatan booking bot (meeting pribadi pemilik akun tidak ditampilkan)._'
+                : ''
+            return reply(
+              `📋 Tidak ada meeting terjadwal di pool tier ${tier}.` + errText + srcNote
+            )
           }
 
           const items = sorted.map((mt) => ({
@@ -3792,7 +3803,12 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
             ? '\n\n⚠️ Error di sebagian host:\n' +
               errors.map((e) => `• ${e.label}: ${e.error}`).join('\n')
             : ''
+          const srcNote =
+            source === 'local'
+              ? '\n_Sumber: catatan booking bot — meeting pribadi pemilik akun tidak ikut._'
+              : ''
           const footer =
+            srcNote +
             `\n\n_Hapus meeting: \`${prefix}pool${tier}del <nomor>\`_\n` +
             `_Contoh: \`${prefix}pool${tier}del 1\` atau \`${prefix}pool${tier}del 1 3\`_`
 
