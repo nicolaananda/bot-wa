@@ -3777,9 +3777,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
               source === 'local'
                 ? '\n\n_Sumber: catatan booking bot (meeting pribadi pemilik akun tidak ditampilkan)._'
                 : ''
-            return reply(
-              `📋 Tidak ada meeting terjadwal di pool tier ${tier}.` + errText + srcNote
-            )
+            return reply(`📋 Tidak ada meeting terjadwal di pool tier ${tier}.` + errText + srcNote)
           }
 
           const items = sorted.map((mt) => ({
