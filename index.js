@@ -590,6 +590,22 @@ function buildZoomFormTemplate() {
   ].join('\n')
 }
 
+function buildZoomAgenda(detail) {
+  const tz = detail.timezone || process.env.ZOOM_DEFAULT_TIMEZONE || 'Asia/Jakarta'
+  const start = moment.tz(detail.startTimeIso, tz)
+  const end = start.clone().add(Number(detail.durationMinutes || 0), 'minutes')
+  const tzShort = (tz.split('/').pop() || tz).replace(/_/g, ' ')
+
+  return [
+    `Jadwal asli customer: ${start.format('DD MMM YYYY HH:mm')} - ${end.format('HH:mm')} ${tzShort}`,
+    `Tanggal: ${start.format('YYYY-MM-DD')}`,
+    `Jam: ${start.format('HH:mm')}`,
+    `Timezone: ${tz}`,
+    `Durasi: ${Number(detail.durationMinutes || 0)} menit`,
+    `Start ISO: ${start.format('YYYY-MM-DDTHH:mm:ss')}`,
+  ].join('\n')
+}
+
 /**
  * Kirim 2 bubble WA:
  *   1. bubble intro + catatan (digabung)
@@ -832,6 +848,7 @@ if (!global.midtransWebhookListenerSetup) {
               password: zoomDetail.password,
               timezone: zoomDetail.timezone,
               startAtUtcMs: zoomDetail.startAtUtcMs,
+              agenda: buildZoomAgenda(zoomDetail),
               allowFallback: true,
             })
           } catch (createErr) {
@@ -2239,6 +2256,7 @@ module.exports = async (nicola, m, mek) => {
                     password: parsed.password,
                     timezone: parsed.timezone,
                     startAtUtcMs: startUtcMs,
+                    agenda: buildZoomAgenda(parsed),
                   })
                 } catch (pErr) {
                   delete db.data.zoomFlow[sender]
@@ -2508,6 +2526,7 @@ module.exports = async (nicola, m, mek) => {
               durationMinutes: parsed.durationMinutes,
               password: parsed.password,
               timezone: parsed.timezone,
+              agenda: buildZoomAgenda(parsed),
             })
 
             delete db.data.zoomFlow[sender]
