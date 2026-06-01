@@ -597,12 +597,9 @@ function buildZoomAgenda(detail) {
   const tzShort = (tz.split('/').pop() || tz).replace(/_/g, ' ')
 
   return [
-    `Jadwal asli customer: ${start.format('DD MMM YYYY HH:mm')} - ${end.format('HH:mm')} ${tzShort}`,
     `Tanggal: ${start.format('YYYY-MM-DD')}`,
     `Jam: ${start.format('HH:mm')}`,
-    `Timezone: ${tz}`,
     `Durasi: ${Number(detail.durationMinutes || 0)} menit`,
-    `Start ISO: ${start.format('YYYY-MM-DDTHH:mm:ss')}`,
   ].join('\n')
 }
 
