@@ -105,7 +105,7 @@ function __wrapSendMessageOnce(nicola) {
     if (nicola.__sendWrapped) return
     const originalSend = nicola.sendMessage.bind(nicola)
     nicola.sendMessage = async function (jid, content, options) {
-      __sendQueue = __sendQueue.then(async () => {
+      const sendTask = async () => {
         const now = Date.now()
         const wait = Math.max(0, SEND_MIN_INTERVAL_MS - (now - __lastSendAt))
         if (wait > 0) await __delay(wait)
@@ -117,11 +117,11 @@ function __wrapSendMessageOnce(nicola) {
             const res = await originalSend(jid, content, options)
             __lastSendAt = Date.now()
             return res
-          } catch (e) {
-            attempt += 1
-            const msg = String(e && e.message ? e.message : '')
-            const code = e && (e.status || e.statusCode || e.code)
-            const transient =
+            } catch (e) {
+              attempt += 1
+              const msg = String(e && e.message ? e.message : '')
+              const code = e && (e.status || e.statusCode || e.code)
+              const transient =
               code === 429 ||
               code === 'ECONNRESET' ||
               code === 'ETIMEDOUT' ||
@@ -137,8 +137,18 @@ function __wrapSendMessageOnce(nicola) {
             await __delay(backoff)
           }
         }
+      }
+
+      const result = __sendQueue.then(sendTask, sendTask)
+      __sendQueue = result.catch((e) => {
+        try {
+          console.error('[WA] send failed', {
+            code: e && (e.status || e.statusCode || e.code),
+            message: e && e.message,
+          })
+        } catch {}
       })
-      return __sendQueue
+      return result
     }
     Object.defineProperty(nicola, '__sendWrapped', {
       value: true,
