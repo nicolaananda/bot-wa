@@ -29,6 +29,18 @@ require('./options/graceful-shutdown')
 // Load database helper
 global.dbHelper = require('./options/db-helper')
 
+function ensurePromoDefaults() {
+  if (!db.data.promo || typeof db.data.promo !== 'object') db.data.promo = {}
+  if (typeof db.data.promo.enabled !== 'boolean') db.data.promo.enabled = false
+  if (!db.data.promo.groupId) db.data.promo.groupId = ''
+  if (!db.data.promo.groupName) db.data.promo.groupName = ''
+  if (!db.data.promo.text) db.data.promo.text = ''
+  if (!db.data.promo.time) db.data.promo.time = '08:00'
+  if (!db.data.promo.timezone) db.data.promo.timezone = 'Asia/Jakarta'
+  if (!db.data.promo.lastSentDate) db.data.promo.lastSentDate = ''
+  if (!db.data.promo.lastSentAt) db.data.promo.lastSentAt = 0
+}
+
 // Initialize Redis (Phase 1)
 const { isRedisAvailable, closeRedis } = require('./config/redis')
   ; (async () => {
@@ -73,6 +85,7 @@ const { isRedisAvailable, closeRedis } = require('./config/redis')
     if (!db.data.saldoHistory) db.data.saldoHistory = []
     if (!db.data.persentase) db.data.persentase = {}
     if (!db.data.customProfit) db.data.customProfit = {}
+    ensurePromoDefaults()
 
     // Log database status
     console.log(`📊 Database loaded: ${Object.keys(db.data.users || {}).length} users, ${(db.data.transaksi || []).length} transactions`)
@@ -164,6 +177,33 @@ async function startnicola() {
 
   // Store global reference for webhook access
   global.gowaAdapter = nicola
+
+  if (!global.__promoSchedulerStarted) {
+    global.__promoSchedulerStarted = true
+    setInterval(async () => {
+      try {
+        if (!global.db || !global.db.data) return
+        ensurePromoDefaults()
+        const promo = global.db.data.promo
+        if (!promo.enabled) return
+        if (!promo.groupId || !promo.text || !promo.time) return
+        const tz = promo.timezone || 'Asia/Jakarta'
+        const now = moment().tz(tz)
+        const nowTime = now.format('HH:mm')
+        const today = now.format('YYYY-MM-DD')
+        if (nowTime !== promo.time) return
+        if (promo.lastSentDate === today) return
+
+        await nicola.sendMessage(promo.groupId, { text: promo.text })
+        promo.lastSentDate = today
+        promo.lastSentAt = Date.now()
+        if (typeof global.scheduleSave === 'function') global.scheduleSave()
+        console.log(`[PROMO] Sent promo to ${promo.groupId} at ${promo.time} ${tz}`)
+      } catch (error) {
+        console.error('[PROMO] Scheduler send failed:', error.message)
+      }
+    }, 60 * 1000)
+  }
 
   // Connect to Gowa service
   console.log('[GOWA] Connecting to WhatsApp service...')

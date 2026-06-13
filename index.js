@@ -1818,6 +1818,18 @@ module.exports = async (nicola, m, mek) => {
         autoketik: false,
         anticall: true,
       }
+    if (!db.data.promo || typeof db.data.promo !== 'object') {
+      db.data.promo = {
+        enabled: false,
+        groupId: '',
+        groupName: '',
+        text: '',
+        time: '08:00',
+        timezone: 'Asia/Jakarta',
+        lastSentDate: '',
+        lastSentAt: 0,
+      }
+    }
     if (isGroup && !db.data.chat[from])
       db.data.chat[from] = {
         welcome: false,
@@ -2051,7 +2063,7 @@ module.exports = async (nicola, m, mek) => {
                 if (!preCheck.ok) {
                   delete db.data.zoomFlow[sender]
                   if (preCheck.error === 'POOL_EMPTY') {
-                    return reply(`❌ Layanan Zoom ${tier}p sedang tidak tersedia. Hubungi admin.`)
+                    return reply(`❌ Zoom ${tier}p kosong.`)
                   }
                   const tzShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(
                     /_/g,
@@ -2060,7 +2072,7 @@ module.exports = async (nicola, m, mek) => {
                   // QRIS path = customer-facing. Jangan bocorkan detail meeting
                   // (topik/jam) maupun label/akun internal milik customer lain.
                   return reply(
-                    `❌ *Semua slot Zoom ${tier}p penuh* di jam yang kamu minta (${tzShort}).\n\n` +
+                    `❌ *Zoom ${tier}p kosong* di jam yang kamu minta (${tzShort}).\n\n` +
                       `QRIS *tidak* digenerate karena meeting tidak bisa dibuat.\n\n` +
                       `Silakan pilih jam lain. Ketik \`${prefix}zoom${tier}qris\` untuk mulai ulang.`
                   )
@@ -2277,7 +2289,7 @@ module.exports = async (nicola, m, mek) => {
                   if (poolResult.error === 'POOL_EMPTY') {
                     return reply(
                       flowIsBuy
-                        ? `❌ Layanan Zoom ${tier}p sedang tidak tersedia. Hubungi admin.`
+                        ? `❌ Zoom ${tier}p kosong.`
                         : `❌ Host pool tier ${tier} kosong. Isi \`config/zoom-pool-${tier}.json\` di server.`
                     )
                   }
@@ -2293,9 +2305,7 @@ module.exports = async (nicola, m, mek) => {
                   const retryCmd = flowIsBuy ? `${prefix}zoom${tier}` : `${prefix}pool${tier}`
                   if (flowIsBuy) {
                     return reply(
-                      `❌ *Semua slot Zoom ${tier}p penuh* di jam yang kamu minta (${tzShort}).\n\n` +
-                        `Saldo kamu *tidak dipotong*.\n\n` +
-                        `Silakan pilih jam lain. Ketik \`${retryCmd}\` untuk mulai ulang.`
+                      `❌ *Zoom ${tier}p kosong* di jam yang kamu minta (${tzShort}).\n\n` + `Saldo kamu *tidak dipotong*.\n\n` + `Silakan pilih jam lain. Ketik \`${retryCmd}\` untuk mulai ulang.`
                     )
                   }
                   const summary = poolResult.reasons
@@ -3555,6 +3565,89 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
     }
 
     switch (command) {
+      case 'helppromo': {
+        return reply(
+          `📢 *HELP PROMO*\n\n` +
+            `*Command:*\n` +
+            `• ${prefix}setpromogroup → jalankan di grup target\n` +
+            `• ${prefix}setpromotext <isi pesan>\n` +
+            `• ${prefix}setpromotime 08:00\n` +
+            `• ${prefix}promoon\n` +
+            `• ${prefix}promooff\n\n` +
+            `*Urutan setup:*\n` +
+            `1. Masuk ke grup target lalu ketik ${prefix}setpromogroup\n` +
+            `2. Di chat owner ketik ${prefix}setpromotext <isi promo>\n` +
+            `3. Di chat owner ketik ${prefix}setpromotime 08:00\n` +
+            `4. Di chat owner ketik ${prefix}promoon\n\n` +
+            `*Contoh:*\n` +
+            `${prefix}setpromotext Promo hari ini diskon panel dan Zoom. Chat sekarang.\n` +
+            `${prefix}setpromotime 08:00`
+        )
+      }
+      case 'setpromogroup': {
+        if (!isGroup) return reply('❌ Command ini hanya bisa dipakai di grup target promo.')
+        if (!isOwner && !isGroupAdmins) return reply(mess.admin)
+        let groupName = ''
+        try {
+          groupName = (groupMetadata && groupMetadata.subject) || ''
+        } catch {
+          groupName = ''
+        }
+        db.data.promo.groupId = from
+        db.data.promo.groupName = groupName
+        if (typeof global.scheduleSave === 'function') global.scheduleSave()
+        return reply(
+          `✅ Grup promo diset ke grup ini.\n\n` +
+            `• Nama: ${groupName || '-'}\n` +
+            `• ID: ${from}`
+        )
+      }
+      case 'setpromotext': {
+        if (!isOwner) return reply(mess.owner)
+        if (!q) return reply(`Contoh: ${prefix + command} Promo hari ini ...`)
+        db.data.promo.text = q.trim()
+        if (typeof global.scheduleSave === 'function') global.scheduleSave()
+        return reply(
+          `✅ Teks promo disimpan.\n\n` +
+            `Preview:\n${db.data.promo.text}`
+        )
+      }
+      case 'setpromotime': {
+        if (!isOwner) return reply(mess.owner)
+        const rawTime = String(q || '').trim()
+        if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(rawTime)) {
+          return reply(`Contoh: ${prefix + command} 08:00`)
+        }
+        db.data.promo.time = rawTime
+        if (typeof global.scheduleSave === 'function') global.scheduleSave()
+        return reply(`✅ Jam promo diset ke ${rawTime} (${db.data.promo.timezone || 'Asia/Jakarta'}).`)
+      }
+      case 'promoon': {
+        if (!isOwner) return reply(mess.owner)
+        if (!db.data.promo.groupId) {
+          return reply(`❌ Grup promo belum diset. Jalankan ${prefix}setpromogroup di grup target.`)
+        }
+        if (!db.data.promo.text) {
+          return reply(`❌ Teks promo belum diset. Jalankan ${prefix}setpromotext <isi pesan>.`)
+        }
+        if (!db.data.promo.time) {
+          return reply(`❌ Jam promo belum diset. Jalankan ${prefix}setpromotime 08:00.`)
+        }
+        db.data.promo.enabled = true
+        if (typeof global.scheduleSave === 'function') global.scheduleSave()
+        return reply(
+          `✅ Promo otomatis ON.\n\n` +
+            `• Grup: ${db.data.promo.groupName || db.data.promo.groupId}\n` +
+            `• Jam: ${db.data.promo.time}\n` +
+            `• Timezone: ${db.data.promo.timezone || 'Asia/Jakarta'}`
+        )
+      }
+      case 'promooff': {
+        if (!isOwner) return reply(mess.owner)
+        db.data.promo.enabled = false
+        if (typeof global.scheduleSave === 'function') global.scheduleSave()
+        return reply('✅ Promo otomatis OFF.')
+      }
       case 'zoomlarge':
       case 'zoomscheduled':
       case 'zoom': {
@@ -4233,7 +4326,12 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
         const pool = zoomPool.loadPool(tier)
         if (!pool.length) {
-          return reply(`❌ Layanan Zoom ${tier}p sedang tidak tersedia. Hubungi admin.`)
+          return reply(`❌ Zoom ${tier}p kosong.`)
+        }
+
+        const licensedPool = await zoomPool.findFirstLicensedHost(tier)
+        if (!licensedPool.ok) {
+          return reply(`❌ Zoom ${tier}p kosong.`)
         }
 
         // Init user record kalau belum ada
@@ -4287,7 +4385,12 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
         const pool = zoomPool.loadPool(tier)
         if (!pool.length) {
-          return reply(`❌ Layanan Zoom ${tier}p sedang tidak tersedia. Hubungi admin.`)
+          return reply(`❌ Zoom ${tier}p kosong.`)
+        }
+
+        const licensedPool = await zoomPool.findFirstLicensedHost(tier)
+        if (!licensedPool.ok) {
+          return reply(`❌ Zoom ${tier}p kosong.`)
         }
 
         if (!db.data.users[sender]) db.data.users[sender] = { saldo: 0, role: 'bronze' }

@@ -7,11 +7,21 @@ if (!usePg) {
 
 const { query } = require('../config/postgres')
 const UPSERT_CHUNK = Math.max(1, Number(process.env.PG_UPSERT_CHUNK || 100))
-const KV_SYNC_KEYS = ['order', 'zoomFlow', 'zoomBookings']
+const KV_SYNC_KEYS = ['order', 'zoomFlow', 'zoomBookings', 'promo']
 const KV_DEFAULTS = {
     order: {},
     zoomFlow: {},
-    zoomBookings: []
+    zoomBookings: [],
+    promo: {
+        enabled: false,
+        groupId: '',
+        groupName: '',
+        text: '',
+        time: '08:00',
+        timezone: 'Asia/Jakarta',
+        lastSentDate: '',
+        lastSentAt: 0
+    }
 }
 
 function cloneJson(value) {
