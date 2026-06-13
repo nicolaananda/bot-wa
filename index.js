@@ -1961,7 +1961,9 @@ module.exports = async (nicola, m, mek) => {
       // Auto-expire flow setelah 15 menit tanpa aktivitas
       if (flow.startedAt && Date.now() - flow.startedAt > 15 * 60 * 1000) {
         delete db.data.zoomFlow[sender]
-        reply('⌛ Sesi pembuatan Zoom meeting kadaluarsa. Ketik `#zoomlarge` lagi untuk memulai.')
+        reply(
+          '⌛ Sesi Zoom kadaluarsa. Ketik ulang command Zoom kamu sebelumnya untuk memulai lagi.'
+        )
         return
       }
 
