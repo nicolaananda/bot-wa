@@ -1832,6 +1832,9 @@ module.exports = async (nicola, m, mek) => {
       }
     }
     if (!Array.isArray(db.data.promo.groups)) db.data.promo.groups = []
+    if (!db.data.promoInputFlow || typeof db.data.promoInputFlow !== 'object') {
+      db.data.promoInputFlow = {}
+    }
     if (
       db.data.promo.groupId &&
       !db.data.promo.groups.some((group) => group && group.id === db.data.promo.groupId)
@@ -1960,6 +1963,38 @@ module.exports = async (nicola, m, mek) => {
     }
 
     expiredCheck(nicola, m, groupId)
+
+    if (db.data.promoInputFlow[sender] && !fromMe) {
+      const flow = db.data.promoInputFlow[sender]
+      const lowered = (chats || '').trim().toLowerCase()
+      const cmdOnly = (command || '').toLowerCase()
+      const skipPromoInput =
+        ['batal', prefix + 'batal', 'cancel', prefix + 'cancel', 'setpromotext'].includes(lowered) ||
+        ['batal', 'cancel', 'setpromotext'].includes(cmdOnly)
+
+      if (flow.startedAt && Date.now() - flow.startedAt > 15 * 60 * 1000) {
+        delete db.data.promoInputFlow[sender]
+        reply('⌛ Sesi input promo kadaluarsa. Ketik #setpromotext lagi untuk mulai ulang.')
+        return
+      }
+
+      if (!skipPromoInput) {
+        const promoTextInput = String(chats || '').trim()
+        if (!promoTextInput) {
+          return reply('❌ Isi promo kosong. Kirim ulang teks promo, atau ketik #batal.')
+        }
+        db.data.promo.text = promoTextInput
+        delete db.data.promoInputFlow[sender]
+        if (typeof global.scheduleSave === 'function') global.scheduleSave()
+        const lineCount = promoTextInput.split(/\r?\n/).length
+        return reply(
+          `✅ Teks promo disimpan.\n\n` +
+            `• Karakter: ${promoTextInput.length}\n` +
+            `• Baris: ${lineCount}\n\n` +
+            `Ketik ${prefix}previewpromo untuk cek isi promo.`
+        )
+      }
+    }
 
     // ==============================================================
     // ZOOM LARGE MEETING FLOW — owner only
@@ -3690,11 +3725,17 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           .trim()
         const promoTextInput = inlinePromoText || quotedPromoText
         if (!promoTextInput)
-          return reply(
-            `Contoh:\n${prefix + command} Promo hari ini ...\n\n` +
-              `Atau kirim multiline:\n${prefix + command}\n📢 Promo hari ini ...\n\n` +
-              `Atau reply pesan promo lalu ketik:\n${prefix + command}`
-          )
+          {
+            db.data.promoInputFlow[sender] = { startedAt: Date.now() }
+            return reply(
+              `📝 Mode input promo aktif.\n\n` +
+                `Sekarang kirim isi promo dalam 1 pesan terpisah.\n` +
+                `Kalau batal, ketik ${prefix}batal.\n\n` +
+                `Alternatif tetap bisa:\n` +
+                `• ${prefix + command} Promo hari ini ...\n` +
+                `• Reply pesan promo lalu ketik ${prefix + command}`
+            )
+          }
         db.data.promo.text = promoTextInput
         if (typeof global.scheduleSave === 'function') global.scheduleSave()
         const lineCount = promoTextInput.split(/\r?\n/).length
@@ -6549,10 +6590,16 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           if (!db.data.order) db.data.order = {}
           if (!db.data.orderDeposit) db.data.orderDeposit = {}
           if (!db.data.zoomFlow) db.data.zoomFlow = {}
+          if (!db.data.promoInputFlow) db.data.promoInputFlow = {}
 
           // Jika user sendiri sedang dalam flow zoom, batalkan flow-nya
           if (db.data.zoomFlow[sender]) {
             delete db.data.zoomFlow[sender]
+            cancelled = true
+          }
+
+          if (db.data.promoInputFlow[sender]) {
+            delete db.data.promoInputFlow[sender]
             cancelled = true
           }
 
