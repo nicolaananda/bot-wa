@@ -16,6 +16,7 @@ const KV_DEFAULTS = {
         enabled: false,
         groupId: '',
         groupName: '',
+        groups: [],
         text: '',
         time: '08:00',
         timezone: 'Asia/Jakarta',

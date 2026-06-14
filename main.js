@@ -34,6 +34,13 @@ function ensurePromoDefaults() {
   if (typeof db.data.promo.enabled !== 'boolean') db.data.promo.enabled = false
   if (!db.data.promo.groupId) db.data.promo.groupId = ''
   if (!db.data.promo.groupName) db.data.promo.groupName = ''
+  if (!Array.isArray(db.data.promo.groups)) db.data.promo.groups = []
+  if (db.data.promo.groupId && !db.data.promo.groups.some((g) => g && g.id === db.data.promo.groupId)) {
+    db.data.promo.groups.push({
+      id: db.data.promo.groupId,
+      name: db.data.promo.groupName || '',
+    })
+  }
   if (!db.data.promo.text) db.data.promo.text = ''
   if (!db.data.promo.time) db.data.promo.time = '08:00'
   if (!db.data.promo.timezone) db.data.promo.timezone = 'Asia/Jakarta'
@@ -186,7 +193,11 @@ async function startnicola() {
         ensurePromoDefaults()
         const promo = global.db.data.promo
         if (!promo.enabled) return
-        if (!promo.groupId || !promo.text || !promo.time) return
+        if (!promo.text || !promo.time) return
+        const targetGroups = Array.isArray(promo.groups)
+          ? promo.groups.filter((g) => g && g.id)
+          : []
+        if (!targetGroups.length) return
         const tz = promo.timezone || 'Asia/Jakarta'
         const now = moment().tz(tz)
         const nowTime = now.format('HH:mm')
@@ -194,11 +205,20 @@ async function startnicola() {
         if (nowTime !== promo.time) return
         if (promo.lastSentDate === today) return
 
-        await nicola.sendMessage(promo.groupId, { text: promo.text })
+        let sentCount = 0
+        for (const group of targetGroups) {
+          try {
+            await nicola.sendMessage(group.id, { text: promo.text })
+            sentCount += 1
+          } catch (sendError) {
+            console.error(`[PROMO] Failed send to ${group.id}:`, sendError.message)
+          }
+        }
+        if (!sentCount) return
         promo.lastSentDate = today
         promo.lastSentAt = Date.now()
         if (typeof global.scheduleSave === 'function') global.scheduleSave()
-        console.log(`[PROMO] Sent promo to ${promo.groupId} at ${promo.time} ${tz}`)
+        console.log(`[PROMO] Sent promo to ${sentCount} group(s) at ${promo.time} ${tz}`)
       } catch (error) {
         console.error('[PROMO] Scheduler send failed:', error.message)
       }

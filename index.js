@@ -1823,12 +1823,23 @@ module.exports = async (nicola, m, mek) => {
         enabled: false,
         groupId: '',
         groupName: '',
+        groups: [],
         text: '',
         time: '08:00',
         timezone: 'Asia/Jakarta',
         lastSentDate: '',
         lastSentAt: 0,
       }
+    }
+    if (!Array.isArray(db.data.promo.groups)) db.data.promo.groups = []
+    if (
+      db.data.promo.groupId &&
+      !db.data.promo.groups.some((group) => group && group.id === db.data.promo.groupId)
+    ) {
+      db.data.promo.groups.push({
+        id: db.data.promo.groupId,
+        name: db.data.promo.groupName || '',
+      })
     }
     if (isGroup && !db.data.chat[from])
       db.data.chat[from] = {
@@ -3571,16 +3582,21 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         return reply(
           `📢 *HELP PROMO*\n\n` +
             `*Command:*\n` +
-            `• ${prefix}setpromogroup → jalankan di grup target\n` +
+            `• ${prefix}setpromogroup → tambah grup ini ke target promo\n` +
+            `• ${prefix}listpromogroup\n` +
+            `• ${prefix}delpromogroup → hapus grup ini dari target promo\n` +
+            `• ${prefix}statuspromo\n` +
+            `• ${prefix}previewpromo\n` +
             `• ${prefix}setpromotext <isi pesan>\n` +
             `• ${prefix}setpromotime 08:00\n` +
             `• ${prefix}promoon\n` +
             `• ${prefix}promooff\n\n` +
             `*Urutan setup:*\n` +
-            `1. Masuk ke grup target lalu ketik ${prefix}setpromogroup\n` +
-            `2. Di chat owner ketik ${prefix}setpromotext <isi promo>\n` +
-            `3. Di chat owner ketik ${prefix}setpromotime 08:00\n` +
-            `4. Di chat owner ketik ${prefix}promoon\n\n` +
+            `1. Masuk ke tiap grup target lalu ketik ${prefix}setpromogroup\n` +
+            `2. Cek daftar dengan ${prefix}listpromogroup\n` +
+            `3. Di chat owner ketik ${prefix}setpromotext <isi promo>\n` +
+            `4. Di chat owner ketik ${prefix}setpromotime 08:00\n` +
+            `5. Di chat owner ketik ${prefix}promoon\n\n` +
             `*Contoh:*\n` +
             `${prefix}setpromotext Promo hari ini diskon panel dan Zoom. Chat sekarang.\n` +
             `${prefix}setpromotime 08:00`
@@ -3595,19 +3611,87 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         } catch {
           groupName = ''
         }
+        const existingIndex = db.data.promo.groups.findIndex((group) => group && group.id === from)
+        if (existingIndex >= 0) {
+          db.data.promo.groups[existingIndex] = { id: from, name: groupName }
+        } else {
+          db.data.promo.groups.push({ id: from, name: groupName })
+        }
         db.data.promo.groupId = from
         db.data.promo.groupName = groupName
         if (typeof global.scheduleSave === 'function') global.scheduleSave()
         return reply(
-          `✅ Grup promo diset ke grup ini.\n\n` +
+          `✅ Grup ini ditambahkan ke target promo.\n\n` +
             `• Nama: ${groupName || '-'}\n` +
-            `• ID: ${from}`
+            `• ID: ${from}\n` +
+            `• Total grup target: ${db.data.promo.groups.length}`
+        )
+      }
+      case 'listpromogroup': {
+        if (!isOwner) return reply(mess.owner)
+        const groups = Array.isArray(db.data.promo.groups)
+          ? db.data.promo.groups.filter((group) => group && group.id)
+          : []
+        if (!groups.length) return reply('❌ Belum ada grup target promo.')
+        return reply(
+          `📢 *DAFTAR GRUP PROMO*\n\n` +
+            groups.map((group, index) => `${index + 1}. ${group.name || '-'}\n${group.id}`).join('\n\n')
+        )
+      }
+      case 'statuspromo': {
+        if (!isOwner) return reply(mess.owner)
+        const groups = Array.isArray(db.data.promo.groups)
+          ? db.data.promo.groups.filter((group) => group && group.id)
+          : []
+        const groupsText = groups.length
+          ? groups.map((group, index) => `${index + 1}. ${group.name || '-'}\n${group.id}`).join('\n\n')
+          : '-'
+        return reply(
+          `📢 *STATUS PROMO*\n\n` +
+            `• Status: ${db.data.promo.enabled ? 'ON' : 'OFF'}\n` +
+            `• Jam: ${db.data.promo.time || '-'}\n` +
+            `• Timezone: ${db.data.promo.timezone || 'Asia/Jakarta'}\n` +
+            `• Jumlah grup: ${groups.length}\n` +
+            `• Teks promo: ${db.data.promo.text ? 'Sudah diset' : 'Belum diset'}\n` +
+            `• Last sent: ${db.data.promo.lastSentDate || '-'}\n\n` +
+            `*Target Grup:*\n${groupsText}`
+        )
+      }
+      case 'previewpromo': {
+        if (!isOwner) return reply(mess.owner)
+        if (!db.data.promo.text) return reply('❌ Teks promo belum diset.')
+        return reply(`📢 *PREVIEW PROMO*\n\n${db.data.promo.text}`)
+      }
+      case 'delpromogroup': {
+        if (!isGroup) return reply('❌ Command ini hanya bisa dipakai di grup target promo.')
+        if (!isOwner && !isGroupAdmins) return reply(mess.admin)
+        const before = db.data.promo.groups.length
+        db.data.promo.groups = db.data.promo.groups.filter((group) => !(group && group.id === from))
+        if (!db.data.promo.groups.length) {
+          db.data.promo.groupId = ''
+          db.data.promo.groupName = ''
+        } else if (db.data.promo.groupId === from) {
+          db.data.promo.groupId = db.data.promo.groups[0].id
+          db.data.promo.groupName = db.data.promo.groups[0].name || ''
+        }
+        if (typeof global.scheduleSave === 'function') global.scheduleSave()
+        if (before === db.data.promo.groups.length) return reply('❌ Grup ini belum masuk target promo.')
+        return reply(
+          `✅ Grup ini dihapus dari target promo.\n\n` +
+            `• Sisa grup target: ${db.data.promo.groups.length}`
         )
       }
       case 'setpromotext': {
         if (!isOwner) return reply(mess.owner)
-        if (!q) return reply(`Contoh: ${prefix + command} Promo hari ini ...`)
-        db.data.promo.text = q.trim()
+        const promoTextInput = String(chats || '')
+          .slice((prefix + command).length)
+          .trim()
+        if (!promoTextInput)
+          return reply(
+            `Contoh:\n${prefix + command} Promo hari ini ...\n\n` +
+              `Atau kirim multiline:\n${prefix + command}\n📢 Promo hari ini ...`
+          )
+        db.data.promo.text = promoTextInput
         if (typeof global.scheduleSave === 'function') global.scheduleSave()
         return reply(
           `✅ Teks promo disimpan.\n\n` +
@@ -3626,7 +3710,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       }
       case 'promoon': {
         if (!isOwner) return reply(mess.owner)
-        if (!db.data.promo.groupId) {
+        if (!Array.isArray(db.data.promo.groups) || !db.data.promo.groups.length) {
           return reply(`❌ Grup promo belum diset. Jalankan ${prefix}setpromogroup di grup target.`)
         }
         if (!db.data.promo.text) {
@@ -3639,7 +3723,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         if (typeof global.scheduleSave === 'function') global.scheduleSave()
         return reply(
           `✅ Promo otomatis ON.\n\n` +
-            `• Grup: ${db.data.promo.groupName || db.data.promo.groupId}\n` +
+            `• Total grup: ${db.data.promo.groups.length}\n` +
             `• Jam: ${db.data.promo.time}\n` +
             `• Timezone: ${db.data.promo.timezone || 'Asia/Jakarta'}`
         )
