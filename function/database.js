@@ -6,7 +6,13 @@ if (!usePg) {
 }
 
 const { query } = require('../config/postgres')
-const UPSERT_CHUNK = Math.max(1, Number(process.env.PG_UPSERT_CHUNK || 100))
+
+function toPositiveInt(value, fallback) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : fallback
+}
+
+const UPSERT_CHUNK = toPositiveInt(process.env.PG_UPSERT_CHUNK || 100, 100)
 const KV_SYNC_KEYS = ['order', 'zoomFlow', 'zoomBookings', 'promo']
 const KV_DEFAULTS = {
     order: {},
@@ -35,6 +41,28 @@ function cloneJson(value) {
     }
 }
 
+function resolveTransactionRefId(item) {
+    return item && (item.ref_id || item.reffId || item.order_id || item.orderId) || null
+}
+
+function normalizeTransactionRecord(item) {
+    const payload = item || {}
+    const refId = resolveTransactionRefId(payload)
+    return {
+        refId,
+        userId: payload && (payload.user_id || payload.userId || payload.user) || null,
+        amount: payload && (Number(payload.amount || payload.totalBayar || (payload.price * (payload.jumlah || 1)) || 0)) || 0,
+        status: payload && (payload.status || null),
+        meta: payload,
+    }
+}
+
+function chunkArray(items, size) {
+    const out = []
+    for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+    return out
+}
+
 class DatabasePG {
     constructor() {
         this.logger = console
@@ -43,6 +71,57 @@ class DatabasePG {
 
     get data() { return this._data }
     set data(value) { this._data = value }
+
+    async persistTransactions(items, executor = query) {
+        const sourceItems = Array.isArray(items) ? items : [items]
+        const normalized = sourceItems
+            .map((item) => normalizeTransactionRecord(item))
+            .filter((item) => item && item.refId)
+
+        if (!normalized.length) return { ok: true, inserted: 0, skipped: sourceItems.length }
+
+        let inserted = 0
+        for (const chunk of chunkArray(normalized, UPSERT_CHUNK)) {
+            const placeholders = []
+            const params = []
+            let paramIndex = 1
+
+            for (const item of chunk) {
+                placeholders.push(`($${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++})`)
+                params.push(item.refId, item.userId, item.amount, item.status, JSON.stringify(item.meta || {}))
+            }
+
+            const sql = `INSERT INTO transaksi(ref_id, user_id, amount, status, meta) VALUES ${placeholders.join(',')} ON CONFLICT (ref_id) WHERE ref_id IS NOT NULL DO NOTHING`
+            const result = await executor(sql, params)
+            inserted += Number(result && result.rowCount || 0)
+        }
+
+        return { ok: true, inserted, skipped: sourceItems.length - normalized.length }
+    }
+
+    async appendTransaction(item, { persist = true } = {}) {
+        const normalized = normalizeTransactionRecord(item)
+        if (!normalized.refId) {
+            throw new Error('Transaction refId is required for persistence')
+        }
+
+        if (persist) {
+            await this.persistTransactions([item])
+        }
+
+        if (!Array.isArray(this._data.transaksi)) this._data.transaksi = []
+        const nextItem = cloneJson(item)
+        const existingIndex = this._data.transaksi.findIndex(
+            (entry) => resolveTransactionRefId(entry) === normalized.refId
+        )
+        if (existingIndex >= 0) {
+            this._data.transaksi[existingIndex] = nextItem
+        } else {
+            this._data.transaksi.push(nextItem)
+        }
+
+        return nextItem
+    }
 
     async load() {
         const snapshot = {}
@@ -65,24 +144,7 @@ class DatabasePG {
         }
 
         const tr = await transaksiPromise
-        const transaksiArray = tr.rows.map(r => r.meta)
-        const originalPush = transaksiArray.push
-        transaksiArray.push = function(...items) {
-            try {
-                for (const item of items) {
-                    // Fire-and-forget insert; do not block caller
-                    query('INSERT INTO transaksi(ref_id, user_id, amount, status, meta) VALUES ($1,$2,$3,$4,$5)', [
-                        item && (item.ref_id || item.reffId) || null,
-                        item && (item.user_id || item.userId || item.user) || null,
-                        item && (Number(item.amount || item.totalBayar || (item.price * (item.jumlah || 1)) || 0)) || 0,
-                        item && (item.status || null),
-                        JSON.stringify(item)
-                    ]).catch(e => { try { console.error('[DBPG] insert transaksi failed:', e.message) } catch {} })
-                }
-            } catch {}
-            return originalPush.apply(this, items)
-        }
-        snapshot.transaksi = transaksiArray
+        snapshot.transaksi = tr.rows.map(r => r.meta)
 
         // produk
         const produk = await produkPromise
@@ -122,105 +184,74 @@ class DatabasePG {
     }
 
     async save() {
+        let hadError = false
+
         try {
-			// Persist users (bulk upsert)
-			if (this._data && this._data.users) {
-				const entries = Object.entries(this._data.users)
-				const chunkSize = UPSERT_CHUNK
-				for (let i = 0; i < entries.length; i += chunkSize) {
-					const chunk = entries.slice(i, i + chunkSize)
-					if (chunk.length === 0) continue
-					const values = []
-					const params = []
-					let paramIndex = 1
-					for (const [userId, u] of chunk) {
-						const saldo = Number(u && u.saldo || 0)
-						const role = (u && u.role) || 'bronze'
-						values.push(`($${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++})`)
-						params.push(userId, saldo, role, JSON.stringify(u || {}))
-					}
-					const sql = `INSERT INTO users(user_id, saldo, role, data) VALUES ${values.join(',')} ON CONFLICT (user_id) DO UPDATE SET saldo=EXCLUDED.saldo, role=EXCLUDED.role, data=EXCLUDED.data`
-					await query(sql, params)
-				}
-			}
-			// Persist produk (bulk upsert)
-			if (this._data && this._data.produk) {
-				const entries = Object.entries(this._data.produk)
-				const chunkSize = UPSERT_CHUNK
-				for (let i = 0; i < entries.length; i += chunkSize) {
-					const chunk = entries.slice(i, i + chunkSize)
-					if (chunk.length === 0) continue
-					const values = []
-					const params = []
-					let paramIndex = 1
-					for (const [id, p] of chunk) {
-						const name = (p && (p.name || p.nama)) || null
-						const price = Number(p && (p.price || p.harga) || 0)
-						const stock = Number(p && (p.stock || (p.stok ? p.stok.length : 0)) || 0)
-						values.push(`($${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++})`)
-						params.push(id, name, price, stock, JSON.stringify(p || {}))
-					}
-					const sql = `INSERT INTO produk(id, name, price, stock, data) VALUES ${values.join(',')} ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, price=EXCLUDED.price, stock=EXCLUDED.stock, data=EXCLUDED.data`
-					await query(sql, params)
-				}
-			}
-			// Persist transaksi (optimized: only sync last 100 transactions)
-			if (this._data && this._data.transaksi && Array.isArray(this._data.transaksi)) {
-				const totalTransactions = this._data.transaksi.length
-				// Only process last 100 transactions to avoid looping through thousands
-				const startIndex = Math.max(0, totalTransactions - 100)
-				const transactionsToSync = this._data.transaksi.slice(startIndex)
-				
-				let totalSaved = 0
-				let totalSkipped = 0
-				
-				for (const t of transactionsToSync) {
-					try {
-						const refId = t && (t.ref_id || t.reffId || t.order_id) || null
-						if (!refId) continue // Skip if no ref_id
-						
-						const uid = t && (t.user_id || t.userId || t.user) || null
-						const amt = Number(t && (t.totalBayar || t.amount || (t.price * (t.jumlah || 1)))) || 0
-						const status = (t && t.status) || 'completed'
-						
-						// Check if exists first
-						const existing = await query('SELECT id FROM transaksi WHERE ref_id = $1 LIMIT 1', [refId])
-						if (existing.rows.length === 0) {
-							// Insert only if not exists
-							await query(
-								'INSERT INTO transaksi(ref_id, user_id, amount, status, meta) VALUES ($1,$2,$3,$4,$5)',
-								[refId, uid, amt, status, JSON.stringify(t)]
-							)
-							totalSaved++
-						} else {
-							totalSkipped++
-						}
-					} catch (e) {
-						try { console.error('[DBPG] Failed to save transaction:', e.message) } catch {}
-					}
-				}
-			}
-            // Persist kv_store mirrored keys (e.g., pending orders)
-            if (KV_SYNC_KEYS.length) {
-                for (const key of KV_SYNC_KEYS) {
-                    try {
-                        const value = this._data && typeof this._data[key] !== 'undefined'
-                            ? this._data[key]
-                            : KV_DEFAULTS[key]
-                        if (typeof value === 'undefined') continue
-                        await query(
-                            'INSERT INTO kv_store(key, value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()',
-                            [key, JSON.stringify(value)]
-                        )
-                    } catch (e) {
-                        try { console.error(`[DBPG] Failed to persist kv_store key "${key}":`, e.message) } catch {}
+            if (this._data && this._data.users) {
+                const entries = Object.entries(this._data.users)
+                for (const chunk of chunkArray(entries, UPSERT_CHUNK)) {
+                    if (!chunk.length) continue
+                    const values = []
+                    const params = []
+                    let paramIndex = 1
+                    for (const [userId, u] of chunk) {
+                        const saldo = Number(u && u.saldo || 0)
+                        const role = (u && u.role) || 'bronze'
+                        values.push(`($${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++})`)
+                        params.push(userId, saldo, role, JSON.stringify(u || {}))
                     }
+                    const sql = `INSERT INTO users(user_id, saldo, role, data) VALUES ${values.join(',')} ON CONFLICT (user_id) DO UPDATE SET saldo=EXCLUDED.saldo, role=EXCLUDED.role, data=EXCLUDED.data`
+                    await query(sql, params)
                 }
             }
         } catch (e) {
-            try { console.error('[DBPG] save sync failed:', e.message) } catch {}
+            hadError = true
+            try { console.error('[DBPG] Failed to persist users:', e.message) } catch {}
         }
-        return true
+
+        try {
+            if (this._data && this._data.produk) {
+                const entries = Object.entries(this._data.produk)
+                for (const chunk of chunkArray(entries, UPSERT_CHUNK)) {
+                    if (!chunk.length) continue
+                    const values = []
+                    const params = []
+                    let paramIndex = 1
+                    for (const [id, p] of chunk) {
+                        const name = (p && (p.name || p.nama)) || null
+                        const price = Number(p && (p.price || p.harga) || 0)
+                        const stock = Number(p && (p.stock || (p.stok ? p.stok.length : 0)) || 0)
+                        values.push(`($${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++})`)
+                        params.push(id, name, price, stock, JSON.stringify(p || {}))
+                    }
+                    const sql = `INSERT INTO produk(id, name, price, stock, data) VALUES ${values.join(',')} ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, price=EXCLUDED.price, stock=EXCLUDED.stock, data=EXCLUDED.data`
+                    await query(sql, params)
+                }
+            }
+        } catch (e) {
+            hadError = true
+            try { console.error('[DBPG] Failed to persist produk:', e.message) } catch {}
+        }
+
+        try {
+            if (KV_SYNC_KEYS.length) {
+                for (const key of KV_SYNC_KEYS) {
+                    const value = this._data && typeof this._data[key] !== 'undefined'
+                        ? this._data[key]
+                        : KV_DEFAULTS[key]
+                    if (typeof value === 'undefined') continue
+                    await query(
+                        'INSERT INTO kv_store(key, value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()',
+                        [key, JSON.stringify(value)]
+                    )
+                }
+            }
+        } catch (e) {
+            hadError = true
+            try { console.error('[DBPG] Failed to persist kv_store keys:', e.message) } catch {}
+        }
+
+        return !hadError
     }
 }
 

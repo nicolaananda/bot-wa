@@ -1018,7 +1018,7 @@ if (!global.midtransWebhookListenerSetup) {
 
           // Log transaksi
           if (!db.data.transaksi) db.data.transaksi = []
-          db.data.transaksi.push({
+          await db.appendTransaction({
             id: `zoom${tier}`,
             name: `Zoom ${tier}p — ${meeting.topic}`,
             price: Number(totalAmount),
@@ -1267,7 +1267,7 @@ if (!global.midtransWebhookListenerSetup) {
         hargaProduk = (id, role) => 0
       }
 
-      db.data.transaksi.push({
+      await db.appendTransaction({
         id: productId,
         name: db.data.produk[productId].name,
         price: hargaProduk(productId, db.data.users[sender]?.role || 'bronze'),
@@ -2366,7 +2366,7 @@ module.exports = async (nicola, m, mek) => {
 
                   // Log transaksi — mirror structure pada buy flow existing
                   if (!db.data.transaksi) db.data.transaksi = []
-                  db.data.transaksi.push({
+                  await db.appendTransaction({
                     id: `zoom${tier}`,
                     name: `Zoom ${tier}p — ${meeting.topic}`,
                     price: priceInfo.price,
@@ -3693,9 +3693,12 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           )
         db.data.promo.text = promoTextInput
         if (typeof global.scheduleSave === 'function') global.scheduleSave()
+        const lineCount = promoTextInput.split(/\r?\n/).length
         return reply(
           `✅ Teks promo disimpan.\n\n` +
-            `Preview:\n${db.data.promo.text}`
+            `• Karakter: ${promoTextInput.length}\n` +
+            `• Baris: ${lineCount}\n\n` +
+            `Ketik ${prefix}previewpromo untuk cek isi promo.`
         )
       }
       case 'setpromotime': {
@@ -5534,7 +5537,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                       totalBayar: credit,
                       type: 'deposit',
                     }
-                    db.data.transaksi.push(depositTransaction)
+                    await db.appendTransaction(depositTransaction)
                     if (typeof global.scheduleSave === 'function') {
                       global.scheduleSave()
                     }
@@ -6428,7 +6431,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               }
 
               // Tambah ke database transaksi
-              db.data.transaksi.push({
+              await db.appendTransaction({
                 id: data[0],
                 name: db.data.produk[data[0]].name,
                 price: hargaProduk(data[0], db.data.users[sender].role),
