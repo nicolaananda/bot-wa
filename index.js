@@ -3683,13 +3683,17 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       }
       case 'setpromotext': {
         if (!isOwner) return reply(mess.owner)
-        const promoTextInput = String(chats || '')
+        const inlinePromoText = String(chats || '')
           .slice((prefix + command).length)
           .trim()
+        const quotedPromoText = String(m?.quoted?.text || '')
+          .trim()
+        const promoTextInput = inlinePromoText || quotedPromoText
         if (!promoTextInput)
           return reply(
             `Contoh:\n${prefix + command} Promo hari ini ...\n\n` +
-              `Atau kirim multiline:\n${prefix + command}\n📢 Promo hari ini ...`
+              `Atau kirim multiline:\n${prefix + command}\n📢 Promo hari ini ...\n\n` +
+              `Atau reply pesan promo lalu ketik:\n${prefix + command}`
           )
         db.data.promo.text = promoTextInput
         if (typeof global.scheduleSave === 'function') global.scheduleSave()
