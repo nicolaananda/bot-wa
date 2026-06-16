@@ -255,7 +255,7 @@ app.post('/webhook/midtrans', async (req, res) => {
 
     // Forward ke server Nala jika order_id untuk Nala
     const orderId = notification.order_id || '';
-    const NALA_PREFIXES = ['BOOK-', 'BELAJAR-', 'SKET-', 'BAJU-', 'GG-', 'GRASP-', 'CLASS-'];
+    const NALA_PREFIXES = ['BOOK-', 'BELAJAR-', 'SKET-', 'BAJU-', 'G60-', 'GG-', 'GRASP-', 'CLASS-'];
     const isNalaTransaction = NALA_PREFIXES.some(prefix => orderId.startsWith(prefix));
 
     if (isNalaTransaction) {
