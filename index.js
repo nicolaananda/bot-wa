@@ -4164,13 +4164,16 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           `timezone=Asia/Jakarta\n` +
           `concurrentMeetings=1\n` +
           `hostKey=123456\n` +
+          `exp=12/07/2026\n` +
+          `exp=12/07/2026\n` +
           `notes=catatan opsional\n` +
           '```\n\n' +
           `*Wajib:* accountId, clientId, clientSecret\n` +
           `*Opsional:* label (auto), userId (default: me), timezone, concurrentMeetings ` +
-          `(default tier ${tier} = ${zoomPool.TIER_DEFAULT_CONCURRENT[tier] || 1}), hostKey, notes\n\n` +
+          `(default tier ${tier} = ${zoomPool.TIER_DEFAULT_CONCURRENT[tier] || 1}), hostKey, exp (format DD/MM/YYYY), notes\n\n` +
           `Setelah submit, bot otomatis cek lisensi via Zoom API.\n` +
-          `Kalau Basic / capacity kurang, host tetap disimpan tapi bot kasih warning.\n\n` +
+          `Kalau Basic / capacity kurang, host tetap disimpan tapi bot kasih warning.\n` +
+          `Kalau exp kosong, host dianggap tidak punya expired.\n\n` +
           `_Tip:_ pakai satu baris per field, lebih aman dari typo.`
 
         if (!q || !q.trim()) {
@@ -4238,6 +4241,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           userId: pick('userId', 'userid', 'user_id') || 'me',
           timezone: pick('timezone') || null,
           hostKey: pick('hostKey', 'hostkey', 'host_key') || '',
+          exp: pick('exp', 'expired', 'expiry', 'expireDate', 'expire_date') || null,
           notes: pick('notes', 'note') || '',
         }
         const concurrentRaw = pick(
@@ -4279,6 +4283,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
             `• Label: ${addRes.host.label}\n` +
             `• Account ID: ${addRes.host.accountId}\n` +
             `• User ID: ${addRes.host.userId}\n` +
+            `• EXP: ${addRes.host.exp || '-'}\n` +
             `• Concurrent: ${addRes.host.concurrentMeetings}\n` +
             `• Total host di pool: ${addRes.pool.length}` +
             licenseLine
