@@ -4346,40 +4346,29 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           `⏳ Cek lisensi ${pool.length} host di pool ${tier}p${force ? ' (force refresh)' : ''}...`
         )
 
-        const lines = []
-        let okCount = 0
-        let badCount = 0
+        const readyLines = []
+        let readyCount = 0
+        let hiddenCount = 0
         let disabledCount = 0
         for (const host of pool) {
-          // Show disabled flag explicitly even before hitting Zoom API.
-          const disabledTag = host.disabledAt
-            ? `\n   ⛔ DISABLED sejak ${host.disabledAt}: ${host.disabledReason || '?'}`
-            : ''
-
           const verdict = await zoomLicense.checkHostForTier(host, tier, {
             forceRefresh: force,
           })
           if (host.disabledAt) disabledCount++
 
-          if (verdict.ok) {
-            okCount++
-            lines.push(
-              `✅ [${host.label}] ${verdict.plan}, ${verdict.capacity}p ` +
-                `(${verdict.source})${disabledTag}` +
-                (host.disabledAt
-                  ? `\n   ↳ lisensi ok sekarang — \`${prefix}zoomenable${tier} ${host.label}\` untuk re-enable`
-                  : '')
-            )
+          if (verdict.ok && !host.disabledAt) {
+            readyCount++
+            readyLines.push(`✅ [${host.label}] Ready — ${verdict.plan}, ${verdict.capacity}p (${verdict.source})`)
           } else {
-            badCount++
-            lines.push(`❌ [${host.label}] ${zoomLicense.reasonText(verdict, tier)}${disabledTag}`)
+            hiddenCount++
           }
         }
 
         return reply(
           `📋 *AUDIT LISENSI ZOOM ${tier}p*\n\n` +
-            `Total: ${pool.length} host (${okCount} OK, ${badCount} bermasalah, ${disabledCount} disabled)\n\n` +
-            lines.join('\n') +
+            `Ready: ${readyCount} host\n` +
+            `Disembunyikan: ${hiddenCount} bermasalah (${disabledCount} disabled)\n\n` +
+            (readyLines.length ? readyLines.join('\n') : 'Tidak ada host Ready.') +
             `\n\n_Refresh manual:_ \`${prefix}zoomlicense${tier} refresh\`` +
             `\n_Re-enable host:_ \`${prefix}zoomenable${tier} <label>\``
         )
