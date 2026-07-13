@@ -3366,6 +3366,335 @@ app.get('/api/dashboard/predictions', async (req, res) => {
   }
 });
 
+function renderDashboardPage() {
+  return String.raw`<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nicola Command Bridge</title>
+  <style>
+    :root {
+      --paper: #f7f9f4;
+      --panel: #ffffff;
+      --ink: #17211c;
+      --muted: #66736b;
+      --line: #dfe7dd;
+      --wa: #1da96c;
+      --deep: #123c2d;
+      --amber: #c98218;
+      --blue: #2f6d80;
+      --danger: #b9473f;
+      --shadow: 0 22px 70px rgba(23, 33, 28, .10);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(29,169,108,.10) 1px, transparent 1px) 0 0 / 44px 44px,
+        radial-gradient(circle at top right, rgba(47,109,128,.18), transparent 34rem),
+        var(--paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input, select { font: inherit; }
+    button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
+      outline: 3px solid rgba(29,169,108,.35);
+      outline-offset: 3px;
+    }
+
+    .shell { display: grid; grid-template-columns: 18rem 1fr; min-height: 100vh; }
+    .rail {
+      position: sticky; top: 0; height: 100vh; padding: 1.25rem;
+      background: rgba(255,255,255,.78); backdrop-filter: blur(18px);
+      border-right: 1px solid var(--line);
+    }
+    .brand { display: flex; gap: .85rem; align-items: center; margin-bottom: 2rem; }
+    .mark {
+      width: 3rem; height: 3rem; border-radius: 1rem; color: white;
+      display: grid; place-items: center; font-weight: 900; letter-spacing: -.08em;
+      background: linear-gradient(145deg, var(--deep), var(--wa)); box-shadow: var(--shadow);
+    }
+    .brand b { display: block; font-size: 1.05rem; letter-spacing: -.03em; }
+    .brand span, .eyebrow, .label, .status-line { color: var(--muted); font-size: .78rem; }
+
+    nav { display: grid; gap: .45rem; }
+    nav a {
+      color: var(--muted); text-decoration: none; border-radius: .9rem; padding: .72rem .85rem;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    nav a:hover, nav a.active { color: var(--ink); background: #edf5ee; }
+    .rail-card { margin-top: 1.5rem; padding: 1rem; border-radius: 1.2rem; background: #10291f; color: white; }
+    .rail-card span { color: #a9c7b8; font-size: .8rem; }
+
+    main { padding: 1.25rem; }
+    .topbar { display: flex; gap: 1rem; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .topbar h1 { margin: 0; font-size: clamp(2rem, 5vw, 4.9rem); letter-spacing: -.08em; line-height: .88; }
+    .toolbar { display: flex; gap: .7rem; align-items: center; flex-wrap: wrap; }
+    .field, .btn {
+      min-height: 2.75rem; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.82);
+      color: var(--ink); padding: 0 1rem;
+    }
+    .btn { cursor: pointer; font-weight: 800; }
+    .btn.primary { background: var(--deep); color: white; border-color: var(--deep); }
+    .btn:hover { transform: translateY(-1px); }
+
+    .hero {
+      display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(18rem, .8fr); gap: 1rem; margin-bottom: 1rem;
+    }
+    .panel {
+      background: rgba(255,255,255,.86); border: 1px solid var(--line); border-radius: 1.6rem;
+      padding: 1.15rem; box-shadow: var(--shadow);
+    }
+    .signal {
+      min-height: 18rem; display: grid; grid-template-columns: 3.2rem 1fr; gap: 1rem; overflow: hidden;
+    }
+    .signal-strip {
+      border-radius: 1.2rem; background: var(--deep); padding: .65rem; display: grid; align-content: end; gap: .35rem;
+    }
+    .signal-strip i { display: block; border-radius: 999px; background: var(--wa); min-height: 12px; opacity: .35; }
+    .signal-strip i:nth-child(2n) { background: var(--amber); }
+    .signal-strip i.live { opacity: 1; }
+    .hero-copy { display: flex; flex-direction: column; justify-content: space-between; gap: 2rem; }
+    .hero-copy h2 { margin: 0; font-size: clamp(1.7rem, 3vw, 3.3rem); line-height: .95; letter-spacing: -.06em; max-width: 12ch; }
+    .hero-copy p { color: var(--muted); max-width: 60ch; line-height: 1.7; }
+    .status-pill { display: inline-flex; gap: .5rem; align-items: center; width: fit-content; border: 1px solid #bde4cf; background: #eaf7ef; color: #12643e; border-radius: 999px; padding: .45rem .75rem; font-weight: 800; }
+    .dot { width: .58rem; height: .58rem; border-radius: 99px; background: currentColor; box-shadow: 0 0 0 .35rem rgba(29,169,108,.13); }
+
+    .scorecard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+    .metric { padding: 1rem; border: 1px solid var(--line); border-radius: 1.1rem; background: #fbfcf9; }
+    .metric strong { display: block; font-size: clamp(1.45rem, 3vw, 2.4rem); letter-spacing: -.06em; margin-top: .25rem; }
+    .metric small { color: var(--muted); }
+
+    .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(20rem, .55fr); gap: 1rem; align-items: start; }
+    .section-head { display: flex; justify-content: space-between; gap: 1rem; align-items: end; margin-bottom: .9rem; }
+    .section-head h3 { margin: 0; font-size: 1.2rem; letter-spacing: -.03em; }
+    .bars { display: grid; gap: .7rem; }
+    .bar-row { display: grid; grid-template-columns: 6.6rem 1fr 5.5rem; gap: .75rem; align-items: center; color: var(--muted); font-size: .9rem; }
+    .track { height: .75rem; background: #edf2eb; border-radius: 99px; overflow: hidden; }
+    .fill { height: 100%; width: var(--w, 0%); background: linear-gradient(90deg, var(--wa), var(--blue)); border-radius: inherit; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: .85rem .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; }
+    td { font-size: .92rem; }
+    .money, .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .tag { display: inline-flex; border-radius: 999px; padding: .25rem .55rem; background: #eef4ef; color: var(--deep); font-size: .75rem; font-weight: 800; }
+    .tag.warn { background: #fff3d9; color: #7a4b05; }
+    .tag.bad { background: #fde8e5; color: #842820; }
+
+    .cards { display: grid; gap: .75rem; }
+    .product { display: grid; grid-template-columns: 1fr auto; gap: .8rem; padding: .85rem; border: 1px solid var(--line); border-radius: 1rem; background: #fbfcf9; }
+    .product b { display: block; letter-spacing: -.02em; }
+    .product span { color: var(--muted); font-size: .83rem; }
+
+    .toast { position: fixed; right: 1rem; bottom: 1rem; max-width: 24rem; padding: .9rem 1rem; border-radius: 1rem; background: #10291f; color: white; box-shadow: var(--shadow); transform: translateY(140%); transition: transform .2s ease; z-index: 5; }
+    .toast.show { transform: translateY(0); }
+    .skeleton { color: transparent; background: linear-gradient(90deg, #edf2eb, #f8faf5, #edf2eb); background-size: 220% 100%; animation: shimmer 1.2s infinite; border-radius: .45rem; }
+    @keyframes shimmer { to { background-position: -220% 0; } }
+
+    @media (max-width: 980px) {
+      .shell { grid-template-columns: 1fr; }
+      .rail { position: static; height: auto; }
+      nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .hero, .grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      main, .rail { padding: .8rem; }
+      nav { display: none; }
+      .topbar, .section-head { align-items: stretch; flex-direction: column; }
+      .scorecard { grid-template-columns: 1fr; }
+      .signal { grid-template-columns: 1fr; }
+      .signal-strip { grid-template-columns: repeat(12, 1fr); min-height: 3rem; align-content: stretch; }
+      .bar-row { grid-template-columns: 1fr; gap: .35rem; }
+      table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail" aria-label="Navigasi dashboard">
+      <div class="brand"><div class="mark">N</div><div><b>Nicola Bridge</b><span>WhatsApp commerce ops</span></div></div>
+      <nav>
+        <a class="active" href="#overview">Overview <span>live</span></a>
+        <a href="#revenue">Revenue <span>7d</span></a>
+        <a href="#stock">Stock <span>alert</span></a>
+        <a href="#transactions">Transaksi <span>baru</span></a>
+      </nav>
+      <div class="rail-card"><b>Mode operator</b><br><span>Satu layar untuk cek uang masuk, barang kosong, dan aktivitas pembeli.</span></div>
+    </aside>
+
+    <main>
+      <div class="topbar">
+        <div><div class="eyebrow">Dashboard API · port ${PORT}</div><h1>Command<br>Bridge</h1></div>
+        <div class="toolbar" role="search">
+          <input id="search" class="field" type="search" placeholder="Cari transaksi / produk" autocomplete="off">
+          <select id="range" class="field" aria-label="Rentang data"><option value="daily">7 hari</option><option value="monthly">12 bulan</option></select>
+          <button id="refresh" class="btn primary" type="button">Refresh</button>
+        </div>
+      </div>
+
+      <section id="overview" class="hero">
+        <article class="panel signal">
+          <div class="signal-strip" aria-hidden="true"><i></i><i class="live"></i><i></i><i class="live"></i><i></i><i class="live"></i><i></i><i></i><i class="live"></i><i></i><i class="live"></i><i></i></div>
+          <div class="hero-copy">
+            <div><span id="health" class="status-pill"><span class="dot"></span>Sinkronisasi data</span><h2>Jaga kas, stok, dan chat tetap bergerak.</h2><p>Dashboard ini membaca endpoint lokal: overview, grafik, transaksi terbaru, stok, dan user. Kalau satu endpoint gagal, panel lain tetap tampil.</p></div>
+            <div class="status-line" id="lastUpdated">Belum dimuat</div>
+          </div>
+        </article>
+        <aside class="scorecard" aria-label="Ringkasan metrik">
+          <div class="metric"><small>Pendapatan total</small><strong id="totalRevenue" class="skeleton">000000</strong><span id="todayRevenue" class="label">Hari ini</span></div>
+          <div class="metric"><small>Transaksi total</small><strong id="totalTransactions" class="skeleton">0000</strong><span id="todayTransactions" class="label">Hari ini</span></div>
+          <div class="metric"><small>User aktif</small><strong id="activeUsers" class="skeleton">0000</strong><span id="newUsers" class="label">User baru</span></div>
+          <div class="metric"><small>Alert stok</small><strong id="stockAlerts" class="skeleton">00</strong><span id="criticalAlerts" class="label">Kritis</span></div>
+        </aside>
+      </section>
+
+      <section class="grid">
+        <div class="panel" id="revenue">
+          <div class="section-head"><div><div class="eyebrow">Ritme penjualan</div><h3 id="chartTitle">Pendapatan 7 hari</h3></div><span id="chartTotal" class="tag">Memuat</span></div>
+          <div id="chart" class="bars" aria-live="polite"></div>
+        </div>
+        <div class="panel" id="stock">
+          <div class="section-head"><div><div class="eyebrow">Prioritas restock</div><h3>Produk menipis</h3></div><span id="stockSummary" class="tag warn">Memuat</span></div>
+          <div id="stockList" class="cards" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="panel" id="transactions" style="margin-top:1rem">
+        <div class="section-head"><div><div class="eyebrow">Feed operasi</div><h3>Transaksi terbaru</h3></div><span id="txCount" class="tag">Memuat</span></div>
+        <table>
+          <thead><tr><th>Referensi</th><th>Produk</th><th>User</th><th>Bayar</th><th>Total</th><th>Waktu</th></tr></thead>
+          <tbody id="transactionsBody"><tr><td colspan="6">Memuat transaksi…</td></tr></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
+    const number = new Intl.NumberFormat('id-ID');
+    const state = { overview: null, daily: [], monthly: [], transactions: [], stock: [] };
+
+    const $ = (id) => document.getElementById(id);
+    function setText(id, value) { $(id).textContent = value; $(id).classList.remove('skeleton'); }
+    function toast(message) { const el = $('toast'); el.textContent = message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 3200); }
+    async function api(path) {
+      const response = await fetch(path, { headers: { Accept: 'application/json' } });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok || json.success === false) throw new Error(json.error || json.message || path + ' gagal');
+      return json.data || json;
+    }
+
+    function dateLabel(value) {
+      if (!value) return '-';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    }
+
+    function normalizeStock(data) {
+      if (Array.isArray(data.products)) return data.products;
+      if (Array.isArray(data.alerts)) return data.alerts.map(item => ({ name: item.productName, stockCount: item.currentStock, stockStatus: item.status, category: item.category }));
+      return [];
+    }
+
+    function renderOverview() {
+      const overview = state.overview || {};
+      setText('totalRevenue', rupiah.format(overview.totalPendapatan || 0));
+      setText('totalTransactions', number.format(overview.totalTransaksi || 0));
+      $('todayRevenue').textContent = 'Hari ini ' + rupiah.format(overview.pendapatanHariIni || 0);
+      $('todayTransactions').textContent = 'Hari ini ' + number.format(overview.transaksiHariIni || 0) + ' transaksi';
+      $('lastUpdated').textContent = 'Terakhir dimuat ' + new Date().toLocaleString('id-ID', { timeStyle: 'medium', dateStyle: 'medium' });
+    }
+
+    function renderUsers(data) {
+      setText('activeUsers', number.format(data.activeUsers || 0));
+      $('newUsers').textContent = number.format(data.newUsers || 0) + ' user baru bulan ini';
+    }
+
+    function renderStock() {
+      const items = state.stock.slice().sort((a, b) => (a.stockCount || 0) - (b.stockCount || 0)).slice(0, 6);
+      const critical = items.filter(item => (item.stockCount || 0) === 0).length;
+      setText('stockAlerts', number.format(items.length));
+      $('criticalAlerts').textContent = number.format(critical) + ' kosong';
+      $('stockSummary').textContent = items.length ? items.length + ' perlu dicek' : 'Aman';
+      $('stockList').innerHTML = items.length ? items.map(item => {
+        const count = item.stockCount || item.currentStock || 0;
+        const cls = count === 0 ? 'bad' : count <= 5 ? 'warn' : '';
+        return '<div class="product"><div><b>' + (item.name || item.productName || 'Produk') + '</b><span>' + (item.category || item.stockStatus || 'Stock') + '</span></div><span class="tag ' + cls + '">' + count + ' item</span></div>';
+      }).join('') : '<p class="label">Tidak ada produk menipis.</p>';
+    }
+
+    function renderChart() {
+      const mode = $('range').value;
+      const data = mode === 'monthly' ? state.monthly : state.daily;
+      const key = mode === 'monthly' ? 'pendapatan' : 'pendapatan';
+      const label = mode === 'monthly' ? 'month' : 'date';
+      const max = Math.max(1, ...data.map(item => item[key] || 0));
+      const total = data.reduce((sum, item) => sum + (item[key] || 0), 0);
+      $('chartTitle').textContent = mode === 'monthly' ? 'Pendapatan 12 bulan' : 'Pendapatan 7 hari';
+      $('chartTotal').textContent = rupiah.format(total);
+      $('chart').innerHTML = data.length ? data.map(item => {
+        const width = Math.max(3, Math.round(((item[key] || 0) / max) * 100));
+        return '<div class="bar-row"><span class="mono">' + item[label] + '</span><div class="track"><div class="fill" style="--w:' + width + '%"></div></div><b class="money">' + rupiah.format(item[key] || 0) + '</b></div>';
+      }).join('') : '<p class="label">Belum ada data grafik.</p>';
+    }
+
+    function renderTransactions() {
+      const q = $('search').value.trim().toLowerCase();
+      const rows = state.transactions.filter(tx => !q || [tx.reffId, tx.name, tx.user, tx.metodeBayar].join(' ').toLowerCase().includes(q));
+      $('txCount').textContent = rows.length + ' tampil';
+      $('transactionsBody').innerHTML = rows.length ? rows.slice(0, 12).map(tx => '<tr><td class="mono">' + (tx.reffId || '-') + '</td><td>' + (tx.name || '-') + '</td><td>' + (tx.user || '-') + '</td><td><span class="tag">' + (tx.metodeBayar || '-') + '</span></td><td class="money">' + rupiah.format(tx.totalBayar || 0) + '</td><td>' + dateLabel(tx.date) + '</td></tr>').join('') : '<tr><td colspan="6">Tidak ada transaksi cocok.</td></tr>';
+    }
+
+    async function load() {
+      $('health').innerHTML = '<span class="dot"></span>Memuat data';
+      try {
+        const results = await Promise.allSettled([
+          api('/api/dashboard/overview'),
+          api('/api/dashboard/chart/daily'),
+          api('/api/dashboard/chart/monthly'),
+          api('/api/dashboard/transactions/recent?limit=30'),
+          api('/api/dashboard/products/stock'),
+          api('/api/dashboard/users/activity')
+        ]);
+        if (results[0].status === 'fulfilled') state.overview = results[0].value;
+        if (results[1].status === 'fulfilled') state.daily = results[1].value;
+        if (results[2].status === 'fulfilled') state.monthly = results[2].value;
+        if (results[3].status === 'fulfilled') state.transactions = results[3].value.transactions || [];
+        if (results[4].status === 'fulfilled') state.stock = normalizeStock(results[4].value);
+        if (results[5].status === 'fulfilled') renderUsers(results[5].value);
+        renderOverview(); renderChart(); renderTransactions(); renderStock();
+        const failed = results.filter(r => r.status === 'rejected').length;
+        $('health').innerHTML = '<span class="dot"></span>' + (failed ? 'Sebagian data gagal' : 'Live dan tersambung');
+        if (failed) toast(failed + ' panel gagal dimuat. API lain tetap tampil.');
+      } catch (error) {
+        $('health').innerHTML = '<span class="dot"></span>Data gagal dimuat';
+        toast(error.message);
+      }
+    }
+
+    $('refresh').addEventListener('click', load);
+    $('range').addEventListener('change', renderChart);
+    $('search').addEventListener('input', renderTransactions);
+    load();
+  </script>
+</body>
+</html>`;
+}
+
+app.get(['/', '/dashboard'], (_req, res) => {
+  res.type('html').send(renderDashboardPage());
+});
+
 // Error handling middleware
 app.use((err, req, res, _next) => {
   console.error(err.stack);
