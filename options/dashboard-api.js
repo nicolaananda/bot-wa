@@ -3375,17 +3375,18 @@ function renderDashboardPage() {
   <title>Nicola Command Bridge</title>
   <style>
     :root {
-      --paper: #f7f9f4;
-      --panel: #ffffff;
-      --ink: #17211c;
-      --muted: #66736b;
-      --line: #dfe7dd;
-      --wa: #1da96c;
-      --deep: #123c2d;
-      --amber: #c98218;
-      --blue: #2f6d80;
-      --danger: #b9473f;
-      --shadow: 0 22px 70px rgba(23, 33, 28, .10);
+      --bg: #07110d;
+      --panel: rgba(12, 27, 21, .82);
+      --panel-strong: rgba(18, 43, 32, .94);
+      --ink: #f4fff8;
+      --muted: #9ab5a5;
+      --line: rgba(171, 255, 206, .16);
+      --wa: #25d366;
+      --lime: #b8ff6a;
+      --cyan: #6ee7ff;
+      --amber: #ffbd5a;
+      --danger: #ff756c;
+      --shadow: 0 28px 90px rgba(0, 0, 0, .34);
     }
 
     * { box-sizing: border-box; }
@@ -3394,9 +3395,9 @@ function renderDashboardPage() {
       margin: 0;
       color: var(--ink);
       background:
-        linear-gradient(90deg, rgba(29,169,108,.10) 1px, transparent 1px) 0 0 / 44px 44px,
-        radial-gradient(circle at top right, rgba(47,109,128,.18), transparent 34rem),
-        var(--paper);
+        radial-gradient(circle at 14% 8%, rgba(37, 211, 102, .25), transparent 25rem),
+        radial-gradient(circle at 86% 16%, rgba(110, 231, 255, .18), transparent 28rem),
+        linear-gradient(135deg, #07110d 0%, #0b1912 45%, #0e2419 100%);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -3406,67 +3407,69 @@ function renderDashboardPage() {
       outline-offset: 3px;
     }
 
-    .shell { display: grid; grid-template-columns: 18rem 1fr; min-height: 100vh; }
+    .shell { display: grid; grid-template-columns: 17rem 1fr; min-height: 100vh; }
     .rail {
       position: sticky; top: 0; height: 100vh; padding: 1.25rem;
-      background: rgba(255,255,255,.78); backdrop-filter: blur(18px);
+      background: rgba(5,14,10,.72); backdrop-filter: blur(22px);
       border-right: 1px solid var(--line);
     }
     .brand { display: flex; gap: .85rem; align-items: center; margin-bottom: 2rem; }
     .mark {
-      width: 3rem; height: 3rem; border-radius: 1rem; color: white;
-      display: grid; place-items: center; font-weight: 900; letter-spacing: -.08em;
-      background: linear-gradient(145deg, var(--deep), var(--wa)); box-shadow: var(--shadow);
+      width: 3rem; height: 3rem; border-radius: 1.05rem; color: #06120d;
+      display: grid; place-items: center; font-weight: 950; letter-spacing: -.08em;
+      background: linear-gradient(145deg, var(--wa), var(--lime)); box-shadow: 0 0 42px rgba(37,211,102,.24);
     }
     .brand b { display: block; font-size: 1.05rem; letter-spacing: -.03em; }
     .brand span, .eyebrow, .label, .status-line { color: var(--muted); font-size: .78rem; }
 
     nav { display: grid; gap: .45rem; }
     nav a {
-      color: var(--muted); text-decoration: none; border-radius: .9rem; padding: .72rem .85rem;
-      display: flex; justify-content: space-between; align-items: center;
+      color: var(--muted); text-decoration: none; border-radius: .95rem; padding: .78rem .9rem;
+      display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent;
     }
-    nav a:hover, nav a.active { color: var(--ink); background: #edf5ee; }
-    .rail-card { margin-top: 1.5rem; padding: 1rem; border-radius: 1.2rem; background: #10291f; color: white; }
-    .rail-card span { color: #a9c7b8; font-size: .8rem; }
+    nav a:hover, nav a.active { color: var(--ink); background: rgba(37,211,102,.10); border-color: var(--line); }
+    .rail-card { margin-top: 1.5rem; padding: 1rem; border: 1px solid var(--line); border-radius: 1.25rem; background: linear-gradient(145deg, rgba(37,211,102,.12), rgba(110,231,255,.06)); color: white; }
+    .rail-card span { color: var(--muted); font-size: .8rem; }
 
     main { padding: 1.25rem; }
     .topbar { display: flex; gap: 1rem; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    .topbar h1 { margin: 0; font-size: clamp(2rem, 5vw, 4.9rem); letter-spacing: -.08em; line-height: .88; }
+    .topbar h1 { margin: 0; font-size: clamp(2.4rem, 6vw, 6rem); letter-spacing: -.09em; line-height: .82; }
     .toolbar { display: flex; gap: .7rem; align-items: center; flex-wrap: wrap; }
     .field, .btn {
-      min-height: 2.75rem; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.82);
+      min-height: 2.75rem; border: 1px solid var(--line); border-radius: 999px; background: rgba(10,24,18,.76);
       color: var(--ink); padding: 0 1rem;
     }
-    .btn { cursor: pointer; font-weight: 800; }
-    .btn.primary { background: var(--deep); color: white; border-color: var(--deep); }
+    .field::placeholder { color: #789484; }
+    .btn { cursor: pointer; font-weight: 850; }
+    .btn.primary { background: linear-gradient(135deg, var(--wa), var(--lime)); color: #06120d; border-color: transparent; }
     .btn:hover { transform: translateY(-1px); }
 
     .hero {
-      display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(18rem, .8fr); gap: 1rem; margin-bottom: 1rem;
+      display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(18rem, .75fr); gap: 1rem; margin-bottom: 1rem;
     }
     .panel {
-      background: rgba(255,255,255,.86); border: 1px solid var(--line); border-radius: 1.6rem;
-      padding: 1.15rem; box-shadow: var(--shadow);
+      background: var(--panel); border: 1px solid var(--line); border-radius: 1.7rem;
+      padding: 1.15rem; box-shadow: var(--shadow); backdrop-filter: blur(20px);
     }
     .signal {
-      min-height: 18rem; display: grid; grid-template-columns: 3.2rem 1fr; gap: 1rem; overflow: hidden;
+      min-height: 19rem; display: grid; grid-template-columns: 3.2rem 1fr; gap: 1rem; overflow: hidden;
+      background: linear-gradient(145deg, rgba(37,211,102,.14), rgba(12,27,21,.86));
     }
     .signal-strip {
-      border-radius: 1.2rem; background: var(--deep); padding: .65rem; display: grid; align-content: end; gap: .35rem;
+      border-radius: 1.2rem; background: rgba(3,10,7,.7); padding: .65rem; display: grid; align-content: end; gap: .35rem;
     }
     .signal-strip i { display: block; border-radius: 999px; background: var(--wa); min-height: 12px; opacity: .35; }
-    .signal-strip i:nth-child(2n) { background: var(--amber); }
-    .signal-strip i.live { opacity: 1; }
+    .signal-strip i:nth-child(2n) { background: var(--cyan); }
+    .signal-strip i.live { opacity: 1; box-shadow: 0 0 22px currentColor; }
     .hero-copy { display: flex; flex-direction: column; justify-content: space-between; gap: 2rem; }
-    .hero-copy h2 { margin: 0; font-size: clamp(1.7rem, 3vw, 3.3rem); line-height: .95; letter-spacing: -.06em; max-width: 12ch; }
+    .hero-copy h2 { margin: 0; font-size: clamp(1.9rem, 3.4vw, 3.8rem); line-height: .9; letter-spacing: -.07em; max-width: 12ch; }
     .hero-copy p { color: var(--muted); max-width: 60ch; line-height: 1.7; }
-    .status-pill { display: inline-flex; gap: .5rem; align-items: center; width: fit-content; border: 1px solid #bde4cf; background: #eaf7ef; color: #12643e; border-radius: 999px; padding: .45rem .75rem; font-weight: 800; }
-    .dot { width: .58rem; height: .58rem; border-radius: 99px; background: currentColor; box-shadow: 0 0 0 .35rem rgba(29,169,108,.13); }
+    .status-pill { display: inline-flex; gap: .5rem; align-items: center; width: fit-content; border: 1px solid rgba(37,211,102,.28); background: rgba(37,211,102,.12); color: #b7ffd2; border-radius: 999px; padding: .45rem .75rem; font-weight: 850; }
+    .dot { width: .58rem; height: .58rem; border-radius: 99px; background: currentColor; box-shadow: 0 0 0 .35rem rgba(37,211,102,.13); }
 
     .scorecard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
-    .metric { padding: 1rem; border: 1px solid var(--line); border-radius: 1.1rem; background: #fbfcf9; }
-    .metric strong { display: block; font-size: clamp(1.45rem, 3vw, 2.4rem); letter-spacing: -.06em; margin-top: .25rem; }
+    .metric { padding: 1rem; border: 1px solid var(--line); border-radius: 1.15rem; background: var(--panel-strong); }
+    .metric strong { display: block; font-size: clamp(1.45rem, 3vw, 2.35rem); letter-spacing: -.06em; margin-top: .25rem; color: var(--lime); }
     .metric small { color: var(--muted); }
 
     .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(20rem, .55fr); gap: 1rem; align-items: start; }
@@ -3474,26 +3477,26 @@ function renderDashboardPage() {
     .section-head h3 { margin: 0; font-size: 1.2rem; letter-spacing: -.03em; }
     .bars { display: grid; gap: .7rem; }
     .bar-row { display: grid; grid-template-columns: 6.6rem 1fr 5.5rem; gap: .75rem; align-items: center; color: var(--muted); font-size: .9rem; }
-    .track { height: .75rem; background: #edf2eb; border-radius: 99px; overflow: hidden; }
-    .fill { height: 100%; width: var(--w, 0%); background: linear-gradient(90deg, var(--wa), var(--blue)); border-radius: inherit; }
+    .track { height: .75rem; background: rgba(255,255,255,.07); border-radius: 99px; overflow: hidden; }
+    .fill { height: 100%; width: var(--w, 0%); background: linear-gradient(90deg, var(--wa), var(--cyan)); border-radius: inherit; box-shadow: 0 0 18px rgba(37,211,102,.24); }
 
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; padding: .85rem .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
     th { color: var(--muted); font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; }
-    td { font-size: .92rem; }
+    td { font-size: .92rem; color: #dff7e8; }
     .money, .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .tag { display: inline-flex; border-radius: 999px; padding: .25rem .55rem; background: #eef4ef; color: var(--deep); font-size: .75rem; font-weight: 800; }
-    .tag.warn { background: #fff3d9; color: #7a4b05; }
-    .tag.bad { background: #fde8e5; color: #842820; }
+    .tag { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: .25rem .55rem; background: rgba(37,211,102,.10); color: #b7ffd2; font-size: .75rem; font-weight: 850; }
+    .tag.warn { background: rgba(255,189,90,.14); color: #ffdca3; }
+    .tag.bad { background: rgba(255,117,108,.14); color: #ffc0bc; }
 
     .cards { display: grid; gap: .75rem; }
-    .product { display: grid; grid-template-columns: 1fr auto; gap: .8rem; padding: .85rem; border: 1px solid var(--line); border-radius: 1rem; background: #fbfcf9; }
+    .product { display: grid; grid-template-columns: 1fr auto; gap: .8rem; padding: .85rem; border: 1px solid var(--line); border-radius: 1rem; background: rgba(255,255,255,.04); }
     .product b { display: block; letter-spacing: -.02em; }
     .product span { color: var(--muted); font-size: .83rem; }
 
-    .toast { position: fixed; right: 1rem; bottom: 1rem; max-width: 24rem; padding: .9rem 1rem; border-radius: 1rem; background: #10291f; color: white; box-shadow: var(--shadow); transform: translateY(140%); transition: transform .2s ease; z-index: 5; }
+    .toast { position: fixed; right: 1rem; bottom: 1rem; max-width: 24rem; padding: .9rem 1rem; border: 1px solid var(--line); border-radius: 1rem; background: #07110d; color: white; box-shadow: var(--shadow); transform: translateY(140%); transition: transform .2s ease; z-index: 5; }
     .toast.show { transform: translateY(0); }
-    .skeleton { color: transparent; background: linear-gradient(90deg, #edf2eb, #f8faf5, #edf2eb); background-size: 220% 100%; animation: shimmer 1.2s infinite; border-radius: .45rem; }
+    .skeleton { color: transparent; background: linear-gradient(90deg, rgba(255,255,255,.06), rgba(37,211,102,.16), rgba(255,255,255,.06)); background-size: 220% 100%; animation: shimmer 1.2s infinite; border-radius: .45rem; }
     @keyframes shimmer { to { background-position: -220% 0; } }
 
     @media (max-width: 980px) {
@@ -3520,19 +3523,19 @@ function renderDashboardPage() {
 <body>
   <div class="shell">
     <aside class="rail" aria-label="Navigasi dashboard">
-      <div class="brand"><div class="mark">N</div><div><b>Nicola Bridge</b><span>WhatsApp commerce ops</span></div></div>
+      <div class="brand"><div class="mark">WA</div><div><b>Nicola Ops</b><span>WhatsApp commerce control</span></div></div>
       <nav>
         <a class="active" href="#overview">Overview <span>live</span></a>
-        <a href="#revenue">Revenue <span>7d</span></a>
-        <a href="#stock">Stock <span>alert</span></a>
-        <a href="#transactions">Transaksi <span>baru</span></a>
+        <a href="#revenue">Revenue <span>trend</span></a>
+        <a href="#stock">Stock <span>risk</span></a>
+        <a href="#transactions">Transaksi <span>feed</span></a>
       </nav>
-      <div class="rail-card"><b>Mode operator</b><br><span>Satu layar untuk cek uang masuk, barang kosong, dan aktivitas pembeli.</span></div>
+      <div class="rail-card"><b>Ops cockpit</b><br><span>Kas, stok, dan transaksi masuk dalam satu layar gelap, cepat, responsif.</span></div>
     </aside>
 
     <main>
       <div class="topbar">
-        <div><div class="eyebrow">Dashboard API · port ${PORT}</div><h1>Command<br>Bridge</h1></div>
+        <div><div class="eyebrow">Dashboard API · port ${PORT}</div><h1>WA Ops<br>Cockpit</h1></div>
         <div class="toolbar" role="search">
           <input id="search" class="field" type="search" placeholder="Cari transaksi / produk" autocomplete="off">
           <select id="range" class="field" aria-label="Rentang data"><option value="daily">7 hari</option><option value="monthly">12 bulan</option></select>
@@ -3544,7 +3547,7 @@ function renderDashboardPage() {
         <article class="panel signal">
           <div class="signal-strip" aria-hidden="true"><i></i><i class="live"></i><i></i><i class="live"></i><i></i><i class="live"></i><i></i><i></i><i class="live"></i><i></i><i class="live"></i><i></i></div>
           <div class="hero-copy">
-            <div><span id="health" class="status-pill"><span class="dot"></span>Sinkronisasi data</span><h2>Jaga kas, stok, dan chat tetap bergerak.</h2><p>Dashboard ini membaca endpoint lokal: overview, grafik, transaksi terbaru, stok, dan user. Kalau satu endpoint gagal, panel lain tetap tampil.</p></div>
+            <div><span id="health" class="status-pill"><span class="dot"></span>Sinkronisasi data</span><h2>Monitor kas, stok, dan chat masuk.</h2><p>Dashboard operator baca endpoint lokal: overview, grafik, transaksi terbaru, stok, dan user. Satu endpoint gagal, panel lain tetap tampil.</p></div>
             <div class="status-line" id="lastUpdated">Belum dimuat</div>
           </div>
         </article>
@@ -3620,6 +3623,10 @@ function renderDashboardPage() {
       $('newUsers').textContent = number.format(data.newUsers || 0) + ' user baru bulan ini';
     }
 
+    function text(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    }
+
     function renderStock() {
       const items = state.stock.slice().sort((a, b) => (a.stockCount || 0) - (b.stockCount || 0)).slice(0, 6);
       const critical = items.filter(item => (item.stockCount || 0) === 0).length;
@@ -3629,7 +3636,7 @@ function renderDashboardPage() {
       $('stockList').innerHTML = items.length ? items.map(item => {
         const count = item.stockCount || item.currentStock || 0;
         const cls = count === 0 ? 'bad' : count <= 5 ? 'warn' : '';
-        return '<div class="product"><div><b>' + (item.name || item.productName || 'Produk') + '</b><span>' + (item.category || item.stockStatus || 'Stock') + '</span></div><span class="tag ' + cls + '">' + count + ' item</span></div>';
+        return '<div class="product"><div><b>' + text(item.name || item.productName || 'Produk') + '</b><span>' + text(item.category || item.stockStatus || 'Stock') + '</span></div><span class="tag ' + cls + '">' + text(count) + ' item</span></div>';
       }).join('') : '<p class="label">Tidak ada produk menipis.</p>';
     }
 
@@ -3644,7 +3651,7 @@ function renderDashboardPage() {
       $('chartTotal').textContent = rupiah.format(total);
       $('chart').innerHTML = data.length ? data.map(item => {
         const width = Math.max(3, Math.round(((item[key] || 0) / max) * 100));
-        return '<div class="bar-row"><span class="mono">' + item[label] + '</span><div class="track"><div class="fill" style="--w:' + width + '%"></div></div><b class="money">' + rupiah.format(item[key] || 0) + '</b></div>';
+        return '<div class="bar-row"><span class="mono">' + text(item[label]) + '</span><div class="track"><div class="fill" style="--w:' + width + '%"></div></div><b class="money">' + rupiah.format(item[key] || 0) + '</b></div>';
       }).join('') : '<p class="label">Belum ada data grafik.</p>';
     }
 
@@ -3652,7 +3659,7 @@ function renderDashboardPage() {
       const q = $('search').value.trim().toLowerCase();
       const rows = state.transactions.filter(tx => !q || [tx.reffId, tx.name, tx.user, tx.metodeBayar].join(' ').toLowerCase().includes(q));
       $('txCount').textContent = rows.length + ' tampil';
-      $('transactionsBody').innerHTML = rows.length ? rows.slice(0, 12).map(tx => '<tr><td class="mono">' + (tx.reffId || '-') + '</td><td>' + (tx.name || '-') + '</td><td>' + (tx.user || '-') + '</td><td><span class="tag">' + (tx.metodeBayar || '-') + '</span></td><td class="money">' + rupiah.format(tx.totalBayar || 0) + '</td><td>' + dateLabel(tx.date) + '</td></tr>').join('') : '<tr><td colspan="6">Tidak ada transaksi cocok.</td></tr>';
+      $('transactionsBody').innerHTML = rows.length ? rows.slice(0, 12).map(tx => '<tr><td class="mono">' + text(tx.reffId || '-') + '</td><td>' + text(tx.name || '-') + '</td><td>' + text(tx.user || '-') + '</td><td><span class="tag">' + text(tx.metodeBayar || '-') + '</span></td><td class="money">' + rupiah.format(tx.totalBayar || 0) + '</td><td>' + text(dateLabel(tx.date)) + '</td></tr>').join('') : '<tr><td colspan="6">Tidak ada transaksi cocok.</td></tr>';
     }
 
     async function load() {

@@ -2021,7 +2021,6 @@ module.exports = async (nicola, m, mek) => {
         ['batal', prefix + 'batal', 'cancel', prefix + 'cancel'].includes(lowered) ||
         [
           // admin single-account
-          'zoom',
           'zoomlarge',
           'zoomscheduled',
           // admin pool management (per tier)
@@ -3791,8 +3790,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         return reply('✅ Promo otomatis OFF.')
       }
       case 'zoomlarge':
-      case 'zoomscheduled':
-      case 'zoom': {
+      case 'zoomscheduled': {
         if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
 
         // Cek env wajib sebelum mulai flow supaya user cepat tahu kalau belum siap
