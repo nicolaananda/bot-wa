@@ -13,6 +13,7 @@ function toPositiveInt(value, fallback) {
 }
 
 const UPSERT_CHUNK = toPositiveInt(process.env.PG_UPSERT_CHUNK || 100, 100)
+const ORDER_TTL_MS = 60 * 60 * 1000
 const KV_SYNC_KEYS = ['order', 'zoomFlow', 'zoomBookings', 'promo']
 const KV_DEFAULTS = {
     order: {},
@@ -29,6 +30,20 @@ const KV_DEFAULTS = {
         lastSentDate: '',
         lastSentAt: 0
     }
+}
+
+function removeExpiredOrders(orders, now = Date.now()) {
+    if (!orders || typeof orders !== 'object' || Array.isArray(orders)) return 0
+
+    let removed = 0
+    for (const [userId, order] of Object.entries(orders)) {
+        const createdAt = Number(order && (order.createdAt || order.startedAt))
+        if (Number.isFinite(createdAt) && now - createdAt > ORDER_TTL_MS) {
+            delete orders[userId]
+            removed++
+        }
+    }
+    return removed
 }
 
 function cloneJson(value) {
@@ -175,6 +190,15 @@ class DatabasePG {
                     snapshot[key] = cloneJson(KV_DEFAULTS[key])
                 }
             }
+        }
+
+        const removedOrders = removeExpiredOrders(snapshot.order)
+        if (removedOrders) {
+            await query(
+                'INSERT INTO kv_store(key, value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()',
+                ['order', JSON.stringify(snapshot.order)]
+            )
+            this.logger.log(`[DBPG] Removed ${removedOrders} expired pending order(s)`)
         }
 
         // dynamic tables made by migration (arrays as item, objects as k/v)
