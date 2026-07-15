@@ -117,11 +117,11 @@ function __wrapSendMessageOnce(nicola) {
             const res = await originalSend(jid, content, options)
             __lastSendAt = Date.now()
             return res
-            } catch (e) {
-              attempt += 1
-              const msg = String(e && e.message ? e.message : '')
-              const code = e && (e.status || e.statusCode || e.code)
-              const transient =
+          } catch (e) {
+            attempt += 1
+            const msg = String(e && e.message ? e.message : '')
+            const code = e && (e.status || e.statusCode || e.code)
+            const transient =
               code === 429 ||
               code === 'ECONNRESET' ||
               code === 'ETIMEDOUT' ||
@@ -1969,8 +1969,9 @@ module.exports = async (nicola, m, mek) => {
       const lowered = (chats || '').trim().toLowerCase()
       const cmdOnly = (command || '').toLowerCase()
       const skipPromoInput =
-        ['batal', prefix + 'batal', 'cancel', prefix + 'cancel', 'setpromotext'].includes(lowered) ||
-        ['batal', 'cancel', 'setpromotext'].includes(cmdOnly)
+        ['batal', prefix + 'batal', 'cancel', prefix + 'cancel', 'setpromotext'].includes(
+          lowered
+        ) || ['batal', 'cancel', 'setpromotext'].includes(cmdOnly)
 
       if (flow.startedAt && Date.now() - flow.startedAt > 15 * 60 * 1000) {
         delete db.data.promoInputFlow[sender]
@@ -2353,7 +2354,9 @@ module.exports = async (nicola, m, mek) => {
                   const retryCmd = flowIsBuy ? `${prefix}zoom${tier}` : `${prefix}pool${tier}`
                   if (flowIsBuy) {
                     return reply(
-                      `❌ *Zoom ${tier}p kosong* di jam yang kamu minta (${tzShort}).\n\n` + `Saldo kamu *tidak dipotong*.\n\n` + `Silakan pilih jam lain. Ketik \`${retryCmd}\` untuk mulai ulang.`
+                      `❌ *Zoom ${tier}p kosong* di jam yang kamu minta (${tzShort}).\n\n` +
+                        `Saldo kamu *tidak dipotong*.\n\n` +
+                        `Silakan pilih jam lain. Ketik \`${retryCmd}\` untuk mulai ulang.`
                     )
                   }
                   const summary = poolResult.reasons
@@ -3670,7 +3673,9 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         if (!groups.length) return reply('❌ Belum ada grup target promo.')
         return reply(
           `📢 *DAFTAR GRUP PROMO*\n\n` +
-            groups.map((group, index) => `${index + 1}. ${group.name || '-'}\n${group.id}`).join('\n\n')
+            groups
+              .map((group, index) => `${index + 1}. ${group.name || '-'}\n${group.id}`)
+              .join('\n\n')
         )
       }
       case 'statuspromo': {
@@ -3679,7 +3684,9 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           ? db.data.promo.groups.filter((group) => group && group.id)
           : []
         const groupsText = groups.length
-          ? groups.map((group, index) => `${index + 1}. ${group.name || '-'}\n${group.id}`).join('\n\n')
+          ? groups
+              .map((group, index) => `${index + 1}. ${group.name || '-'}\n${group.id}`)
+              .join('\n\n')
           : '-'
         return reply(
           `📢 *STATUS PROMO*\n\n` +
@@ -3710,7 +3717,8 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           db.data.promo.groupName = db.data.promo.groups[0].name || ''
         }
         if (typeof global.scheduleSave === 'function') global.scheduleSave()
-        if (before === db.data.promo.groups.length) return reply('❌ Grup ini belum masuk target promo.')
+        if (before === db.data.promo.groups.length)
+          return reply('❌ Grup ini belum masuk target promo.')
         return reply(
           `✅ Grup ini dihapus dari target promo.\n\n` +
             `• Sisa grup target: ${db.data.promo.groups.length}`
@@ -3721,21 +3729,19 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         const inlinePromoText = String(chats || '')
           .slice((prefix + command).length)
           .trim()
-        const quotedPromoText = String(m?.quoted?.text || '')
-          .trim()
+        const quotedPromoText = String(m?.quoted?.text || '').trim()
         const promoTextInput = inlinePromoText || quotedPromoText
-        if (!promoTextInput)
-          {
-            db.data.promoInputFlow[sender] = { startedAt: Date.now() }
-            return reply(
-              `📝 Mode input promo aktif.\n\n` +
-                `Sekarang kirim isi promo dalam 1 pesan terpisah.\n` +
-                `Kalau batal, ketik ${prefix}batal.\n\n` +
-                `Alternatif tetap bisa:\n` +
-                `• ${prefix + command} Promo hari ini ...\n` +
-                `• Reply pesan promo lalu ketik ${prefix + command}`
-            )
-          }
+        if (!promoTextInput) {
+          db.data.promoInputFlow[sender] = { startedAt: Date.now() }
+          return reply(
+            `📝 Mode input promo aktif.\n\n` +
+              `Sekarang kirim isi promo dalam 1 pesan terpisah.\n` +
+              `Kalau batal, ketik ${prefix}batal.\n\n` +
+              `Alternatif tetap bisa:\n` +
+              `• ${prefix + command} Promo hari ini ...\n` +
+              `• Reply pesan promo lalu ketik ${prefix + command}`
+          )
+        }
         db.data.promo.text = promoTextInput
         if (typeof global.scheduleSave === 'function') global.scheduleSave()
         const lineCount = promoTextInput.split(/\r?\n/).length
@@ -3754,7 +3760,9 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         }
         db.data.promo.time = rawTime
         if (typeof global.scheduleSave === 'function') global.scheduleSave()
-        return reply(`✅ Jam promo diset ke ${rawTime} (${db.data.promo.timezone || 'Asia/Jakarta'}).`)
+        return reply(
+          `✅ Jam promo diset ke ${rawTime} (${db.data.promo.timezone || 'Asia/Jakarta'}).`
+        )
       }
       case 'promoon': {
         if (!isOwner) return reply(mess.owner)
@@ -4358,7 +4366,9 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
           if (verdict.ok && !host.disabledAt) {
             readyCount++
-            readyLines.push(`✅ [${host.label}] Ready — ${verdict.plan}, ${verdict.capacity}p (${verdict.source})`)
+            readyLines.push(
+              `✅ [${host.label}] Ready — ${verdict.plan}, ${verdict.capacity}p (${verdict.source})`
+            )
           } else {
             hiddenCount++
           }
