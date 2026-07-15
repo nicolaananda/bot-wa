@@ -129,6 +129,14 @@ const { isRedisAvailable, closeRedis } = require('./config/redis')
       }, SAVE_DELAY_MS)
     }
 
+    if (typeof db.cleanupExpiredOrders === 'function') {
+      setInterval(() => {
+        db.cleanupExpiredOrders().catch((error) => {
+          console.error('[DB] Pending order cleanup failed:', error.message)
+        })
+      }, 5 * 60 * 1000)
+    }
+
     // Force save on shutdown
     process.on('SIGINT', async () => {
       if (saveTimeout) clearTimeout(saveTimeout)

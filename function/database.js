@@ -192,19 +192,24 @@ class DatabasePG {
             }
         }
 
-        const removedOrders = removeExpiredOrders(snapshot.order)
-        if (removedOrders) {
-            await query(
-                'INSERT INTO kv_store(key, value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()',
-                ['order', JSON.stringify(snapshot.order)]
-            )
-            this.logger.log(`[DBPG] Removed ${removedOrders} expired pending order(s)`)
-        }
+        this._data = snapshot
+        await this.cleanupExpiredOrders()
 
         // dynamic tables made by migration (arrays as item, objects as k/v)
         // We won't eagerly load all to keep startup fast.
-        this._data = snapshot
         return this._data
+    }
+
+    async cleanupExpiredOrders() {
+        const removedOrders = removeExpiredOrders(this._data && this._data.order)
+        if (!removedOrders) return 0
+
+        await query(
+            'INSERT INTO kv_store(key, value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()',
+            ['order', JSON.stringify(this._data.order)]
+        )
+        this.logger.log(`[DBPG] Removed ${removedOrders} expired pending order(s)`)
+        return removedOrders
     }
 
     async save() {
