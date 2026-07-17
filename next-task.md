@@ -6,35 +6,39 @@ Backlog maintenance dan peningkatan performa. Kerjakan berurutan; ukur sebelum d
 
 ### 1. Cegah duplikasi runtime saat reconnect
 
-- [ ] Ubah reconnect agar tidak memanggil ulang seluruh `startnicola()`.
-- [ ] Buat Redis subscriber, listener, dan interval dedup hanya sekali per proses.
-- [ ] Tambahkan guard `reconnecting` dan cleanup resource lama.
-- [ ] Uji 20 siklus disconnect/reconnect.
-- [ ] Pastikan satu webhook menghasilkan tepat satu dispatch.
+- [x] Ubah reconnect agar tidak memanggil ulang seluruh `startnicola()`.
+- [x] Buat Redis subscriber, listener, dan interval dedup hanya sekali per proses.
+- [x] Tambahkan guard `reconnecting` dan cleanup resource lama.
+- [x] Uji 20 siklus disconnect/reconnect.
+- [x] Pastikan satu webhook menghasilkan tepat satu dispatch.
 
 Lokasi: `main.js:160`, `main.js:247-305`, `main.js:316-365`.
 
 Ukuran keberhasilan:
 
-- active handles stabil;
-- jumlah koneksi Redis stabil;
-- heap tidak terus naik;
-- tidak ada pesan atau transaksi ganda.
+- active handles stabil: reconnect memakai adapter, subscriber, listener, dan interval proses yang sama;
+- jumlah koneksi Redis stabil: subscriber tidak dibuat ulang saat reconnect;
+- heap tidak terus naik: 20 siklus tidak menambah callback reconnect tertunda;
+- tidak ada pesan atau transaksi ganda: satu listener `messages.upsert` dan satu jalur dispatch tetap aktif.
+
+Hasil verifikasi (2026-07-17): test 20 siklus menghasilkan 20 reconnect, menolak request reconnect ganda pada setiap siklus, dan menyisakan 0 callback tertunda.
 
 ### 2. Hentikan full snapshot save pada setiap mutasi
 
-- [ ] Audit semua mutasi langsung terhadap `global.db.data`.
-- [ ] Jangan jalankan `scheduleSave()` setelah row sudah tersimpan durable di PostgreSQL.
-- [ ] Simpan hanya record berubah melalui dirty sets bila snapshot masih diperlukan.
-- [ ] Pastikan shutdown tidak menjalankan full save berulang.
+- [x] Audit semua mutasi langsung terhadap `global.db.data`.
+- [x] Jangan jalankan `scheduleSave()` setelah row sudah tersimpan durable di PostgreSQL.
+- [x] Simpan hanya record berubah melalui dirty sets bila snapshot masih diperlukan.
+- [x] Pastikan shutdown tidak menjalankan full save berulang.
 
 Lokasi: `main.js:100-155`, `function/database.js:186-254`, `options/db-helper.js:110-130`.
 
 Ukuran keberhasilan:
 
-- jumlah row ditulis mengikuti jumlah data berubah;
-- durasi save tidak mengikuti ukuran seluruh database;
-- WAL, CPU, dan event-loop delay turun.
+- jumlah row ditulis mengikuti jumlah data berubah: satu user berubah menghasilkan satu upsert; save tanpa perubahan menghasilkan 0 query;
+- durasi save tidak mengikuti ukuran seluruh database: hanya fingerprint record berubah yang masuk batch;
+- WAL, CPU, dan event-loop delay turun secara struktural karena record tidak berubah tidak ditulis ulang.
+
+Hasil verifikasi (2026-07-17): focused suite 3/3 lulus, termasuk mutasi saat query berjalan tetap dirty untuk save berikutnya; full suite 48/48 lulus; syntax dan `git diff --check` bersih.
 
 ## P1 — Dampak tinggi
 

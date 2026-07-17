@@ -16,6 +16,7 @@ const { imageToWebp, videoToWebp, writeExifImg, writeExifVid } = require('./func
 const { color } = require('./function/console.js')
 const { groupResponseWelcome, groupResponseRemove, groupResponsePromote, groupResponseDemote } = require('./function/respon-group.js')
 const { nocache } = require('./function/chache.js')
+const { createReconnectController } = require('./options/reconnect-controller.js')
 
 
 
@@ -101,32 +102,36 @@ const { isRedisAvailable, closeRedis } = require('./config/redis')
     // Instead of checking every 5 seconds with expensive JSON.stringify,
     // we save only after data changes and wait for inactivity period
     let saveTimeout = null
-    let isSaving = false
+    let savePromise = null
     const SAVE_DELAY_MS = 10 * 1000 // Save after 10 seconds of inactivity
+
+    async function persistDirty() {
+      if (savePromise) return savePromise
+      savePromise = db.save()
+      try {
+        return await savePromise
+      } finally {
+        savePromise = null
+      }
+    }
 
     // Debounced save function - call this after any data modification
     global.scheduleSave = function () {
       if (global.opts['test']) return // Skip in test mode
+      if (saveTimeout) clearTimeout(saveTimeout)
+      saveTimeout = setTimeout(() => {
+        saveTimeout = null
+        persistDirty().catch((error) => console.error('[DB] Save failed:', error.message))
+      }, SAVE_DELAY_MS)
+    }
 
-      // Clear existing timeout
+    global.flushScheduledSave = async function () {
       if (saveTimeout) {
         clearTimeout(saveTimeout)
+        saveTimeout = null
       }
-
-      // Schedule new save
-      saveTimeout = setTimeout(async () => {
-        if (isSaving) return // Prevent concurrent saves
-
-        isSaving = true
-        try {
-          await db.save()
-          // console.log('[DB] Auto-saved after inactivity period')
-        } catch (error) {
-          console.error('[DB] Save failed:', error.message)
-        } finally {
-          isSaving = false
-        }
-      }, SAVE_DELAY_MS)
+      if (savePromise) await savePromise
+      return persistDirty()
     }
 
     if (typeof db.cleanupExpiredOrders === 'function') {
@@ -136,31 +141,6 @@ const { isRedisAvailable, closeRedis } = require('./config/redis')
         })
       }, 5 * 60 * 1000)
     }
-
-    // Force save on shutdown
-    process.on('SIGINT', async () => {
-      if (saveTimeout) clearTimeout(saveTimeout)
-      if (!isSaving) {
-        try {
-          await db.save()
-          console.log('[DB] Saved on shutdown')
-        } catch (error) {
-          console.error('[DB] Save failed on shutdown:', error.message)
-        }
-      }
-    })
-
-    process.on('SIGTERM', async () => {
-      if (saveTimeout) clearTimeout(saveTimeout)
-      if (!isSaving) {
-        try {
-          await db.save()
-          console.log('[DB] Saved on shutdown')
-        } catch (error) {
-          console.error('[DB] Save failed on shutdown:', error.message)
-        }
-      }
-    })
 
     console.log('✅ [DB] Debounced save system initialized (10s inactivity delay)')
   })()
@@ -232,6 +212,13 @@ async function startnicola() {
       }
     }, 60 * 1000)
   }
+
+  const reconnectController = createReconnectController(async () => {
+    console.log('[GOWA] Reconnecting to WhatsApp service...')
+    const reconnected = await nicola.connect()
+    if (!reconnected) console.error('[GOWA] Reconnect failed; waiting for next close event')
+  })
+  global.cleanupReconnect = reconnectController.cleanup
 
   // Connect to Gowa service
   console.log('[GOWA] Connecting to WhatsApp service...')
@@ -310,7 +297,7 @@ async function startnicola() {
     }
     if (connection === "close") {
       console.log("Connection closed, reconnecting...");
-      setTimeout(() => startnicola(), 5000) // Reconnect after 5 seconds
+      reconnectController.schedule()
     }
     if (connection === "connecting") {
       if (nicola.user) {

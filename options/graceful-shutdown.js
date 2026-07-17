@@ -27,7 +27,28 @@ async function gracefulShutdown(signal) {
     }
   }
   
-  // 2. Close Redis connection
+  // 2. Cancel pending reconnect
+  if (typeof global.cleanupReconnect === 'function') {
+    global.cleanupReconnect();
+  }
+
+  // 3. Persist remaining dirty records once
+  const persist = typeof global.flushScheduledSave === 'function'
+    ? global.flushScheduledSave
+    : global.db && typeof global.db.save === 'function'
+      ? () => global.db.save()
+      : null;
+  if (persist) {
+    shutdownTasks.push(
+      persist().then(() => {
+        console.log('[SHUTDOWN] Database saved successfully');
+      }).catch((error) => {
+        console.error('[SHUTDOWN] Error saving database:', error.message);
+      })
+    );
+  }
+
+  // 4. Close Redis connection
   try {
     const { closeRedis } = require('../config/redis');
     if (typeof closeRedis === 'function') {
@@ -42,18 +63,7 @@ async function gracefulShutdown(signal) {
   } catch (error) {
     // Redis not available, skip
   }
-  
-  // 3. Save database (force immediate save, don't use debounced)
-  if (global.db && typeof global.db.save === 'function') {
-    shutdownTasks.push(
-      global.db.save().then(() => {
-        console.log('[SHUTDOWN] Database saved successfully');
-      }).catch((error) => {
-        console.error('[SHUTDOWN] Error saving database:', error.message);
-      })
-    );
-  }
-  
+
   // Wait for all tasks with timeout
   try {
     await Promise.race([

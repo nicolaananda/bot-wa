@@ -124,10 +124,6 @@ async function updateUserSaldo(userId, amount, operation = 'add') {
         global.db.data.users[idWith].saldo = nv;
         global.db.data.users[idNo].saldo = nv;
       }
-      // Schedule save for PG mode (in-memory snapshot updated)
-      if (typeof global.scheduleSave === 'function') {
-        global.scheduleSave();
-      }
       return true;
     } else {
       if (!global.db || !global.db.data || !global.db.data.users) {

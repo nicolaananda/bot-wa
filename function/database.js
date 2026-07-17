@@ -82,6 +82,12 @@ class DatabasePG {
     constructor() {
         this.logger = console
         this._data = {}
+        this._persisted = {
+            users: new Map(),
+            produk: new Map(),
+            kv: new Map(),
+        }
+        this._savePromise = null
     }
 
     get data() { return this._data }
@@ -193,6 +199,7 @@ class DatabasePG {
         }
 
         this._data = snapshot
+        this._resetPersistedState()
         await this.cleanupExpiredOrders()
 
         // dynamic tables made by migration (arrays as item, objects as k/v)
@@ -212,72 +219,85 @@ class DatabasePG {
         return removedOrders
     }
 
+    _resetPersistedState() {
+        this._persisted.users = new Map(Object.entries(this._data.users || {}).map(([id, value]) => [id, JSON.stringify(value || {})]))
+        this._persisted.produk = new Map(Object.entries(this._data.produk || {}).map(([id, value]) => [id, JSON.stringify(value || {})]))
+        this._persisted.kv = new Map(KV_SYNC_KEYS.map((key) => [key, JSON.stringify(
+            this._data && typeof this._data[key] !== 'undefined' ? this._data[key] : KV_DEFAULTS[key]
+        )]))
+    }
+
     async save() {
+        if (this._savePromise) return this._savePromise
+        this._savePromise = this._saveDirty()
+        try {
+            return await this._savePromise
+        } finally {
+            this._savePromise = null
+        }
+    }
+
+    async _saveDirty() {
         let hadError = false
+        const domains = [
+            {
+                name: 'users',
+                entries: Object.entries(this._data.users || {}),
+                sql: (values) => `INSERT INTO users(user_id, saldo, role, data) VALUES ${values.join(',')} ON CONFLICT (user_id) DO UPDATE SET saldo=EXCLUDED.saldo, role=EXCLUDED.role, data=EXCLUDED.data`,
+                row: ([id, value], index) => ({
+                    values: `($${index},$${index + 1},$${index + 2},$${index + 3})`,
+                    params: [id, Number(value && value.saldo || 0), (value && value.role) || 'bronze', JSON.stringify(value || {})],
+                }),
+            },
+            {
+                name: 'produk',
+                entries: Object.entries(this._data.produk || {}),
+                sql: (values) => `INSERT INTO produk(id, name, price, stock, data) VALUES ${values.join(',')} ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, price=EXCLUDED.price, stock=EXCLUDED.stock, data=EXCLUDED.data`,
+                row: ([id, value], index) => ({
+                    values: `($${index},$${index + 1},$${index + 2},$${index + 3},$${index + 4})`,
+                    params: [id, (value && (value.name || value.nama)) || null, Number(value && (value.price || value.harga) || 0), Number(value && (value.stock || (value.stok ? value.stok.length : 0)) || 0), JSON.stringify(value || {})],
+                }),
+            },
+        ]
 
-        try {
-            if (this._data && this._data.users) {
-                const entries = Object.entries(this._data.users)
-                for (const chunk of chunkArray(entries, UPSERT_CHUNK)) {
-                    if (!chunk.length) continue
-                    const values = []
-                    const params = []
-                    let paramIndex = 1
-                    for (const [userId, u] of chunk) {
-                        const saldo = Number(u && u.saldo || 0)
-                        const role = (u && u.role) || 'bronze'
-                        values.push(`($${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++})`)
-                        params.push(userId, saldo, role, JSON.stringify(u || {}))
-                    }
-                    const sql = `INSERT INTO users(user_id, saldo, role, data) VALUES ${values.join(',')} ON CONFLICT (user_id) DO UPDATE SET saldo=EXCLUDED.saldo, role=EXCLUDED.role, data=EXCLUDED.data`
-                    await query(sql, params)
+        for (const domain of domains) {
+            const dirty = domain.entries
+                .map(([id, value]) => ({ id, value, serialized: JSON.stringify(value || {}) }))
+                .filter(({ id, serialized }) => this._persisted[domain.name].get(id) !== serialized)
+            for (const chunk of chunkArray(dirty, UPSERT_CHUNK)) {
+                const values = []
+                const params = []
+                let index = 1
+                for (const { id, value } of chunk) {
+                    const row = domain.row([id, value], index)
+                    values.push(row.values)
+                    params.push(...row.params)
+                    index += row.params.length
+                }
+                try {
+                    await query(domain.sql(values), params)
+                    for (const { id, serialized } of chunk) this._persisted[domain.name].set(id, serialized)
+                } catch (e) {
+                    hadError = true
+                    try { console.error(`[DBPG] Failed to persist ${domain.name}:`, e.message) } catch {}
                 }
             }
-        } catch (e) {
-            hadError = true
-            try { console.error('[DBPG] Failed to persist users:', e.message) } catch {}
         }
 
-        try {
-            if (this._data && this._data.produk) {
-                const entries = Object.entries(this._data.produk)
-                for (const chunk of chunkArray(entries, UPSERT_CHUNK)) {
-                    if (!chunk.length) continue
-                    const values = []
-                    const params = []
-                    let paramIndex = 1
-                    for (const [id, p] of chunk) {
-                        const name = (p && (p.name || p.nama)) || null
-                        const price = Number(p && (p.price || p.harga) || 0)
-                        const stock = Number(p && (p.stock || (p.stok ? p.stok.length : 0)) || 0)
-                        values.push(`($${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++})`)
-                        params.push(id, name, price, stock, JSON.stringify(p || {}))
-                    }
-                    const sql = `INSERT INTO produk(id, name, price, stock, data) VALUES ${values.join(',')} ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, price=EXCLUDED.price, stock=EXCLUDED.stock, data=EXCLUDED.data`
-                    await query(sql, params)
-                }
+        for (const key of KV_SYNC_KEYS) {
+            const value = this._data && typeof this._data[key] !== 'undefined' ? this._data[key] : KV_DEFAULTS[key]
+            const serialized = JSON.stringify(value)
+            if (this._persisted.kv.get(key) === serialized) continue
+            try {
+                await query(
+                    'INSERT INTO kv_store(key, value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()',
+                    [key, serialized]
+                )
+                this._persisted.kv.set(key, serialized)
+            } catch (e) {
+                hadError = true
+                try { console.error('[DBPG] Failed to persist kv_store key:', e.message) } catch {}
             }
-        } catch (e) {
-            hadError = true
-            try { console.error('[DBPG] Failed to persist produk:', e.message) } catch {}
-        }
-
-        try {
-            if (KV_SYNC_KEYS.length) {
-                for (const key of KV_SYNC_KEYS) {
-                    const value = this._data && typeof this._data[key] !== 'undefined'
-                        ? this._data[key]
-                        : KV_DEFAULTS[key]
-                    if (typeof value === 'undefined') continue
-                    await query(
-                        'INSERT INTO kv_store(key, value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()',
-                        [key, JSON.stringify(value)]
-                    )
-                }
-            }
-        } catch (e) {
-            hadError = true
-            try { console.error('[DBPG] Failed to persist kv_store keys:', e.message) } catch {}
         }
 
         return !hadError
