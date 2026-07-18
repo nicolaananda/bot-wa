@@ -424,9 +424,21 @@ async function startnicola() {
     return nicola.sendMessage(jid, { contacts: { displayName: `${list.length} Kontak`, contacts: list }, ...opts }, { quoted })
   }
 
+  async function loadMedia(path) {
+    if (Buffer.isBuffer(path)) return path
+    if (/^data:.*?\/.*?;base64,/i.test(path)) return Buffer.from(path.split`,`[1], 'base64')
+    if (/^https?:\/\//.test(path)) return getBuffer(path)
+    try {
+      return await fs.promises.readFile(path)
+    } catch (error) {
+      if (error.code === 'ENOENT') return Buffer.alloc(0)
+      throw error
+    }
+  }
+
   nicola.sendImage = async (jid, path, caption = '', quoted = '', options) => {
-    let buffer = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,`[1], 'base64') : /^https?:\/\//.test(path) ? await (await getBuffer(path)) : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
-    return await nicola.sendMessage(jid, { image: buffer, caption: caption, ...options }, { quoted })
+    const buffer = await loadMedia(path)
+    return nicola.sendMessage(jid, { image: buffer, caption: caption, ...options }, { quoted })
   }
 
   const jidDecode = (jid) => {
@@ -450,31 +462,31 @@ async function startnicola() {
   }
 
   nicola.sendImageAsSticker = async (jid, path, quoted, options = {}) => {
-    let buff = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,`[1], 'base64') : /^https?:\/\//.test(path) ? await (await getBuffer(path)) : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
-    let buffer
-    if (options && (options.packname || options.author)) {
-      buffer = await writeExifImg(buff, options)
-    } else {
-      buffer = await imageToWebp(buff)
+    const buff = await loadMedia(path)
+    const buffer = options && (options.packname || options.author)
+      ? await writeExifImg(buff, options)
+      : await imageToWebp(buff)
+    try {
+      return await nicola.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted })
+    } finally {
+      await fs.promises.unlink(buffer).catch(error => {
+        if (error.code !== 'ENOENT') throw error
+      })
     }
-    await nicola.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted }).then(response => {
-      fs.unlinkSync(buffer)
-      return response
-    })
   }
 
   nicola.sendVideoAsSticker = async (jid, path, quoted, options = {}) => {
-    let buff = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,`[1], 'base64') : /^https?:\/\//.test(path) ? await (await getBuffer(path)) : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
-    let buffer
-    if (options && (options.packname || options.author)) {
-      buffer = await writeExifVid(buff, options)
-    } else {
-      buffer = await videoToWebp(buff)
+    const buff = await loadMedia(path)
+    const buffer = options && (options.packname || options.author)
+      ? await writeExifVid(buff, options)
+      : await videoToWebp(buff)
+    try {
+      return await nicola.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted })
+    } finally {
+      await fs.promises.unlink(buffer).catch(error => {
+        if (error.code !== 'ENOENT') throw error
+      })
     }
-    await nicola.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted }).then(response => {
-      fs.unlinkSync(buffer)
-      return response
-    })
   }
 
   return nicola

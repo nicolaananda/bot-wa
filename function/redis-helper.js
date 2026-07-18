@@ -189,10 +189,8 @@ async function getCache(key) {
   try {
     const data = await redis.get(key);
     if (data) {
-      console.log(`✅ [CACHE] Cache HIT for key: ${key}`);
       return JSON.parse(data);
     } else {
-      console.log(`❌ [CACHE] Cache MISS for key: ${key}`);
       return null;
     }
   } catch (error) {
@@ -217,7 +215,6 @@ async function setCache(key, value, ttlSeconds = 300) {
   try {
     const serialized = JSON.stringify(value);
     await redis.setex(key, ttlSeconds, serialized);
-    console.log(`💾 [CACHE] Cached key: ${key} (TTL: ${ttlSeconds}s)`);
     return true;
   } catch (error) {
     console.error('❌ [CACHE] Error setting cache:', error);
@@ -238,7 +235,6 @@ async function deleteCache(key) {
 
   try {
     await redis.del(key);
-    console.log(`🗑️ [CACHE] Deleted cache key: ${key}`);
     return true;
   } catch (error) {
     console.error('❌ [CACHE] Error deleting cache:', error);
@@ -261,7 +257,6 @@ async function invalidateCachePattern(pattern) {
     const keys = await redis.keys(pattern);
     if (keys.length > 0) {
       await redis.del(...keys);
-      console.log(`🗑️ [CACHE] Invalidated ${keys.length} keys matching: ${pattern}`);
       return keys.length;
     }
     return 0;
