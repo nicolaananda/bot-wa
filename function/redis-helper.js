@@ -1,4 +1,5 @@
-const { getRedis, isRedisAvailable } = require('../config/redis');
+const crypto = require('crypto');
+const { getRedis } = require('../config/redis');
 
 /**
  * Redis Helper Functions for Bot WA
@@ -13,35 +14,39 @@ const { getRedis, isRedisAvailable } = require('../config/redis');
 // 1. TRANSACTION LOCKING
 // ============================================
 
+function isRedisReady(redis) {
+  return Boolean(redis && redis.status === 'ready');
+}
+
 /**
  * Acquire lock for a user transaction
  * @param {string} sender - User JID
  * @param {string} operation - Operation name (e.g., 'buy', 'buynow')
  * @param {number} ttlSeconds - Lock expiry time (default: 30s)
- * @returns {Promise<boolean>} True if lock acquired, false if already locked
+ * @returns {Promise<string|null>} Opaque ownership token, or null if already locked
  */
 async function acquireLock(sender, operation = 'transaction', ttlSeconds = 30) {
   const redis = getRedis();
-  if (!redis || !(await isRedisAvailable())) {
-    // Redis not available, return true (no locking)
+  if (!isRedisReady(redis)) {
     console.warn('⚠️ [LOCK] Redis not available, proceeding without lock');
-    return true;
+    return crypto.randomBytes(32).toString('hex');
   }
 
   try {
     const lockKey = `lock:${operation}:${sender}`;
-    const result = await redis.set(lockKey, Date.now(), 'NX', 'EX', ttlSeconds);
-    
+    const token = crypto.randomBytes(32).toString('hex');
+    const result = await redis.set(lockKey, token, 'NX', 'EX', ttlSeconds);
+
     if (result === 'OK') {
       console.log(`🔒 [LOCK] Acquired lock for ${sender} on ${operation}`);
-      return true;
+      return token;
     } else {
       console.log(`⚠️ [LOCK] Lock already exists for ${sender} on ${operation}`);
-      return false;
+      return null;
     }
   } catch (error) {
     console.error('❌ [LOCK] Error acquiring lock:', error);
-    return true; // Fail open: allow operation if Redis fails
+    return crypto.randomBytes(32).toString('hex'); // Fail open
   }
 }
 
@@ -49,19 +54,24 @@ async function acquireLock(sender, operation = 'transaction', ttlSeconds = 30) {
  * Release lock for a user transaction
  * @param {string} sender - User JID
  * @param {string} operation - Operation name
- * @returns {Promise<boolean>} True if lock released
+ * @param {string} token - Opaque ownership token returned by acquireLock
+ * @returns {Promise<boolean>} True if this owner released the lock
  */
-async function releaseLock(sender, operation = 'transaction') {
+async function releaseLock(sender, operation = 'transaction', token) {
   const redis = getRedis();
-  if (!redis || !(await isRedisAvailable())) {
-    return true;
+  if (!isRedisReady(redis) || !token) {
+    return false;
   }
 
   try {
     const lockKey = `lock:${operation}:${sender}`;
-    await redis.del(lockKey);
-    console.log(`🔓 [LOCK] Released lock for ${sender} on ${operation}`);
-    return true;
+    const result = await redis.eval(
+      "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+      1,
+      lockKey,
+      token
+    );
+    return result === 1;
   } catch (error) {
     console.error('❌ [LOCK] Error releasing lock:', error);
     return false;
@@ -76,7 +86,7 @@ async function releaseLock(sender, operation = 'transaction') {
  */
 async function isLocked(sender, operation = 'transaction') {
   const redis = getRedis();
-  if (!redis || !(await isRedisAvailable())) {
+  if (!isRedisReady(redis)) {
     return false;
   }
 
@@ -104,7 +114,7 @@ async function isLocked(sender, operation = 'transaction') {
  */
 async function checkRateLimit(sender, command, maxRequests = 5, windowSeconds = 60) {
   const redis = getRedis();
-  if (!redis || !(await isRedisAvailable())) {
+  if (!isRedisReady(redis)) {
     // Redis not available, allow all requests
     return { allowed: true, remaining: maxRequests, resetIn: 0 };
   }
@@ -146,7 +156,7 @@ async function checkRateLimit(sender, command, maxRequests = 5, windowSeconds = 
  */
 async function resetRateLimit(sender, command) {
   const redis = getRedis();
-  if (!redis || !(await isRedisAvailable())) {
+  if (!isRedisReady(redis)) {
     return true;
   }
 
@@ -172,7 +182,7 @@ async function resetRateLimit(sender, command) {
  */
 async function getCache(key) {
   const redis = getRedis();
-  if (!redis || !(await isRedisAvailable())) {
+  if (!isRedisReady(redis)) {
     return null;
   }
 
@@ -200,7 +210,7 @@ async function getCache(key) {
  */
 async function setCache(key, value, ttlSeconds = 300) {
   const redis = getRedis();
-  if (!redis || !(await isRedisAvailable())) {
+  if (!isRedisReady(redis)) {
     return false;
   }
 
@@ -222,7 +232,7 @@ async function setCache(key, value, ttlSeconds = 300) {
  */
 async function deleteCache(key) {
   const redis = getRedis();
-  if (!redis || !(await isRedisAvailable())) {
+  if (!isRedisReady(redis)) {
     return true;
   }
 
@@ -243,7 +253,7 @@ async function deleteCache(key) {
  */
 async function invalidateCachePattern(pattern) {
   const redis = getRedis();
-  if (!redis || !(await isRedisAvailable())) {
+  if (!isRedisReady(redis)) {
     return 0;
   }
 

@@ -14,9 +14,9 @@ function transactionLock(lockKey = null, ttl = 30) {
         const key = lockKey || command;
 
         try {
-            const lockAcquired = await acquireLock(sender, key, ttl);
+            const lockToken = await acquireLock(sender, key, ttl);
 
-            if (!lockAcquired) {
+            if (!lockToken) {
                 logger.warn('Transaction lock failed', {
                     sender,
                     key,
@@ -32,6 +32,7 @@ function transactionLock(lockKey = null, ttl = 30) {
             // Store lock info in context for cleanup
             context.lock = {
                 key,
+                token: lockToken,
                 acquired: true,
             };
 
@@ -39,7 +40,7 @@ function transactionLock(lockKey = null, ttl = 30) {
                 await next();
             } finally {
                 // Always release lock after command execution
-                await releaseLock(sender, key);
+                await releaseLock(sender, key, lockToken);
                 logger.debug('Transaction lock released', { sender, key });
             }
         } catch (error) {

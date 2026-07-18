@@ -76,12 +76,17 @@ CREATE TABLE IF NOT EXISTS midtrans_webhooks (
   settlement_time TIMESTAMPTZ,
   processed BOOLEAN NOT NULL DEFAULT false,
   processed_at TIMESTAMPTZ,
+  last_error TEXT,
+  event_key TEXT,
   webhook_data JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE midtrans_webhooks ADD COLUMN IF NOT EXISTS last_error TEXT;
+ALTER TABLE midtrans_webhooks ADD COLUMN IF NOT EXISTS event_key TEXT;
 
 -- Index untuk query yang cepat
-CREATE INDEX IF NOT EXISTS idx_midtrans_webhooks_processed ON midtrans_webhooks(processed, created_at);
+CREATE INDEX IF NOT EXISTS idx_midtrans_webhooks_processed ON midtrans_webhooks(processed, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_midtrans_webhooks_event_key ON midtrans_webhooks(event_key);
 CREATE INDEX IF NOT EXISTS idx_midtrans_webhooks_order_id ON midtrans_webhooks(order_id);
 CREATE INDEX IF NOT EXISTS idx_midtrans_webhooks_gross_amount ON midtrans_webhooks(gross_amount);
 
