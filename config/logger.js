@@ -1,8 +1,6 @@
 const winston = require('winston');
 const DailyRotateFile = require('winston-daily-rotate-file');
 const path = require('path');
-const fs = require('fs');
-const logsDir = path.join(__dirname, '../logs');
 
 // Define log levels
 const levels = {
@@ -41,34 +39,40 @@ const consoleFormat = winston.format.combine(
     )
 );
 
+// Create logs directory if it doesn't exist
+const fs = require('fs');
+const logsDir = path.join(__dirname, '../logs');
+if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
+}
+
 // Define transports
 const transports = [
+    // Console transport (only in development)
     new winston.transports.Console({
         format: consoleFormat,
         level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
     }),
-];
 
-if (process.env.NODE_ENV !== 'production') {
-    if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
-    transports.push(
-        new DailyRotateFile({
-            filename: path.join(logsDir, 'error-%DATE%.log'),
-            datePattern: 'YYYY-MM-DD',
-            level: 'error',
-            maxSize: '20m',
-            maxFiles: '14d',
-            format,
-        }),
-        new DailyRotateFile({
-            filename: path.join(logsDir, 'combined-%DATE%.log'),
-            datePattern: 'YYYY-MM-DD',
-            maxSize: '20m',
-            maxFiles: '14d',
-            format,
-        })
-    );
-}
+    // Error log file (daily rotate)
+    new DailyRotateFile({
+        filename: path.join(logsDir, 'error-%DATE%.log'),
+        datePattern: 'YYYY-MM-DD',
+        level: 'error',
+        maxSize: '20m',
+        maxFiles: '14d',
+        format,
+    }),
+
+    // Combined log file (daily rotate)
+    new DailyRotateFile({
+        filename: path.join(logsDir, 'combined-%DATE%.log'),
+        datePattern: 'YYYY-MM-DD',
+        maxSize: '20m',
+        maxFiles: '14d',
+        format,
+    }),
+];
 
 // Create logger
 const logger = winston.createLogger({

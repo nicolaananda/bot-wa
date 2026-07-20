@@ -44,35 +44,17 @@ const WHATSAPP_SUFFIX = '@s.whatsapp.net';
 const normalizeWhatsAppId = (sqlExpression) => `regexp_replace(COALESCE(${sqlExpression}, ''), '${WHATSAPP_SUFFIX.replace('.', '\.')}$', '')`;
 const transactionAmountSql = "COALESCE(t.amount, NULLIF(t.meta->>'totalBayar', '')::numeric, COALESCE(NULLIF(t.meta->>'price', '')::numeric, 0) * COALESCE(NULLIF(t.meta->>'jumlah', '')::numeric, 1), 0)";
 const transactionDateSql = "COALESCE(NULLIF(t.meta->>'date', '')::timestamptz, t.created_at)";
-const utcTodaySql = "date_trunc('day', CURRENT_TIMESTAMP AT TIME ZONE 'UTC')";
-const paymentMethodSql = "lower(COALESCE(t.payment_method, t.meta->>'payment_method', t.meta->>'metodeBayar', ''))";
 const app = express();
 
 // PostgreSQL-backed ordinary dashboard endpoints. Keep snapshot loading for explicit exports/receipts only.
 app.get('/api/dashboard/overview', async (req, res) => {
   try {
     const { rows: [data] } = await pgQuery(`
-      WITH totals AS (
-        SELECT COUNT(*)::int AS "totalTransaksi",
-          COALESCE(SUM(${transactionAmountSql}), 0)::float8 AS "totalPendapatan",
-          COUNT(*) FILTER (WHERE ${transactionDateSql} >= ${utcTodaySql} AT TIME ZONE 'UTC')::int AS "transaksiHariIni",
-          COALESCE(SUM(${transactionAmountSql}) FILTER (WHERE ${transactionDateSql} >= ${utcTodaySql} AT TIME ZONE 'UTC'), 0)::float8 AS "pendapatanHariIni",
-          COUNT(*) FILTER (WHERE ${paymentMethodSql} LIKE '%saldo%')::int AS saldo,
-          COUNT(*) FILTER (WHERE ${paymentMethodSql} LIKE '%qris%')::int AS qris,
-          COUNT(*) FILTER (WHERE ${paymentMethodSql} NOT LIKE '%saldo%' AND ${paymentMethodSql} NOT LIKE '%qris%')::int AS unknown
-        FROM transaksi t
-      ), top_users AS (
-        SELECT ${normalizeWhatsAppId('t.user_id')} AS "user", COUNT(*)::int AS transaksi,
-          COALESCE(SUM(${transactionAmountSql}), 0)::float8 AS "totalSpent"
-        FROM transaksi t WHERE NULLIF(t.user_id, '') IS NOT NULL GROUP BY 1
-        ORDER BY transaksi DESC, "user" ASC LIMIT 10
-      )
-      SELECT totals.*, json_build_object('saldo', saldo, 'qris', qris, 'unknown', unknown) AS "metodeBayar",
-        COALESCE((SELECT json_agg(top_users ORDER BY transaksi DESC, "user" ASC) FROM top_users), '[]'::json) AS "topUsers"
-      FROM totals`);
-    delete data.saldo;
-    delete data.qris;
-    delete data.unknown;
+      SELECT COUNT(*)::int AS "totalTransaksi",
+        COALESCE(SUM(${transactionAmountSql}), 0)::float8 AS "totalPendapatan",
+        COUNT(*) FILTER (WHERE ${transactionDateSql} >= CURRENT_DATE)::int AS "transaksiHariIni",
+        COALESCE(SUM(${transactionAmountSql}) FILTER (WHERE ${transactionDateSql} >= CURRENT_DATE), 0)::float8 AS "pendapatanHariIni"
+      FROM transaksi t`);
     res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -82,11 +64,10 @@ app.get('/api/dashboard/overview', async (req, res) => {
 app.get('/api/dashboard/chart/daily', async (req, res) => {
   try {
     const { rows } = await pgQuery(`
-      SELECT to_char(day, 'YYYY-MM-DD') AS date, COALESCE(COUNT(t.id), 0)::int AS transaksi,
-        COALESCE(SUM(${transactionAmountSql}), 0)::float8 AS pendapatan
-      FROM generate_series(${utcTodaySql} - INTERVAL '6 days', ${utcTodaySql}, INTERVAL '1 day') day
-      LEFT JOIN transaksi t ON ${transactionDateSql} >= day AT TIME ZONE 'UTC'
-        AND ${transactionDateSql} < (day + INTERVAL '1 day') AT TIME ZONE 'UTC'
+      SELECT to_char(day, 'YYYY-MM-DD') AS date, COALESCE(COUNT(t.id), 0)::int AS transactions,
+        COALESCE(SUM(${transactionAmountSql}), 0)::float8 AS revenue
+      FROM generate_series(CURRENT_DATE - INTERVAL '29 days', CURRENT_DATE, INTERVAL '1 day') day
+      LEFT JOIN transaksi t ON ${transactionDateSql} >= day AND ${transactionDateSql} < day + INTERVAL '1 day'
       GROUP BY day ORDER BY day`);
     res.json({ success: true, data: rows });
   } catch (error) {
@@ -97,39 +78,12 @@ app.get('/api/dashboard/chart/daily', async (req, res) => {
 app.get('/api/dashboard/chart/monthly', async (req, res) => {
   try {
     const { rows } = await pgQuery(`
-      SELECT to_char(month, 'YYYY-MM') AS month, COALESCE(COUNT(t.id), 0)::int AS transaksi,
-        COALESCE(SUM(${transactionAmountSql}), 0)::float8 AS pendapatan
-      FROM generate_series(date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '11 months', date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), INTERVAL '1 month') month
-      LEFT JOIN transaksi t ON ${transactionDateSql} >= month AT TIME ZONE 'UTC'
-        AND ${transactionDateSql} < (month + INTERVAL '1 month') AT TIME ZONE 'UTC'
+      SELECT to_char(month, 'YYYY-MM') AS month, COALESCE(COUNT(t.id), 0)::int AS transactions,
+        COALESCE(SUM(${transactionAmountSql}), 0)::float8 AS revenue
+      FROM generate_series(date_trunc('month', CURRENT_DATE) - INTERVAL '11 months', date_trunc('month', CURRENT_DATE), INTERVAL '1 month') month
+      LEFT JOIN transaksi t ON ${transactionDateSql} >= month AND ${transactionDateSql} < month + INTERVAL '1 month'
       GROUP BY month ORDER BY month`);
     res.json({ success: true, data: rows });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get('/api/dashboard/users/activity', async (req, res) => {
-  try {
-    const [{ rows: [counts] }, { rows }] = await Promise.all([
-      pgQuery(`SELECT COUNT(*) FILTER (WHERE COALESCE((u.data->>'isActive')::boolean, true))::int AS "activeUsers",
-          COUNT(*) FILTER (WHERE u.created_at >= date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')::int AS "newUsers"
-        FROM users u`),
-      pgQuery(`SELECT ${normalizeWhatsAppId('u.user_id')} AS "user",
-          COALESCE(u.data->>'username', 'User ' || right(${normalizeWhatsAppId('u.user_id')}, 4)) AS username,
-          COUNT(t.id)::int AS "totalTransaksi", COALESCE(SUM(${transactionAmountSql}), 0)::float8 AS "totalSpent",
-          u.saldo::float8 AS saldo, COALESCE(MAX(${transactionDateSql}), u.created_at) AS "lastActivity",
-          CASE WHEN COALESCE(SUM(${transactionAmountSql}), 0) >= 1000000 THEN 'gold'
-            WHEN COALESCE(SUM(${transactionAmountSql}), 0) >= 500000 THEN 'silver' ELSE 'bronze' END AS role,
-          json_build_object('saldo', COUNT(t.id) FILTER (WHERE ${paymentMethodSql} LIKE '%saldo%'),
-            'qris', COUNT(t.id) FILTER (WHERE ${paymentMethodSql} LIKE '%qris%'),
-            'unknown', COUNT(t.id) FILTER (WHERE ${paymentMethodSql} NOT LIKE '%saldo%' AND ${paymentMethodSql} NOT LIKE '%qris%')) AS "metodeBayar"
-        FROM users u LEFT JOIN transaksi t ON ${normalizeWhatsAppId('t.user_id')} = ${normalizeWhatsAppId('u.user_id')}
-        GROUP BY u.user_id, u.data, u.saldo, u.created_at ORDER BY "lastActivity" DESC NULLS LAST LIMIT 20`),
-    ]);
-    res.json({ success: true, data: { ...counts, userActivity: rows, activityTrends: {
-      dailyActive: [120, 135, 142, 128, 156, 149, 138], weeklyActive: [890, 920, 945, 912, 978, 934, 956], monthlyActive: [2800, 2950, 3100, 3020, 3180, 3050, 3120],
-    } }, message: 'User activity data retrieved successfully' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -318,7 +272,7 @@ app.post('/webhook/midtrans', createWebhookHandler({ pg: usePg ? pg : null, serv
 app.post('/webhook/midtrans-legacy-disabled', async (req, res) => {
   try {
     const notification = req.body;
-    console.log('🔔 [Webhook] Midtrans legacy notification received');
+    console.log('🔔 [Webhook] Midtrans notification:', JSON.stringify(notification));
 
     if (!verifyMidtransSignature(notification)) {
       console.error('❌ [Webhook] Invalid signature for', notification.order_id);
@@ -423,7 +377,7 @@ app.post('/webhook/midtrans-legacy-disabled', async (req, res) => {
       } catch (error) {
         console.error(`❌ [Webhook] Failed to forward to nala: ${error.message}`);
         if (error.response) {
-          console.error(`   Status: ${error.response.status}`);
+          console.error(`   Status: ${error.response.status}, Data:`, JSON.stringify(error.response.data));
         }
       }
     }
@@ -452,7 +406,7 @@ app.post('/webhook/gowa', async (req, res) => {
     }
 
     const webhookData = req.body;
-    console.log('[GOWA-WEBHOOK] Received verified event');
+    console.log('[GOWA-WEBHOOK] Received:', JSON.stringify(webhookData).substring(0, 200));
 
     // Publish to Redis for bot to consume
     // Check if redisClient exists and is ready (ioredis uses .status, but we can check existence too)
@@ -495,28 +449,15 @@ async function loadSingleProdukAsync(productId) {
 
 // Helper untuk update stok di PG
 async function updateProdukStockPg(productId, updater) {
-  const client = await pg.getClient();
-  try {
-    await client.query('BEGIN');
-    const row = await client.query('SELECT data FROM produk WHERE id=$1 FOR UPDATE', [productId]);
-    if (!row.rows[0]) {
-      await client.query('ROLLBACK');
-      return { ok: false, error: 'Product not found' };
-    }
-    const data = structuredClone(row.rows[0].data || {});
-    const beforeCount = Array.isArray(data.stok) ? data.stok.length : 0;
-    const updated = await updater(structuredClone(data));
-    if (!updated || typeof updated !== 'object') throw new Error('Invalid update');
-    const newCount = Array.isArray(updated.stok) ? updated.stok.length : 0;
-    await client.query('UPDATE produk SET data=$2, stock=$3 WHERE id=$1', [productId, JSON.stringify(updated), newCount]);
-    await client.query('COMMIT');
-    return { ok: true, beforeCount, newCount, data: updated };
-  } catch (error) {
-    try { await client.query('ROLLBACK'); } catch {}
-    throw error;
-  } finally {
-    client.release();
-  }
+  const row = await pg.query('SELECT data FROM produk WHERE id=$1', [productId]);
+  if (!row.rows[0]) return { ok: false, error: 'Product not found' };
+  const data = row.rows[0].data || {};
+  const beforeCount = Array.isArray(data.stok) ? data.stok.length : 0;
+  const updated = await updater({ ...data });
+  if (!updated || typeof updated !== 'object') return { ok: false, error: 'Invalid update' };
+  const newCount = Array.isArray(updated.stok) ? updated.stok.length : 0;
+  await pg.query('UPDATE produk SET data=$2, stock=$3 WHERE id=$1', [productId, JSON.stringify(updated), newCount]);
+  return { ok: true, beforeCount, newCount, data: updated };
 }
 
 // Helper: Parse delivered account from TRX file if available
@@ -582,8 +523,7 @@ function cleanUpIdempotencyCache() {
     if (now - info.at > IDEMP_TTL_MS) idempotencyCache.delete(key);
   }
 }
-const idempotencyCleanupTimer = setInterval(cleanUpIdempotencyCache, 60 * 1000);
-idempotencyCleanupTimer.unref?.();
+setInterval(cleanUpIdempotencyCache, 60 * 1000);
 
 function posAdminAuth(req, res) {
   // Reuse Bearer auth
@@ -607,17 +547,12 @@ function _findUserRecord(db, userId) {
   return null;
 }
 
-let auditWriteQueue = Promise.resolve();
 function writeAudit(entry) {
-  const filePath = path.join(__dirname, 'audit-admin.log');
-  const line = JSON.stringify(entry) + '\n';
-  const write = async () => {
-    const handle = await fsPromises.open(filePath, 'a', 0o600);
-    try { await handle.write(line); await handle.sync(); } finally { await handle.close(); }
-  };
-  const queued = auditWriteQueue.then(write, write);
-  auditWriteQueue = queued.catch(() => {});
-  return queued;
+  try {
+    const filePath = path.join(__dirname, 'audit-admin.log');
+    const line = JSON.stringify(entry) + '\n';
+    fs.appendFileSync(filePath, line, 'utf8');
+  } catch { /* ignored */ }
 }
 
 function generateAuditId() {
@@ -729,7 +664,7 @@ app.patch('/api/admin/users/:userId/saldo', async (req, res) => {
       // No limit - allow negative saldo (admin can set any value)
       await pg.query('INSERT INTO users(user_id, saldo, role, data) VALUES ($1,$2,' + "'bronze'" + ', ' + "'{}'" + '::jsonb) ON CONFLICT (user_id) DO UPDATE SET saldo=$2', [userId, after]);
       const auditId = generateAuditId();
-      await writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'saldo.adjust', delta: amount, reason: reason || null, before, after, timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
+      writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'saldo.adjust', delta: amount, reason: reason || null, before, after, timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
       return res.json({ success: true, data: { userId, before, after, delta: amount, auditId } });
     }
     return res.status(500).json({ success: false, error: 'PostgreSQL mode is required' });
@@ -754,7 +689,7 @@ app.post('/api/admin/users/:userId/pin', async (req, res) => {
         [userId, pin, '{pin}']
       );
       const auditId = generateAuditId();
-      await writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'pin.update', masked: '******', timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
+      writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'pin.update', masked: '******', timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
       return res.json({ success: true, data: { userId, updatedAt: new Date().toISOString() } });
     }
     return res.status(500).json({ success: false, error: 'PostgreSQL mode is required' });
@@ -786,7 +721,7 @@ app.patch('/api/admin/users/:userId/role', async (req, res) => {
         [userId, role, '{role}']
       );
       const auditId = generateAuditId();
-      await writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'role.update', oldRole, newRole: role, timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
+      writeAudit({ id: auditId, admin: req.adminUser, userId, action: 'role.update', oldRole, newRole: role, timestamp: new Date().toISOString(), ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null });
       return res.json({ success: true, data: { userId, oldRole, newRole: role } });
     }
     return res.status(500).json({ success: false, error: 'PostgreSQL mode is required' });
@@ -864,7 +799,195 @@ function _generateUserId() {
 
 // API Endpoints
 
-// Ordinary overview, chart, and activity routes are registered above with PostgreSQL aggregates.
+// 1. Dashboard Overview
+app.get('/api/dashboard/overview', async (req, res) => {
+  try {
+    const db = await getFormattedDataAsync();
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load database'
+      });
+    }
+
+    const dashboardData = getDashboardData(db);
+    if (dashboardData) {
+      res.json({
+        success: true,
+        data: dashboardData
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to process dashboard data'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 2. Chart Data Harian
+app.get('/api/dashboard/chart/daily', async (req, res) => {
+  try {
+    const db = await getFormattedDataAsync();
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load database'
+      });
+    }
+
+    const dailyData = getDailyChartData(db);
+    res.json({
+      success: true,
+      data: dailyData
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 3. Chart Data Bulanan
+app.get('/api/dashboard/chart/monthly', async (req, res) => {
+  try {
+    const db = await getFormattedDataAsync();
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load database'
+      });
+    }
+
+    const monthlyData = getMonthlyChartData(db);
+    res.json({
+      success: true,
+      data: monthlyData
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 4. User Activity
+app.get('/api/dashboard/users/activity', async (req, res) => {
+  try {
+    const db = await getFormattedDataAsync();
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to load database'
+      });
+    }
+
+    // Get user activity data
+    const users = db.data.users || {};
+
+    // Calculate active users
+    const activeUsers = Object.keys(users).filter(userId => {
+      const user = users[userId];
+      return user && user.isActive !== false;
+    }).length;
+
+    // Calculate new users this month
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const newUsers = Object.keys(users).filter(userId => {
+      const user = users[userId];
+      if (!user || !user.createdAt) return false;
+      const userMonth = user.createdAt.toString().slice(0, 7);
+      return userMonth === currentMonth;
+    }).length;
+
+    // Get user activity details with saldo, username, and role
+    const userActivity = Object.keys(users).map(userId => {
+      const user = users[userId];
+      if (!user) return null;
+
+      // Get user transactions
+      const userTransactions = transaksi.filter(t => t.user === userId);
+      const totalTransaksi = userTransactions.length;
+      const totalSpent = userTransactions.reduce((sum, t) => {
+        return sum + (parseInt(t.totalBayar) || (parseInt(t.price) * (t.jumlah || 1)));
+      }, 0);
+
+      // Calculate payment method breakdown
+      const metodeBayar = {
+        saldo: 0,
+        qris: 0,
+        unknown: 0
+      };
+
+      userTransactions.forEach(t => {
+        const paymentMethod = (t.payment_method || t.metodeBayar || '').toLowerCase();
+        if (paymentMethod.includes('saldo')) {
+          metodeBayar.saldo++;
+        } else if (paymentMethod.includes('qris')) {
+          metodeBayar.qris++;
+        } else {
+          metodeBayar.unknown++;
+        }
+      });
+
+      // Auto-generate username if not exists
+      const username = user.username || `User ${userId.slice(-4)}`;
+
+      // Auto-calculate role based on total spending
+      let role = user.role || 'bronze';
+      if (totalSpent >= 1000000) {
+        role = 'gold';
+      } else if (totalSpent >= 500000) {
+        role = 'silver';
+      } else {
+        role = 'bronze';
+      }
+
+      return {
+        user: userId,
+        username: username,
+        totalTransaksi: totalTransaksi,
+        totalSpent: totalSpent,
+        saldo: parseInt(user.saldo) || 0,
+        lastActivity: user.lastActivity || user.createdAt || new Date().toISOString(),
+        role: role,
+        metodeBayar: metodeBayar
+      };
+    }).filter(Boolean).sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+
+    // Calculate activity trends (mock data for now)
+    const activityTrends = {
+      dailyActive: [120, 135, 142, 128, 156, 149, 138],
+      weeklyActive: [890, 920, 945, 912, 978, 934, 956],
+      monthlyActive: [2800, 2950, 3100, 3020, 3180, 3050, 3120]
+    };
+
+    res.json({
+      success: true,
+      data: {
+        activeUsers: activeUsers,
+        newUsers: newUsers,
+        userActivity: userActivity.slice(0, 20), // Limit to 20 most recent
+        activityTrends: activityTrends
+      },
+      message: "User activity data retrieved successfully"
+    });
+
+  } catch (error) {
+    console.error('Error in user activity endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 // 5. Get All Users with Pagination
 app.get('/api/dashboard/users/all', async (req, res) => {
@@ -3818,21 +3941,34 @@ app.get('/api/dashboard/receipts', async (req, res) => {
   try {
     const receiptsDir = path.join(__dirname, 'receipts');
 
-    let files;
-    try { files = await fsPromises.readdir(receiptsDir); }
-    catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-      return res.json({ success: true, data: { receipts: [], total: 0, message: 'No receipts found' } });
+    if (!fs.existsSync(receiptsDir)) {
+      return res.json({
+        success: true,
+        data: {
+          receipts: [],
+          total: 0,
+          message: 'No receipts found'
+        }
+      });
     }
-    const receipts = [];
-    for (const file of files.filter(file => file.endsWith('.txt'))) {
+
+    const files = fs.readdirSync(receiptsDir);
+    const receiptFiles = files.filter(file => file.endsWith('.txt'));
+
+    const receipts = receiptFiles.map(file => {
+      const reffId = file.replace('.txt', '');
       const filePath = path.join(receiptsDir, file);
-      let stats;
-      try { stats = await fsPromises.stat(filePath); }
-      catch (error) { if (error.code === 'ENOENT') continue; throw error; }
-      receipts.push({ reffId: file.replace('.txt', ''), filename: file, createdAt: stats.birthtime, modifiedAt: stats.mtime, size: stats.size, sizeFormatted: formatBytes(stats.size) });
-    }
-    receipts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const stats = fs.statSync(filePath);
+
+      return {
+        reffId: reffId,
+        filename: file,
+        createdAt: stats.birthtime,
+        modifiedAt: stats.mtime,
+        size: stats.size,
+        sizeFormatted: formatBytes(stats.size)
+      };
+    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     res.json({
       success: true,

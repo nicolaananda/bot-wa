@@ -299,78 +299,6 @@ function exportStockToCSV() {
   return csv;
 }
 
-async function mutateProductPg(pg, productId, updater) {
-  const client = await pg.getClient();
-  try {
-    await client.query('BEGIN');
-    const result = await client.query('SELECT data FROM produk WHERE id=$1 FOR UPDATE', [productId]);
-    if (!result.rows[0]) throw new Error(`Product ${productId} not found`);
-    const original = structuredClone(result.rows[0].data || {});
-    const product = await updater(structuredClone(original));
-    if (!product || typeof product !== 'object') throw new Error('Invalid product update');
-    const stock = Array.isArray(product.stok) ? product.stok : [];
-    product.stok = stock;
-    delete product.stock;
-    await client.query('UPDATE produk SET data=$2, stock=$3 WHERE id=$1', [productId, JSON.stringify(product), stock.length]);
-    await client.query('COMMIT');
-    return { product, beforeCount: Array.isArray(original.stok) ? original.stok.length : 0, newCount: stock.length };
-  } catch (error) {
-    try { await client.query('ROLLBACK'); } catch {}
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-async function consumeStockPg(pg, productId, quantity) {
-  if (!Number.isInteger(quantity) || quantity <= 0) throw new Error('Quantity must be a positive integer');
-  let items;
-  const result = await mutateProductPg(pg, productId, (product) => {
-    const stock = Array.isArray(product.stok) ? product.stok : [];
-    if (stock.length < quantity) throw new Error(`Insufficient stock. Available: ${stock.length}`);
-    items = stock.splice(0, quantity);
-    product.stok = stock;
-    product.terjual = Number(product.terjual || 0) + quantity;
-    return product;
-  });
-  return { items, product: result.product };
-}
-
-async function buyWithSaldoPg(pg, userId, productId, quantity, totalPrice) {
-  if (!Number.isInteger(quantity) || quantity <= 0) throw new Error('Quantity must be a positive integer');
-  if (!Number.isFinite(totalPrice) || totalPrice < 0) throw new Error('Invalid total price');
-  const client = await pg.getClient();
-  try {
-    await client.query('BEGIN');
-    // All buyers lock user before product to prevent lock-order deadlocks.
-    const userResult = await client.query('SELECT saldo, data FROM users WHERE user_id=$1 FOR UPDATE', [userId]);
-    if (!userResult.rows[0]) throw new Error(`User ${userId} not found`);
-    const productResult = await client.query('SELECT data FROM produk WHERE id=$1 FOR UPDATE', [productId]);
-    if (!productResult.rows[0]) throw new Error(`Product ${productId} not found`);
-
-    const saldo = Number(userResult.rows[0].saldo || 0);
-    if (saldo < totalPrice) throw new Error(`Insufficient balance. Available: ${saldo}`);
-    const product = structuredClone(productResult.rows[0].data || {});
-    const stock = Array.isArray(product.stok) ? product.stok : [];
-    if (stock.length < quantity) throw new Error(`Insufficient stock. Available: ${stock.length}`);
-
-    const items = stock.splice(0, quantity);
-    const newSaldo = saldo - totalPrice;
-    product.stok = stock;
-    product.terjual = Number(product.terjual || 0) + quantity;
-    delete product.stock;
-    await client.query('UPDATE users SET saldo=$2 WHERE user_id=$1', [userId, newSaldo]);
-    await client.query('UPDATE produk SET data=$2, stock=$3 WHERE id=$1', [productId, JSON.stringify(product), stock.length]);
-    await client.query('COMMIT');
-    return { items, product, saldo: newSaldo };
-  } catch (error) {
-    try { await client.query('ROLLBACK'); } catch {}
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
 module.exports = {
   getStockStatus,
   getProductCategory,
@@ -379,8 +307,5 @@ module.exports = {
   calculateStockMetrics,
   getStockAnalytics,
   generateStockReport,
-  exportStockToCSV,
-  mutateProductPg,
-  consumeStockPg,
-  buyWithSaldoPg
-};
+  exportStockToCSV
+}; 

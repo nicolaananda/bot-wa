@@ -87,7 +87,6 @@ let pg
 if (usePg) {
   pg = require('./config/postgres')
 }
-const { consumeStockPg, mutateProductPg, buyWithSaldoPg } = require('./options/stock-helper')
 const { core, isProduction } = require('./config/midtrans')
 const USE_POLLING = true // true = pakai polling status Midtrans; false = andalkan webhook saja
 
@@ -1034,19 +1033,10 @@ if (!global.midtransWebhookListenerSetup) {
 
       console.log(`✅ [MID-GLOBAL] Processing payment for order: ${orderId}, RefId: ${reffId}`)
 
-      // Reserve canonical stock under a PostgreSQL row lock before marking processed.
-      let stockResult
-      let currentStock
-      try {
-        stockResult = await consumeStockPg(pg, productId, jumlah)
-        db.data.produk[productId] = stockResult.product
-        currentStock = stockResult.product.stok.length + jumlah
-      } catch (error) {
-        const shortage = /^Insufficient stock\. Available: (\d+)$/.exec(error.message)
-        if (!shortage) throw error
-        currentStock = Number(shortage[1])
-      }
-      if (!stockResult) {
+      // 🔒 CRITICAL: Check stock availability BEFORE marking as processed
+      // This prevents race condition where customer pays but stock is empty
+      const currentStock = db.data.produk[productId].stok.length
+      if (currentStock < jumlah) {
         console.error(
           `❌ [MID-GLOBAL] Insufficient stock for product ${productId}: requested ${jumlah}, available ${currentStock}`
         )
@@ -1094,7 +1084,17 @@ if (!global.midtransWebhookListenerSetup) {
         return
       }
 
-      const dataStok = stockResult.items
+      // Reserve stock (atomic operation)
+      let dataStok = []
+      for (let i = 0; i < jumlah; i++) {
+        dataStok.push(db.data.produk[productId].stok.shift())
+      }
+
+      // Update sold count
+      db.data.produk[productId].terjual += jumlah
+
+      // Important: Delete old stock property to force recalculation from stok.length
+      delete db.data.produk[productId].stock
 
       // Low stock alert to owner
       const sisaStokAfterBuy = db.data.produk[productId].stok.length
@@ -4888,12 +4888,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
 
           let dataStok = data[1].split('\n').map((i) => i.trim())
-          const added = await mutateProductPg(pg, data[0], (product) => {
-            product.stok = Array.isArray(product.stok) ? product.stok : []
-            product.stok.push(...dataStok)
-            return product
-          })
-          db.data.produk[data[0]] = added.product
+          db.data.produk[data[0]].stok.push(...dataStok)
 
           reply(`Berhasil menambahkan stok sebanyak ${dataStok.length}`)
         }
@@ -4905,7 +4900,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           if (!q) return reply(`Contoh: ${prefix + command} idproduk confirm`)
 
           const delStokArgs = q.trim().split(' ')
-          const idDelStok = delStokArgs[0]
+          const idDelStok = delStokArgs[0].toLowerCase()
           const konfirmasiDel = delStokArgs[1]
 
           if (!db.data.produk[idDelStok]) return reply(`Produk dengan ID *${idDelStok}* tidak ada`)
@@ -4918,11 +4913,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             )
           }
 
-          const cleared = await mutateProductPg(pg, idDelStok, (product) => {
-            product.stok = []
-            return product
-          })
-          db.data.produk[idDelStok] = cleared.product
+          db.data.produk[idDelStok].stok = []
+
+          if (typeof global.scheduleSave === 'function') global.scheduleSave()
 
           reply(`✅ Berhasil hapus *${jumlahStokDel} akun* dari stok produk *${idDelStok}*`)
         }
@@ -4995,7 +4988,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             )
 
           const pickArgs = q.trim().split(' ')
-          const idProdukPick = pickArgs[0]
+          const idProdukPick = pickArgs[0]?.toLowerCase()
           const nomorList = pickArgs
             .slice(1)
             .map((n) => parseInt(n))
@@ -5018,34 +5011,30 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             return reply(`📦 Stok produk *${produkPick.name || idProdukPick}* kosong`)
           }
 
-          let akunDipick
-          let pickResult
-          try {
-            pickResult = await mutateProductPg(pg, idProdukPick, (product) => {
-              const stock = Array.isArray(product.stok) ? product.stok : []
-              const invalidNomor = nomorList.filter((n) => n > stock.length)
-              if (invalidNomor.length > 0) {
-                const error = new Error('Invalid stock indexes')
-                error.invalidNomor = invalidNomor
-                error.stockLength = stock.length
-                throw error
-              }
-              const uniqueNomor = [...new Set(nomorList)].sort((a, b) => b - a)
-              akunDipick = uniqueNomor
-                .map((nomor) => ({ nomor, data: stock[nomor - 1] }))
-                .sort((a, b) => a.nomor - b.nomor)
-              for (const nomor of uniqueNomor) stock.splice(nomor - 1, 1)
-              product.stok = stock
-              return product
-            })
-          } catch (error) {
-            if (!error.invalidNomor) throw error
+          // Validasi semua nomor
+          const invalidNomor = nomorList.filter((n) => n > stokPick.length)
+          if (invalidNomor.length > 0) {
             return reply(
-              `❌ Nomor *${error.invalidNomor.join(', ')}* tidak valid. Stok tersedia: *${error.stockLength}* akun\n\n💡 Gunakan ${prefix}cek ${idProdukPick} untuk melihat daftar`
+              `❌ Nomor *${invalidNomor.join(', ')}* tidak valid. Stok tersedia: *${stokPick.length}* akun\n\n💡 Gunakan ${prefix}cek ${idProdukPick} untuk melihat daftar`
             )
           }
-          db.data.produk[idProdukPick] = pickResult.product
-          const sisaStok = pickResult.newCount
+
+          // Hapus duplikat dan urutkan dari terbesar ke terkecil agar index tidak bergeser
+          const uniqueNomor = [...new Set(nomorList)].sort((a, b) => b - a)
+          const akunDipick = []
+
+          for (const nomor of uniqueNomor) {
+            const idx = nomor - 1
+            akunDipick.unshift({ nomor, data: stokPick[idx] })
+            db.data.produk[idProdukPick].stok.splice(idx, 1)
+          }
+
+          const sisaStok = db.data.produk[idProdukPick].stok.length
+
+          // Simpan perubahan
+          if (typeof global.scheduleSave === 'function') {
+            global.scheduleSave()
+          }
 
           let teks = `*╭────〔 AKUN PICK 〕─*\n`
           teks += `*┊・ 📦 Produk:* ${produkPick.name || idProdukPick}\n`
@@ -5770,8 +5759,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
 
             const jumlah = Number(data[1])
-            if (!Number.isInteger(jumlah) || jumlah <= 0)
-              return reply('Jumlah harus berupa bilangan bulat lebih dari 0')
+            if (!Number.isFinite(jumlah) || jumlah <= 0)
+              return reply('Jumlah harus berupa angka lebih dari 0')
 
             let stok = db.data.produk[data[0]].stok
             if (stok.length <= 0) return reply('Stok habis, silahkan hubungi Owner untuk restok')
@@ -6213,8 +6202,13 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
 
             const jumlah = Number(data[1])
-            if (!Number.isInteger(jumlah) || jumlah <= 0)
-              return reply('Jumlah harus berupa bilangan bulat lebih dari 0')
+            if (!Number.isFinite(jumlah) || jumlah <= 0)
+              return reply('Jumlah harus berupa angka lebih dari 0')
+
+            let stok = db.data.produk[data[0]].stok
+            if (stok.length <= 0) return reply('Stok habis, silahkan hubungi Owner untuk restok')
+            if (stok.length < jumlah)
+              return reply(`Stok tersedia ${stok.length}, jadi harap jumlah tidak melebihi stok`)
 
             const reffId = crypto.randomBytes(5).toString('hex').toUpperCase()
             db.data.order[sender] = {
@@ -6228,7 +6222,19 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             requestPendingOrderSave()
 
             try {
-              const totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * jumlah
+              // Cek saldo user (PG-aware)
+              let totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * jumlah
+              const currentSaldo =
+                typeof dbHelper.getUserSaldoAsync === 'function'
+                  ? await dbHelper.getUserSaldoAsync(sender)
+                  : dbHelper.getUserSaldo(sender)
+              if (currentSaldo < totalHarga) {
+                delete db.data.order[sender]
+                requestPendingOrderSave()
+                return reply(
+                  `Saldo tidak cukup! Saldo kamu: Rp${toRupiah(currentSaldo)}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}deposit nominal*`
+                )
+              }
 
               reply(
                 isOwnerBuy
@@ -6236,25 +6242,20 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   : 'Sedang memproses pembelian dengan saldo...'
               )
 
-              let purchase
-              try {
-                purchase = await buyWithSaldoPg(pg, sender, data[0], jumlah, totalHarga)
-              } catch (error) {
-                delete db.data.order[sender]
-                requestPendingOrderSave()
-                const balance = /^Insufficient balance\. Available: (.+)$/.exec(error.message)
-                if (balance) {
-                  return reply(
-                    `Saldo tidak cukup! Saldo kamu: Rp${toRupiah(Number(balance[1]))}\nTotal harga: Rp${toRupiah(totalHarga)}\n\nSilahkan topup saldo terlebih dahulu dengan ketik *${prefix}deposit nominal*`
-                  )
-                }
-                const stock = /^Insufficient stock\. Available: (\d+)$/.exec(error.message)
-                if (stock) return reply(`Stok tersedia ${stock[1]}, jadi harap jumlah tidak melebihi stok`)
-                throw error
+              // Kurangi saldo user (PG)
+              await dbHelper.updateUserSaldo(sender, totalHarga, 'subtract')
+
+              await sleep(1000)
+
+              // Proses pembelian langsung
+              db.data.produk[data[0]].terjual += jumlah
+              let dataStok = []
+              for (let i = 0; i < jumlah; i++) {
+                dataStok.push(db.data.produk[data[0]].stok.shift())
               }
-              db.data.users[sender].saldo = purchase.saldo
-              db.data.produk[data[0]] = purchase.product
-              const dataStok = purchase.items
+
+              // Important: Delete old stock property to force recalculation from stok.length
+              delete db.data.produk[data[0]].stock
 
               // Low stock alert to owner
               const sisaStokBuy = db.data.produk[data[0]].stok.length
