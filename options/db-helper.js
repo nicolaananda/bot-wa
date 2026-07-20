@@ -207,21 +207,21 @@ function getUserSaldo(userId) {
 async function getUserSaldoAsync(userId) {
   try {
     if (usePg) {
-      const variants = collectUserIdVariants(userId);
-      const idWith = normalizeUserId(userId);
-      const idNo = idWith ? idWith.replace(/@s\.whatsapp\.net$/i, '') : userId;
+      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`;
+      const idNo = userId.replace(/@s\.whatsapp\.net$/, '');
       try {
-        const result = await pg.query(
-          'SELECT user_id, saldo FROM users WHERE user_id = ANY($1::text[])',
-          [variants]
-        );
-        const balances = result.rows.map((row) => Number(row.saldo) || 0);
+        const [resNo, resWith] = await Promise.all([
+          pg.query('SELECT saldo FROM users WHERE user_id=$1', [idNo]),
+          pg.query('SELECT saldo FROM users WHERE user_id=$1', [idWith])
+        ]);
+        const saldo1 = resNo.rows[0] ? Number(resNo.rows[0].saldo) : 0;
+        const saldo2 = resWith.rows[0] ? Number(resWith.rows[0].saldo) : 0;
 
         // Update in-memory snapshot if present
         if (!global.db) global.db = { data: { users: {} } };
         if (!global.db.data) global.db.data = { users: {} };
         if (!global.db.data.users) global.db.data.users = {};
-        const finalSaldo = balances.length ? Math.max(...balances) : 0;
+        const finalSaldo = Math.max(saldo1, saldo2);
         global.db.data.users[idWith] = Object.assign({ saldo: 0, role: 'bronze' }, global.db.data.users[idWith], { saldo: finalSaldo });
         global.db.data.users[idNo] = Object.assign({ saldo: 0, role: 'bronze' }, global.db.data.users[idNo], { saldo: finalSaldo });
         return finalSaldo;

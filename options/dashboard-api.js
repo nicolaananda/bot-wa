@@ -11,7 +11,6 @@ const { getDashboardData, getDailyChartData, getMonthlyChartData } = require('./
 // Midtrans webhook integration
 const crypto = require('crypto');
 const axios = require('axios');
-const { createWebhookHandler, startWebhookWorker } = require('./midtrans-webhook');
 const envValidator = require('../config/env-validator');
 envValidator.validateOrExit();
 const { clearCachedPaymentData } = require('../config/midtrans');
@@ -38,117 +37,11 @@ async function getDbInstance() {
 }
 const { getReceipt, receiptExists, deleteReceipt } = require('../config/r2-storage');
 const dbHelper = require('./db-helper');
-const { query: pgQuery } = require('../config/postgres');
-
-const WHATSAPP_SUFFIX = '@s.whatsapp.net';
-const normalizeWhatsAppId = (sqlExpression) => `regexp_replace(COALESCE(${sqlExpression}, ''), '${WHATSAPP_SUFFIX.replace('.', '\.')}$', '')`;
-const transactionAmountSql = "COALESCE(t.amount, NULLIF(t.meta->>'totalBayar', '')::numeric, COALESCE(NULLIF(t.meta->>'price', '')::numeric, 0) * COALESCE(NULLIF(t.meta->>'jumlah', '')::numeric, 1), 0)";
-const transactionDateSql = "COALESCE(NULLIF(t.meta->>'date', '')::timestamptz, t.created_at)";
-const app = express();
-
-// PostgreSQL-backed ordinary dashboard endpoints. Keep snapshot loading for explicit exports/receipts only.
-app.get('/api/dashboard/overview', async (req, res) => {
-  try {
-    const { rows: [data] } = await pgQuery(`
-      SELECT COUNT(*)::int AS "totalTransaksi",
-        COALESCE(SUM(${transactionAmountSql}), 0)::float8 AS "totalPendapatan",
-        COUNT(*) FILTER (WHERE ${transactionDateSql} >= CURRENT_DATE)::int AS "transaksiHariIni",
-        COALESCE(SUM(${transactionAmountSql}) FILTER (WHERE ${transactionDateSql} >= CURRENT_DATE), 0)::float8 AS "pendapatanHariIni"
-      FROM transaksi t`);
-    res.json({ success: true, data });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get('/api/dashboard/chart/daily', async (req, res) => {
-  try {
-    const { rows } = await pgQuery(`
-      SELECT to_char(day, 'YYYY-MM-DD') AS date, COALESCE(COUNT(t.id), 0)::int AS transactions,
-        COALESCE(SUM(${transactionAmountSql}), 0)::float8 AS revenue
-      FROM generate_series(CURRENT_DATE - INTERVAL '29 days', CURRENT_DATE, INTERVAL '1 day') day
-      LEFT JOIN transaksi t ON ${transactionDateSql} >= day AND ${transactionDateSql} < day + INTERVAL '1 day'
-      GROUP BY day ORDER BY day`);
-    res.json({ success: true, data: rows });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get('/api/dashboard/chart/monthly', async (req, res) => {
-  try {
-    const { rows } = await pgQuery(`
-      SELECT to_char(month, 'YYYY-MM') AS month, COALESCE(COUNT(t.id), 0)::int AS transactions,
-        COALESCE(SUM(${transactionAmountSql}), 0)::float8 AS revenue
-      FROM generate_series(date_trunc('month', CURRENT_DATE) - INTERVAL '11 months', date_trunc('month', CURRENT_DATE), INTERVAL '1 month') month
-      LEFT JOIN transaksi t ON ${transactionDateSql} >= month AND ${transactionDateSql} < month + INTERVAL '1 month'
-      GROUP BY month ORDER BY month`);
-    res.json({ success: true, data: rows });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get('/api/dashboard/all-users', async (req, res) => {
-  try {
-    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
-    const search = String(req.query.search || '').trim();
-    const role = String(req.query.role || '').trim();
-    const sortColumns = { name: 'name', saldo: 'saldo', transactions: 'transaction_count', spent: 'total_spent' };
-    const sort = sortColumns[req.query.sort] || 'name';
-    const direction = String(req.query.order).toLowerCase() === 'desc' ? 'DESC' : 'ASC';
-    const params = [];
-    const where = [];
-    if (search) { params.push(`%${search}%`); where.push(`(u.user_id ILIKE $${params.length} OR COALESCE(u.data->>'name', '') ILIKE $${params.length})`); }
-    if (role) { params.push(role); where.push(`u.role = $${params.length}`); }
-    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const countParams = [...params];
-    params.push(limit, (page - 1) * limit);
-    const [result, count] = await Promise.all([
-      pgQuery(`SELECT ${normalizeWhatsAppId('u.user_id')} AS id, COALESCE(u.data->>'name', ${normalizeWhatsAppId('u.user_id')}) AS name,
-          u.saldo::float8 AS saldo, u.role, COUNT(t.id)::int AS transaction_count,
-          COALESCE(SUM(${transactionAmountSql}), 0)::float8 AS total_spent
-        FROM users u LEFT JOIN transaksi t ON ${normalizeWhatsAppId('t.user_id')} = ${normalizeWhatsAppId('u.user_id')}
-        ${whereSql} GROUP BY u.user_id, u.data, u.saldo, u.role
-        ORDER BY ${sort} ${direction}, u.user_id ASC LIMIT $${params.length - 1} OFFSET $${params.length}`, params),
-      pgQuery(`SELECT COUNT(*)::int AS total FROM users u ${whereSql}`, countParams),
-    ]);
-    res.json({ success: true, data: result.rows, pagination: { page, limit, total: count.rows[0].total } });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get('/api/dashboard/user-transactions/:userId', async (req, res) => {
-  try {
-    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
-    const status = String(req.query.status || '').trim();
-    const sortColumns = { date: 'transaction_date', amount: 'amount', status: 'status' };
-    const sort = sortColumns[req.query.sort] || 'transaction_date';
-    const direction = String(req.query.order).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
-    const params = [String(req.params.userId).replace(/@s\.whatsapp\.net$/, '')];
-    const where = [`${normalizeWhatsAppId('t.user_id')} = $1`];
-    if (status) { params.push(status); where.push(`t.status = $${params.length}`); }
-    const countParams = [...params];
-    params.push(limit, (page - 1) * limit);
-    const whereSql = where.join(' AND ');
-    const [result, count] = await Promise.all([
-      pgQuery(`SELECT t.ref_id, ${normalizeWhatsAppId('t.user_id')} AS user_id, ${transactionAmountSql}::float8 AS amount,
-          t.status, t.meta, ${transactionDateSql} AS transaction_date FROM transaksi t WHERE ${whereSql}
-        ORDER BY ${sort} ${direction}, t.id DESC LIMIT $${params.length - 1} OFFSET $${params.length}`, params),
-      pgQuery(`SELECT COUNT(*)::int AS total FROM transaksi t WHERE ${whereSql}`, countParams),
-    ]);
-    res.json({ success: true, data: result.rows, pagination: { page, limit, total: count.rows[0].total } });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 // Contoh API endpoint untuk dashboard web
 // Pastikan install: npm install express cors
 
+const app = express();
 const PORT = process.env.PORT || 3002;
 const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 
@@ -267,9 +160,7 @@ app.get('/webhook/midtrans/test', (req, res) => {
   });
 });
 
-app.post('/webhook/midtrans', createWebhookHandler({ pg: usePg ? pg : null, serverKey: MIDTRANS_SERVER_KEY }));
-
-app.post('/webhook/midtrans-legacy-disabled', async (req, res) => {
+app.post('/webhook/midtrans', async (req, res) => {
   try {
     const notification = req.body;
     console.log('🔔 [Webhook] Midtrans notification:', JSON.stringify(notification));
@@ -3830,22 +3721,6 @@ app.use('*', (req, res) => {
 
 // Start server
 if (require.main === module) {
-  if (usePg) {
-    startWebhookWorker({
-      pg,
-      redis: getRedis(),
-      forward: async notification => {
-        const orderId = notification.order_id || '';
-        const prefixes = ['BOOK-', 'BELAJAR-', 'SKET-', 'BAJU-', 'G60-', 'GG-', 'GRASP-', 'CLASS-'];
-        if (prefixes.some(prefix => orderId.startsWith(prefix))) {
-          await axios.post('https://api.artstudionala.com/api/midtrans/notification', notification, {
-            headers: { 'Content-Type': 'application/json' }, timeout: 10000
-          });
-        }
-        try { clearCachedPaymentData(orderId); } catch {}
-      }
-    });
-  }
   // HTTP Server
   try {
     const httpServer = http.createServer(app);

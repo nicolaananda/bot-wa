@@ -90,17 +90,73 @@ if (usePg) {
 const { core, isProduction } = require('./config/midtrans')
 const USE_POLLING = true // true = pakai polling status Midtrans; false = andalkan webhook saja
 
-// Centralized send throttling, retry, and aggregate queue metrics.
+// Centralized, minimal send throttling + retry to avoid bursty spam patterns
 const SEND_MIN_INTERVAL_MS = Number(process.env.WA_SEND_MIN_INTERVAL_MS || 800)
 const SEND_MAX_RETRIES = Number(process.env.WA_SEND_RETRIES || 3)
-const { createSendQueue } = require('./options/send-queue')
-const waSendQueue = createSendQueue({
-  minIntervalMs: SEND_MIN_INTERVAL_MS,
-  maxRetries: SEND_MAX_RETRIES,
-  snapshotIntervalMs: Number(process.env.WA_SEND_METRICS_INTERVAL_MS || 60000),
-})
-const __wrapSendMessageOnce = waSendQueue.wrap
-global.getWaSendQueueMetrics = waSendQueue.snapshot
+let __sendQueue = Promise.resolve()
+let __lastSendAt = 0
+
+function __delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function __wrapSendMessageOnce(nicola) {
+  try {
+    if (nicola.__sendWrapped) return
+    const originalSend = nicola.sendMessage.bind(nicola)
+    nicola.sendMessage = async function (jid, content, options) {
+      const sendTask = async () => {
+        const now = Date.now()
+        const wait = Math.max(0, SEND_MIN_INTERVAL_MS - (now - __lastSendAt))
+        if (wait > 0) await __delay(wait)
+
+        let attempt = 0
+        // Retry on transient/rate-limit-like errors with exponential backoff
+        while (true) {
+          try {
+            const res = await originalSend(jid, content, options)
+            __lastSendAt = Date.now()
+            return res
+          } catch (e) {
+            attempt += 1
+            const msg = String(e && e.message ? e.message : '')
+            const code = e && (e.status || e.statusCode || e.code)
+            const transient =
+              code === 429 ||
+              code === 'ECONNRESET' ||
+              code === 'ETIMEDOUT' ||
+              code === 'ENOTFOUND' ||
+              /rate|too many|retry|temporarily unavailable|timeout|timed out|flood|ECONNRESET|ETIMEDOUT|ENOTFOUND/i.test(
+                msg
+              )
+            if (!transient || attempt > SEND_MAX_RETRIES) throw e
+            const backoff = Math.min(1000 * 2 ** (attempt - 1), 8000)
+            try {
+              console.warn('[WA] send retry', { attempt, backoff, code, message: msg })
+            } catch {}
+            await __delay(backoff)
+          }
+        }
+      }
+
+      const result = __sendQueue.then(sendTask, sendTask)
+      __sendQueue = result.catch((e) => {
+        try {
+          console.error('[WA] send failed', {
+            code: e && (e.status || e.statusCode || e.code),
+            message: e && e.message,
+          })
+        } catch {}
+      })
+      return result
+    }
+    Object.defineProperty(nicola, '__sendWrapped', {
+      value: true,
+      enumerable: false,
+      configurable: false,
+    })
+  } catch {}
+}
 
 // Performance optimization: Cache for user saldo
 const saldoCache = new Map()
@@ -306,7 +362,6 @@ function cleanupAllTimeouts() {
 
 // Cleanup on shutdown
 process.on('SIGINT', () => {
-  waSendQueue.close()
   const cleaned = cleanupAllTimeouts()
   if (cleaned > 0) {
     console.log(`[Timeout] Cleaned up ${cleaned} active timeouts on shutdown`)
@@ -314,7 +369,6 @@ process.on('SIGINT', () => {
 })
 
 process.on('SIGTERM', () => {
-  waSendQueue.close()
   const cleaned = cleanupAllTimeouts()
   if (cleaned > 0) {
     console.log(`[Timeout] Cleaned up ${cleaned} active timeouts on shutdown`)
@@ -2216,7 +2270,7 @@ module.exports = async (nicola, m, mek) => {
 
                   return
                 } finally {
-                  await releaseLock(sender, 'mid', gotLock)
+                  await releaseLock(sender, 'mid')
                 }
               }
 
@@ -2501,7 +2555,7 @@ module.exports = async (nicola, m, mek) => {
 
                 return
               } finally {
-                await releaseLock(sender, lockKey, gotLock)
+                await releaseLock(sender, lockKey)
               }
             }
 
@@ -5749,7 +5803,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
           try {
             if (db.data.order[sender] !== undefined) {
-              await releaseLock(sender, 'mid', lockAcquired)
+              await releaseLock(sender, 'mid')
               return reply(
                 `Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`
               )
@@ -5796,7 +5850,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               //   console.log(`✅ [MID] QRIS statis Midtrans loaded: ${orderId}`);
               // } catch (qrisError) {
               //   console.error(`❌ [MID] Error loading QRIS statis:`, qrisError.message);
-              //   await releaseLock(sender, 'mid', lockAcquired)
+              //   await releaseLock(sender, 'mid')
               //   return reply(`❌ Gagal memuat QR Code Midtrans. Silakan hubungi admin.`)
               // }
               const qrImagePath = await qrisDinamis(`${totalAmount}`, './options/sticker/qris.jpg')
@@ -6091,7 +6145,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             console.error('❌ [MID] Outer error:', outerError)
             reply('Terjadi kesalahan saat memproses pembelian. Silakan coba lagi.')
           } finally {
-            await releaseLock(sender, 'mid', lockAcquired)
+            await releaseLock(sender, 'mid')
           }
         }
         break
@@ -6118,7 +6172,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
           try {
             if (db.data.order[sender] !== undefined) {
-              await releaseLock(sender, 'buy', lockAcquired)
+              await releaseLock(sender, 'buy')
               return reply(
                 `Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`
               )
@@ -6525,7 +6579,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             reply('Terjadi kesalahan saat memproses pembelian. Silakan coba lagi.')
           } finally {
             // 🔓 REDIS UNLOCK: Always release lock
-            await releaseLock(sender, 'buy', lockAcquired)
+            await releaseLock(sender, 'buy')
           }
         }
         break
