@@ -1,17 +1,17 @@
 // Load environment variables
-require('dotenv').config();
+require('dotenv').config()
 
 //Pairing Code
 global.pairingCode = String(process.env.BOT_PAIRING_CODE || 'true').toLowerCase() === 'true' //true = gausah scan qr cukup 1 hp || false = harus scan qr dan 2 hp
 
-//Backup otomatis 
+//Backup otomatis
 global.jamBackup = Number(process.env.BOT_BACKUP_HOURS || 12) //Contoh: 12, berarti setiap 12 jam otomatis backup script
 
 //Setting order kuota
-global.memberId = process.env.ORDER_KUOTA_MEMBER_ID || "" //Untuk cara mendapatkannya cek di file panduan.txt
-global.pin = process.env.ORDER_KUOTA_PIN || "" //Pin order kuota
-global.pw = process.env.ORDER_KUOTA_PASSWORD || "" //Password order kuota
-global.codeqr = process.env.MIDTRANS_STATIC_QRIS || "" //Code QR lu (GoPay Merchant) - Ganti dengan QRIS GoPay Anda
+global.memberId = process.env.ORDER_KUOTA_MEMBER_ID || '' //Untuk cara mendapatkannya cek di file panduan.txt
+global.pin = process.env.ORDER_KUOTA_PIN || '' //Pin order kuota
+global.pw = process.env.ORDER_KUOTA_PASSWORD || '' //Password order kuota
+global.codeqr = process.env.MIDTRANS_STATIC_QRIS || '' //Code QR lu (GoPay Merchant) - Ganti dengan QRIS GoPay Anda
 // Force app to use this static QR string for dynamic generation and display
 if (global.codeqr) {
   process.env.MIDTRANS_STATIC_QRIS = global.codeqr
@@ -22,7 +22,7 @@ if (global.codeqr) {
 global.feeDepo = Number(process.env.FEE_DEPO || 2)
 
 //Type profit
-global.type = process.env.PROFIT_TYPE || "persen" //persen = profit menggunakan persentase || nominal = profit menggunakan nominal
+global.type = process.env.PROFIT_TYPE || 'persen' //persen = profit menggunakan persentase || nominal = profit menggunakan nominal
 
 //Persentase default || Jika type profit menggunakan persentase
 global.bronze = Number(process.env.PROFIT_BRONZE_PERCENT || 2) //Persentase keuntungan Bronze
@@ -39,69 +39,87 @@ global.uSilver = Number(process.env.UPGRADE_SILVER_PRICE || 100000)
 global.uGold = Number(process.env.UPGRADE_GOLD_PRICE || 200000)
 
 //Other
-global.botName = process.env.BOT_NAME || "GiHa Smart Bot" //Nama bot
+global.botName = process.env.BOT_NAME || 'GiHa Smart Bot' //Nama bot
 // Owner numbers - parse from comma-separated string
-const ownerNumbersStr = process.env.OWNER_NUMBERS || "6287777657944,6281389592985,6287887842985"
-global.owner = ownerNumbersStr.split(',').map(num => num.trim()).filter(num => num) //Ganti agar fitur owner bisa digunakan
-global.ownerNomer = process.env.OWNER_NUMBER || "6287777657944" //Nomor lu
-global.ownerName = process.env.OWNER_NAME || "Owner" //Nama lu
-global.packname = process.env.BOT_PACKNAME || "" //Seterah
-global.author = process.env.BOT_AUTHOR || "Owner" //Seterah
-global.sessionName = process.env.BOT_SESSION_NAME || "session" //Ngga usah di ganti
+const ownerNumbersStr = process.env.OWNER_NUMBERS || '6287777657944,6281389592985,6287887842985'
+global.owner = ownerNumbersStr
+  .split(',')
+  .map((num) => num.trim())
+  .filter((num) => num) //Ganti agar fitur owner bisa digunakan
+global.ownerNomer = process.env.OWNER_NUMBER || '6287777657944' //Nomor lu
+global.ownerName = process.env.OWNER_NAME || 'Owner' //Nama lu
+global.packname = process.env.BOT_PACKNAME || '' //Seterah
+global.author = process.env.BOT_AUTHOR || 'Owner' //Seterah
+global.sessionName = process.env.BOT_SESSION_NAME || 'session' //Ngga usah di ganti
 // Group links - parse from comma-separated string
-const groupLinksStr = process.env.BOT_GROUP_LINKS || "https://chat.whatsapp.com/L0LR1HBOFKJAiQv5Busd9t?mode=ems_copy_t,https://chat.whatsapp.com/KwBA0yxcwl0JGpL6uN7L9i?mode=ems_copy_t,https://chat.whatsapp.com/GO2a2ty2n5JAz5b6E9HpEs?mode=ems_copy_c"
-global.linkGroup = groupLinksStr.split(',').map(link => link.trim()).filter(link => link) //Link gc lu
+const groupLinksStr =
+  process.env.BOT_GROUP_LINKS ||
+  'https://chat.whatsapp.com/L0LR1HBOFKJAiQv5Busd9t?mode=ems_copy_t,https://chat.whatsapp.com/KwBA0yxcwl0JGpL6uN7L9i?mode=ems_copy_t,https://chat.whatsapp.com/GO2a2ty2n5JAz5b6E9HpEs?mode=ems_copy_c'
+global.linkGroup = groupLinksStr
+  .split(',')
+  .map((link) => link.trim())
+  .filter((link) => link) //Link gc lu
+
+// Group JIDs are the primary whitelist identity; unlike invite links they need no admin API call.
+const groupJidsStr = process.env.BOT_GROUP_JIDS || ''
+global.groupJids = groupJidsStr
+  .split(',')
+  .map((jid) => jid.trim())
+  .filter((jid) => jid)
 
 // Group names - parse from comma-separated string (alternatif untuk whitelist berdasarkan nama)
-const groupNamesStr = process.env.BOT_GROUP_NAMES || ""
-global.groupNames = groupNamesStr.split(',').map(name => name.trim().toLowerCase().replace(/\s+/g, ' ')).filter(name => name) //Nama group yang diizinkan (normalized: lowercase, trim, single space)
+const groupNamesStr = process.env.BOT_GROUP_NAMES || ''
+global.groupNames = groupNamesStr
+  .split(',')
+  .map((name) => name.trim().toLowerCase().replace(/\s+/g, ' '))
+  .filter((name) => name) //Nama group yang diizinkan (normalized: lowercase, trim, single space)
 
 // Admin group untuk notifikasi zoom - kosongkan atau tambahkan ID grup (e.g., "120363419470324991@g.us")
-global.adminGroupId = process.env.ADMIN_GROUP_ID || "" // ID grup admin untuk notifikasi zoom
-global.adminGroupName = process.env.ADMIN_GROUP_NAME || "GH bot BARU" // Nama grup admin (fallback jika ID tidak di-set)
+global.adminGroupId = process.env.ADMIN_GROUP_ID || '' // ID grup admin untuk notifikasi zoom
+global.adminGroupName = process.env.ADMIN_GROUP_NAME || 'GH bot BARU' // Nama grup admin (fallback jika ID tidak di-set)
 
 //Image
-global.thumbnail = "./options/image/payment.jpg"
+global.thumbnail = './options/image/payment.jpg'
 
 //Message
 global.mess = {
-  sukses: "Done🤗",
-  admin: "Command ini hanya bisa digunakan oleh Admin Grup",
-  botAdmin: "Bot Harus menjadi admin",
-  owner: "Command ini hanya dapat digunakan oleh owner bot",
-  prem: "Command ini khusus member premium",
-  group: "Command ini hanya bisa digunakan di grup",
-  private: "Command ini hanya bisa digunakan di Private Chat",
-  wait: "⏳ Mohon tunggu sebentar...",
+  sukses: 'Done🤗',
+  admin: 'Command ini hanya bisa digunakan oleh Admin Grup',
+  botAdmin: 'Bot Harus menjadi admin',
+  owner: 'Command ini hanya dapat digunakan oleh owner bot',
+  prem: 'Command ini khusus member premium',
+  group: 'Command ini hanya bisa digunakan di grup',
+  private: 'Command ini hanya bisa digunakan di Private Chat',
+  wait: '⏳ Mohon tunggu sebentar...',
   error: {
-    lv: "Link yang kamu berikan tidak valid",
-    api: "Maaf terjadi kesalahan"
-  }
+    lv: 'Link yang kamu berikan tidak valid',
+    api: 'Maaf terjadi kesalahan',
+  },
 }
 
 //Payment
 global.payment = {
   qris: {
-    an: process.env.PAYMENT_QRIS_NAME || "GIGIHADIOD" //Atas nama qris
+    an: process.env.PAYMENT_QRIS_NAME || 'GIGIHADIOD', //Atas nama qris
   },
   dana: {
-    nope: process.env.PAYMENT_DANA_NUMBER || "085235540944",
-    an: process.env.PAYMENT_DANA_NAME || "BRI****"
+    nope: process.env.PAYMENT_DANA_NUMBER || '085235540944',
+    an: process.env.PAYMENT_DANA_NAME || 'BRI****',
   },
   gopay: {
-    nope: process.env.PAYMENT_GOPAY_NUMBER || "085235540944",
-    an: process.env.PAYMENT_GOPAY_NAME || "BRI****"
+    nope: process.env.PAYMENT_GOPAY_NUMBER || '085235540944',
+    an: process.env.PAYMENT_GOPAY_NAME || 'BRI****',
   },
   ovo: {
-    nope: process.env.PAYMENT_OVO_NUMBER || "085235540944",
-    an: process.env.PAYMENT_OVO_NAME || "BRI****"
-  }
+    nope: process.env.PAYMENT_OVO_NUMBER || '085235540944',
+    an: process.env.PAYMENT_OVO_NAME || 'BRI****',
+  },
 }
 
 // Listener backend for notification-based payment detection
 global.listener = {
-  baseUrl: process.env.LISTENER_BASE_URL || "https://api-pg.nicola.id",
-  apiKey: process.env.LISTENER_API_KEY || "kodeku"
+  baseUrl: process.env.LISTENER_BASE_URL || 'https://api-pg.nicola.id',
+  apiKey: process.env.LISTENER_API_KEY || 'kodeku',
 }
 
 // Gowa WhatsApp Service Configuration
@@ -109,17 +127,21 @@ global.gowaConfig = {
   apiUrl: process.env.GOWA_API_URL || 'https://gowa2.nicola.id',
   apiKey: process.env.GOWA_API_KEY || 'apiku',
   deviceId: process.env.GOWA_DEVICE_ID || 'default',
-  webhookSecret: process.env.GOWA_WEBHOOK_SECRET || ''
+  webhookSecret: process.env.GOWA_WEBHOOK_SECRET || '',
 }
 
 //Function buat menu
-const fs = require("fs");
-const chalk = require('chalk');
-const moment = require("moment-timezone");
-const { runtime } = require("./function/myfunc");
+const fs = require('fs')
+const chalk = require('chalk')
+const moment = require('moment-timezone')
+const { runtime } = require('./function/myfunc')
 
 const d = new Date(Date.now() + 3600000)
-const dateIslam = Intl.DateTimeFormat('id' + '-TN-u-ca-islamic', { day: 'numeric', month: 'long', year: 'numeric' }).format(d)
+const dateIslam = Intl.DateTimeFormat('id' + '-TN-u-ca-islamic', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+}).format(d)
 
 //Tampilan menu
 global.menu = (prefix, sender, pushname) => {
@@ -131,11 +153,11 @@ global.menu = (prefix, sender, pushname) => {
 • Owner: @${ownerNomer}
 
 *👤 USER INFO 👤*
-• Tag: @${sender.split("@")[0]}
+• Tag: @${sender.split('@')[0]}
 • Name: ${pushname}
 
 *📆 DATE INFO 📆*
-• Masehi: ${moment.tz("Asia/Jakarta").format("DD MMMM YYYY")}
+• Masehi: ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}
 • Hijriah: ${dateIslam}
 
 *⏰ TIME INFO ⏰*
@@ -158,11 +180,11 @@ global.allmenu = (prefix, sender, pushname) => {
 • Owner: @${ownerNomer}
 
 *👤 USER INFO 👤*
-• Tag: @${sender.split("@")[0]}
+• Tag: @${sender.split('@')[0]}
 • Name: ${pushname}
 
 *📆 DATE INFO 📆*
-• Masehi: ${moment.tz("Asia/Jakarta").format("DD MMMM YYYY")}
+• Masehi: ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}
 • Hijriah: ${dateIslam}
 
 *⏰ TIME INFO ⏰*
@@ -309,11 +331,11 @@ global.groupmenu = (prefix, sender, pushname) => {
 • Owner: @${ownerNomer}
 
 *👤 USER INFO 👤*
-• Tag: @${sender.split("@")[0]}
+• Tag: @${sender.split('@')[0]}
 • Name: ${pushname}
 
 *📆 DATE INFO 📆*
-• Masehi: ${moment.tz("Asia/Jakarta").format("DD MMMM YYYY")}
+• Masehi: ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}
 • Hijriah: ${dateIslam}
 
 *⏰ TIME INFO ⏰*
@@ -356,11 +378,11 @@ global.infobot = (prefix, sender, pushname) => {
 • Owner: @${ownerNomer}
 
 *👤 USER INFO 👤*
-• Tag: @${sender.split("@")[0]}
+• Tag: @${sender.split('@')[0]}
 • Name: ${pushname}
 
 *📆 DATE INFO 📆*
-• Masehi: ${moment.tz("Asia/Jakarta").format("DD MMMM YYYY")}
+• Masehi: ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}
 • Hijriah: ${dateIslam}
 
 *⏰ TIME INFO ⏰*
@@ -391,11 +413,11 @@ global.ownermenu = (prefix, sender, pushname) => {
 • Owner: @${ownerNomer}
 
 *👤 USER INFO 👤*
-• Tag: @${sender.split("@")[0]}
+• Tag: @${sender.split('@')[0]}
 • Name: ${pushname}
 
 *📆 DATE INFO 📆*
-• Masehi: ${moment.tz("Asia/Jakarta").format("DD MMMM YYYY")}
+• Masehi: ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}
 • Hijriah: ${dateIslam}
 
 *⏰ TIME INFO ⏰*
@@ -459,11 +481,11 @@ global.stalkermenu = (prefix, sender, pushname) => {
 • Owner: @${ownerNomer}
 
 *👤 USER INFO 👤*
-• Tag: @${sender.split("@")[0]}
+• Tag: @${sender.split('@')[0]}
 • Name: ${pushname}
 
 *📆 DATE INFO 📆*
-• Masehi: ${moment.tz("Asia/Jakarta").format("DD MMMM YYYY")}
+• Masehi: ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}
 • Hijriah: ${dateIslam}
 
 *⏰ TIME INFO ⏰*
@@ -504,11 +526,11 @@ global.storemenu = (prefix, sender, pushname) => {
 • Owner: @${ownerNomer}
 
 *👤 USER INFO 👤*
-• Tag: @${sender.split("@")[0]}
+• Tag: @${sender.split('@')[0]}
 • Name: ${pushname}
 
 *📆 DATE INFO 📆*
-• Masehi: ${moment.tz("Asia/Jakarta").format("DD MMMM YYYY")}
+• Masehi: ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}
 • Hijriah: ${dateIslam}
 
 *⏰ TIME INFO ⏰*
@@ -551,11 +573,11 @@ global.topupmenu = (prefix, sender, pushname) => {
 • Owner: @${ownerNomer}
 
 *👤 USER INFO 👤*
-• Tag: @${sender.split("@")[0]}
+• Tag: @${sender.split('@')[0]}
 • Name: ${pushname}
 
 *📆 DATE INFO 📆*
-• Masehi: ${moment.tz("Asia/Jakarta").format("DD MMMM YYYY")}
+• Masehi: ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}
 • Hijriah: ${dateIslam}
 
 *⏰ TIME INFO ⏰*
@@ -585,12 +607,12 @@ global.ordermenu = (prefix, sender, pushname, bio) => {
 • Owner: @${ownerNomer}
 
 *👤 USER INFO 👤*
-• Tag: @${sender.split("@")[0]}
+• Tag: @${sender.split('@')[0]}
 • Name: ${pushname}
-• Bio: ${bio ? bio : "-"}
+• Bio: ${bio ? bio : '-'}
 
 *📆 DATE INFO 📆*
-• Masehi: ${moment.tz("Asia/Jakarta").format("DD MMMM YYYY")}
+• Masehi: ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}
 • Hijriah: ${dateIslam}
 
 *⏰ TIME INFO ⏰*
@@ -620,7 +642,9 @@ let time = moment(new Date()).format('HH:mm:ss DD/MM/YYYY')
 let file = require.resolve(__filename)
 fs.watchFile(file, () => {
   fs.unwatchFile(file)
-  console.log(chalk.greenBright(`[ ${botName} ]  `) + time + chalk.cyanBright(` "${file}" Telah diupdate!`))
+  console.log(
+    chalk.greenBright(`[ ${botName} ]  `) + time + chalk.cyanBright(` "${file}" Telah diupdate!`)
+  )
   delete require.cache[file]
   require(file)
 })

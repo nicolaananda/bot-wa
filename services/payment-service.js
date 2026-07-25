@@ -1,5 +1,11 @@
 const logger = require('../config/logger');
 
+const ROLE_DISCOUNTS = Object.freeze({
+    bronze: 0,
+    silver: 0.05,
+    gold: 0.10,
+});
+
 /**
  * Payment Service
  * Handles all payment-related business logic
@@ -17,13 +23,7 @@ class PaymentService {
      * @returns {Object} Payment details
      */
     calculateTotal(basePrice, quantity, userRole = 'bronze') {
-        const roleDiscounts = {
-            bronze: 0,
-            silver: 0.05, // 5% discount
-            gold: 0.10,   // 10% discount
-        };
-
-        const discount = roleDiscounts[userRole] || 0;
+        const discount = ROLE_DISCOUNTS[userRole] || 0;
         const subtotal = basePrice * quantity;
         const discountAmount = subtotal * discount;
         const afterDiscount = subtotal - discountAmount;
@@ -49,13 +49,26 @@ class PaymentService {
      */
     async processSaldoPayment(userId, productId, quantity, db) {
         try {
+            if (!Number.isInteger(quantity) || quantity <= 0) {
+                throw new Error('Quantity must be a positive integer');
+            }
+
+            const user = db.data.users[userId];
+            if (!user) {
+                throw new Error(`User ${userId} not found`);
+            }
+
             // Check user balance
-            const userBalance = db.data.users[userId]?.saldo || 0;
-            const userRole = db.data.users[userId]?.role || 'bronze';
+            const userBalance = user.saldo || 0;
+            const userRole = user.role || 'bronze';
             const product = db.data.produk[productId];
 
             if (!product) {
                 throw new Error(`Product ${productId} not found`);
+            }
+
+            if (!Array.isArray(product.stok)) {
+                throw new Error(`Product ${productId} has invalid stock data`);
             }
 
             const basePrice = this.getProductPrice(product, userRole);
@@ -71,7 +84,7 @@ class PaymentService {
             }
 
             // Deduct balance
-            db.data.users[userId].saldo -= payment.total;
+            user.saldo -= payment.total;
 
             // Get products from stock
             const items = product.stok.splice(0, quantity);

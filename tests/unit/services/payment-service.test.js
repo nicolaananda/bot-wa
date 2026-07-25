@@ -78,6 +78,22 @@ describe('PaymentService', () => {
         });
     });
 
+    describe('processSaldoPayment()', () => {
+        test('should reject a non-positive or fractional quantity', async () => {
+            const db = { data: { users: { user1: { saldo: 100000 } }, produk: {} } };
+
+            await expect(
+                paymentService.processSaldoPayment('user1', 'product1', 0, db)
+            ).rejects.toThrow('Quantity must be a positive integer');
+            await expect(
+                paymentService.processSaldoPayment('user1', 'product1', -1, db)
+            ).rejects.toThrow('Quantity must be a positive integer');
+            await expect(
+                paymentService.processSaldoPayment('user1', 'product1', 1.5, db)
+            ).rejects.toThrow('Quantity must be a positive integer');
+        });
+    });
+
     describe('generateOrderId()', () => {
         test('should generate unique order ID with method prefix', () => {
             const orderId1 = paymentService.generateOrderId('SALDO');

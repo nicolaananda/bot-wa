@@ -20,6 +20,7 @@ const { createCanvas, loadImage } = require('canvas')
 const { OrderKuota } = require('./function/orderkuota')
 const { getGroupAdmins, runtime, sleep } = require('./function/myfunc')
 const { color } = require('./function/console')
+const { checkGroupWhitelist } = require('./lib/group-whitelist')
 const {
   addResponList,
   delResponList,
@@ -1460,150 +1461,31 @@ module.exports = async (nicola, m, mek) => {
     const isQuotedVideo = isQuotedMsg ? (content.includes('videoMessage') ? true : false) : false
     const isSewa = db.data.sewa[from] ? true : false
 
-    // 🛡️ GROUP WHITELIST: Cek apakah group diizinkan (hanya untuk group, bukan private chat)
-    if (isGroup && !isOwner) {
-      // Pastikan groupName valid
-      if (!groupName || typeof groupName !== 'string') {
-        console.warn(`⚠️ [GROUP-WHITELIST] Invalid group name, blocking for safety`)
+    // Group whitelist: use payload JID first and never fetch an invite link in the message path.
+    if (isGroup) {
+      const whitelist = checkGroupWhitelist({
+        jid: from,
+        allowedJids: global.groupJids,
+        groupName,
+        allowedNames: global.groupNames,
+        hasLegacyLinks: global.linkGroup.length > 0,
+      })
+      const messageId = m.key?.id || 'unknown'
+
+      if (whitelist.status === 'ALLOWED') {
+        console.log(`[GROUP-WHITELIST] ALLOWED jid=${from} source=${whitelist.source}`)
+        console.log(
+          `[COMMAND] message_id=${messageId} jid=${from} command=${command || 'none'} whitelist=allowed result=processing`
+        )
+      } else {
+        const status = whitelist.status.toLowerCase()
         console.warn(
-          `   Group metadata: ${JSON.stringify({ from, isGroup, hasMetadata: !!groupMetadata })}`
+          `[GROUP-WHITELIST] ${whitelist.status} jid=${from} reason=${whitelist.reason} action=blocked`
+        )
+        console.warn(
+          `[COMMAND] message_id=${messageId} jid=${from} command=${command || 'none'} whitelist=${status} result=blocked error=${JSON.stringify(whitelist.reason)}`
         )
         return
-      }
-
-      // Debug: Log konfigurasi whitelist
-      console.log(`🔍 [GROUP-WHITELIST] Checking group: "${groupName}" (${from})`)
-      console.log(
-        `   BOT_GROUP_NAMES: ${global.groupNames && global.groupNames.length > 0 ? global.groupNames.join(', ') : 'NOT SET'}`
-      )
-      console.log(
-        `   BOT_GROUP_LINKS: ${global.linkGroup && global.linkGroup.length > 0 ? `${global.linkGroup.length} links` : 'NOT SET'}`
-      )
-
-      let isAllowedGroup = false
-      let checkMethod = ''
-
-      // Prioritas 1: Cek berdasarkan nama group (jika BOT_GROUP_NAMES di-set)
-      // Cek apakah BOT_GROUP_NAMES environment variable di-set (bukan hanya array kosong)
-      const hasGroupNamesEnv =
-        process.env.BOT_GROUP_NAMES !== undefined && process.env.BOT_GROUP_NAMES !== null
-
-      if (hasGroupNamesEnv) {
-        // Jika BOT_GROUP_NAMES di-set tapi kosong, block semua group
-        if (!global.groupNames || global.groupNames.length === 0) {
-          console.log(
-            `🚫 [GROUP-WHITELIST] BLOCKED - BOT_GROUP_NAMES is set but empty (whitelist mode enabled, no groups allowed)`
-          )
-          console.log(`   Group: "${groupName}" (${from})`)
-          return
-        }
-
-        // Normalize: lowercase, trim, dan hapus karakter whitespace berlebih
-        const normalizedGroupName = groupName.toLowerCase().trim().replace(/\s+/g, ' ')
-        isAllowedGroup = global.groupNames.some((allowedName) => {
-          const normalizedAllowed = allowedName.toLowerCase().trim().replace(/\s+/g, ' ')
-          return normalizedGroupName === normalizedAllowed
-        })
-        checkMethod = 'name'
-
-        console.log(
-          `   Checking name: "${normalizedGroupName}" in [${global.groupNames.map((n) => `"${n.toLowerCase().trim().replace(/\s+/g, ' ')}"`).join(', ')}]`
-        )
-
-        if (isAllowedGroup) {
-          console.log(`✅ [GROUP-WHITELIST] Allowed group by name: ${groupName}`)
-          checkMethod = 'name'
-        } else {
-          console.log(
-            `⚠️ [GROUP-WHITELIST] Group name '${groupName}' (normalized: "${normalizedGroupName}") not in whitelist.`
-          )
-          console.log(`   Allowed Names: ${global.groupNames.map((n) => `"${n}"`).join(', ')}`)
-          console.log(`   Proceeding to check invite link fallback...`)
-          // Don't return here! Fallthrough to link check
-        }
-      }
-
-      // Prioritas 2: Cek berdasarkan invite code (jika belum allowed via nama DAN BOT_GROUP_LINKS di-set)
-      if (!isAllowedGroup && global.linkGroup && global.linkGroup.length > 0) {
-        try {
-          // Ambil group invite code
-          const groupInviteCode = await nicola.groupInviteCode(from)
-          const groupLink = `https://chat.whatsapp.com/${groupInviteCode}`
-
-          // Extract invite code dari whitelist links
-          const allowedInviteCodes = global.linkGroup
-            .map((link) => {
-              // Extract invite code dari link (format: https://chat.whatsapp.com/INVITECODE?mode=...)
-              const match = link.match(/chat\.whatsapp\.com\/([A-Za-z0-9]+)/)
-              return match ? match[1] : null
-            })
-            .filter((code) => code !== null)
-
-          // Cek apakah group invite code ada di whitelist
-          isAllowedGroup = allowedInviteCodes.includes(groupInviteCode)
-          checkMethod = 'invite_code'
-
-          if (!isAllowedGroup) {
-            console.log(`🚫 [GROUP-WHITELIST] BLOCKED - Group invite code not in whitelist:`)
-            console.log(`   Group: ${groupName} (${from})`)
-            console.log(`   Group Invite Code: ${groupInviteCode}`)
-            console.log(`   Allowed Codes: ${allowedInviteCodes.join(', ')}`)
-            return // Jangan proses pesan dari group yang tidak diizinkan
-          } else {
-            console.log(
-              `✅ [GROUP-WHITELIST] Allowed group by invite code: ${groupName} (${groupInviteCode})`
-            )
-          }
-        } catch (error) {
-          // Jika error saat ambil invite code (misal: not-authorized), fallback ke nama group jika ada
-          if (error.message && error.message.includes('not-authorized')) {
-            console.warn(
-              `⚠️ [GROUP-WHITELIST] Cannot get invite code (not-authorized), falling back to name check`
-            )
-
-            // Jika BOT_GROUP_NAMES tidak di-set, block untuk safety
-            if (!global.groupNames || global.groupNames.length === 0) {
-              console.log(
-                `🚫 [GROUP-WHITELIST] BLOCKED - Cannot verify (no BOT_GROUP_NAMES set and invite code check failed)`
-              )
-              console.log(`   Group: ${groupName} (${from})`)
-              return
-            }
-
-            // Coba cek berdasarkan nama group sebagai fallback
-            const normalizedGroupName = groupName.toLowerCase().trim().replace(/\s+/g, ' ')
-            isAllowedGroup = global.groupNames.some((allowedName) => {
-              const normalizedAllowed = allowedName.toLowerCase().trim().replace(/\s+/g, ' ')
-              return normalizedGroupName === normalizedAllowed
-            })
-            checkMethod = 'name (fallback)'
-
-            console.log(
-              `   Fallback checking name: "${normalizedGroupName}" in [${global.groupNames.map((n) => `"${n.toLowerCase().trim().replace(/\s+/g, ' ')}"`).join(', ')}]`
-            )
-
-            if (!isAllowedGroup) {
-              console.log(`🚫 [GROUP-WHITELIST] BLOCKED - Group name not in whitelist (fallback):`)
-              console.log(`   Group: "${groupName}" (normalized: "${normalizedGroupName}")`)
-              console.log(`   Allowed Names: ${global.groupNames.map((n) => `"${n}"`).join(', ')}`)
-              return
-            } else {
-              console.log(`✅ [GROUP-WHITELIST] Allowed group by name (fallback): ${groupName}`)
-            }
-          } else {
-            // Error lain, block untuk safety
-            console.error(`❌ [GROUP-WHITELIST] Error checking group:`, error.message)
-            console.error(`   Group: ${groupName} (${from})`)
-            console.log(`🚫 [GROUP-WHITELIST] BLOCKED - Error during check (safety measure)`)
-            return
-          }
-        }
-      } else {
-        // Jika tidak ada whitelist sama sekali, izinkan semua (backward compatibility)
-        console.log(
-          `⚠️ [GROUP-WHITELIST] No whitelist configured (BOT_GROUP_NAMES or BOT_GROUP_LINKS), allowing all groups`
-        )
-        isAllowedGroup = true
       }
     }
 
@@ -3512,7 +3394,9 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       )
     }
 
-    if (isGroup && db.data.chat[from].antilink) {
+    const containsLink = /(?:https?:\/\/|wa\.me|t\.me)/i.test(chats)
+
+    if (isGroup && db.data.chat[from].antilink && containsLink) {
       let gc = await nicola.groupInviteCode(from)
       if (chats.match(/(`https:\/\/chat.whatsapp.com\/${gc}`)/gi)) {
         if (!isBotGroupAdmins) return
@@ -3539,7 +3423,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       }
     }
 
-    if (isGroup && db.data.chat[from].antilink2) {
+    if (isGroup && db.data.chat[from].antilink2 && containsLink) {
       let gc = await nicola.groupInviteCode(from)
       if (
         (chats.match('http://') ||
