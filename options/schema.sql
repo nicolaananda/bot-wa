@@ -77,8 +77,28 @@ CREATE TABLE IF NOT EXISTS midtrans_webhooks (
   processed BOOLEAN NOT NULL DEFAULT false,
   processed_at TIMESTAMPTZ,
   webhook_data JSONB NOT NULL,
+  event_key TEXT,
+  lifecycle_status TEXT NOT NULL DEFAULT 'received' CHECK (lifecycle_status IN ('received','processing','completed','failed')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  locked_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Compatible upgrade for databases created by older schema.sql versions.
+ALTER TABLE midtrans_webhooks ADD COLUMN IF NOT EXISTS event_key TEXT;
+ALTER TABLE midtrans_webhooks ADD COLUMN IF NOT EXISTS lifecycle_status TEXT NOT NULL DEFAULT 'received';
+ALTER TABLE midtrans_webhooks ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE midtrans_webhooks ADD COLUMN IF NOT EXISTS last_error TEXT;
+ALTER TABLE midtrans_webhooks ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE midtrans_webhooks ADD COLUMN IF NOT EXISTS locked_at TIMESTAMPTZ;
+UPDATE midtrans_webhooks SET event_key=md5(concat_ws('|',order_id,transaction_id,
+  transaction_status,gross_amount::text,settlement_time::text,id::text)) WHERE event_key IS NULL;
+DELETE FROM midtrans_webhooks a USING midtrans_webhooks b
+WHERE a.event_key=b.event_key AND a.id>b.id;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_midtrans_webhooks_event_key ON midtrans_webhooks(event_key);
+CREATE INDEX IF NOT EXISTS idx_midtrans_webhooks_worker ON midtrans_webhooks(lifecycle_status, next_attempt_at, id);
 
 -- Index untuk query yang cepat
 CREATE INDEX IF NOT EXISTS idx_midtrans_webhooks_processed ON midtrans_webhooks(processed, created_at);

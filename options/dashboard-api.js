@@ -15,6 +15,7 @@ const envValidator = require('../config/env-validator');
 envValidator.validateOrExit();
 const { clearCachedPaymentData } = require('../config/midtrans');
 const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
+const { createWebhookHandler, ensureWebhookSchema } = require('./midtrans-webhook');
 
 // Use shared Redis client from config/redis.js
 const { getRedis } = require('../config/redis');
@@ -95,6 +96,10 @@ app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '2mb' })); // ganti yang sebelumnya app.use(express.json())
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
 let pg; if (usePg) { pg = require('../config/postgres'); }
+let midtransSchemaReady = false;
+if (pg) ensureWebhookSchema(pg)
+  .then(() => { midtransSchemaReady = true; })
+  .catch(error => console.error('[Webhook] schema migration failed:', error.message));
 
 // Function untuk membaca database snapshot dari Postgres
 async function loadDatabaseAsync() {
@@ -160,7 +165,7 @@ app.get('/webhook/midtrans/test', (req, res) => {
   });
 });
 
-app.post('/webhook/midtrans', async (req, res) => {
+app.post('/webhook/midtrans-legacy-disabled', async (req, res) => {
   try {
     const notification = req.body;
     console.log('🔔 [Webhook] Midtrans notification:', JSON.stringify(notification));
@@ -279,6 +284,17 @@ app.post('/webhook/midtrans', async (req, res) => {
     return res.status(500).json({ status: 'error', message: err.message });
   }
 });
+
+// Canonical endpoint: ACK only after the durable PostgreSQL insert commits.
+app.post('/webhook/midtrans', createWebhookHandler({
+  pg,
+  serverKey: MIDTRANS_SERVER_KEY,
+  ready: () => midtransSchemaReady,
+  wake: async () => {
+    const redis = getRedis();
+    if (redis) await redis.publish('midtrans:webhook:wake', '1');
+  }
+}));
 
 // ===== Gowa WhatsApp Webhook =====
 // Webhook endpoint for incoming WhatsApp messages from Gowa service
@@ -782,6 +798,7 @@ app.get('/api/dashboard/users/activity', async (req, res) => {
 
     // Get user activity data
     const users = db.data.users || {};
+    const transaksi = Array.isArray(db.data.transaksi) ? db.data.transaksi : [];
 
     // Calculate active users
     const activeUsers = Object.keys(users).filter(userId => {
@@ -894,6 +911,7 @@ app.get('/api/dashboard/users/all', async (req, res) => {
     }
 
     const users = db.data.users || {};
+    const transaksi = Array.isArray(db.data.transaksi) ? db.data.transaksi : [];
 
     // Parse pagination parameters
     const currentPage = parseInt(page);
@@ -1638,7 +1656,9 @@ app.post('/api/dashboard/products', async (req, res) => {
 });
 
 // Read product
-app.get('/api/dashboard/products/:productId', async (req, res) => {
+app.get('/api/dashboard/products/:productId', async (req, res, next) => {
+  // Static product endpoints are declared later; do not consume them as IDs.
+  if (['performance', 'stock'].includes(req.params.productId)) return next();
   try {
     const { productId } = req.params;
     const product = usePg ? await loadSingleProdukAsync(productId) : (await loadDatabaseAsync())?.produk?.[productId];
@@ -3518,9 +3538,127 @@ function renderDashboardPage() {
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
     }
+
+    /* Red Broadcast: operations UI. Existing IDs and data behavior stay unchanged. */
+    :root {
+      --bg: #f9f9f9;
+      --panel: #fff;
+      --panel-strong: #fff;
+      --ink: #0f0f0f;
+      --muted: #606060;
+      --line: #e5e5e5;
+      --wa: #ff0000;
+      --lime: #ff0000;
+      --cyan: #065fd4;
+      --amber: #b06000;
+      --danger: #cc0000;
+      --shadow: none;
+    }
+    body { background: var(--bg); font-family: Roboto, Arial, sans-serif; }
+    a { color: #065fd4; }
+    button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible, label:focus-visible {
+      outline: 2px solid #065fd4; outline-offset: 2px;
+    }
+    .shell { grid-template-columns: 240px minmax(0, 1fr); padding-top: 56px; }
+    .rail {
+      top: 56px; height: calc(100vh - 56px); padding: 16px 12px; background: #fff;
+      border-right: 1px solid var(--line); backdrop-filter: none;
+    }
+    .brand {
+      position: fixed; inset: 0 0 auto 0; z-index: 4; height: 56px; margin: 0; padding: 0 16px;
+      background: #fff; border-bottom: 1px solid var(--line); gap: 12px;
+    }
+    .mark { width: 32px; height: 22px; border-radius: 6px; color: #fff; background: #ff0000; box-shadow: none; font-size: 11px; }
+    .brand b { font-size: 18px; }
+    .brand span { display: none; }
+    nav { gap: 4px; }
+    nav a { min-height: 40px; padding: 0 12px; border: 0; border-radius: 10px; color: var(--ink); }
+    nav a span { color: var(--muted); font-size: 11px; }
+    nav a:hover, nav a.active { color: var(--ink); background: #f2f2f2; border-color: transparent; }
+    nav a.active::before { content: ''; width: 3px; height: 18px; margin-right: 8px; border-radius: 2px; background: #ff0000; }
+    .rail-card { margin-top: 20px; padding: 12px; border: 0; border-radius: 12px; background: #f2f2f2; color: var(--ink); }
+    .rail-card span { color: var(--muted); }
+    .nav-toggle { position: fixed; width: 1px; height: 1px; opacity: 0; }
+    .nav-toggle-label {
+      position: fixed; top: 8px; left: 8px; z-index: 6; display: none; width: 40px; height: 40px;
+      place-items: center; border-radius: 999px; color: var(--ink); cursor: pointer;
+    }
+    main { min-width: 0; padding: 24px 28px 40px; }
+    .topbar { min-height: 48px; margin-bottom: 20px; align-items: center; }
+    .topbar h1 { margin: 2px 0 0; font-size: 24px; line-height: 1.2; letter-spacing: 0; }
+    .toolbar { gap: 8px; }
+    .field, .btn { min-height: 36px; border-color: #d3d3d3; background: #fff; color: var(--ink); padding: 0 14px; }
+    .field::placeholder { color: var(--muted); }
+    .btn { border-radius: 18px; }
+    .btn.primary { background: #ff0000; color: #fff; }
+    .btn:hover { transform: none; background-color: #f2f2f2; }
+    .btn.primary:hover { background: #cc0000; }
+    .hero { grid-template-columns: minmax(0, 1.25fr) minmax(300px, .75fr); gap: 24px; margin-bottom: 28px; }
+    .panel { padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; }
+    .signal { min-height: 236px; grid-template-columns: 12px 1fr; gap: 20px; padding: 20px; background: #fff; border-radius: 12px; }
+    .signal-strip { width: 12px; padding: 0; border-radius: 6px; background: #f2f2f2; gap: 3px; }
+    .signal-strip i, .signal-strip i:nth-child(2n) { min-height: 8px; background: #d3d3d3; box-shadow: none; }
+    .signal-strip i.live { background: #ff0000; box-shadow: none; }
+    .hero-copy { gap: 20px; }
+    .hero-copy h2 { max-width: 22ch; margin-top: 16px; font-size: clamp(28px, 4vw, 44px); line-height: 1.08; letter-spacing: -.03em; }
+    .hero-copy p { color: var(--muted); line-height: 1.5; }
+    .status-pill, .tag { border: 0; background: #f2f2f2; color: var(--ink); }
+    .status-pill { padding: 6px 10px; font-size: 12px; }
+    .dot { color: #ff0000; box-shadow: none; }
+    .scorecard { gap: 12px; }
+    .metric { position: relative; min-height: 112px; padding: 16px 16px 16px 40px; border: 0; border-radius: 12px; background: #fff; }
+    .metric::before { content: ''; position: absolute; left: 16px; top: 16px; bottom: 16px; width: 12px; border-radius: 6px; background: #f2f2f2; }
+    .metric:first-child::before { background: #ff0000; }
+    .metric strong { margin-top: 8px; color: var(--ink); font-size: clamp(20px, 2.4vw, 30px); letter-spacing: -.02em; }
+    .grid { grid-template-columns: minmax(0, 1.4fr) minmax(280px, .6fr); gap: 28px; }
+    .section-head { margin-bottom: 14px; align-items: center; }
+    .section-head h3 { font-size: 18px; }
+    .eyebrow, .label, .status-line { color: var(--muted); }
+    .bars, .cards { padding: 16px; border-radius: 12px; background: #fff; }
+    .track { height: 8px; background: #e5e5e5; }
+    .fill { background: #ff0000; box-shadow: none; }
+    .product { border: 0; border-radius: 0; border-bottom: 1px solid var(--line); background: transparent; }
+    .product:last-child { border-bottom: 0; }
+    .tag.warn { background: #fff3d6; color: #805000; }
+    .tag.bad { background: #ffe5e5; color: #b00000; }
+    #transactions { margin-top: 28px !important; padding: 20px; border-radius: 12px; background: #fff; }
+    th, td { border-bottom-color: var(--line); }
+    th { color: var(--muted); }
+    td { color: var(--ink); }
+    .toast { border: 0; border-radius: 8px; background: #212121; box-shadow: 0 4px 18px rgba(0,0,0,.2); }
+    .skeleton { background: linear-gradient(90deg, #eee, #ddd, #eee); background-size: 220% 100%; }
+    @media (max-width: 980px) {
+      .shell { grid-template-columns: 72px minmax(0, 1fr); }
+      .rail { position: sticky; height: calc(100vh - 56px); padding: 12px 8px; }
+      nav { grid-template-columns: 1fr; }
+      nav a { justify-content: center; padding: 0 6px; font-size: 12px; }
+      nav a span, nav a.active::before, .rail-card { display: none; }
+      .hero, .grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .shell { display: block; padding-top: 56px; }
+      .brand { padding-left: 56px; }
+      .nav-toggle-label { display: grid; }
+      .rail {
+        position: fixed; z-index: 3; top: 56px; left: 0; width: 240px; height: calc(100vh - 56px);
+        transform: translateX(-100%); transition: transform .18s ease; box-shadow: 4px 0 16px rgba(0,0,0,.12);
+      }
+      .nav-toggle:checked ~ .shell .rail { transform: translateX(0); }
+      nav { display: grid; }
+      nav a { justify-content: space-between; padding: 0 12px; font-size: 14px; }
+      nav a span { display: inline; }
+      main { padding: 16px; }
+      .topbar, .section-head { align-items: stretch; }
+      .scorecard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .signal { grid-template-columns: 12px 1fr; }
+      .signal-strip { grid-template-columns: 1fr; min-height: auto; }
+      .bar-row { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
+  <input id="navToggle" class="nav-toggle" type="checkbox" aria-label="Buka navigasi">
+  <label class="nav-toggle-label" for="navToggle" aria-label="Buka atau tutup navigasi">☰</label>
   <div class="shell">
     <aside class="rail" aria-label="Navigasi dashboard">
       <div class="brand"><div class="mark">WA</div><div><b>Nicola Ops</b><span>WhatsApp commerce control</span></div></div>
@@ -3530,12 +3668,12 @@ function renderDashboardPage() {
         <a href="#stock">Stock <span>risk</span></a>
         <a href="#transactions">Transaksi <span>feed</span></a>
       </nav>
-      <div class="rail-card"><b>Ops cockpit</b><br><span>Kas, stok, dan transaksi masuk dalam satu layar gelap, cepat, responsif.</span></div>
+      <div class="rail-card"><b>Pusat operasi</b><br><span>Kas, stok, dan transaksi dalam satu layar ringkas.</span></div>
     </aside>
 
     <main>
       <div class="topbar">
-        <div><div class="eyebrow">Dashboard API · port ${PORT}</div><h1>WA Ops<br>Cockpit</h1></div>
+        <div><div class="eyebrow">Dashboard API · port ${PORT}</div><h1>Ringkasan operasi</h1></div>
         <div class="toolbar" role="search">
           <input id="search" class="field" type="search" placeholder="Cari transaksi / produk" autocomplete="off">
           <select id="range" class="field" aria-label="Rentang data"><option value="daily">7 hari</option><option value="monthly">12 bulan</option></select>
@@ -3712,7 +3850,10 @@ app.use((err, req, res, _next) => {
 });
 
 // 404 handler
-app.use('*', (req, res) => {
+app.use('*', (req, res, next) => {
+  // Receipt routes are defined below for legacy reasons; wildcard mounting rewrites req.path.
+  const requestPath = String(req.originalUrl || '').split('?')[0];
+  if (requestPath.startsWith('/api/dashboard/receipts') || /^\/api\/dashboard\/transactions\/[^/]+\/with-receipt$/.test(requestPath)) return next();
   res.status(404).json({
     success: false,
     error: 'Endpoint not found'

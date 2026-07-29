@@ -252,11 +252,11 @@ async function startnicola() {
         }
       });
 
-      subscriber.subscribe('gowa:messages', 'midtrans:events', (err, count) => {
+      subscriber.subscribe('gowa:messages', (err, count) => {
         if (err) {
           console.error('[REDIS-SUB] Subscribe error:', err.message);
         } else {
-          console.log(`[REDIS-SUB] Subscribed to gowa:messages and midtrans:events`);
+          console.log(`[REDIS-SUB] Subscribed to gowa:messages`);
         }
       });
 
@@ -267,11 +267,6 @@ async function startnicola() {
           if (channel === 'gowa:messages') {
             console.log('[REDIS-SUB] Received message from webhook');
             nicola.handleWebhook(parsedMessage);
-          } else if (channel === 'midtrans:events') {
-            console.log(`[REDIS-SUB] Received midtrans event: ${parsedMessage.event}`);
-            if (parsedMessage.event === 'payment-completed') {
-              process.emit('payment-completed', parsedMessage.data);
-            }
           }
         } catch (error) {
           console.error('[REDIS-SUB] Error processing message:', error.message);

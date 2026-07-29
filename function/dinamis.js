@@ -33,7 +33,7 @@ function toCRC16(str) {
 
 async function generateStyledQR(text, outPath, opts = {}) {
   const {
-    colorDark = process.env.QR_COLOR_DARK || '#800000FF',
+    colorDark = '#000000FF',
     colorLight = process.env.QR_COLOR_LIGHT || '#FFFFFFFF',
     logoPath = null,
     backgroundPath = null,
@@ -65,7 +65,8 @@ async function generateStyledQR(text, outPath, opts = {}) {
   // No logo drawing (explicitly disabled)
 
   const buf = canvas.toBuffer('image/png');
-  fs.writeFileSync(outPath, buf);
+  if (!outPath) return buf;
+  await fs.promises.writeFile(outPath, buf);
   return outPath;
 }
 
@@ -73,8 +74,7 @@ async function qrisDinamis(nominalOrQris, outPath) {
   // If first arg looks like a full EMV QR string, write it directly
   const isFullQrisString = typeof nominalOrQris === 'string' && /^(00\d{2}\d{2})/.test(nominalOrQris) && nominalOrQris.includes('6304');
   if (isFullQrisString) {
-    await generateStyledQR(nominalOrQris, outPath);
-    return outPath;
+    return generateStyledQR(nominalOrQris, outPath);
   }
 
   // Backward-compatible: treat as amount and build from global.codeqr
@@ -88,8 +88,7 @@ async function qrisDinamis(nominalOrQris, outPath) {
 
   let output = pecahQris[0] + uang + pecahQris[1] + toCRC16(pecahQris[0] + uang + pecahQris[1])
 
-  await generateStyledQR(output, outPath)
-  return outPath
+  return generateStyledQR(output, outPath)
 }
 
 /**

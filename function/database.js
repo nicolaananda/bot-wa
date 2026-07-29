@@ -13,10 +13,11 @@ function toPositiveInt(value, fallback) {
 }
 
 const UPSERT_CHUNK = toPositiveInt(process.env.PG_UPSERT_CHUNK || 100, 100)
-const ORDER_TTL_MS = 60 * 60 * 1000
-const KV_SYNC_KEYS = ['order', 'zoomFlow', 'zoomBookings', 'promo']
+const ORDER_TTL_MS = 24 * 60 * 60 * 1000
+const KV_SYNC_KEYS = ['order', 'orderDeposit', 'zoomFlow', 'zoomBookings', 'promo']
 const KV_DEFAULTS = {
     order: {},
+    orderDeposit: {},
     zoomFlow: {},
     zoomBookings: [],
     promo: {

@@ -21,6 +21,7 @@ const { OrderKuota } = require('./function/orderkuota')
 const { getGroupAdmins, runtime, sleep } = require('./function/myfunc')
 const { color } = require('./function/console')
 const { checkGroupWhitelist } = require('./lib/group-whitelist')
+const { summarizeQris } = require('./lib/qris-summary')
 const {
   addResponList,
   delResponList,
@@ -58,6 +59,7 @@ const {
   getUsernameAov,
 } = require('./function/stalker')
 const { qrisDinamis, qrisStatis, qrisStatisMidtrans } = require('./function/dinamis')
+const { createQrisCard } = require('./lib/qris-card')
 const {
   createPaymentLink,
   getPaymentLinkStatus,
@@ -90,6 +92,8 @@ if (usePg) {
 }
 const { core, isProduction } = require('./config/midtrans')
 const USE_POLLING = true // true = pakai polling status Midtrans; false = andalkan webhook saja
+const { matchPendingOrder, startWebhookWorker } = require('./options/midtrans-webhook')
+const { completeDeposit, finishDepositUx, matchPendingDeposit } = require('./lib/deposit-payment')
 
 // Centralized, minimal send throttling + retry to avoid bursty spam patterns
 const SEND_MIN_INTERVAL_MS = Number(process.env.WA_SEND_MIN_INTERVAL_MS || 800)
@@ -684,33 +688,60 @@ if (!global.zoomHealthListenerSetup) {
 if (!global.midtransWebhookListenerSetup) {
   global.midtransWebhookListenerSetup = true
 
-  process.on('payment-completed', async (webhookData) => {
+  const processMidtransPayment = async (webhookData) => {
     try {
       const { orderId: webhookOrderId, transactionStatus, gross_amount } = webhookData
       const webhookAmount = Number(gross_amount || webhookData.gross_amount || 0)
       const isStatusPaid = /(settlement|capture)/i.test(String(transactionStatus))
 
-      if (!isStatusPaid || !webhookAmount) return
+      if (!isStatusPaid) return
+      if (!webhookAmount) throw new Error('Invalid Midtrans amount')
 
       // Akses global.db langsung
       const db = global.db
       if (!db || !db.data) {
         console.log(`⚠️ [MID-GLOBAL] Database not available yet`)
-        return
+        throw new Error('Bot database is not ready')
       }
 
       console.log(
         `🔔 [MID-GLOBAL] Webhook received: Amount Rp${webhookAmount}, Status: ${transactionStatus}, OrderID: ${webhookOrderId}`
       )
 
+      const depositMatch = matchPendingDeposit(db.data.orderDeposit, webhookData)
+      if (depositMatch?.ambiguous) throw new Error('Ambiguous pending Midtrans deposit')
+      if (depositMatch) {
+        const { sender, order } = depositMatch
+        const result = await completeDeposit({
+          pg,
+          sender,
+          order,
+          webhook: webhookData,
+          date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
+        })
+        if (result.credited) {
+          db.data.users[sender].saldo =
+            Number(db.data.users[sender].saldo || 0) + result.item.amount
+          await db.appendTransaction(result.item, { persist: false })
+        }
+        delete db.data.orderDeposit[sender]
+        if (!(await db.save())) throw new Error('Failed to clear durable deposit context')
+        // Financial commit and context removal are authoritative; UX failures never retry credit.
+        const client = globalRonzz || global.gowaAdapter
+        if (client) await finishDepositUx(client, { ...order, from: order.from || sender }, result)
+        return
+      }
+
       // Cari order yang match dengan amount
       const orders = db.data.order || {}
-      let matchedOrder = null
-      let matchedSender = null
+      const correlation = matchPendingOrder(orders, webhookData)
+      let matchedOrder = correlation && !correlation.ambiguous ? correlation.order : null
+      let matchedSender = correlation && !correlation.ambiguous ? correlation.sender : null
 
       console.log(`🔍 [MID-GLOBAL] Searching ${Object.keys(orders).length} pending orders...`)
 
-      for (const [sender, order] of Object.entries(orders)) {
+      // Legacy body remains for compatibility, but only the guarded matcher may select an order.
+      for (const [sender, order] of []) {
         if (!order) continue
 
         // Cek metode MIDTRANS atau MIDTRANS-ZOOM
@@ -759,7 +790,7 @@ if (!global.midtransWebhookListenerSetup) {
         // Simpan webhook ke database untuk polling nanti (jika order belum dibuat)
         try {
           if (!db.data.midtransWebhooks) db.data.midtransWebhooks = []
-          const oneHourAgo = Date.now() - 60 * 60 * 1000
+          const oneHourAgo = Date.now() - 24 * 60 * 60 * 1000
           db.data.midtransWebhooks = db.data.midtransWebhooks.filter(
             (w) => w.timestamp > oneHourAgo
           )
@@ -792,7 +823,11 @@ if (!global.midtransWebhookListenerSetup) {
           console.error(`❌ [MID-GLOBAL] Error saving webhook:`, saveError.message)
         }
 
-        return
+        throw new Error(
+          correlation?.ambiguous
+            ? 'Ambiguous pending Midtrans order'
+            : 'Pending Midtrans order not found'
+        )
       }
 
       // Process payment
@@ -1305,10 +1340,17 @@ if (!global.midtransWebhookListenerSetup) {
     } catch (error) {
       console.error(`❌ [MID-GLOBAL] Error processing webhook:`, error.message)
       console.error(error.stack)
+      throw error
     }
-  })
+  }
 
-  console.log('✅ [MID-GLOBAL] Global webhook listener registered')
+  global.processMidtransPayment = processMidtransPayment
+  if (usePg && !global.midtransDurableWorkerSetup) {
+    global.midtransDurableWorkerSetup = true
+    startWebhookWorker({ pg, dispatch: processMidtransPayment })
+  }
+
+  console.log('✅ [MID-GLOBAL] Durable webhook processor registered')
 }
 
 module.exports = async (nicola, m, mek) => {
@@ -1884,7 +1926,7 @@ module.exports = async (nicola, m, mek) => {
     // State: db.data.zoomFlow[sender] = { session: 'WAIT-FORM', startedAt }
     // ==============================================================
     if (!db.data.zoomFlow) db.data.zoomFlow = {}
-    if (db.data.zoomFlow[sender] && !fromMe) {
+    if (db.data.zoomFlow[sender]) {
       const flow = db.data.zoomFlow[sender]
 
       // Auto-expire flow setelah 15 menit tanpa aktivitas
@@ -5113,8 +5155,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               t.type !== 'deposit'
             )
           })
+          const qrisRekap = summarizeQris(db.data.transaksi || [], rekapStart, rekapEnd)
 
-          if (transaksiRekap.length === 0) {
+          if (transaksiRekap.length === 0 && qrisRekap.depositCount === 0) {
             return reply(`📭 Tidak ada transaksi pada periode *${rekapLabel}*`)
           }
 
@@ -5151,6 +5194,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           teks += `*┊・ 🧾 Transaksi:* ${transaksiRekap.length}x\n`
           teks += `*┊・ 💰 Omzet:* Rp${toRupiah(totalOmzet)}\n`
           teks += `*┊・ 📈 Profit:* Rp${toRupiah(totalProfit)}\n`
+          teks += `*┊・ 💳 Penjualan QRIS:* ${qrisRekap.salesCount}x | Rp${toRupiah(qrisRekap.salesAmount)}\n`
+          teks += `*┊・ 💰 Deposit QRIS:* ${qrisRekap.depositCount}x | Rp${toRupiah(qrisRekap.depositAmount)}\n`
+          teks += `*┊・ 📊 Total QRIS:* ${qrisRekap.totalCount}x | Rp${toRupiah(qrisRekap.totalAmount)}\n`
           teks += `*╰┈┈┈┈┈┈┈┈*\n`
 
           teks += `\n*📦 Per Produk:*\n`
@@ -5327,10 +5373,17 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
             const orderId = `DEP-${reffId}-${Date.now()}`
             // Gunakan QRIS dinamis (sama seperti buynow)
-            const qrImagePath = await qrisDinamis(`${totalAmount}`, './options/sticker/qris.jpg')
+            const expirationTime = Date.now() + toMs('30m')
+            const rawQr = await qrisDinamis(`${totalAmount}`)
+            const qrImage = await createQrisCard({
+              qr: rawQr,
+              amount: totalAmount,
+              orderId,
+              expiresAt: expirationTime,
+              type: 'deposit',
+            })
             console.log(`✅ [DEPOSIT] QRIS dinamis generated: ${orderId}, Amount: Rp${totalAmount}`)
 
-            const expirationTime = Date.now() + toMs('30m')
             const expireDate = new Date(expirationTime)
             const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000))
             const currentTime = new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })
@@ -5354,8 +5407,6 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               `⏰ Batas waktu: sebelum ${formattedTime}\n` +
               `Ketik *${prefix}batal* untuk membatalkan.`
 
-            // Improvement: Async file read
-            const qrImage = await fs.promises.readFile(qrImagePath)
             const message = await nicola.sendMessage(
               from,
               {
@@ -5368,15 +5419,19 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             db.data.orderDeposit[sender] = {
               from,
               key: message.key,
+              qrMessageKey: message.key,
+              qrMessageId: message.key && message.key.id,
               orderId,
               reffId,
               baseAmount,
               totalAmount,
               uniqueCode,
               bonus,
+              balanceBefore: Number(db.data.users[sender].saldo || 0),
               metode: 'QRIS', // Pastikan metode di-set untuk global listener
               createdAt: createdAtTs,
             }
+            if (!(await db.save())) throw new Error('Failed to persist deposit context')
 
             console.log(
               `📝 [DEPOSIT] Order created: ${orderId}, Amount: Rp${totalAmount}, Sender: ${sender}`
@@ -5464,6 +5519,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                       userRole: db.data.users[sender]?.role || 'bronze',
                       reffId: orderId,
                       metodeBayar: 'Deposit',
+                      payment_method: 'QRIS',
                       status: 'completed',
                       totalBayar: credit,
                       type: 'deposit',
@@ -5737,10 +5793,17 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               //   await releaseLock(sender, 'mid')
               //   return reply(`❌ Gagal memuat QR Code Midtrans. Silakan hubungi admin.`)
               // }
-              const qrImagePath = await qrisDinamis(`${totalAmount}`, './options/sticker/qris.jpg')
+              const expirationTime = Date.now() + toMs('30m')
+              const rawQr = await qrisDinamis(`${totalAmount}`)
+              const qrImage = await createQrisCard({
+                qr: rawQr,
+                amount: totalAmount,
+                orderId,
+                expiresAt: expirationTime,
+                type: 'payment',
+              })
               console.log(`✅ [MID] QRIS dinamis generated: ${orderId}, Amount: Rp${totalAmount}`)
 
-              const expirationTime = Date.now() + toMs('30m')
               const expireDate = new Date(expirationTime)
               const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000))
               const currentTime = new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })
@@ -5767,7 +5830,6 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 `⏰ Batas waktu: sebelum ${formattedTime}\n` +
                 `Jika ingin membatalkan, ketik *${prefix}batal*`
 
-              const qrImage = await fs.promises.readFile(qrImagePath)
               const message = await nicola.sendMessage(
                 from,
                 {
@@ -5890,7 +5952,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                      AND transaction_status IN ('settlement', 'capture')
                      AND ABS(gross_amount - $1) < $2
                      AND created_at >= $3
-                     AND order_id LIKE 'MID-%'
+                     AND (order_id LIKE 'MID-%' OR order_id LIKE 'QRIS-%')
                    ORDER BY created_at DESC
                    LIMIT 10`,
                         [orderAmount, tolerance, orderCreatedAt]
@@ -5908,7 +5970,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                         const isAmountMatch = amountDiff < tolerance
                         const webhookCreatedAt = new Date(row.created_at)
                         const isTimeValid = webhookCreatedAt >= orderCreatedAt
-                        const isOrderIdValid = String(row.order_id || '').startsWith('MID-')
+                        const isOrderIdValid = /^(MID|QRIS)-/.test(String(row.order_id || ''))
 
                         console.log(
                           `  - Webhook: OrderID: ${row.order_id}, Amount Rp${webhookAmount}, Created: ${webhookCreatedAt.toISOString()}, AmountMatch: ${isAmountMatch}, TimeValid: ${isTimeValid}, OrderIDValid: ${isOrderIdValid}`
@@ -5960,7 +6022,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                         )
                         const webhookTimestamp = webhook.timestamp || 0
                         const isTimeValid = webhookTimestamp >= createdAtTs
-                        const isOrderIdValid = String(webhook.orderId || '').startsWith('MID-')
+                        const isOrderIdValid = /^(MID|QRIS)-/.test(String(webhook.orderId || ''))
 
                         console.log(
                           `  - Webhook: OrderID: ${webhook.orderId}, Amount Rp${webhookAmount}, Status: ${webhook.transactionStatus}, Timestamp: ${new Date(webhookTimestamp).toISOString()}, AmountMatch: ${isAmountMatch}, TimeValid: ${isTimeValid}, OrderIDValid: ${isOrderIdValid}`
@@ -7231,29 +7293,20 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           try {
             if (!db?.data?.transaksi) return reply('❌ Belum ada data transaksi')
             const today = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
-            const transaksiQris = db.data.transaksi.filter(
-              (t) =>
-                String(t.metodeBayar).toUpperCase() === 'QRIS' &&
-                String(t.date || '').startsWith(today)
-            )
-            if (transaksiQris.length === 0) {
+            const qris = summarizeQris(db.data.transaksi, today)
+            if (qris.totalCount === 0) {
               return reply(
                 `📊 Tidak ada transaksi QRIS pada ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`
               )
             }
 
-            const totalAmount = transaksiQris.reduce((sum, t) => {
-              if (Number.isFinite(Number(t.totalBayar))) return sum + Number(t.totalBayar)
-              if (Number.isFinite(Number(t.price))) return sum + Number(t.price)
-              return sum
-            }, 0)
-
             const message = [
               `*📊 RINGKASAN TRANSAKSI QRIS HARI INI*`,
               ``,
               `*Tanggal:* ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`,
-              `*Total Transaksi:* ${transaksiQris.length} kali`,
-              `*Total Nominal:* Rp${toRupiah(totalAmount)}`,
+              `*Penjualan QRIS:* ${qris.salesCount} kali | Rp${toRupiah(qris.salesAmount)}`,
+              `*Deposit QRIS:* ${qris.depositCount} kali | Rp${toRupiah(qris.depositAmount)}`,
+              `*Total QRIS:* ${qris.totalCount} kali | Rp${toRupiah(qris.totalAmount)}`,
               ``,
               `_Data diambil dari transaksi dengan metode QRIS pada hari ini._`,
             ].join('\n')
