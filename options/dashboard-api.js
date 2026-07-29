@@ -16,6 +16,7 @@ envValidator.validateOrExit();
 const { clearCachedPaymentData } = require('../config/midtrans');
 const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
 const { createWebhookHandler, ensureWebhookSchema } = require('./midtrans-webhook');
+const { verifyWebhookSignature } = require('../lib/gowa-webhook-auth');
 
 // Use shared Redis client from config/redis.js
 const { getRedis } = require('../config/redis');
@@ -93,7 +94,10 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json({ limit: '2mb' })); // ganti yang sebelumnya app.use(express.json())
+app.use(express.json({
+  limit: '2mb',
+  verify: (req, res, buffer) => { req.rawBody = Buffer.from(buffer); }
+}));
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
 let pg; if (usePg) { pg = require('../config/postgres'); }
 let midtransSchemaReady = false;
@@ -306,14 +310,17 @@ app.post('/webhook/gowa', async (req, res) => {
       if (!signature) {
         return res.status(401).json({ success: false, error: 'Missing signature' });
       }
-      const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex');
-      if (signature !== expected) {
+      if (!verifyWebhookSignature(req.rawBody, signature, secret)) {
         return res.status(401).json({ success: false, error: 'Invalid signature' });
       }
     }
 
     const webhookData = req.body;
-    console.log('[GOWA-WEBHOOK] Received:', JSON.stringify(webhookData).substring(0, 200));
+    console.log('[GOWA-WEBHOOK] Received', {
+      event: webhookData?.event || webhookData?.type || 'unknown',
+      messageId: webhookData?.id || webhookData?.data?.id || webhookData?.data?.message?.id || 'unknown',
+      bytes: req.rawBody?.length || 0
+    });
 
     // Publish to Redis for bot to consume
     // Check if redisClient exists and is ready (ioredis uses .status, but we can check existence too)
@@ -327,8 +334,8 @@ app.post('/webhook/gowa', async (req, res) => {
 
     return res.status(200).json({ success: true, status: 'ok' });
   } catch (error) {
-    console.error('[GOWA-WEBHOOK] Error:', error);
-    return res.status(500).json({ success: false, error: error.message });
+    console.error('[GOWA-WEBHOOK] Error:', error.message);
+    return res.status(500).json({ success: false, error: 'Webhook processing failed' });
   }
 });
 

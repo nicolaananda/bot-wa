@@ -119,7 +119,7 @@ global.payment = {
 // Listener backend for notification-based payment detection
 global.listener = {
   baseUrl: process.env.LISTENER_BASE_URL || 'https://api-pg.nicola.id',
-  apiKey: process.env.LISTENER_API_KEY || 'kodeku',
+  apiKey: process.env.LISTENER_API_KEY || '',
 }
 
 // Gowa WhatsApp Service Configuration

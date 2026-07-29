@@ -91,7 +91,7 @@ if (usePg) {
   pg = require('./config/postgres')
 }
 const { core, isProduction } = require('./config/midtrans')
-const USE_POLLING = true // true = pakai polling status Midtrans; false = andalkan webhook saja
+const USE_POLLING = false // Durable webhook worker is authoritative; transaction-list polling is redundant.
 const { matchPendingOrder, startWebhookWorker } = require('./options/midtrans-webhook')
 const { completeDeposit, finishDepositUx, matchPendingDeposit } = require('./lib/deposit-payment')
 
@@ -3505,17 +3505,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
       try {
         let targetGroupId = global.adminGroupId
 
-        // Jika ID grup admin tidak di-set, cari grup berdasarkan nama
-        if (!targetGroupId && global.adminGroupName) {
-          const groups = await nicola.groupFetchAllParticipating()
-          const targetGroup = Object.values(groups).find(
-            (g) =>
-              g.subject && g.subject.toLowerCase().includes(global.adminGroupName.toLowerCase())
-          )
-          if (targetGroup) {
-            targetGroupId = targetGroup.id
-          }
-        }
+        // GOWA can send to a configured group ID but cannot enumerate groups by name.
 
         if (targetGroupId) {
           const forwardText =
@@ -3532,8 +3522,6 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           })
 
           console.log(`✅ [ZOOM-FORWARD] Pesan dari ${pushname} di-forward ke grup admin`)
-        } else {
-          console.warn(`⚠️ [ZOOM-FORWARD] Grup admin "${global.adminGroupName}" tidak ditemukan`)
         }
       } catch (err) {
         console.error(`❌ [ZOOM-FORWARD] Error:`, err.message)
@@ -5563,8 +5551,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               }
             }
 
-            // Register webhook listener
-            process.on('payment-completed', paymentListener)
+            // The single global durable webhook listener processes this order.
 
             // Polling untuk timeout handling (jika webhook tidak datang)
             let pollInterval = 2000 // Mulai dari 2 detik (lebih cepat)
@@ -5909,8 +5896,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 }
               }
 
-              // Register webhook listener
-              process.on('payment-completed', paymentListener)
+              // The single global durable webhook listener processes this order.
 
               // Polling untuk timeout handling (jika webhook tidak datang)
               let pollInterval = 2000 // Mulai dari 2 detik (lebih cepat)

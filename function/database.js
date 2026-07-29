@@ -147,13 +147,18 @@ class DatabasePG {
 
     async load() {
         const snapshot = {}
+        const startedAt = Date.now()
+        const profile = (name, promise) => promise.then((result) => {
+            this.logger.log(`[DBPG] Startup load ${name}: ${Date.now() - startedAt}ms`)
+            return result
+        })
 
-        const usersPromise = query('SELECT user_id, saldo, role, data FROM users')
-        const transaksiPromise = query('SELECT meta FROM transaksi ORDER BY id ASC')
-        const produkPromise = query('SELECT id, data FROM produk')
-        const settingsPromise = query('SELECT key, value FROM settings')
+        const usersPromise = profile('users', query('SELECT user_id, saldo, role, data FROM users'))
+        const transaksiPromise = profile('transaksi', query('SELECT meta FROM transaksi ORDER BY id ASC'))
+        const produkPromise = profile('produk', query('SELECT id, data FROM produk'))
+        const settingsPromise = profile('settings', query('SELECT key, value FROM settings'))
         const kvPromise = KV_SYNC_KEYS.length
-            ? query('SELECT key, value FROM kv_store WHERE key = ANY($1::text[])', [KV_SYNC_KEYS])
+            ? profile('kv_store', query('SELECT key, value FROM kv_store WHERE key = ANY($1::text[])', [KV_SYNC_KEYS]))
             : Promise.resolve({ rows: [] })
 
         const users = await usersPromise

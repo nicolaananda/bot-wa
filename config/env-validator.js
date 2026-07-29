@@ -149,7 +149,7 @@ class EnvValidator {
         continue;
       }
 
-      result.config[varName] = value;
+      result.config[varName] = config.sensitive ? '[HIDDEN]' : value;
     }
 
     return result;
@@ -188,10 +188,7 @@ class EnvValidator {
     if (result.valid) {
       console.log('✅ All required environment variables are properly configured\n');
       
-      console.log('📋 Configuration Summary:');
-      for (const [key, value] of Object.entries(result.config)) {
-        console.log(`   ${key}: ${value}`);
-      }
+      console.log(`📋 Configuration validated (${Object.keys(result.config).length} variables; values omitted)`);
     } else {
       console.log('❌ Environment validation failed!\n');
       

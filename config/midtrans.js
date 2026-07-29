@@ -4,6 +4,8 @@ const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY || ''
 const MIDTRANS_PRODUCTION = String(process.env.MIDTRANS_PRODUCTION || process.env.MIDTRANS_IS_PRODUCTION || 'false').toLowerCase() === 'true'
 
 const baseUrl = MIDTRANS_PRODUCTION ? 'https://api.midtrans.com' : 'https://api.sandbox.midtrans.com'
+let transactionListFailures = 0
+let transactionListRetryAt = 0
 
 function getAuthHeader() {
   const token = Buffer.from(MIDTRANS_SERVER_KEY + ':').toString('base64')
@@ -96,6 +98,7 @@ async function getTransactionStatusByTransactionId(transactionId) {
  * @returns {Promise<Object|null>} Transaction data jika ditemukan, null jika tidak
  */
 async function findStaticQRISTransaction(amount, startTime, endTime = Date.now()) {
+  if (Date.now() < transactionListRetryAt) return null
   try {
     // Midtrans Transaction List API (jika tersedia)
     // Format: GET /v2/transactions?from=timestamp&to=timestamp
@@ -130,8 +133,10 @@ async function findStaticQRISTransaction(amount, startTime, endTime = Date.now()
       
       return null
     } catch (apiError) {
-      // Jika endpoint tidak tersedia atau error, return null
-      console.warn(`⚠️ [Midtrans] Transaction list API not available or error:`, apiError.message)
+      if (apiError.response && apiError.response.status === 503) {
+        transactionListFailures = Math.min(transactionListFailures + 1, 6)
+        transactionListRetryAt = Date.now() + Math.min(1000 * (2 ** transactionListFailures), 60000)
+      }
       return null
     }
   } catch (error) {
