@@ -1,9 +1,29 @@
 'use strict';
 
 const crypto = require('crypto');
+const { sendOperationalAlert } = require('../lib/telegram-notifier');
 
 const MAX_ATTEMPTS = 10;
 const LEASE_MINUTES = 5;
+const STUCK_MINUTES = 2;
+const MONITOR_INTERVAL_MS = 30000;
+
+async function monitorWebhookWorker({ pg, alert = sendOperationalAlert, state, now = Date.now() }) {
+  state.heartbeatAt = now;
+  const result = await pg.query(
+    `SELECT count(*)::integer AS count FROM midtrans_webhooks
+     WHERE lifecycle_status='received' AND attempts=0
+       AND created_at < now() - interval '${STUCK_MINUTES} minutes'`
+  );
+  const count = Number(result.rows[0]?.count || 0);
+  if (count > 0 && !state.stuckAlertActive) {
+    state.stuckAlertActive = true;
+    await alert(`Midtrans webhook worker: ${count} event received belum diproses selama >${STUCK_MINUTES} menit.`);
+  } else if (count === 0) {
+    state.stuckAlertActive = false;
+  }
+  return { count, heartbeatAt: state.heartbeatAt };
+}
 
 function verifySignature(notification, serverKey) {
   const input = String(notification?.order_id || '') + String(notification?.status_code || '') +
@@ -130,15 +150,23 @@ async function ensureWebhookSchema(pg) {
 }
 
 function startWebhookWorker(options, intervalMs = 500) {
-  let stopped = false; let timer;
+  let stopped = false; let timer; let monitorTimer;
+  const monitorState = { heartbeatAt: null, stuckAlertActive: false };
   const run = async () => {
     if (stopped) return;
     try { while (await processNextWebhook(options)) {} } catch (error) { console.error('[Webhook worker]', error.message); }
     if (!stopped) timer = setTimeout(run, intervalMs);
   };
-  ensureWebhookSchema(options.pg).then(run).catch(error => console.error('[Webhook worker] schema migration failed:', error.message));
-  return () => { stopped = true; clearTimeout(timer); };
+  const monitor = async () => {
+    if (stopped) return;
+    try { await monitorWebhookWorker({ ...options, state: monitorState }); }
+    catch (error) { console.error('[Webhook worker monitor]', error.message); }
+    if (!stopped) monitorTimer = setTimeout(monitor, MONITOR_INTERVAL_MS);
+  };
+  ensureWebhookSchema(options.pg).then(() => { run(); monitor(); })
+    .catch(error => console.error('[Webhook worker] schema migration failed:', error.message));
+  return () => { stopped = true; clearTimeout(timer); clearTimeout(monitorTimer); };
 }
 
 module.exports = { createWebhookHandler, ensureWebhookSchema, eventKey, matchPendingOrder, persistWebhook,
-  processNextWebhook, startWebhookWorker, verifySignature };
+  monitorWebhookWorker, processNextWebhook, startWebhookWorker, verifySignature };

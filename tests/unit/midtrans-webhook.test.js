@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('crypto');
-const { createWebhookHandler, ensureWebhookSchema, eventKey, matchPendingOrder, processNextWebhook, verifySignature } = require('../../options/midtrans-webhook');
+const { createWebhookHandler, ensureWebhookSchema, eventKey, matchPendingOrder, monitorWebhookWorker, processNextWebhook, verifySignature } = require('../../options/midtrans-webhook');
 
 function response() { return { code: 0, body: null, status(n) { this.code=n; return this; }, json(v) { this.body=v; return this; } }; }
 function signed(key, extra={}) { const body={order_id:'QRIS-1',status_code:'200',gross_amount:'10000.00',transaction_status:'settlement',...extra}; body.signature_key=crypto.createHash('sha512').update(body.order_id+body.status_code+body.gross_amount+key).digest('hex'); return body; }
@@ -64,8 +64,22 @@ test('internal order id bukan external correlation', () => {
 
 test('entrypoint memasang worker dan menghapus listener Redis Midtrans', () => {
   const fs=require('fs'); const index=fs.readFileSync(require.resolve('../../index'),'utf8'); const main=fs.readFileSync(require.resolve('../../main'),'utf8');
-  expect(index).toMatch(/startWebhookWorker\(\{ pg, dispatch: processMidtransPayment \}\)/);
+  expect(index).toMatch(/global\.stopMidtransDurableWorker = startWebhookWorker/);
   expect(main).not.toMatch(/subscribe\([^\n]*midtrans:events/);
+});
+
+test('monitor heartbeat mendeteksi row macet dan deduplikasi alert', async () => {
+  const pg={query:jest.fn(async()=>({rows:[{count:2}]}))}; const alert=jest.fn(); const state={};
+  const first=await monitorWebhookWorker({pg,alert,state,now:123});
+  await monitorWebhookWorker({pg,alert,state,now:456});
+  expect(first).toEqual({count:2,heartbeatAt:123}); expect(state.heartbeatAt).toBe(456); expect(alert).toHaveBeenCalledTimes(1);
+  expect(pg.query.mock.calls[0][0]).toMatch(/lifecycle_status='received'.*attempts=0[\s\S]*interval '2 minutes'/);
+});
+
+test('monitor mengizinkan alert baru setelah kondisi pulih', async () => {
+  const counts=[1,0,1]; const pg={query:jest.fn(async()=>({rows:[{count:counts.shift()}]}))}; const alert=jest.fn(); const state={};
+  await monitorWebhookWorker({pg,alert,state}); await monitorWebhookWorker({pg,alert,state}); await monitorWebhookWorker({pg,alert,state});
+  expect(alert).toHaveBeenCalledTimes(2);
 });
 
 describe('deposit durable', () => {

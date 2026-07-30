@@ -1345,9 +1345,14 @@ if (!global.midtransWebhookListenerSetup) {
   }
 
   global.processMidtransPayment = processMidtransPayment
-  if (usePg && !global.midtransDurableWorkerSetup) {
-    global.midtransDurableWorkerSetup = true
-    startWebhookWorker({ pg, dispatch: processMidtransPayment })
+  if (usePg) {
+    if (typeof global.stopMidtransDurableWorker === 'function') {
+      global.stopMidtransDurableWorker()
+    }
+    global.stopMidtransDurableWorker = startWebhookWorker({
+      pg,
+      dispatch: processMidtransPayment,
+    })
   }
 
   console.log('✅ [MID-GLOBAL] Durable webhook processor registered')
