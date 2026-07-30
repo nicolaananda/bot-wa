@@ -1295,20 +1295,23 @@ if (!global.midtransWebhookListenerSetup) {
         hargaProduk = (id, role) => 0
       }
 
-      await db.appendTransaction({
-        id: productId,
-        name: db.data.produk[productId].name,
-        price: hargaProduk(productId, db.data.users[sender]?.role || 'bronze'),
-        date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
-        profit: db.data.produk[productId].profit || 0,
-        jumlah: jumlah,
-        user: sender.split('@')[0],
-        userRole: db.data.users[sender]?.role || 'bronze',
-        reffId: reffId,
-        metodeBayar: 'QRIS',
-        totalBayar: totalAmount,
-        akun: dataStok,
-      }, { persist: false })
+      await db.appendTransaction(
+        {
+          id: productId,
+          name: db.data.produk[productId].name,
+          price: hargaProduk(productId, db.data.users[sender]?.role || 'bronze'),
+          date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
+          profit: db.data.produk[productId].profit || 0,
+          jumlah: jumlah,
+          user: sender.split('@')[0],
+          userRole: db.data.users[sender]?.role || 'bronze',
+          reffId: reffId,
+          metodeBayar: 'QRIS',
+          totalBayar: totalAmount,
+          akun: dataStok,
+        },
+        { persist: false }
+      )
 
       if (typeof global.scheduleSave === 'function') {
         global.scheduleSave()
