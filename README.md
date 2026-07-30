@@ -1,255 +1,336 @@
-# 🤖 WhatsApp Bot - Modern E-commerce Bot
+# bot-wa
 
-[![Tests](https://github.com/nicolaananda/bot-wa/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/nicolaananda/bot-wa/actions)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Node.js](https://img.shields.io/badge/Node.js-CommonJS-339933?logo=nodedotjs&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-required-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-webhook_transport-DC382D?logo=redis&logoColor=white)
+![License](https://img.shields.io/badge/license-ISC-blue)
 
-Modern WhatsApp bot untuk e-commerce dengan fitur lengkap: payment gateway, product management, user roles, dan monitoring.
+Bot commerce WhatsApp berbasis **GOWA**, **PostgreSQL**, **Redis**, dan **Midtrans QRIS**. Proyek ini menangani stok produk digital, harga berbasis role, pembelian dengan saldo atau QRIS, deposit, booking Zoom, receipt, notifikasi operasional, serta dashboard/webhook API terpisah.
 
-## ✨ Features
+> Proyek menggunakan dua proses Node.js: `bot-wa` untuk business logic dan `api` untuk dashboard serta webhook ingress.
 
-- 🛒 **E-commerce**: Product management, stock tracking, automated ordering
-- 💳 **Payment Gateway**: Midtrans integration, saldo system, QRIS payment
-- 👥 **User Management**: Role-based pricing (Bronze/Silver/Gold), balance management
-- 🔒 **Security**: Rate limiting, transaction locking, circuit breaker
-- 📊 **Monitoring**: Health checks, metrics, structured logging
-- 🧪 **Testing**: 22 unit tests with Jest
-- 🚀 **CI/CD**: GitHub Actions pipeline with auto-deploy
+## Arsitektur
 
-## 🚀 Quick Start
+```text
+GOWA
+  └─ POST /webhook/gowa
+       └─ Dashboard API
+            └─ Redis channel: gowa:messages
+                 └─ Bot process
 
-### Prerequisites
+Midtrans
+  └─ POST /webhook/midtrans
+       └─ Signature verification
+            └─ PostgreSQL: midtrans_webhooks
+                 └─ Durable payment worker
+                      └─ Idempotent fulfillment / balance credit
 
-- Node.js 18+
-- Redis 6.0+
-- PostgreSQL 13+ (optional)
-- WhatsApp account
+PostgreSQL
+  ├─ users dan saldo
+  ├─ produk dan stok
+  ├─ transaksi
+  ├─ pending order/deposit
+  └─ durable Midtrans webhook queue
 
-### Installation
+Redis
+  ├─ GOWA webhook transport
+  ├─ transaction locks
+  ├─ rate limits
+  └─ cache
+```
+
+PostgreSQL adalah sumber data utama dan antrean pembayaran authoritative. Redis dipakai sebagai transport event WhatsApp, locking, rate limiting, dan cache.
+
+## Fitur utama
+
+- Manajemen produk dan stok akun digital.
+- Harga berdasarkan role pengguna.
+- Pembelian menggunakan saldo atau Midtrans QRIS.
+- Deposit QRIS dengan kode unik.
+- Durable payment worker dengan retry, idempotency, heartbeat, dan deteksi antrean macet.
+- GOWA multi-device dengan webhook signature verification.
+- Deduplication event WhatsApp.
+- Booking Zoom dan pool host bertingkat.
+- Receipt berbasis storage S3-compatible/R2.
+- Dashboard API untuk transaksi, user, stok, receipt, dan analytics.
+- Group whitelist dan kontrol akses owner/admin.
+- Telegram operational alert jika dikonfigurasi.
+
+## Prasyarat
+
+- Node.js dan npm.
+- PostgreSQL.
+- Redis.
+- GOWA yang aktif dan sudah terautentikasi.
+- Kredensial Midtrans untuk fitur pembayaran.
+- Endpoint HTTPS publik untuk webhook GOWA dan Midtrans.
+
+Versi minimum runtime belum dikunci melalui `engines` di `package.json`. Gunakan versi Node.js LTS yang kompatibel dengan dependency proyek.
+
+## Instalasi
 
 ```bash
-# Clone repository
 git clone https://github.com/nicolaananda/bot-wa.git
 cd bot-wa
-
-# Install dependencies
-npm install
-
-# Setup environment
+npm ci
 cp .env.example .env
-# Edit .env with your configuration
+```
 
-# Run tests
-npm test
+Isi `.env`, buat database PostgreSQL, lalu terapkan schema:
 
-# Start bot
+```bash
+npm run pg:schema
+```
+
+Validasi instalasi:
+
+```bash
+npm test -- --runInBand
+```
+
+## Konfigurasi
+
+Gunakan `.env.example` sebagai inventory konfigurasi. Jangan commit `.env`.
+
+### Runtime utama
+
+```dotenv
+USE_PG=true
+
+PG_HOST=
+PG_PORT=
+PG_DATABASE=
+PG_USER=
+PG_PASSWORD=
+
+REDIS_HOST=
+REDIS_PORT=
+REDIS_PASSWORD=
+
+GOWA_API_URL=
+GOWA_USERNAME=
+GOWA_PASSWORD=
+GOWA_DEVICE_ID=
+GOWA_WEBHOOK_SECRET=
+
+MIDTRANS_SERVER_KEY=
+MIDTRANS_CLIENT_KEY=
+MIDTRANS_MERCHANT_ID=
+MIDTRANS_IS_PRODUCTION=true
+
+OWNER_NUMBER=
+```
+
+Nama variabel lengkap dan integrasi opsional tersedia di `.env.example`. Jangan menyalin contoh placeholder menjadi kredensial production.
+
+### Integrasi opsional
+
+- Telegram operational notification.
+- Cloudflare R2 atau storage S3-compatible untuk receipt.
+- Zoom Server-to-Server OAuth dan host pool.
+- Listener backend.
+- Order Kuota.
+- Pricing override dan payment display details.
+
+## PostgreSQL
+
+Terapkan schema setelah `.env` selesai:
+
+```bash
+npm run pg:schema
+```
+
+Schema utama mencakup:
+
+- `users`
+- `transaksi`
+- `produk`
+- `settings`
+- `kv_store`
+- `midtrans_webhooks`
+- `web_pos_pin`
+
+Reference ID transaksi dan Midtrans event key memiliki uniqueness protection untuk mencegah fulfillment atau kredit ganda saat retry.
+
+`npm run pg:dedup` adalah maintenance command. Backup database sebelum menjalankannya.
+
+## Menjalankan aplikasi
+
+Bot dan API berjalan sebagai proses terpisah.
+
+Terminal 1:
+
+```bash
 npm start
 ```
 
-## 📁 Project Structure
-
-```
-bot-wa/
-├── commands/          # Bot commands (to be extracted)
-├── config/            # Configuration files
-│   ├── logger.js      # Winston logger
-│   ├── env.js         # Environment validation
-│   ├── postgres.js    # PostgreSQL config
-│   └── redis.js       # Redis config
-├── services/          # Business logic layer
-│   ├── payment-service.js
-│   ├── product-service.js
-│   └── user-service.js
-├── middleware/        # Express/Bot middleware
-│   ├── rate-limit.js
-│   ├── transaction-lock.js
-│   └── error-handler.js
-├── repositories/      # Data access layer
-├── lib/               # External integrations
-│   ├── gowa-proto.js  # WhatsApp client
-│   └── circuit-breaker.js
-├── function/          # Helper functions
-├── routes/            # API routes
-│   └── health.js      # Health check endpoints
-├── tests/             # Test files
-│   ├── unit/
-│   ├── integration/
-│   └── e2e/
-└── index.js           # Main entry point
-```
-
-## 🧪 Testing
+Terminal 2:
 
 ```bash
-# Run all tests
+npm run dashboard
+```
+
+`npm start` menjalankan launcher `nicola.js`, lalu memulai `main.js` dengan bounded restart dan backoff. Dashboard/webhook API menggunakan port HTTP `3002` secara default.
+
+## Integrasi GOWA
+
+1. Jalankan dan autentikasikan GOWA.
+2. Isi URL, Basic Auth, dan device ID GOWA pada `.env`.
+3. Arahkan webhook device GOWA ke:
+
+   ```text
+   POST https://<public-host>/webhook/gowa
+   ```
+
+4. Samakan `GOWA_WEBHOOK_SECRET` pada GOWA dan API.
+5. Jalankan Redis, dashboard API, dan bot.
+
+API memverifikasi HMAC menggunakan raw request bytes, lalu meneruskan event valid ke Redis channel `gowa:messages`. Bot berlangganan channel tersebut dan memproses event melalui GOWA adapter.
+
+## Pembayaran Midtrans
+
+Alur aktif menggunakan Midtrans Core API QRIS dan durable webhook worker:
+
+1. Bot membuat QRIS charge.
+2. Midtrans mengirim notifikasi ke:
+
+   ```text
+   POST https://<public-host>/webhook/midtrans
+   ```
+
+3. API memverifikasi signature SHA-512.
+4. Event disimpan ke PostgreSQL sebelum API mengembalikan sukses.
+5. Worker mengambil event dengan `FOR UPDATE SKIP LOCKED`.
+6. Kegagalan diproses ulang menggunakan exponential backoff.
+7. Unique transaction reference mencegah saldo atau akun terkirim dua kali.
+
+Worker mendukung direct purchase dan deposit QRIS. Korelasi mengutamakan external order/transaction ID, dengan fallback nominal dan rentang waktu yang dibatasi.
+
+### Monitoring worker
+
+- Heartbeat worker berjalan setiap 30 detik.
+- Webhook `received` dengan `attempts=0` lebih dari dua menit dianggap macet.
+- Alert dideduplikasi sampai antrean pulih.
+- Hot reload menghentikan worker lama dan memasang worker baru.
+
+Polling transaction-list dan Redis Midtrans event bukan jalur authoritative.
+
+## Menjalankan test
+
+```bash
 npm test
-
-# Run tests in watch mode
+npm test -- --runInBand
 npm run test:watch
-
-# Generate coverage report
 npm run test:coverage
-
-# Run specific test suite
 npm run test:unit
-npm run test:integration
-npm run test:e2e
 ```
 
-## 📊 Monitoring
+Test mencakup payment flow, durable webhook, deposit, PostgreSQL dirty persistence, GOWA authentication dan deduplication, reconnect controller, QRIS rendering/reporting, produk, serta group whitelist.
 
-### Health Check
+## Deployment dengan PM2
 
 ```bash
-curl http://localhost:3000/health
+npm ci
+npm run pg:schema
+npm test -- --runInBand
+
+pm2 start npm --name bot-wa -- start
+pm2 start npm --name api -- run dashboard
+pm2 save
 ```
 
-Response:
-```json
-{
-  "status": "ok",
-  "timestamp": "2026-02-01T12:00:00.000Z",
-  "uptime": 3600,
-  "checks": {
-    "redis": { "status": "ok" },
-    "postgres": { "status": "ok" },
-    "gowa": { "status": "ok" }
-  }
-}
-```
-
-### Metrics
+Verifikasi:
 
 ```bash
-curl http://localhost:3000/metrics
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-See [.env.example](.env.example) for all available configuration options.
-
-**Required**:
-- `GOWA_API_URL` - WhatsApp API endpoint
-- `GOWA_USERNAME` - WhatsApp API username
-- `GOWA_PASSWORD` - WhatsApp API password
-- `OWNER_NUMBER` - Bot owner phone number
-- `REDIS_URL` - Redis connection URL
-
-**Optional**:
-- `USE_PG` - Enable PostgreSQL (default: false)
-- `MIDTRANS_SERVER_KEY` - Midtrans payment gateway
-- `TELEGRAM_BOT_TOKEN` - Telegram notifications
-- `LOG_LEVEL` - Logging level (default: info)
-
-## 📝 Available Commands
-
-### User Commands
-- `stok` - View available products
-- `buy <product> <qty>` - Purchase with saldo
-- `buynow <product> <qty>` - Purchase with payment gateway
-- `saldo` - Check balance
-- `profile` - View user profile
-
-### Admin Commands
-- `addproduk` - Add new product
-- `delproduk` - Delete product
-- `addsaldo` - Add user balance
-- `setrole` - Set user role
-- `broadcast` - Send broadcast message
-
-## 🏗️ Architecture
-
-### Services Layer
-Business logic separated into services:
-- **PaymentService**: Payment calculations, saldo processing
-- **ProductService**: Product operations, stock management
-- **UserService**: User management, balance operations
-
-### Middleware Layer
-Reusable middleware for common operations:
-- **RateLimit**: Redis-based rate limiting
-- **TransactionLock**: Prevent concurrent transactions
-- **ErrorHandler**: Centralized error handling
-
-### Circuit Breaker
-API resilience with Opossum:
-- Automatic fallback on failures
-- Configurable thresholds
-- Event logging and stats
-
-## 🚀 Deployment
-
-### Using PM2
-
-```bash
-# Install PM2
-npm install -g pm2
-
-# Start bot
-pm2 start npm --name "bot-wa" -- start
-
-# View logs
+pm2 show bot-wa
+pm2 show api
 pm2 logs bot-wa
-
-# Restart
-pm2 restart bot-wa
+pm2 logs api
 ```
 
-### Using Docker
+Reverse proxy harus meneruskan webhook GOWA dan Midtrans ke dashboard API pada port `3002`.
+
+### Update deployment
 
 ```bash
-# Build image
-docker build -t bot-wa .
-
-# Run container
-docker run -d \
-  --name bot-wa \
-  --env-file .env \
-  -p 3000:3000 \
-  bot-wa
+git pull --ff-only
+npm ci
+npm run pg:schema
+npm test -- --runInBand
+pm2 restart bot-wa api --update-env
 ```
 
-## 🤝 Contributing
+Hindari deploy saat ada pembayaran aktif. Jika perlu melakukan hot reload, durable worker akan mengganti worker lama dan melanjutkan antrean PostgreSQL.
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+## NPM scripts
 
-### Development Workflow
+| Command | Fungsi |
+|---|---|
+| `npm start` | Menjalankan launcher bot dengan V8 heap limit 1024 MB |
+| `npm run start:unlimited` | Menjalankan launcher tanpa heap limit eksplisit |
+| `npm run dashboard` | Menjalankan dashboard dan webhook API |
+| `npm run dashboard:dev` | Menjalankan API dengan `nodemon` |
+| `npm test` | Menjalankan Jest |
+| `npm run test:watch` | Menjalankan Jest watch mode |
+| `npm run test:coverage` | Menjalankan coverage dengan global threshold |
+| `npm run test:unit` | Menjalankan unit tests |
+| `npm run pg:schema` | Menerapkan `options/schema.sql` |
+| `npm run pg:dedup` | Menjalankan utility deduplication transaksi |
+| `npm run backup` | Membuat backup |
+| `npm run restore` | Menjalankan restore |
+| `npm run backup-list` | Menampilkan daftar backup |
+| `npm run backup-health` | Memeriksa kesehatan backup |
+| `npm run start-safe` | Backup lalu menjalankan bot |
+| `npm run lint` | Menjalankan ESLint untuk `index.js` |
+| `npm run lint:fix` | Memperbaiki lint yang didukung |
+| `npm run format` | Memformat `index.js` dengan Prettier |
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+## Keamanan dan operasional
 
-### Code Quality
+- Jangan commit `.env`, token, password, QR, receipt, atau file pool Zoom.
+- Gunakan HTTPS untuk seluruh webhook.
+- Samakan dan lindungi `GOWA_WEBHOOK_SECRET`.
+- Jangan mengekspos PostgreSQL atau Redis langsung ke internet.
+- Letakkan dashboard API di belakang reverse proxy dan autentikasi.
+- Rotasi kredensial jika pernah muncul di log atau Git history.
+- Backup PostgreSQL sebelum schema migration atau deduplication.
+- Monitor proses bot dan API; event GOWA tidak dapat mencapai bot ketika Redis mati.
+- Log hanya metadata event. Jangan mencetak payload webhook atau Authorization header.
 
-- Pre-commit hooks run ESLint and Prettier
-- All tests must pass
-- Maintain test coverage above 30%
+## Troubleshooting
 
-## 📄 License
+### Bot menerima pesan tetapi tidak membalas
 
-This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
+```bash
+pm2 show bot-wa
+pm2 logs bot-wa --lines 100
+```
 
-## 🙏 Acknowledgments
+Periksa GOWA Basic Auth, `GOWA_DEVICE_ID`, dan status device.
 
-- [Baileys](https://github.com/WhiskeySockets/Baileys) - WhatsApp Web API
-- [Winston](https://github.com/winstonjs/winston) - Logging
-- [Jest](https://jestjs.io/) - Testing framework
-- [Opossum](https://github.com/nodeshift/opossum) - Circuit breaker
+### Webhook GOWA ditolak
 
-## 📞 Support
+- Pastikan `GOWA_WEBHOOK_SECRET` sama pada kedua sisi.
+- Signature harus dihitung dari raw request body.
+- Periksa reverse proxy tidak mengubah body.
 
-- **Issues**: [GitHub Issues](https://github.com/nicolaananda/bot-wa/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/nicolaananda/bot-wa/discussions)
+### Pembayaran tidak selesai otomatis
 
-## 🔗 Links
+Periksa antrean durable:
 
-- [Documentation](docs/)
-- [API Reference](docs/api.md)
-- [Changelog](CHANGELOG.md)
+```sql
+SELECT id, lifecycle_status, attempts, next_attempt_at, created_at
+FROM midtrans_webhooks
+WHERE processed = false
+ORDER BY id DESC;
+```
 
----
+Jangan fulfillment manual sebelum memastikan event belum diproses. Gunakan reference ID untuk mencegah pengiriman atau kredit ganda.
 
-**Made with ❤️ by Nicola**
+### Database lambat
+
+Startup log mencatat durasi load `users`, `transaksi`, `produk`, `settings`, dan `kv_store`. Fokus pada koneksi PostgreSQL dan ukuran tabel sebelum menambah index; full-table startup load tidak otomatis terbantu oleh index.
+
+## Lisensi
+
+ISC, sesuai deklarasi pada `package.json`.
