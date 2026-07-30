@@ -15,7 +15,7 @@ const PG_SSL = String(process.env.PG_SSL || 'false').toLowerCase() === 'true';
 const sslConfig = PG_SSL ? { rejectUnauthorized: false } : false;
 
 const pool = new Pool({
-  host: process.env.PG_HOST || 'localhost',
+  host: process.env.PG_HOST || '127.0.0.1',
   port: Number(process.env.PG_PORT || 5432),
   database: process.env.PG_DATABASE || 'bot_wa',
   user: process.env.PG_USER || 'bot_wa',

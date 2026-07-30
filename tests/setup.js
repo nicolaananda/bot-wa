@@ -4,7 +4,7 @@
 // Mock environment variables for testing
 process.env.NODE_ENV = 'test';
 process.env.REDIS_URL = 'redis://localhost:6379';
-process.env.PG_HOST = 'localhost';
+process.env.PG_HOST = '127.0.0.1';
 process.env.PG_DATABASE = 'bot_wa_test';
 
 // Global test timeout
