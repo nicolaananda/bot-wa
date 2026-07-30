@@ -6,6 +6,7 @@ const { reserveOrderStock } = require('../../lib/qris-fulfillment')
 const indexSource = fs.readFileSync(require.resolve('../../index'), 'utf8')
 
 test('persists delivery proof and skips duplicate send on retry', () => {
+  expect(indexSource).toMatch(/const deliveryClient = globalRonzz \|\| global\.gowaAdapter/)
   expect(indexSource).toMatch(/order\.deliveryStatus !== 'sent'/)
   expect(indexSource).toMatch(/order\.deliveryMessageId = delivery\?\.id \|\| delivery\?\.key\?\.id \|\| null/)
   expect(indexSource).toMatch(/Failed to persist QRIS delivery receipt/)

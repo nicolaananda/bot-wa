@@ -1247,10 +1247,11 @@ if (!global.midtransWebhookListenerSetup) {
       const detailAkunCustomer = detailParts.join('\n')
 
       // Delivery must succeed before the transaction and pending-order deletion are committed.
-      if (!globalRonzz) throw new Error('WhatsApp client is not ready')
+      const deliveryClient = globalRonzz || global.gowaAdapter
+      if (!deliveryClient) throw new Error('WhatsApp client is not ready')
       if (order.deliveryStatus !== 'sent') {
         await sleep(1000)
-        const delivery = await globalRonzz.sendMessage(sender, { text: detailAkunCustomer })
+        const delivery = await deliveryClient.sendMessage(sender, { text: detailAkunCustomer })
         order.deliveryStatus = 'sent'
         order.deliveryMessageId = delivery?.id || delivery?.key?.id || null
         order.deliveredAt = Date.now()
