@@ -60,6 +60,7 @@ const {
 } = require('./function/stalker')
 const { qrisDinamis, qrisStatis, qrisStatisMidtrans } = require('./function/dinamis')
 const { createQrisCard } = require('./lib/qris-card')
+const { reserveOrderStock } = require('./lib/qris-fulfillment')
 const {
   createPaymentLink,
   getPaymentLinkStatus,
@@ -1126,7 +1127,7 @@ if (!global.midtransWebhookListenerSetup) {
       // 🔒 CRITICAL: Check stock availability BEFORE marking as processed
       // This prevents race condition where customer pays but stock is empty
       const currentStock = db.data.produk[productId].stok.length
-      if (currentStock < jumlah) {
+      if (!Array.isArray(order.fulfillmentReservation) && currentStock < jumlah) {
         console.error(
           `❌ [MID-GLOBAL] Insufficient stock for product ${productId}: requested ${jumlah}, available ${currentStock}`
         )
@@ -1174,17 +1175,8 @@ if (!global.midtransWebhookListenerSetup) {
         return
       }
 
-      // Reserve stock (atomic operation)
-      let dataStok = []
-      for (let i = 0; i < jumlah; i++) {
-        dataStok.push(db.data.produk[productId].stok.shift())
-      }
-
-      // Update sold count
-      db.data.produk[productId].terjual += jumlah
-
-      // Important: Delete old stock property to force recalculation from stok.length
-      delete db.data.produk[productId].stock
+      // Persist the reservation in the pending order before delivery. Retries reuse it.
+      const dataStok = await reserveOrderStock(db, sender, productId, jumlah)
 
       // Low stock alert to owner
       const sisaStokAfterBuy = db.data.produk[productId].stok.length
@@ -1200,12 +1192,6 @@ if (!global.midtransWebhookListenerSetup) {
           await globalRonzz.sendMessage(ownerNomer + '@s.whatsapp.net', { text: alertMsg })
         } catch (_) {}
       }
-
-      // NOW mark as processed (stock already reserved)
-      order.processed = true
-      order.status = 'success'
-      db.data.order[sender] = order
-      await db.save()
 
       // Delete QRIS message
       if (globalRonzz && messageKey) {
@@ -1260,25 +1246,31 @@ if (!global.midtransWebhookListenerSetup) {
 
       const detailAkunCustomer = detailParts.join('\n')
 
-      // Send to customer
-      if (globalRonzz) {
-        try {
-          await sleep(1000)
-          await globalRonzz.sendMessage(sender, { text: detailAkunCustomer })
-          console.log(`✅ [MID-GLOBAL] Account details sent to ${sender}`)
+      // Delivery must succeed before the transaction and pending-order deletion are committed.
+      if (!globalRonzz) throw new Error('WhatsApp client is not ready')
+      if (order.deliveryStatus !== 'sent') {
+        await sleep(1000)
+        const delivery = await globalRonzz.sendMessage(sender, { text: detailAkunCustomer })
+        order.deliveryStatus = 'sent'
+        order.deliveryMessageId = delivery?.id || delivery?.key?.id || null
+        order.deliveredAt = Date.now()
+        db.data.order[sender] = order
+        if (!(await db.save())) throw new Error('Failed to persist QRIS delivery receipt')
+        console.log(`✅ [MID-GLOBAL] Account details sent to ${sender}`)
+      }
 
-          // If group message, send public confirmation
-          if (from.endsWith('@g.us')) {
-            await globalRonzz.sendMessage(
-              from,
-              {
-                text: '🎉 Pembayaran QRIS berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!',
-              },
-              { quoted: { key: messageKey } }
-            )
-          }
+      // Public confirmation is non-authoritative UX.
+      if (from.endsWith('@g.us')) {
+        try {
+          await globalRonzz.sendMessage(
+            from,
+            {
+              text: '🎉 Pembayaran QRIS berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!',
+            },
+            { quoted: { key: messageKey } }
+          )
         } catch (error) {
-          console.error(`❌ [MID-GLOBAL] Error sending account details:`, error.message)
+          console.error(`❌ [MID-GLOBAL] Error sending group confirmation:`, error.message)
         }
       }
 
@@ -1316,14 +1308,14 @@ if (!global.midtransWebhookListenerSetup) {
         metodeBayar: 'QRIS',
         totalBayar: totalAmount,
         akun: dataStok,
-      })
+      }, { persist: false })
 
       if (typeof global.scheduleSave === 'function') {
         global.scheduleSave()
       }
 
       delete db.data.order[sender]
-      await db.save()
+      if (!(await db.save())) throw new Error('Failed to finalize QRIS fulfillment')
       console.log(`✅ [MID-GLOBAL] Transaction completed: ${orderId} - ${reffId}`)
 
       // Send Telegram notification
