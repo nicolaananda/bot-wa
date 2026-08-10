@@ -68,14 +68,7 @@ async function query(text, params) {
 }
 
 async function getClient() {
-  const client = await pool.connect();
-  const q = client.query.bind(client);
-  const release = client.release.bind(client);
-  client.query = (...args) => {
-    return q(...args);
-  };
-  client.release = () => release();
-  return client;
+  return pool.connect();
 }
 
 // Best-effort warm-up to reduce cold-start latency
