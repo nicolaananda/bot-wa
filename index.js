@@ -86,6 +86,7 @@ const zoomClient = require('./lib/zoom-client')
 const zoomPool = require('./lib/zoom-pool')
 const zoomPricing = require('./lib/zoom-pricing')
 const zoomLicense = require('./lib/zoom-license')
+const zoomBackdate = require('./lib/zoom-backdate')
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 let pg
 if (usePg) {
@@ -2349,6 +2350,7 @@ module.exports = async (nicola, m, mek) => {
                       duration: Number(parsed.durationMinutes || meeting.duration || 0),
                       timezone: parsed.timezone || null,
                       hostLabel: host.label,
+                      hostAccountId: host.accountId,
                       billedUnit: priceInfo.billedUnit,
                       billedQty: priceInfo.billedQty,
                     },
@@ -2517,6 +2519,16 @@ module.exports = async (nicola, m, mek) => {
               password: parsed.password,
               timezone: parsed.timezone,
               agenda: buildZoomAgenda(parsed),
+            })
+
+            zoomBackdate.recordBooking({
+              tier: 100,
+              hostAccountId: process.env.ZOOM_ACCOUNT_ID,
+              hostLabel: 'akun utama',
+              meetingId: meeting.id,
+              realStartUtcMs: moment.tz(parsed.startTimeIso, parsed.timezone).valueOf(),
+              durationMinutes: parsed.durationMinutes,
+              topic: parsed.topic,
             })
 
             delete db.data.zoomFlow[sender]
@@ -3875,76 +3887,79 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           )
         }
 
-        const candidates = []
-        if (
-          ['ZOOM_ACCOUNT_ID', 'ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET'].every(
-            (key) => process.env[key] && String(process.env[key]).trim()
+        let booking = zoomBackdate.findBookingByMeetingId(meetingId)
+        if (!booking) {
+          const transaction = (db.data.transaksi || []).find(
+            (item) => String(item && item.akun && item.akun.meetingId) === meetingId
           )
-        ) {
-          candidates.push({ label: 'akun utama', creds: undefined })
-        }
-        for (const tier of zoomPool.VALID_TIERS) {
-          for (const host of zoomPool.loadPool(tier)) {
-            if (!candidates.some((item) => item.accountId === host.accountId)) {
-              candidates.push({
-                label: `${host.label} (${tier}p)`,
-                accountId: host.accountId,
-                creds: host,
-              })
+          if (transaction) {
+            booking = {
+              tier: Number(transaction.akun.tier || 100),
+              hostAccountId: String(transaction.akun.hostAccountId || ''),
+              hostLabel: String(transaction.akun.hostLabel || ''),
             }
           }
         }
-        if (!candidates.length) return reply('❌ Belum ada akun Zoom yang dikonfigurasi.')
+        if (!booking) {
+          return reply('❌ Meeting ID tidak ditemukan di database booking Zoom.')
+        }
 
-        let recording = null
-        let sourceLabel = ''
-        const errors = []
-        for (const candidate of candidates) {
-          try {
-            recording = await zoomClient.getMeetingRecordings({ meetingId, creds: candidate.creds })
-            sourceLabel = candidate.label
-            break
-          } catch (error) {
-            errors.push(error)
+        const primaryAccountId = String(process.env.ZOOM_ACCOUNT_ID || '')
+        let sourceLabel = 'akun utama'
+        let creds
+
+        if (String(booking.hostAccountId) !== primaryAccountId || booking.hostLabel) {
+          const host = zoomPool
+            .loadPool(Number(booking.tier))
+            .find(
+              (item) =>
+                (booking.hostAccountId && item.accountId === String(booking.hostAccountId)) ||
+                (booking.hostLabel && item.label === String(booking.hostLabel))
+            )
+          if (!host && String(booking.hostAccountId) === primaryAccountId) {
+            sourceLabel = booking.hostLabel || 'akun utama'
+          } else if (!host) {
+            return reply(
+              `❌ Meeting tercatat dibuat oleh ${booking.hostLabel || booking.hostAccountId}, tetapi konfigurasi akunnya tidak ditemukan.`
+            )
+          } else {
+            creds = host
+            sourceLabel = `${host.label} (${booking.tier}p)`
           }
         }
 
-        if (!recording) {
-          const forbidden = errors.find((error) => error && error.status === 401)
-          const missingScope = errors.find((error) => error && error.status === 400)
-          if (forbidden || missingScope) {
+        let recording
+        try {
+          recording = await zoomClient.getMeetingRecordings({ meetingId, creds })
+        } catch (error) {
+          if (
+            error &&
+            (error.status === 404 || Number(error.response && error.response.code) === 3301)
+          ) {
+            return reply(
+              `❌ Akun *${sourceLabel}* belum mengaktifkan rekaman untuk meeting ini, atau rekamannya belum selesai diproses.`
+            )
+          }
+          if (error && [400, 401, 403].includes(error.status)) {
             return reply(
               '❌ Rekaman gagal diakses. Pastikan Server-to-Server OAuth memiliki scope baca cloud recording, lalu aktifkan ulang app Zoom.'
             )
           }
           return reply(
-            '❌ Rekaman tidak ditemukan di akun utama maupun host pool. Pastikan meeting sudah selesai dan Cloud Recording aktif.'
+            `❌ Rekaman tidak ditemukan di ${sourceLabel}. Pastikan meeting sudah selesai dan Cloud Recording aktif.`
           )
         }
 
-        const files = Array.isArray(recording.recording_files)
-          ? recording.recording_files.filter((file) => file && file.status !== 'deleted')
-          : []
-        const lines = files.map((file, index) => {
-          const sizeMb = Number(file.file_size || 0) / 1024 / 1024
-          const label = [file.file_type, file.recording_type].filter(Boolean).join(' • ')
-          const url = file.play_url || recording.share_url
-          return `${index + 1}. *${label || 'Recording'}*${sizeMb ? ` (${sizeMb.toFixed(1)} MB)` : ''}${url ? `\n   ${url}` : ''}`
-        })
-        const shareUrl = recording.share_url ? `\n\n🔗 *Link utama:* ${recording.share_url}` : ''
-        const passcode = recording.password ? `\n🔑 *Passcode rekaman:* ${recording.password}` : ''
+        const files = Array.isArray(recording.recording_files) ? recording.recording_files : []
+        const shareUrl = recording.share_url || (files.find((file) => file.play_url) || {}).play_url
+        const passcode = recording.password || recording.recording_play_passcode || '-'
+        if (!shareUrl) {
+          return reply(
+            `⌛ Rekaman dari akun *${sourceLabel}* ditemukan, tetapi masih diproses Zoom.`
+          )
+        }
 
-        return reply(
-          `🎬 *REKAMAN ZOOM*\n\n` +
-            `*Topik:* ${recording.topic || '-'}\n` +
-            `*Meeting ID:* ${meetingId}\n` +
-            `*Akun:* ${sourceLabel}\n\n` +
-            (lines.length
-              ? lines.join('\n\n')
-              : 'Rekaman ditemukan, tetapi file masih diproses oleh Zoom.') +
-            shareUrl +
-            passcode
-        )
+        return reply(`✅ *REKAMAN DITEMUKAN*\n\n` + `Link: ${shareUrl}\n` + `Passcode: ${passcode}`)
       }
       // ===== ADMIN POOL MANAGEMENT (per tier) =====
       case 'pool100':
