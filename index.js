@@ -87,6 +87,7 @@ const zoomPool = require('./lib/zoom-pool')
 const zoomPricing = require('./lib/zoom-pricing')
 const zoomLicense = require('./lib/zoom-license')
 const zoomBackdate = require('./lib/zoom-backdate')
+const { refreshAllLicenses, formatLicenseSummary } = require('./lib/zoom-license-refresh')
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 let pg
 if (usePg) {
@@ -638,6 +639,37 @@ moment.tz.setDefault('Asia/Jakarta').locale('id')
 
 // Global listener untuk webhook Midtrans (harus di luar module.exports agar bisa akses global)
 let globalRonzz = null
+
+if (!global.zoomLicenseSchedulerSetup) {
+  global.zoomLicenseSchedulerSetup = true
+  let running = false
+  cron.schedule(
+    '0 3 * * *',
+    async () => {
+      if (running) return
+      running = true
+      try {
+        const snapshot = await refreshAllLicenses()
+        if (global.db && global.db.data) {
+          global.db.data.zoomLicenseStatus = snapshot
+          if (typeof global.scheduleSave === 'function') global.scheduleSave()
+        }
+
+        const summary = formatLicenseSummary(snapshot)
+        console.log(`[ZOOM-LICENSE] ${summary.replace(/\n/g, ' | ')}`)
+        if (globalRonzz && global.ownerNomer) {
+          await globalRonzz.sendMessage(`${global.ownerNomer}@s.whatsapp.net`, { text: summary })
+        }
+      } catch (error) {
+        console.error('[ZOOM-LICENSE] Daily refresh failed:', error.message)
+      } finally {
+        running = false
+      }
+    },
+    { timezone: 'Asia/Jakarta' }
+  )
+  console.log('[ZOOM-LICENSE] Daily refresh scheduled at 03:00 Asia/Jakarta')
+}
 
 // Setup once: notify owner whenever a Zoom host transitions disabled<->enabled.
 // Fired by lib/zoom-pool.js when license check auto-marks a host.
@@ -3942,7 +3974,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           }
           if (error && [400, 401, 403].includes(error.status)) {
             return reply(
-              '❌ Rekaman gagal diakses. Pastikan Server-to-Server OAuth memiliki scope baca cloud recording, lalu aktifkan ulang app Zoom.'
+              `❌ Rekaman akun *${sourceLabel}* gagal diakses. Pastikan Server-to-Server OAuth akun tersebut memiliki scope baca cloud recording, lalu aktifkan ulang app Zoom.`
             )
           }
           return reply(
