@@ -3863,6 +3863,89 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
             `\n\n_Jalankan \`${prefix}largelist\` untuk lihat daftar terbaru._`
         )
       }
+      case 'zoomrecord':
+      case 'zoomrekaman':
+      case 'getrekaman': {
+        if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
+
+        const meetingId = String(q || '').replace(/\s+/g, '')
+        if (!/^\d{9,11}$/.test(meetingId)) {
+          return reply(
+            `❌ Format: \`${prefix}zoomrecord <meeting-id>\`\nContoh: \`${prefix}zoomrecord 84137438962\``
+          )
+        }
+
+        const candidates = []
+        if (
+          ['ZOOM_ACCOUNT_ID', 'ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET'].every(
+            (key) => process.env[key] && String(process.env[key]).trim()
+          )
+        ) {
+          candidates.push({ label: 'akun utama', creds: undefined })
+        }
+        for (const tier of zoomPool.VALID_TIERS) {
+          for (const host of zoomPool.loadPool(tier)) {
+            if (!candidates.some((item) => item.accountId === host.accountId)) {
+              candidates.push({
+                label: `${host.label} (${tier}p)`,
+                accountId: host.accountId,
+                creds: host,
+              })
+            }
+          }
+        }
+        if (!candidates.length) return reply('❌ Belum ada akun Zoom yang dikonfigurasi.')
+
+        let recording = null
+        let sourceLabel = ''
+        const errors = []
+        for (const candidate of candidates) {
+          try {
+            recording = await zoomClient.getMeetingRecordings({ meetingId, creds: candidate.creds })
+            sourceLabel = candidate.label
+            break
+          } catch (error) {
+            errors.push(error)
+          }
+        }
+
+        if (!recording) {
+          const forbidden = errors.find((error) => error && error.status === 401)
+          const missingScope = errors.find((error) => error && error.status === 400)
+          if (forbidden || missingScope) {
+            return reply(
+              '❌ Rekaman gagal diakses. Pastikan Server-to-Server OAuth memiliki scope baca cloud recording, lalu aktifkan ulang app Zoom.'
+            )
+          }
+          return reply(
+            '❌ Rekaman tidak ditemukan di akun utama maupun host pool. Pastikan meeting sudah selesai dan Cloud Recording aktif.'
+          )
+        }
+
+        const files = Array.isArray(recording.recording_files)
+          ? recording.recording_files.filter((file) => file && file.status !== 'deleted')
+          : []
+        const lines = files.map((file, index) => {
+          const sizeMb = Number(file.file_size || 0) / 1024 / 1024
+          const label = [file.file_type, file.recording_type].filter(Boolean).join(' • ')
+          const url = file.play_url || recording.share_url
+          return `${index + 1}. *${label || 'Recording'}*${sizeMb ? ` (${sizeMb.toFixed(1)} MB)` : ''}${url ? `\n   ${url}` : ''}`
+        })
+        const shareUrl = recording.share_url ? `\n\n🔗 *Link utama:* ${recording.share_url}` : ''
+        const passcode = recording.password ? `\n🔑 *Passcode rekaman:* ${recording.password}` : ''
+
+        return reply(
+          `🎬 *REKAMAN ZOOM*\n\n` +
+            `*Topik:* ${recording.topic || '-'}\n` +
+            `*Meeting ID:* ${meetingId}\n` +
+            `*Akun:* ${sourceLabel}\n\n` +
+            (lines.length
+              ? lines.join('\n\n')
+              : 'Rekaman ditemukan, tetapi file masih diproses oleh Zoom.') +
+            shareUrl +
+            passcode
+        )
+      }
       // ===== ADMIN POOL MANAGEMENT (per tier) =====
       case 'pool100':
       case 'pool300':
@@ -7658,7 +7741,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           `*🎬 ZOOM LEGACY (single host)*\n` +
           `• \`${p}zoomlarge\` / \`${p}zoom\` — bikin meeting Zoom Large\n` +
           `• \`${p}zoomlist\` / \`${p}largelist\` — list meeting\n` +
-          `• \`${p}delzoom <id>\` — hapus meeting Zoom Large\n\n` +
+          `• \`${p}delzoom <id>\` — hapus meeting Zoom Large\n` +
+          `• \`${p}zoomrecord <meeting-id>\` — ambil link rekaman cloud\n\n` +
           `*📦 PRODUK*\n` +
           `• \`${p}stok\` — list semua produk + stok\n` +
           `• \`${p}addproduk\` — tambah produk baru\n` +
