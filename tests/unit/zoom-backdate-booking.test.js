@@ -42,3 +42,37 @@ test('removes recording lookup history after 30 days', () => {
 
   expect(zoomBackdate.findBookingByMeetingId('84137438962')).toBeNull()
 })
+
+test('counts daily bookings per host account', () => {
+  const startAtUtcMs = Date.parse('2026-08-21T03:00:00.000Z')
+  for (const [hostAccountId, hour] of [
+    ['account-a', 3],
+    ['account-a', 5],
+    ['account-b', 7],
+  ]) {
+    zoomBackdate.recordBooking({
+      tier: 300,
+      hostAccountId,
+      meetingId: `${hostAccountId}-${hour}`,
+      realStartUtcMs: Date.parse(`2026-08-21T${String(hour).padStart(2, '0')}:00:00.000Z`),
+      durationMinutes: 60,
+    })
+  }
+
+  expect(
+    zoomBackdate.countBookingsForDay({
+      tier: 300,
+      hostAccountId: 'account-a',
+      startAtUtcMs,
+      timezone: 'Asia/Jakarta',
+    })
+  ).toBe(2)
+  expect(
+    zoomBackdate.countBookingsForDay({
+      tier: 300,
+      hostAccountId: 'account-b',
+      startAtUtcMs,
+      timezone: 'Asia/Jakarta',
+    })
+  ).toBe(1)
+})
