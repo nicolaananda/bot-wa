@@ -423,7 +423,7 @@ setInterval(clearExpiredCache, 10 * 60 * 1000)
 // ===============================================================
 
 /**
- * Parse fleksibel durasi: "60", "60 menit", "2 jam", "1 hari", "1h", "2j", "1d"
+ * Parse fleksibel durasi: "60", "60 menit", "2 jam", "1 hari", "1 minggu", "1 bulan"
  * @returns {{ minutes: number, raw: string } | null}
  */
 function parseZoomDuration(input) {
@@ -434,7 +434,7 @@ function parseZoomDuration(input) {
   const m = raw
     .toLowerCase()
     .match(
-      /^(\d+(?:[.,]\d+)?)\s*(menit|minute|minutes|min|m|jam|hour|hours|h|j|hari|day|days|d)?$/i
+      /^(\d+(?:[.,]\d+)?)\s*(menit|minute|minutes|min|m|jam|hour|hours|h|j|hari|day|days|d|minggu|week|weeks|w|bulan|month|months|mo)?$/i
     )
   if (!m) return null
   const n = parseFloat(m[1].replace(',', '.'))
@@ -449,8 +449,28 @@ function parseZoomDuration(input) {
   } else if (['jam', 'hour', 'hours', 'h', 'j'].includes(unit)) {
     minutes = n * 60
     unitKind = 'hour'
-  } else if (['hari', 'day', 'days', 'd'].includes(unit)) {
-    minutes = n * 60 * 24
+  } else if (
+    [
+      'hari',
+      'day',
+      'days',
+      'd',
+      'minggu',
+      'week',
+      'weeks',
+      'w',
+      'bulan',
+      'month',
+      'months',
+      'mo',
+    ].includes(unit)
+  ) {
+    const days = ['minggu', 'week', 'weeks', 'w'].includes(unit)
+      ? 7
+      : ['bulan', 'month', 'months', 'mo'].includes(unit)
+        ? 30
+        : 1
+    minutes = n * 60 * 24 * days
     unitKind = 'day'
   } else {
     minutes = n
@@ -511,7 +531,7 @@ function parseZoomForm(text) {
   if (result._errors.length) return result
 
   result.topic = fields.topic.slice(0, 200)
-  result.password = (fields.password || '').trim()
+  result.password = (fields.password || '').replace(/[^A-Za-z0-9@_*-]/g, '').slice(0, 10)
   if (fields.timezone) result.timezone = fields.timezone
 
   // Parse durasi DULU — kalau pakai satuan hari, mode full-day aktif
@@ -603,7 +623,7 @@ function buildZoomFormTemplate() {
     'Nama Meet: Rapat Koordinasi',
     'Tgl: 2026-05-20',
     'Jam: 14:00',
-    'Durasi: 1 jam / 2 jam / 3 jam / 1 hari',
+    'Durasi: 1 jam / 2 jam / 3 jam / 1 hari / 1 minggu / 1 bulan',
     'Password: rahasia1',
   ].join('\n')
 }
@@ -627,7 +647,9 @@ function buildZoomAgenda(detail) {
  *   2. bubble berisi HANYA template form (plain text, gampang di-copy)
  */
 async function sendZoomFormPrompt(nicola, m, from, { intro, footer }) {
-  const head = footer ? `${intro}\n\n${footer}` : intro
+  const passwordRule =
+    '🔐 Password otomatis dirapikan: spasi/karakter yang tidak didukung dihapus dan maksimal 10 karakter. Contoh: `nico la` menjadi `nicola`.'
+  const head = footer ? `${intro}\n\n${passwordRule}\n\n${footer}` : `${intro}\n\n${passwordRule}`
   await nicola.sendMessage(from, { text: head }, { quoted: m })
   await nicola.sendMessage(from, { text: buildZoomFormTemplate() })
 }
@@ -906,11 +928,6 @@ if (!global.midtransWebhookListenerSetup) {
             return
           }
 
-          // Mark as processed BEFORE creating to prevent duplicate webhook race
-          order.processed = true
-          db.data.order[sender] = order
-          await db.save()
-
           // Re-validate slot availability and create on the earmarked host.
           // allowFallback=true: kalau host yang di-earmark sudah penuh,
           // failover ke host lain di tier yang sama.
@@ -940,9 +957,10 @@ if (!global.midtransWebhookListenerSetup) {
             order.status = 'failed_create_meeting'
             order.failedAt = Date.now()
             order.failureReason = createResult ? createResult.error : 'unknown'
+            order.failureDetail = createResult && createResult.detail
             db.data.order[sender] = order
             await db.save()
-            // Notify customer + owner — refund manual
+            // Keep processed=false so a retried webhook can retry transient Zoom errors.
             const failMsg =
               `⚠️ *PEMBAYARAN BERHASIL TAPI MEETING GAGAL DIBUAT*\n\n` +
               `Order ID: ${orderId}\n` +
@@ -961,7 +979,8 @@ if (!global.midtransWebhookListenerSetup) {
                   `🚨 *ZOOM-QRIS REFUND REQUIRED*\n\n` +
                   `Customer: ${sender.split('@')[0]}\n` +
                   `Tier: ${tier}p\nAmount: Rp${Number(totalAmount).toLocaleString('id-ID')}\n` +
-                  `Order ID: ${orderId}\nRefId: ${reffId}\nReason: ${createResult ? createResult.error : 'unknown'}`,
+                  `Order ID: ${orderId}\nRefId: ${reffId}\nReason: ${createResult ? createResult.error : 'unknown'}` +
+                  (createResult && createResult.detail ? `\nDetail: ${createResult.detail}` : ''),
               })
             } catch (_) {
               /* ignore */
@@ -972,6 +991,12 @@ if (!global.midtransWebhookListenerSetup) {
           const meeting = createResult.meeting
           const usedHost = createResult.host
           const hostInfo = createResult.hostInfo
+
+          order.processed = true
+          order.status = 'completed'
+          order.completedAt = Date.now()
+          db.data.order[sender] = order
+          await db.save()
 
           // Delete QRIS bubble if present
           if (globalRonzz && messageKey) {
