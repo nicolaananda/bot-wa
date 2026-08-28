@@ -76,3 +76,23 @@ test('counts daily bookings per host account', () => {
     })
   ).toBe(1)
 })
+
+test('blocks a shared account across different requested tiers', () => {
+  const startAtUtcMs = Date.parse('2026-08-21T03:00:00.000Z')
+  zoomBackdate.recordBooking({
+    tier: 500,
+    hostAccountId: 'shared-1000',
+    meetingId: '500-booking',
+    realStartUtcMs: startAtUtcMs,
+    durationMinutes: 60,
+  })
+
+  expect(
+    zoomBackdate.findLocalConflicts({
+      tier: 1000,
+      hostAccountId: 'shared-1000',
+      startAtUtcMs: startAtUtcMs + 30 * 60 * 1000,
+      durationMinutes: 60,
+    })
+  ).toHaveLength(1)
+})

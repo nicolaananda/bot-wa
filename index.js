@@ -935,6 +935,7 @@ if (!global.midtransWebhookListenerSetup) {
           try {
             createResult = await zoomPool.createMeetingOnHost({
               tier,
+              poolTier: earmarkedHost.poolTier || tier,
               host: earmarkedHost,
               topic: zoomDetail.topic,
               startTimeIso: zoomDetail.startTimeIso,
@@ -2211,6 +2212,7 @@ module.exports = async (nicola, m, mek) => {
                         timezone: earmarkedHost.timezone,
                         hostKey: earmarkedHost.hostKey || '',
                         concurrentMeetings: earmarkedHost.concurrentMeetings,
+                        poolTier: preCheck.poolTier || tier,
                       },
                     },
                   }
@@ -3967,7 +3969,8 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
 
         if (String(booking.hostAccountId) !== primaryAccountId || booking.hostLabel) {
           const host = zoomPool
-            .loadPool(Number(booking.tier))
+            .loadHostsForTier(Number(booking.tier))
+            .map(({ host: candidate }) => candidate)
             .find(
               (item) =>
                 (booking.hostAccountId && item.accountId === String(booking.hostAccountId)) ||
@@ -4528,7 +4531,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           return reply(`❌ Tier tidak valid: ${tier}. Pakai 100 / 300 / 500 / 1000.`)
         }
 
-        const pool = zoomPool.loadPool(tier)
+        const pool = zoomPool.loadHostsForTier(tier).map(({ host }) => host)
         if (!pool.length) {
           return reply(`❌ Zoom ${tier}p kosong.`)
         }
@@ -4587,7 +4590,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           return reply(`❌ Tier tidak valid: ${tier}.`)
         }
 
-        const pool = zoomPool.loadPool(tier)
+        const pool = zoomPool.loadHostsForTier(tier).map(({ host }) => host)
         if (!pool.length) {
           return reply(`❌ Zoom ${tier}p kosong.`)
         }
