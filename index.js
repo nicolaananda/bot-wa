@@ -87,6 +87,7 @@ const zoomPool = require('./lib/zoom-pool')
 const zoomPricing = require('./lib/zoom-pricing')
 const zoomLicense = require('./lib/zoom-license')
 const zoomBackdate = require('./lib/zoom-backdate')
+const indukPool = require('./lib/induk-pool')
 const { refreshAllLicenses, formatLicenseSummary } = require('./lib/zoom-license-refresh')
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 let pg
@@ -2018,6 +2019,9 @@ module.exports = async (nicola, m, mek) => {
           'pool300del',
           'pool500del',
           'pool1000del',
+          'daftar300',
+          'invit',
+          'unlink',
           // user-facing buy via saldo (per tier)
           'zoom100',
           'zoom300',
@@ -4022,6 +4026,60 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         return reply(`✅ *REKAMAN DITEMUKAN*\n\n` + `Link: ${shareUrl}\n` + `Passcode: ${passcode}`)
       }
       // ===== ADMIN POOL MANAGEMENT (per tier) =====
+      // ===== ADMIN: MANAGE USERS ON THE SINGLE 300p PARENT =====
+      case 'daftar300':
+      case 'invit':
+      case 'unlink': {
+        if (!isOwner) return reply('❌ Hanya owner yang dapat menggunakan command ini')
+
+        try {
+          if (command === 'daftar300') {
+            await reply('⏳ Mengambil daftar user dari satu induk Zoom 300...')
+            const { parent, users } = await indukPool.listUsers()
+            if (!users.length) return reply(`📋 Tidak ada user pada induk *${parent.label}*.`)
+
+            const lines = users.map((user, index) => {
+              const type =
+                Number(user.type) === 1
+                  ? 'Basic'
+                  : Number(user.type) === 2
+                    ? 'Licensed'
+                    : `Type ${user.type || '-'}`
+              return (
+                `${index + 1}. *${user.email || '-'}*\n   ${user.first_name || ''} ${user.last_name || ''}`.trimEnd() +
+                ` • ${type} • ${user.status || '-'}`
+              )
+            })
+            return reply(`📋 *USER INDUK ZOOM 300*\n_${parent.label}_\n\n${lines.join('\n')}`)
+          }
+
+          const email = String(q || '')
+            .trim()
+            .toLowerCase()
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return reply(`❌ Format: \`${prefix}${command} email@zoom.us\``)
+          }
+
+          if (command === 'invit') {
+            const { parent, existing } = await indukPool.inviteBasic(email)
+            if (existing)
+              return reply(
+                `ℹ️ *${email}* sudah terdaftar dengan status *${existing.status || '-'}* di induk ${parent.label}.`
+              )
+            return reply(
+              `✅ Undangan Basic untuk *${email}* sudah dikirim melalui induk *${parent.label}*.`
+            )
+          }
+
+          const { parent, found } = await indukPool.unlink(email)
+          if (!found) return reply(`❌ User *${email}* tidak ditemukan di induk ${parent.label}.`)
+          return reply(`✅ *${email}* berhasil di-unlink dari induk *${parent.label}*.`)
+        } catch (error) {
+          const detail = error && error.message ? error.message : String(error)
+          console.error('[ZOOM-300-USERS]', detail)
+          return reply(`❌ Operasi user Zoom gagal: ${detail}`)
+        }
+      }
       case 'pool100':
       case 'pool300':
       case 'pool500':
