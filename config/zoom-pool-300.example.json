@@ -6,7 +6,6 @@
     "clientSecret": "PASTE_CLIENT_SECRET_HERE",
     "userId": "me",
     "timezone": "Asia/Jakarta",
-    "hostKey": "",
     "exp": "12/07/2026",
     "concurrentMeetings": 2,
     "notes": "Akun Zoom 300p. Lisensi Business mendukung 2 concurrent meetings per host."

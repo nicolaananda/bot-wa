@@ -1035,11 +1035,7 @@ if (!global.midtransWebhookListenerSetup) {
           const hostName =
             (hostInfo && (hostInfo.first_name || hostInfo.display_name || hostInfo.email)) ||
             usedHost.label
-          const hostKey =
-            (hostInfo && hostInfo.host_key ? String(hostInfo.host_key).trim() : '') ||
-            (usedHost && usedHost.hostKey ? String(usedHost.hostKey).trim() : '') ||
-            String(process.env.ZOOM_DEFAULT_HOSTKEY || '').trim() ||
-            '123123'
+          const hostKey = hostInfo.host_key
 
           const inviteLines = [
             `${hostName} is inviting you to a scheduled Zoom meeting.`,
@@ -2214,7 +2210,6 @@ module.exports = async (nicola, m, mek) => {
                         clientSecret: earmarkedHost.clientSecret,
                         userId: earmarkedHost.userId,
                         timezone: earmarkedHost.timezone,
-                        hostKey: earmarkedHost.hostKey || '',
                         concurrentMeetings: earmarkedHost.concurrentMeetings,
                         poolTier: preCheck.poolTier || tier,
                       },
@@ -2453,12 +2448,7 @@ module.exports = async (nicola, m, mek) => {
                 const hostName =
                   (hostInfo && (hostInfo.first_name || hostInfo.display_name || hostInfo.email)) ||
                   host.label
-                // Host key fallback: API -> pool entry -> env default -> '123123'
-                const hostKey =
-                  (hostInfo && hostInfo.host_key ? String(hostInfo.host_key).trim() : '') ||
-                  (host && host.hostKey ? String(host.hostKey).trim() : '') ||
-                  String(process.env.ZOOM_DEFAULT_HOSTKEY || '').trim() ||
-                  '123123'
+                const hostKey = hostInfo.host_key
 
                 // ==== Bubble 1: info / pembelian / host pool ====
                 const infoLines = []
@@ -2575,6 +2565,9 @@ module.exports = async (nicola, m, mek) => {
               console.warn('[ZOOM] conflict check skipped:', preErr && preErr.message)
             }
 
+            const hostInfo = await zoomClient.getUser({ requireHostKey: true })
+            const hostName = hostInfo.first_name || hostInfo.display_name || hostInfo.email || ''
+            const hostKey = hostInfo.host_key
             const meeting = await zoomClient.createMeeting({
               topic: parsed.topic,
               startTime: parsed.startTimeIso,
@@ -2595,22 +2588,6 @@ module.exports = async (nicola, m, mek) => {
             })
 
             delete db.data.zoomFlow[sender]
-
-            // Fetch host info (first_name for invite, host_key if scope granted)
-            let hostName = ''
-            let hostKey = ''
-            try {
-              const u = await zoomClient.getUser()
-              hostName = (u && (u.first_name || u.display_name || u.email || '')).toString()
-              hostKey = u && u.host_key ? String(u.host_key).trim() : ''
-            } catch (uErr) {
-              // Scope user:read:* belum ada -> lanjut tanpa host info
-              console.warn('[ZOOM] getUser skipped:', uErr && uErr.message)
-            }
-            // Fallback: env default, lalu literal '123123' kalau semua kosong
-            if (!hostKey) {
-              hostKey = String(process.env.ZOOM_DEFAULT_HOSTKEY || '').trim() || '123123'
-            }
 
             const meetingIdFmt = String(meeting.id).replace(/(\d{3})(\d{4})(\d+)/, '$1 $2 $3')
             const timeZoneShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(
@@ -4298,14 +4275,14 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           `userId=me\n` +
           `timezone=Asia/Jakarta\n` +
           `concurrentMeetings=1\n` +
-          `hostKey=123456\n` +
           `exp=12/07/2026\n` +
           `exp=12/07/2026\n` +
           `notes=catatan opsional\n` +
           '```\n\n' +
           `*Wajib:* accountId, clientId, clientSecret\n` +
           `*Opsional:* label (auto), userId (default: me), timezone, concurrentMeetings ` +
-          `(default tier ${tier} = ${zoomPool.TIER_DEFAULT_CONCURRENT[tier] || 1}), hostKey, exp (format DD/MM/YYYY), notes\n\n` +
+          `(default tier ${tier} = ${zoomPool.TIER_DEFAULT_CONCURRENT[tier] || 1}), exp (format DD/MM/YYYY), notes\n\n` +
+          `Host key wajib tersedia dari Zoom API (scope user:read:user:admin).\n` +
           `Setelah submit, bot otomatis cek lisensi via Zoom API.\n` +
           `Kalau Basic / capacity kurang, host tetap disimpan tapi bot kasih warning.\n` +
           `Kalau exp kosong, host dianggap tidak punya expired.\n\n` +
@@ -4375,7 +4352,6 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           label: pick('label') || `Host ${String(accountIdVal).slice(0, 6)}`,
           userId: pick('userId', 'userid', 'user_id') || 'me',
           timezone: pick('timezone') || null,
-          hostKey: pick('hostKey', 'hostkey', 'host_key') || '',
           exp: pick('exp', 'expired', 'expiry', 'expireDate', 'expire_date') || null,
           notes: pick('notes', 'note') || '',
         }
