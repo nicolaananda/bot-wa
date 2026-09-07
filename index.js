@@ -777,8 +777,6 @@ if (!global.midtransWebhookListenerSetup) {
           date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
         })
         if (result.credited) {
-          db.data.users[sender].saldo =
-            Number(db.data.users[sender].saldo || 0) + result.item.amount
           await db.appendTransaction(result.item, { persist: false })
         }
         delete db.data.orderDeposit[sender]
@@ -2266,8 +2264,7 @@ module.exports = async (nicola, m, mek) => {
                   tier
                 )
 
-                if (!db.data.users[sender]) db.data.users[sender] = { saldo: 0, role: 'bronze' }
-                const saldoUser = Number(db.data.users[sender].saldo || 0)
+                const saldoUser = await dbHelper.getUserSaldoAsync(sender)
                 if (saldoUser < priceInfo.price) {
                   delete db.data.zoomFlow[sender]
                   const kurang = priceInfo.price - saldoUser
@@ -2374,14 +2371,40 @@ module.exports = async (nicola, m, mek) => {
                 // Debit saldo + log transaksi kalau buy mode
                 let saldoSesudah = 0
                 if (flowIsBuy && priceInfo) {
-                  const prev = Number(db.data.users[sender].saldo || 0)
-                  saldoSesudah = Math.max(0, prev - priceInfo.price)
-                  db.data.users[sender].saldo = saldoSesudah
-                  try {
-                    setCachedSaldo(sender, saldoSesudah)
-                  } catch {
-                    /* ignore cache errors */
+                  // ponytail: durable evidence, not an atomic debit ledger; reconcile manually by ref.
+                  const debitRef = `ZOOM-${meeting.id}-DEBIT`
+                  const debitEvidence = await db.appendTransaction({
+                    reffId: debitRef,
+                    purchaseRef: `ZOOM-${meeting.id}`,
+                    type: 'wallet_reconciliation',
+                    status: 'debit_pending',
+                    user: sender.split('@')[0],
+                    debitAmount: priceInfo.price,
+                    date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
+                    meetingId: String(meeting.id),
+                    hostAccountId: host.accountId,
+                    hostLabel: host.label,
+                    tier,
+                  })
+                  const debited = await dbHelper.updateUserSaldo(
+                    sender,
+                    priceInfo.price,
+                    'subtract'
+                  )
+                  const debitStatus = debited === true ? 'debit_confirmed' : 'debit_unconfirmed'
+                  const debitSaved = await pg.query(
+                    `UPDATE transaksi SET status=$2, meta=jsonb_set(meta, '{status}', to_jsonb($2::text)) WHERE ref_id=$1`,
+                    [debitRef, debitStatus]
+                  )
+                  if (debitSaved.rowCount !== 1)
+                    throw new Error(`Debit reconciliation required: ${debitRef}`)
+                  debitEvidence.status = debitStatus
+                  if (debited !== true) {
+                    return reply(
+                      `Debit belum terkonfirmasi. Meeting tidak dikirim. Hubungi admin dengan ref ${debitRef}; jangan ulangi pembelian.`
+                    )
                   }
+                  saldoSesudah = await dbHelper.getUserSaldoAsync(sender)
 
                   // Log transaksi — mirror structure pada buy flow existing
                   if (!db.data.transaksi) db.data.transaksi = []
@@ -2393,7 +2416,7 @@ module.exports = async (nicola, m, mek) => {
                     profit: priceInfo.price,
                     jumlah: 1,
                     user: sender.split('@')[0],
-                    userRole: db.data.users[sender].role || 'bronze',
+                    userRole: db.data.users[sender]?.role || 'bronze',
                     reffId: `ZOOM-${meeting.id}`,
                     metodeBayar: 'Saldo',
                     totalBayar: priceInfo.price,
@@ -6275,8 +6298,26 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         }
         break
 
+      case 'getbalance':
+        if (!isOwner) return reply('Perintah ini khusus owner.')
+        if (isGroup || from !== sender) return reply('Gunakan perintah ini di chat pribadi bot.')
+        return reply(await require('./lib/otp').getBalance())
+
+      case 'otp':
+        if (isGroup || from !== sender) return reply('Gunakan perintah OTP di chat pribadi bot.')
+        return reply(await require('./lib/otp').command(sender, q || ''))
+
       case 'buy':
         {
+          if (/^otp(?:\s|$)/i.test(q || '')) {
+            if (isGroup || from !== sender)
+              return reply('Gunakan perintah OTP di chat pribadi bot.')
+            if (!isOwner && !(await checkRateLimit(sender, 'buy', 3, 60)).allowed)
+              return reply('Terlalu banyak pembelian. Tunggu satu menit.')
+            return reply(
+              await require('./lib/otp').command(sender, q.replace(/^otp\s*/i, ''), true)
+            )
+          }
           // 🛡️ RATE LIMIT: Prevent spam (max 3 buy per minute for non-owners)
           if (!isOwner) {
             const rateLimit = await checkRateLimit(sender, 'buy', 3, 60)
@@ -6421,8 +6462,36 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   : 'Sedang memproses pembelian dengan saldo...'
               )
 
-              // Kurangi saldo user (PG)
-              await dbHelper.updateUserSaldo(sender, totalHarga, 'subtract')
+              // Keep evidence outside expiring orders and finally cleanup.
+              const debitRef = `${reffId}-DEBIT`
+              const debitEvidence = await db.appendTransaction({
+                reffId: debitRef,
+                purchaseRef: reffId,
+                type: 'wallet_reconciliation',
+                status: 'debit_pending',
+                user: sender.split('@')[0],
+                debitAmount: totalHarga,
+                productId: data[0],
+                quantity: jumlah,
+                targetNumber,
+                date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
+              })
+              const debited = await dbHelper.updateUserSaldo(sender, totalHarga, 'subtract')
+              const debitStatus = debited === true ? 'debit_confirmed' : 'debit_unconfirmed'
+              const debitSaved = await pg.query(
+                `UPDATE transaksi SET status=$2, meta=jsonb_set(meta, '{status}', to_jsonb($2::text)) WHERE ref_id=$1`,
+                [debitRef, debitStatus]
+              )
+              if (debitSaved.rowCount !== 1)
+                throw new Error(`Debit reconciliation required: ${debitRef}`)
+              debitEvidence.status = debitStatus
+              if (debited !== true) {
+                delete db.data.order[sender]
+                requestPendingOrderSave()
+                return reply(
+                  `Saldo tidak cukup, sedang direservasi, atau debit belum terkonfirmasi. Hubungi admin dengan ref ${reffId}; jangan ulangi pembelian.`
+                )
+              }
 
               await sleep(1000)
 
@@ -6693,7 +6762,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             } catch (error) {
               console.log('Error processing buy:', error)
               reply(
-                'Terjadi kesalahan saat memproses pembelian. Silakan coba lagi atau hubungi admin.'
+                `Terjadi kesalahan saat memproses pembelian. Hubungi admin dengan ref ${reffId}; jangan ulangi pembelian sebelum saldo diperiksa.`
               )
             } finally {
               delete db.data.order[sender]
@@ -6899,62 +6968,11 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             // Clean phone number (remove +, -, spaces, etc)
             phoneNumber = phoneNumber.replace(/[^0-9]/g, '')
 
-            // Check both formats: with and without @s.whatsapp.net suffix
-            const cleanPhoneNumber = phoneNumber
-            const targetUserIdWithSuffix = phoneNumber + '@s.whatsapp.net'
-
-            // Try to find user in database with both formats
-            let targetUser = null
-            let foundKey = null
-
-            if (db.data.users && db.data.users[cleanPhoneNumber]) {
-              targetUser = db.data.users[cleanPhoneNumber]
-              foundKey = cleanPhoneNumber
-            } else if (db.data.users && db.data.users[targetUserIdWithSuffix]) {
-              targetUser = db.data.users[targetUserIdWithSuffix]
-              foundKey = targetUserIdWithSuffix
-            }
-
-            if (targetUser) {
-              // Try to get saldo from cache first for better performance
-              let saldo = getCachedSaldo(foundKey)
-              if (saldo === null) {
-                // If not in cache, get from database and cache it
-                saldo = parseInt(targetUser.saldo) || 0
-                setCachedSaldo(foundKey, saldo)
-              }
-
-              const username = targetUser.username || `User ${cleanPhoneNumber.slice(-4)}`
-
-              reply(
-                `*💰 Cek Saldo User (Owner Only)*\n\n👤 *User:* ${username}\n📱 *Nomor HP:* ${cleanPhoneNumber}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`
-              )
-            } else {
-              // User not found, create new user with 0 saldo
-              if (!db.data.users) db.data.users = {}
-
-              // Create user with both formats
-              db.data.users[cleanPhoneNumber] = {
-                saldo: 0,
-                role: 'bronze',
-                username: `User ${cleanPhoneNumber.slice(-4)}`,
-                createdAt: new Date().toISOString(),
-              }
-
-              // Also create with suffix format for consistency
-              db.data.users[targetUserIdWithSuffix] = {
-                saldo: 0,
-                role: 'bronze',
-                username: `User ${cleanPhoneNumber.slice(-4)}`,
-                createdAt: new Date().toISOString(),
-              }
-
-              await db.save()
-
-              reply(
-                `*💰 Cek Saldo User (Owner Only)*\n\n👤 *User:* User ${cleanPhoneNumber.slice(-4)}\n📱 *Nomor HP:* ${cleanPhoneNumber}\n💳 *Saldo:* Rp0\n\n👑 *Checked by:* Owner\n\n💡 *Info:* User baru dibuat dengan saldo 0`
-              )
-            }
+            if (!/^[0-9]{7,15}$/.test(phoneNumber)) return reply('Nomor HP tidak valid.')
+            const ownerSaldo = await dbHelper.getUserSaldoAsync(phoneNumber)
+            return reply(
+              `*Cek Saldo User (Owner Only)*\n\nNomor HP: ${phoneNumber}\nSaldo: Rp${toRupiah(ownerSaldo)}`
+            )
           }
           // Check if this is a reply/quote reply
           else if (m.quoted) {
@@ -6970,91 +6988,13 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             // Get the quoted message sender - use m.quoted.sender which is processed by myfunc.js
             const quotedSender = m.quoted.sender
 
-            // Debug: Log the quoted message structure
-            console.log('🔍 Quote Debug:', {
-              quotedSender,
-              quoted: m.quoted,
-              participant: m.quoted.participant,
-              key: m.quoted.key,
-              sender: m.quoted.sender,
-              isQuotedMsg: m.isQuotedMsg,
-              contextInfo: m.msg?.contextInfo,
-            })
-
-            if (quotedSender) {
-              // Extract user ID from quoted sender
-              const targetUserId = quotedSender.split('@')[0]
-              const targetUserIdWithSuffix = quotedSender
-
-              // Try to find user in database with both formats
-              let targetUser = null
-              let foundKey = null
-
-              if (db.data.users && db.data.users[targetUserId]) {
-                targetUser = db.data.users[targetUserId]
-                foundKey = targetUserId
-              } else if (db.data.users && db.data.users[targetUserIdWithSuffix]) {
-                targetUser = db.data.users[targetUserIdWithSuffix]
-                foundKey = targetUserIdWithSuffix
-              }
-
-              // Debug: Log database search
-              console.log('🔍 Database Search:', {
-                targetUserId,
-                targetUserIdWithSuffix,
-                foundInDB: !!targetUser,
-                foundKey,
-                availableKeys: Object.keys(db.data.users || {}).slice(0, 5), // Show first 5 keys
-              })
-
-              if (targetUser) {
-                // Try to get saldo from cache first for better performance
-                let saldo = getCachedSaldo(foundKey)
-                if (saldo === null) {
-                  // If not in cache, get from database and cache it
-                  saldo = parseInt(targetUser.saldo) || 0
-                  setCachedSaldo(foundKey, saldo)
-                }
-
-                const username = targetUser.username || `User ${targetUserId.slice(-4)}`
-
-                reply(
-                  `*💰 Cek Saldo User Lain (Owner Only)*\n\n👤 *User:* ${username}\n🆔 *ID:* ${targetUserId}\n💳 *Saldo:* Rp${toRupiah(saldo)}\n\n👑 *Checked by:* Owner`,
-                  { quoted: m }
-                )
-              } else {
-                // User not found, create new user with 0 saldo
-                if (!db.data.users) db.data.users = {}
-
-                // Create user with both formats
-                db.data.users[targetUserId] = {
-                  saldo: 0,
-                  role: 'bronze',
-                  username: `User ${targetUserId.slice(-4)}`,
-                  createdAt: new Date().toISOString(),
-                }
-
-                // Also create with suffix format for consistency
-                db.data.users[targetUserIdWithSuffix] = {
-                  saldo: 0,
-                  role: 'bronze',
-                  username: `User ${targetUserId.slice(-4)}`,
-                  createdAt: new Date().toISOString(),
-                }
-
-                await db.save()
-
-                reply(
-                  `*💰 Cek Saldo User Lain (Owner Only)*\n\n👤 *User:* User ${targetUserId.slice(-4)}\n🆔 *ID:* ${targetUserId}\n💳 *Saldo:* Rp0\n\n👑 *Checked by:* Owner\n\n💡 *Info:* User baru dibuat dengan saldo 0`,
-                  { quoted: m }
-                )
-              }
-            } else {
-              reply(
-                `❌ Tidak bisa mendapatkan informasi user dari pesan yang di-reply.\n\n💡 *Tips:* Reply/quote reply pesan user lain yang ingin di-cek saldonya.\n\n🔍 *Debug Info:*\n• Quoted Structure: ${JSON.stringify(m.quoted, null, 2)}`,
-                { quoted: m }
-              )
+            if (!/^[0-9]+(?:@s\.whatsapp\.net)?$/.test(quotedSender || '')) {
+              return reply('Tidak bisa mendapatkan nomor user dari pesan yang di-reply.')
             }
+            const ownerSaldo = await dbHelper.getUserSaldoAsync(quotedSender)
+            return reply(
+              `*Cek Saldo User (Owner Only)*\n\nID: ${quotedSender.split('@')[0]}\nSaldo: Rp${toRupiah(ownerSaldo)}`
+            )
           } else {
             // If not reply and no parameter, check own saldo (all users can do this)
             // Self saldo check
@@ -7099,10 +7039,10 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             }
           }
 
-          const previousSaldo = Number(db.data.users[nomorNya].saldo || 0)
-          await dbHelper.updateUserSaldo(nomorNya, nominal, 'add')
-          await sleep(50)
-          const newSaldo = Number(db.data.users[nomorNya].saldo || previousSaldo + nominal)
+          const previousSaldo = await dbHelper.getUserSaldoAsync(nomorNya)
+          if (!(await dbHelper.updateUserSaldo(nomorNya, nominal, 'add')))
+            return reply('Perubahan saldo gagal atau belum pasti. Cek saldo sebelum mencoba lagi.')
+          const newSaldo = await dbHelper.getUserSaldoAsync(nomorNya)
 
           try {
             await dbHelper.recordSaldoHistory({
@@ -7124,7 +7064,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           nicola.sendMessage(
             from,
             {
-              text: `*SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}`,
+              text: `*SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(newSaldo)}`,
               mentions: [nomorNya],
             },
             { quoted: m }
@@ -7132,7 +7072,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
           // Notifikasi ke user yang ditambahkan saldonya
           nicola.sendMessage(nomorNya, {
-            text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(db.data.users[nomorNya].saldo)}\n\n*By:* @${sender.split('@')[0]}`,
+            text: `💰 *SALDO BERHASIL DITAMBAHKAN!*\n\n👤 *User:* @${nomorNya.split('@')[0]}\n💰 *Nominal:* Rp${toRupiah(nominal)}\n💳 *Saldo Sekarang:* Rp${toRupiah(newSaldo)}\n\n*By:* @${sender.split('@')[0]}`,
             mentions: [nomorNya, sender],
           })
         }
@@ -7157,19 +7097,17 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           }
 
           // Validate saldo before deduction
-          if (db.data.users[nomorNya].saldo <= 0)
+          const previousSaldo = await dbHelper.getUserSaldoAsync(nomorNya)
+          if (previousSaldo <= 0)
             return reply('User belum terdaftar di database saldo atau saldo 0.')
-          if (db.data.users[nomorNya].saldo < nominal)
+          if (previousSaldo < nominal)
             return reply(
-              `Saldo user tidak cukup! Saldo: Rp${toRupiah(db.data.users[nomorNya].saldo)}, yang ingin dikurangi: Rp${toRupiah(nominal)}`
+              `Saldo user tidak cukup! Saldo: Rp${toRupiah(previousSaldo)}, yang ingin dikurangi: Rp${toRupiah(nominal)}`
             )
 
-          const previousSaldo = Number(db.data.users[nomorNya].saldo || 0)
-          await dbHelper.updateUserSaldo(nomorNya, nominal, 'subtract')
-          await sleep(50)
-          const newSaldo = Number(
-            db.data.users[nomorNya].saldo || Math.max(0, previousSaldo - nominal)
-          )
+          if (!(await dbHelper.updateUserSaldo(nomorNya, nominal, 'subtract')))
+            return reply('Perubahan saldo gagal atau belum pasti. Cek saldo sebelum mencoba lagi.')
+          const newSaldo = await dbHelper.getUserSaldoAsync(nomorNya)
 
           try {
             await dbHelper.recordSaldoHistory({

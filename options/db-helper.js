@@ -1,50 +1,56 @@
-require('dotenv').config();
-const crypto = require('crypto');
-const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
-let pg; if (usePg) { pg = require('../config/postgres'); }
-const SALDO_HISTORY_LIMIT = Number(process.env.SALDO_HISTORY_LIMIT || 2000);
-let saldoHistoryTablePromise = null;
+require('dotenv').config()
+const crypto = require('crypto')
+const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
+let pg
+if (usePg) {
+  pg = require('../config/postgres')
+}
+const { walletQuery, ensureOtpWalletSchema } = require('../lib/otp-wallet')
+const SALDO_HISTORY_LIMIT = Number(process.env.SALDO_HISTORY_LIMIT || 2000)
+let saldoHistoryTablePromise = null
 
 function ensureDbData() {
-  if (!global.db) global.db = { data: {} };
-  if (!global.db.data) global.db.data = {};
-  return global.db.data;
+  if (!global.db) global.db = { data: {} }
+  if (!global.db.data) global.db.data = {}
+  return global.db.data
 }
 
 function normalizeUserId(userId) {
-  if (!userId) return null;
-  if (/@s\.whatsapp\.net$/i.test(userId)) return userId;
-  const digits = String(userId).replace(/[^0-9]/g, '');
-  if (!digits) return userId;
-  return `${digits}@s.whatsapp.net`;
+  if (!userId) return null
+  if (/@s\.whatsapp\.net$/i.test(userId)) return userId
+  const digits = String(userId).replace(/[^0-9]/g, '')
+  if (!digits) return userId
+  return `${digits}@s.whatsapp.net`
 }
 
 function collectUserIdVariants(userId) {
-  const variants = new Set();
-  if (userId) variants.add(userId);
-  const normalized = normalizeUserId(userId);
-  if (normalized) variants.add(normalized);
+  const variants = new Set()
+  if (userId) variants.add(userId)
+  const normalized = normalizeUserId(userId)
+  if (normalized) variants.add(normalized)
   if (normalized) {
-    const digits = normalized.replace(/@s\.whatsapp\.net$/i, '');
+    const digits = normalized.replace(/@s\.whatsapp\.net$/i, '')
     if (digits) {
-      variants.add(digits);
-      variants.add(`${digits}@s.whatsapp.net`);
+      variants.add(digits)
+      variants.add(`${digits}@s.whatsapp.net`)
     }
   }
-  return Array.from(variants).filter(Boolean);
+  return Array.from(variants).filter(Boolean)
 }
 
 function generateHistoryId() {
   if (crypto.randomUUID) {
-    return `SAL-${crypto.randomUUID()}`;
+    return `SAL-${crypto.randomUUID()}`
   }
-  return `SAL-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  return `SAL-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 }
 
 async function ensureSaldoHistoryTable() {
-  if (!usePg) return true;
+  if (!usePg) return true
   if (!saldoHistoryTablePromise) {
-    saldoHistoryTablePromise = pg.query(`
+    saldoHistoryTablePromise = pg
+      .query(
+        `
       CREATE TABLE IF NOT EXISTS saldo_history (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
@@ -61,32 +67,34 @@ async function ensureSaldoHistoryTable() {
         meta JSONB,
         created_at TIMESTAMP DEFAULT NOW()
       )
-    `).catch((error) => {
-      console.error('[DB] Failed to ensure saldo_history table:', error.message);
-      saldoHistoryTablePromise = null;
-    });
+    `
+      )
+      .catch((error) => {
+        console.error('[DB] Failed to ensure saldo_history table:', error.message)
+        saldoHistoryTablePromise = null
+      })
   }
   try {
-    await saldoHistoryTablePromise;
+    await saldoHistoryTablePromise
   } catch {
     // noop
   }
-  return true;
+  return true
 }
 
 // Helper function untuk memastikan database tersimpan (no-op untuk PG)
 async function ensureDatabaseSaved() {
-  if (usePg) return true;
+  if (usePg) return true
   try {
     if (global.db) {
-      await global.db.save();
-      console.log('Database saved successfully');
-      return true;
+      await global.db.save()
+      console.log('Database saved successfully')
+      return true
     }
-    return false;
+    return false
   } catch (error) {
-    console.error('Error saving database:', error);
-    return false;
+    console.error('Error saving database:', error)
+    return false
   }
 }
 
@@ -94,112 +102,125 @@ async function ensureDatabaseSaved() {
 async function updateUserSaldo(userId, amount, operation = 'add') {
   try {
     if (usePg) {
-      const delta = Number(amount) || 0;
-      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`;
-      const idNo = userId.replace(/@s\.whatsapp\.net$/, '');
+      const delta = Number(amount)
+      if (
+        typeof userId !== 'string' ||
+        !/^[0-9]+(?:@s\.whatsapp\.net)?$/.test(userId) ||
+        !['number', 'string'].includes(typeof amount) ||
+        String(amount).trim() === '' ||
+        !['add', 'subtract', 'set'].includes(operation) ||
+        !Number.isFinite(delta) ||
+        delta < 0 ||
+        Math.abs(delta * 100 - Math.round(delta * 100)) > 1e-6 ||
+        !Number.isSafeInteger(Math.round(delta * 100))
+      )
+        return false
+      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`
+      let result
       if (operation === 'set') {
-        await pg.query(
-          'INSERT INTO users(user_id, saldo, role, data) VALUES ($1,$2,COALESCE((SELECT role FROM users WHERE user_id=$1),' + "'bronze'" + '), COALESCE((SELECT data FROM users WHERE user_id=$1),' + "'{}'" + '::jsonb)) ON CONFLICT (user_id) DO UPDATE SET saldo=$2',
+        result = await walletQuery(
+          'INSERT INTO users(user_id, saldo, role, data) VALUES ($1,$2,COALESCE((SELECT role FROM users WHERE user_id=$1),' +
+            "'bronze'" +
+            '), COALESCE((SELECT data FROM users WHERE user_id=$1),' +
+            "'{}'" +
+            '::jsonb)) ON CONFLICT (user_id) DO UPDATE SET saldo=$2',
           [idWith, delta]
-        );
+        )
       } else if (operation === 'subtract') {
-        await pg.query('UPDATE users SET saldo = GREATEST(saldo - $2, 0) WHERE user_id=$1', [idWith, Math.abs(delta)]);
+        result = await walletQuery(
+          `UPDATE users SET saldo = saldo - $2::numeric WHERE user_id=$1
+          AND saldo >= $2::numeric`,
+          [idWith, delta]
+        )
       } else {
-        await pg.query('INSERT INTO users(user_id, saldo, role, data) VALUES ($1,$2,' + "'bronze'" + ', ' + "'{}'" + '::jsonb) ON CONFLICT (user_id) DO UPDATE SET saldo = users.saldo + EXCLUDED.saldo', [idWith, Math.abs(delta)]);
+        result = await walletQuery(
+          'INSERT INTO users(user_id, saldo, role, data) VALUES ($1,$2,' +
+            "'bronze'" +
+            ', ' +
+            "'{}'" +
+            '::jsonb) ON CONFLICT (user_id) DO UPDATE SET saldo = users.saldo + EXCLUDED.saldo',
+          [idWith, delta]
+        )
       }
-      // Update in-memory snapshot for compatibility
-      if (!global.db.data) global.db.data = {};
-      if (!global.db.data.users) global.db.data.users = {};
-      if (!global.db.data.users[idWith]) global.db.data.users[idWith] = { saldo: 0, role: 'bronze' };
-      if (!global.db.data.users[idNo]) global.db.data.users[idNo] = { saldo: 0, role: 'bronze' };
-      if (operation === 'set') {
-        global.db.data.users[idWith].saldo = delta;
-        global.db.data.users[idNo].saldo = delta;
-      } else if (operation === 'subtract') {
-        const nv = Math.max(0, Number(global.db.data.users[idWith].saldo || 0) - Math.abs(delta));
-        global.db.data.users[idWith].saldo = nv;
-        global.db.data.users[idNo].saldo = nv;
-      } else {
-        const nv = Number(global.db.data.users[idWith].saldo || 0) + Math.abs(delta);
-        global.db.data.users[idWith].saldo = nv;
-        global.db.data.users[idNo].saldo = nv;
-      }
-      return true;
+      // SQL writes must not become a second legacy snapshot delta.
+      return result.rowCount === 1
     } else {
       if (!global.db || !global.db.data || !global.db.data.users) {
-        console.error('Database not initialized');
-        return false;
+        console.error('Database not initialized')
+        return false
       }
-      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`;
-      const idNo = userId.replace(/@s\.whatsapp\.net$/, '');
+      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`
+      const idNo = userId.replace(/@s\.whatsapp\.net$/, '')
 
-      if (!global.db.data.users[idWith]) global.db.data.users[idWith] = { saldo: 0, role: 'bronze' };
-      if (!global.db.data.users[idNo]) global.db.data.users[idNo] = { saldo: 0, role: 'bronze' };
+      if (!global.db.data.users[idWith]) global.db.data.users[idWith] = { saldo: 0, role: 'bronze' }
+      if (!global.db.data.users[idNo]) global.db.data.users[idNo] = { saldo: 0, role: 'bronze' }
 
       const applyOp = (current, op, amt) => {
-        if (op === 'add') return Number(current || 0) + Number(amt);
-        if (op === 'subtract') return Math.max(0, Number(current || 0) - Number(amt));
-        if (op === 'set') return Number(amt);
-        return Number(current || 0);
-      };
+        if (op === 'add') return Number(current || 0) + Number(amt)
+        if (op === 'subtract') return Math.max(0, Number(current || 0) - Number(amt))
+        if (op === 'set') return Number(amt)
+        return Number(current || 0)
+      }
 
-      const nextSaldo = applyOp(global.db.data.users[idWith].saldo, operation, amount);
-      global.db.data.users[idWith].saldo = nextSaldo;
-      global.db.data.users[idNo].saldo = nextSaldo;
+      const nextSaldo = applyOp(global.db.data.users[idWith].saldo, operation, amount)
+      global.db.data.users[idWith].saldo = nextSaldo
+      global.db.data.users[idNo].saldo = nextSaldo
 
       // Use debounced save if available, otherwise immediate save
       if (typeof global.scheduleSave === 'function') {
-        global.scheduleSave();
+        global.scheduleSave()
       } else {
-        await global.db.save();
+        await global.db.save()
       }
-      console.log(`User ${idWith}/${idNo} saldo updated: ${nextSaldo}`);
-      return true;
+      console.log(`User ${idWith}/${idNo} saldo updated: ${nextSaldo}`)
+      return true
     }
   } catch (error) {
-    console.error('Error updating user saldo:', error);
-    return false;
+    console.error('Error updating user saldo:', error)
+    return false
   }
 }
 
-// Helper function untuk get user saldo
+// ponytail: legacy snapshot only; use getUserSaldoAsync and a conditional SQL debit for spending.
 function getUserSaldo(userId) {
   try {
     if (usePg) {
-      const dbData = ensureDbData();
-      if (!dbData.users) dbData.users = {};
-      const users = dbData.users;
-      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`;
-      const idNo = userId.replace(/@s\.whatsapp\.net$/, '');
-      
-      // Check both formats in cache
-      const u = users[idWith] || users[idNo];
-      if (u) {
-        return Number(u.saldo || 0);
-      }
-      
-      // If not in cache, return 0 (cache should be populated by database loader)
-      console.warn(`User ${userId} not found in cache, returning 0. This might indicate a cache sync issue.`);
-      return 0;
-    } else {
-      if (!global.db || !global.db.data || !global.db.data.users) return 0;
-      const users = global.db.data.users;
-      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`;
-      const idNo = userId.replace(/@s\.whatsapp\.net$/, '');
+      const dbData = ensureDbData()
+      if (!dbData.users) dbData.users = {}
+      const users = dbData.users
+      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`
+      const idNo = userId.replace(/@s\.whatsapp\.net$/, '')
 
-      const u = users[idWith] || users[idNo];
-      if (!u) {
-        users[idWith] = { saldo: 0, role: 'bronze' };
-        users[idNo] = { saldo: 0, role: 'bronze' };
-        return 0;
+      // Check both formats in cache
+      const u = users[idWith] || users[idNo]
+      if (u) {
+        return Number(u.saldo || 0)
       }
-      if (!users[idWith]) users[idWith] = { saldo: Number(u.saldo || 0), role: u.role || 'bronze' };
-      if (!users[idNo]) users[idNo] = { saldo: Number(u.saldo || 0), role: u.role || 'bronze' };
-      return Number(u.saldo || 0);
+
+      // If not in cache, return 0 (cache should be populated by database loader)
+      console.warn(
+        `User ${userId} not found in cache, returning 0. This might indicate a cache sync issue.`
+      )
+      return 0
+    } else {
+      if (!global.db || !global.db.data || !global.db.data.users) return 0
+      const users = global.db.data.users
+      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`
+      const idNo = userId.replace(/@s\.whatsapp\.net$/, '')
+
+      const u = users[idWith] || users[idNo]
+      if (!u) {
+        users[idWith] = { saldo: 0, role: 'bronze' }
+        users[idNo] = { saldo: 0, role: 'bronze' }
+        return 0
+      }
+      if (!users[idWith]) users[idWith] = { saldo: Number(u.saldo || 0), role: u.role || 'bronze' }
+      if (!users[idNo]) users[idNo] = { saldo: Number(u.saldo || 0), role: u.role || 'bronze' }
+      return Number(u.saldo || 0)
     }
   } catch (error) {
-    console.error('Error getting user saldo:', error);
-    return 0;
+    console.error('Error getting user saldo:', error)
+    return 0
   }
 }
 
@@ -207,50 +228,43 @@ function getUserSaldo(userId) {
 async function getUserSaldoAsync(userId) {
   try {
     if (usePg) {
-      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`;
-      const idNo = userId.replace(/@s\.whatsapp\.net$/, '');
-      try {
-        const [resNo, resWith] = await Promise.all([
-          pg.query('SELECT saldo FROM users WHERE user_id=$1', [idNo]),
-          pg.query('SELECT saldo FROM users WHERE user_id=$1', [idWith])
-        ]);
-        const saldo1 = resNo.rows[0] ? Number(resNo.rows[0].saldo) : 0;
-        const saldo2 = resWith.rows[0] ? Number(resWith.rows[0].saldo) : 0;
-
-        // Update in-memory snapshot if present
-        if (!global.db) global.db = { data: { users: {} } };
-        if (!global.db.data) global.db.data = { users: {} };
-        if (!global.db.data.users) global.db.data.users = {};
-        const finalSaldo = Math.max(saldo1, saldo2);
-        global.db.data.users[idWith] = Object.assign({ saldo: 0, role: 'bronze' }, global.db.data.users[idWith], { saldo: finalSaldo });
-        global.db.data.users[idNo] = Object.assign({ saldo: 0, role: 'bronze' }, global.db.data.users[idNo], { saldo: finalSaldo });
-        return finalSaldo;
-      } catch (e) {
-        // Fallback to cache
-        return getUserSaldo(userId);
-      }
+      const idWith = /@s\.whatsapp\.net$/.test(userId) ? userId : `${userId}@s.whatsapp.net`
+      const idNo = userId.replace(/@s\.whatsapp\.net$/, '')
+      const otpReady = await ensureOtpWalletSchema(false)
+      const result = await pg.query(
+        `SELECT GREATEST(0, saldo ${
+          otpReady
+            ? `- COALESCE(
+        (SELECT SUM(amount) FROM otp_orders WHERE user_id=$1 AND state IN ('purchasing','uncertain')), 0)`
+            : ''
+        }) AS available
+        FROM users WHERE user_id IN ($1,$2)
+        ORDER BY (user_id=$1) DESC LIMIT 1`,
+        [idWith, idNo]
+      )
+      return Number(result.rows[0]?.available || 0)
     } else {
-      return getUserSaldo(userId);
+      return getUserSaldo(userId)
     }
   } catch (error) {
-    return 0;
+    return 0
   }
 }
 
 // Helper function untuk check apakah user punya saldo cukup
 function hasEnoughSaldo(userId, requiredAmount) {
-  const currentSaldo = getUserSaldo(userId);
-  return currentSaldo >= Number(requiredAmount);
+  const currentSaldo = getUserSaldo(userId)
+  return currentSaldo >= Number(requiredAmount)
 }
 
 async function recordSaldoHistory(entry = {}) {
   try {
-    if (!entry || !entry.userId) return null;
-    const dbData = ensureDbData();
-    if (!dbData.saldoHistory) dbData.saldoHistory = [];
+    if (!entry || !entry.userId) return null
+    const dbData = ensureDbData()
+    if (!dbData.saldoHistory) dbData.saldoHistory = []
 
-    const variants = collectUserIdVariants(entry.userId);
-    const normalizedUserId = normalizeUserId(entry.userId) || variants[0];
+    const variants = collectUserIdVariants(entry.userId)
+    const normalizedUserId = normalizeUserId(entry.userId) || variants[0]
 
     const historyEntry = {
       id: entry.id || generateHistoryId(),
@@ -266,11 +280,11 @@ async function recordSaldoHistory(entry = {}) {
       refId: entry.refId || entry.reffId || entry.orderId || null,
       source: entry.source || entry.feature || null,
       meta: entry.meta || null,
-      timestamp: entry.timestamp || new Date().toISOString()
-    };
+      timestamp: entry.timestamp || new Date().toISOString(),
+    }
 
     if (usePg) {
-      await ensureSaldoHistoryTable();
+      await ensureSaldoHistoryTable()
       try {
         await pg.query(
           `INSERT INTO saldo_history (id, user_id, raw_user_id, action, method, amount, before_balance, after_balance, actor, notes, ref_id, source, meta, created_at)
@@ -290,74 +304,78 @@ async function recordSaldoHistory(entry = {}) {
             historyEntry.refId,
             historyEntry.source,
             historyEntry.meta ? JSON.stringify(historyEntry.meta) : null,
-            historyEntry.timestamp ? new Date(historyEntry.timestamp) : new Date()
+            historyEntry.timestamp ? new Date(historyEntry.timestamp) : new Date(),
           ]
-        );
+        )
       } catch (error) {
-        console.error('[DB] Failed to insert saldo history:', error.message);
+        console.error('[DB] Failed to insert saldo history:', error.message)
       }
     }
 
-    dbData.saldoHistory.push(historyEntry);
+    dbData.saldoHistory.push(historyEntry)
     if (dbData.saldoHistory.length > SALDO_HISTORY_LIMIT) {
-      dbData.saldoHistory = dbData.saldoHistory.slice(-SALDO_HISTORY_LIMIT);
+      dbData.saldoHistory = dbData.saldoHistory.slice(-SALDO_HISTORY_LIMIT)
     }
 
     if (!usePg) {
       if (typeof global.scheduleSave === 'function') {
-        global.scheduleSave();
+        global.scheduleSave()
       } else if (global.db && typeof global.db.save === 'function') {
-        await global.db.save();
+        await global.db.save()
       }
     }
 
-    return historyEntry;
+    return historyEntry
   } catch (error) {
-    console.error('Error recording saldo history:', error);
-    return null;
+    console.error('Error recording saldo history:', error)
+    return null
   }
 }
 
 async function getSaldoHistory(userId = null, options = {}) {
   try {
-    const limitVal = Math.min(Math.max(Number(options.limit) || 50, 1), 200);
-    const offsetVal = Math.max(Number(options.offset) || 0, 0);
-    const filterAction = options.action ? String(options.action).toLowerCase() : null;
-    const filterMethod = options.method ? String(options.method).toLowerCase() : null;
-    const filterSource = options.source ? String(options.source).toLowerCase() : null;
-    const searchValue = options.search ? String(options.search).toLowerCase() : null;
-    const variants = userId ? collectUserIdVariants(userId) : [];
+    const limitVal = Math.min(Math.max(Number(options.limit) || 50, 1), 200)
+    const offsetVal = Math.max(Number(options.offset) || 0, 0)
+    const filterAction = options.action ? String(options.action).toLowerCase() : null
+    const filterMethod = options.method ? String(options.method).toLowerCase() : null
+    const filterSource = options.source ? String(options.source).toLowerCase() : null
+    const searchValue = options.search ? String(options.search).toLowerCase() : null
+    const variants = userId ? collectUserIdVariants(userId) : []
 
     if (usePg) {
-      await ensureSaldoHistoryTable();
-      const params = [];
-      const whereClause = [];
+      await ensureSaldoHistoryTable()
+      const params = []
+      const whereClause = []
 
       if (variants.length > 0) {
-        params.push(variants);
-        whereClause.push(`(user_id = ANY($${params.length}) OR raw_user_id = ANY($${params.length}))`);
+        params.push(variants)
+        whereClause.push(
+          `(user_id = ANY($${params.length}) OR raw_user_id = ANY($${params.length}))`
+        )
       }
       if (filterAction) {
-        params.push(filterAction);
-        whereClause.push(`LOWER(action) = $${params.length}`);
+        params.push(filterAction)
+        whereClause.push(`LOWER(action) = $${params.length}`)
       }
       if (filterMethod) {
-        params.push(filterMethod);
-        whereClause.push(`LOWER(method) = $${params.length}`);
+        params.push(filterMethod)
+        whereClause.push(`LOWER(method) = $${params.length}`)
       }
       if (filterSource) {
-        params.push(filterSource);
-        whereClause.push(`LOWER(source) = $${params.length}`);
+        params.push(filterSource)
+        whereClause.push(`LOWER(source) = $${params.length}`)
       }
       if (searchValue) {
-        params.push(`%${searchValue}%`);
-        whereClause.push(`(LOWER(COALESCE(notes,'')) LIKE $${params.length} OR LOWER(COALESCE(ref_id,'')) LIKE $${params.length} OR LOWER(COALESCE(source,'')) LIKE $${params.length})`);
+        params.push(`%${searchValue}%`)
+        whereClause.push(
+          `(LOWER(COALESCE(notes,'')) LIKE $${params.length} OR LOWER(COALESCE(ref_id,'')) LIKE $${params.length} OR LOWER(COALESCE(source,'')) LIKE $${params.length})`
+        )
       }
 
-      params.push(limitVal);
-      const limitIdx = params.length;
-      params.push(offsetVal);
-      const offsetIdx = params.length;
+      params.push(limitVal)
+      const limitIdx = params.length
+      params.push(offsetVal)
+      const offsetIdx = params.length
 
       const sql = `
         SELECT id, user_id, raw_user_id, action, method, amount, before_balance, after_balance, actor, notes, ref_id, source, meta, created_at
@@ -366,9 +384,9 @@ async function getSaldoHistory(userId = null, options = {}) {
         ORDER BY created_at DESC
         LIMIT $${limitIdx}
         OFFSET $${offsetIdx}
-      `;
+      `
 
-      const result = await pg.query(sql, params);
+      const result = await pg.query(sql, params)
       const entries = result.rows.map((row) => ({
         id: row.id,
         userId: row.user_id,
@@ -383,47 +401,58 @@ async function getSaldoHistory(userId = null, options = {}) {
         refId: row.ref_id,
         source: row.source,
         meta: row.meta,
-        timestamp: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at
-      }));
+        timestamp: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+      }))
 
       return {
         entries,
         total: entries.length,
         limit: limitVal,
-        offset: offsetVal
-      };
+        offset: offsetVal,
+      }
     }
 
-    const dbData = ensureDbData();
-    const history = Array.isArray(dbData.saldoHistory) ? [...dbData.saldoHistory] : [];
-    const filtered = history.filter((entry) => {
-      if (variants.length && !variants.includes(entry.userId) && !variants.includes(entry.rawUserId)) return false;
-      if (filterAction && String(entry.action || '').toLowerCase() !== filterAction) return false;
-      if (filterMethod && String(entry.method || '').toLowerCase() !== filterMethod) return false;
-      if (filterSource && String(entry.source || '').toLowerCase() !== filterSource) return false;
-      if (searchValue) {
-        const note = String(entry.notes || '').toLowerCase();
-        const refId = String(entry.refId || '').toLowerCase();
-        const sourceVal = String(entry.source || '').toLowerCase();
-        if (!note.includes(searchValue) && !refId.includes(searchValue) && !sourceVal.includes(searchValue)) {
-          return false;
+    const dbData = ensureDbData()
+    const history = Array.isArray(dbData.saldoHistory) ? [...dbData.saldoHistory] : []
+    const filtered = history
+      .filter((entry) => {
+        if (
+          variants.length &&
+          !variants.includes(entry.userId) &&
+          !variants.includes(entry.rawUserId)
+        )
+          return false
+        if (filterAction && String(entry.action || '').toLowerCase() !== filterAction) return false
+        if (filterMethod && String(entry.method || '').toLowerCase() !== filterMethod) return false
+        if (filterSource && String(entry.source || '').toLowerCase() !== filterSource) return false
+        if (searchValue) {
+          const note = String(entry.notes || '').toLowerCase()
+          const refId = String(entry.refId || '').toLowerCase()
+          const sourceVal = String(entry.source || '').toLowerCase()
+          if (
+            !note.includes(searchValue) &&
+            !refId.includes(searchValue) &&
+            !sourceVal.includes(searchValue)
+          ) {
+            return false
+          }
         }
-      }
-      return true;
-    }).sort((a, b) => {
-      return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
-    });
+        return true
+      })
+      .sort((a, b) => {
+        return new Date(b.timestamp || 0) - new Date(a.timestamp || 0)
+      })
 
-    const entries = filtered.slice(offsetVal, offsetVal + limitVal);
+    const entries = filtered.slice(offsetVal, offsetVal + limitVal)
     return {
       entries,
       total: filtered.length,
       limit: limitVal,
-      offset: offsetVal
-    };
+      offset: offsetVal,
+    }
   } catch (error) {
-    console.error('Error getting saldo history:', error);
-    return { entries: [], total: 0, limit: 0, offset: 0 };
+    console.error('Error getting saldo history:', error)
+    return { entries: [], total: 0, limit: 0, offset: 0 }
   }
 }
 
@@ -434,5 +463,5 @@ module.exports = {
   getUserSaldoAsync,
   hasEnoughSaldo,
   recordSaldoHistory,
-  getSaldoHistory
-}; 
+  getSaldoHistory,
+}

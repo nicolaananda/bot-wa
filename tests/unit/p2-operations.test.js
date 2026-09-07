@@ -28,7 +28,11 @@ test('Telegram is silent and skips when credentials are incomplete', async () =>
 
 test('PostgreSQL startup queries are concurrent, narrow, and individually profiled', () => {
   const source = fs.readFileSync(require.resolve('../../function/database'), 'utf8')
-  expect(source).toContain("profile('transaksi', query('SELECT meta FROM transaksi ORDER BY id ASC'))")
-  expect(source).toContain("profile('kv_store', query('SELECT key, value FROM kv_store WHERE key = ANY($1::text[])'")
+  expect(source).toMatch(
+    /profile\(\s*'transaksi',\s*query\('SELECT meta FROM transaksi ORDER BY id ASC'\)\s*\)/
+  )
+  expect(source).toMatch(
+    /profile\(\s*'kv_store',\s*query\('SELECT key, value FROM kv_store WHERE key = ANY\(\$1::text\[\]\)'/
+  )
   expect(source).not.toMatch(/SELECT \*/)
 })

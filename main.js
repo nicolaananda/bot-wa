@@ -1,24 +1,27 @@
-require("./setting.js")
+require('./setting.js')
 // Gowa WhatsApp adapter (replaces Baileys)
 const GowaAdapter = require('./lib/gowa-adapter')
 const chalk = require('chalk')
 // Removed: readline and pino (not needed with Gowa)
-const fs = require("fs");
-const figlet = require("figlet")
+const fs = require('fs')
+const figlet = require('figlet')
 const PhoneNumber = require('awesome-phonenumber')
 const moment = require('moment')
 const time = moment(new Date()).format('HH:mm:ss DD/MM/YYYY')
 const yargs = require('yargs/yargs')
-const { exec, execSync } = require("child_process");
+const { exec, execSync } = require('child_process')
 
-const { smsg, getBuffer } = require("./function/myfunc.js")
+const { smsg, getBuffer } = require('./function/myfunc.js')
 const { imageToWebp, videoToWebp, writeExifImg, writeExifVid } = require('./function/uploader.js')
 const { color } = require('./function/console.js')
-const { groupResponseWelcome, groupResponseRemove, groupResponsePromote, groupResponseDemote } = require('./function/respon-group.js')
+const {
+  groupResponseWelcome,
+  groupResponseRemove,
+  groupResponsePromote,
+  groupResponseDemote,
+} = require('./function/respon-group.js')
 const { nocache } = require('./function/chache.js')
 const { createReconnectController } = require('./options/reconnect-controller.js')
-
-
 
 //DATABASE
 global.opts = new Object(yargs(process.argv.slice(2)).exitProcess(false).parse())
@@ -36,7 +39,10 @@ function ensurePromoDefaults() {
   if (!db.data.promo.groupId) db.data.promo.groupId = ''
   if (!db.data.promo.groupName) db.data.promo.groupName = ''
   if (!Array.isArray(db.data.promo.groups)) db.data.promo.groups = []
-  if (db.data.promo.groupId && !db.data.promo.groups.some((g) => g && g.id === db.data.promo.groupId)) {
+  if (
+    db.data.promo.groupId &&
+    !db.data.promo.groups.some((g) => g && g.id === db.data.promo.groupId)
+  ) {
     db.data.promo.groups.push({
       id: db.data.promo.groupId,
       name: db.data.promo.groupName || '',
@@ -51,113 +57,127 @@ function ensurePromoDefaults() {
 
 // Initialize Redis (Phase 1)
 const { isRedisAvailable, closeRedis } = require('./config/redis')
-  ; (async () => {
-    const redisReady = await isRedisAvailable()
-    if (redisReady) {
-      console.log('✅ [REDIS] Phase 1 features enabled: Locking, Rate Limiting, Caching')
-    } else {
-      console.log('⚠️ [REDIS] Not configured - Bot will run without Redis features')
-      console.log('💡 [REDIS] Setup guide: REDIS-SETUP.md')
+;(async () => {
+  const redisReady = await isRedisAvailable()
+  if (redisReady) {
+    console.log('✅ [REDIS] Phase 1 features enabled: Locking, Rate Limiting, Caching')
+  } else {
+    console.log('⚠️ [REDIS] Not configured - Bot will run without Redis features')
+    console.log('💡 [REDIS] Setup guide: REDIS-SETUP.md')
+  }
+})()
+
+// Graceful shutdown is now handled by options/graceful-shutdown.js
+// This ensures proper cleanup order: timeouts -> Redis -> database
+
+// Load full snapshot from PG (if enabled), then init defaults and log counts
+;(async () => {
+  try {
+    const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
+    if (usePg && typeof db.load === 'function') {
+      await db.load()
     }
-  })()
+  } catch (e) {
+    console.error('[DB] Failed to load from Postgres:', e)
+  }
 
-  // Graceful shutdown is now handled by options/graceful-shutdown.js
-  // This ensures proper cleanup order: timeouts -> Redis -> database
+  // Initialize database structure only if it doesn't exist
+  // Don't overwrite existing data
+  if (!db.data.list) db.data.list = []
+  if (!db.data.testi) db.data.testi = []
+  if (!db.data.chat) db.data.chat = {}
+  if (!db.data.users) db.data.users = {}
+  if (!db.data.sewa) db.data.sewa = {}
+  if (!db.data.profit) db.data.profit = {}
+  if (!db.data.topup) db.data.topup = {}
+  if (!db.data.type) db.data.type = type
+  if (!db.data.setting) db.data.setting = {}
+  if (!db.data.deposit) db.data.deposit = {}
+  if (!db.data.produk) db.data.produk = {}
+  if (!db.data.order) db.data.order = {}
+  if (!db.data.transaksi) db.data.transaksi = []
+  if (!db.data.saldoHistory) db.data.saldoHistory = []
+  if (!db.data.persentase) db.data.persentase = {}
+  if (!db.data.customProfit) db.data.customProfit = {}
+  ensurePromoDefaults()
 
-  // Load full snapshot from PG (if enabled), then init defaults and log counts
-  ; (async () => {
+  // Log database status
+  console.log(
+    `📊 Database loaded: ${Object.keys(db.data.users || {}).length} users, ${(db.data.transaksi || []).length} transactions`
+  )
+
+  // Optimized debounced save system
+  // Instead of checking every 5 seconds with expensive JSON.stringify,
+  // we save only after data changes and wait for inactivity period
+  let saveTimeout = null
+  let savePromise = null
+  const SAVE_DELAY_MS = 10 * 1000 // Save after 10 seconds of inactivity
+
+  async function persistDirty() {
+    if (savePromise) return savePromise
+    savePromise = db.save()
     try {
-      const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
-      if (usePg && typeof db.load === 'function') {
-        await db.load()
-      }
-    } catch (e) {
-      console.error('[DB] Failed to load from Postgres:', e)
+      return await savePromise
+    } finally {
+      savePromise = null
     }
+  }
 
-    // Initialize database structure only if it doesn't exist
-    // Don't overwrite existing data
-    if (!db.data.list) db.data.list = []
-    if (!db.data.testi) db.data.testi = []
-    if (!db.data.chat) db.data.chat = {}
-    if (!db.data.users) db.data.users = {}
-    if (!db.data.sewa) db.data.sewa = {}
-    if (!db.data.profit) db.data.profit = {}
-    if (!db.data.topup) db.data.topup = {}
-    if (!db.data.type) db.data.type = type
-    if (!db.data.setting) db.data.setting = {}
-    if (!db.data.deposit) db.data.deposit = {}
-    if (!db.data.produk) db.data.produk = {}
-    if (!db.data.order) db.data.order = {}
-    if (!db.data.transaksi) db.data.transaksi = []
-    if (!db.data.saldoHistory) db.data.saldoHistory = []
-    if (!db.data.persentase) db.data.persentase = {}
-    if (!db.data.customProfit) db.data.customProfit = {}
-    ensurePromoDefaults()
+  // Debounced save function - call this after any data modification
+  global.scheduleSave = function () {
+    if (global.opts['test']) return // Skip in test mode
+    if (saveTimeout) clearTimeout(saveTimeout)
+    saveTimeout = setTimeout(() => {
+      saveTimeout = null
+      persistDirty().catch((error) => console.error('[DB] Save failed:', error.message))
+    }, SAVE_DELAY_MS)
+  }
 
-    // Log database status
-    console.log(`📊 Database loaded: ${Object.keys(db.data.users || {}).length} users, ${(db.data.transaksi || []).length} transactions`)
-
-    // Optimized debounced save system
-    // Instead of checking every 5 seconds with expensive JSON.stringify,
-    // we save only after data changes and wait for inactivity period
-    let saveTimeout = null
-    let savePromise = null
-    const SAVE_DELAY_MS = 10 * 1000 // Save after 10 seconds of inactivity
-
-    async function persistDirty() {
-      if (savePromise) return savePromise
-      savePromise = db.save()
-      try {
-        return await savePromise
-      } finally {
-        savePromise = null
-      }
+  global.flushScheduledSave = async function () {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout)
+      saveTimeout = null
     }
+    if (savePromise) await savePromise
+    return persistDirty()
+  }
 
-    // Debounced save function - call this after any data modification
-    global.scheduleSave = function () {
-      if (global.opts['test']) return // Skip in test mode
-      if (saveTimeout) clearTimeout(saveTimeout)
-      saveTimeout = setTimeout(() => {
-        saveTimeout = null
-        persistDirty().catch((error) => console.error('[DB] Save failed:', error.message))
-      }, SAVE_DELAY_MS)
-    }
-
-    global.flushScheduledSave = async function () {
-      if (saveTimeout) {
-        clearTimeout(saveTimeout)
-        saveTimeout = null
-      }
-      if (savePromise) await savePromise
-      return persistDirty()
-    }
-
-    if (typeof db.cleanupExpiredOrders === 'function') {
-      setInterval(() => {
+  if (typeof db.cleanupExpiredOrders === 'function') {
+    setInterval(
+      () => {
         db.cleanupExpiredOrders().catch((error) => {
           console.error('[DB] Pending order cleanup failed:', error.message)
         })
-      }, 5 * 60 * 1000)
-    }
+      },
+      5 * 60 * 1000
+    )
+  }
 
-    console.log('✅ [DB] Debounced save system initialized (10s inactivity delay)')
-  })()
+  console.log('✅ [DB] Debounced save system initialized (10s inactivity delay)')
+})()
 
 async function startnicola() {
-
-  console.log(chalk.bold.green(figlet.textSync('Velzzy', {
-    font: 'Standard',
-    horizontalLayout: 'default',
-    vertivalLayout: 'default',
-    whitespaceBreak: false
-  })))
+  console.log(
+    chalk.bold.green(
+      figlet.textSync('Velzzy', {
+        font: 'Standard',
+        horizontalLayout: 'default',
+        vertivalLayout: 'default',
+        whitespaceBreak: false,
+      })
+    )
+  )
 
   // console.log(chalk.yellow(`${chalk.red('[ CREATOR RONZZ YT ]')}\n\n${chalk.italic.magenta(`SV Ronzz YT\nNomor: 08817861263\nSebut nama👆,`)}\n\n\n${chalk.red(`ADMIN MENYEDIAKAN`)}\n${chalk.white(`- SC BOT TOPUP\n- SC BOT CPANEL\n- SC BOT CPANEL DEPO OTOMATIS\n- SC BOT PUSH KONTAK\n- ADD FITUR JADIBOT\n- UBAH SC LAMA KE PAIRING CODE\n- FIXS FITUR/SC ERROR\n`)}`))
 
   require('./index')
-  nocache('../index', module => console.log(chalk.greenBright('[ VelzzyBotz ]  ') + time + chalk.cyanBright(` "${module}" Telah diupdate!`)))
+  nocache('../index', (module) =>
+    console.log(
+      chalk.greenBright('[ VelzzyBotz ]  ') +
+        time +
+        chalk.cyanBright(` "${module}" Telah diupdate!`)
+    )
+  )
 
   // Disabled store to save memory (Gowa handles message history)
   const store = null
@@ -167,7 +187,7 @@ async function startnicola() {
     baseUrl: process.env.GOWA_API_URL || 'https://gowa2.nicola.id',
     username: process.env.GOWA_USERNAME || 'admin',
     password: process.env.GOWA_PASSWORD || '',
-    deviceId: process.env.GOWA_DEVICE_ID || 'default'
+    deviceId: process.env.GOWA_DEVICE_ID || 'default',
   })
 
   // Store global reference for webhook access
@@ -242,61 +262,66 @@ async function startnicola() {
   // Subscribe to Redis for webhook messages (if Redis is enabled)
   if (process.env.REDIS !== 'OFF') {
     try {
-      const Redis = require('ioredis');
+      const Redis = require('ioredis')
       const subscriber = new Redis({
         host: process.env.REDIS_HOST || 'localhost',
         port: process.env.REDIS_PORT || 6379,
         password: process.env.REDIS_PASSWORD || undefined,
         retryStrategy: (times) => {
-          return Math.min(times * 500, 30000);
-        }
-      });
+          return Math.min(times * 500, 30000)
+        },
+      })
 
       subscriber.subscribe('gowa:messages', (err, count) => {
         if (err) {
-          console.error('[REDIS-SUB] Subscribe error:', err.message);
+          console.error('[REDIS-SUB] Subscribe error:', err.message)
         } else {
-          console.log(`[REDIS-SUB] Subscribed to gowa:messages`);
+          console.log(`[REDIS-SUB] Subscribed to gowa:messages`)
         }
-      });
+      })
 
       subscriber.on('message', (channel, message) => {
         try {
-          const parsedMessage = JSON.parse(message);
+          const parsedMessage = JSON.parse(message)
 
           if (channel === 'gowa:messages') {
-            console.log('[REDIS-SUB] Received message from webhook');
-            nicola.handleWebhook(parsedMessage);
+            console.log('[REDIS-SUB] Received message from webhook')
+            nicola.handleWebhook(parsedMessage)
           }
         } catch (error) {
-          console.error('[REDIS-SUB] Error processing message:', error.message);
+          console.error('[REDIS-SUB] Error processing message:', error.message)
         }
-      });
+      })
 
       subscriber.on('error', (err) => {
-        console.error('[REDIS-SUB] Error:', err.message);
-      });
+        console.error('[REDIS-SUB] Error:', err.message)
+      })
 
-      console.log('[REDIS-SUB] Redis subscriber initialized');
+      console.log('[REDIS-SUB] Redis subscriber initialized')
     } catch (error) {
-      console.error('[REDIS-SUB] Failed to initialize:', error.message);
-      console.log('[REDIS-SUB] Bot will not receive webhook messages without Redis');
+      console.error('[REDIS-SUB] Failed to initialize:', error.message)
+      console.log('[REDIS-SUB] Bot will not receive webhook messages without Redis')
     }
   } else {
-    console.log('[REDIS-SUB] Redis disabled - webhook messages will not be received');
+    console.log('[REDIS-SUB] Redis disabled - webhook messages will not be received')
   }
 
-  nicola.on("connection.update", ({ connection }) => {
-    if (connection === "open") {
-      console.log("CONNECTION OPEN ( +" + nicola.user?.id?.split(":")[0] + " || " + nicola.user?.name + " )")
+  nicola.on('connection.update', ({ connection }) => {
+    if (connection === 'open') {
+      require('./lib/otp').start(nicola)
+      console.log(
+        'CONNECTION OPEN ( +' + nicola.user?.id?.split(':')[0] + ' || ' + nicola.user?.name + ' )'
+      )
     }
-    if (connection === "close") {
-      console.log("Connection closed, reconnecting...");
+    if (connection === 'close') {
+      console.log('Connection closed, reconnecting...')
       reconnectController.schedule()
     }
-    if (connection === "connecting") {
+    if (connection === 'connecting') {
       if (nicola.user) {
-        console.log("CONNECTION FOR ( +" + nicola.user?.id?.split(":")[0] + " || " + nicola.user?.name + " )")
+        console.log(
+          'CONNECTION FOR ( +' + nicola.user?.id?.split(':')[0] + ' || ' + nicola.user?.name + ' )'
+        )
       }
     }
   })
@@ -321,7 +346,7 @@ async function startnicola() {
   // Periodic cleanup every 5 minutes (less frequent = less CPU usage)
   setInterval(cleanupOldMessages, MESSAGE_CACHE_TTL)
 
-  nicola.on('messages.upsert', async chatUpdate => {
+  nicola.on('messages.upsert', async (chatUpdate) => {
     try {
       for (let mek of chatUpdate.messages) {
         if (!mek.message) continue // Changed from return to continue
@@ -343,7 +368,10 @@ async function startnicola() {
           }
         }
 
-        mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
+        mek.message =
+          Object.keys(mek.message)[0] === 'ephemeralMessage'
+            ? mek.message.ephemeralMessage.message
+            : mek.message
         const m = smsg(nicola, mek, store)
         if (mek.key && mek.key.remoteJid === 'status@broadcast') continue // Changed from return to continue
         if (mek.key.id.startsWith('BAE5') && mek.key.id.length === 16) continue // Changed from return to continue
@@ -356,32 +384,34 @@ async function startnicola() {
 
   // Event processing not needed with Gowa (uses webhooks)
 
-
   nicola.ws.on('CB:call', async (json) => {
     try {
-    const callerId = json.content[0].attrs['call-creator']
-    const botJid = nicola.user?.id?.split(":")[0] + "@s.whatsapp.net"
-    const settingData = db.data.setting?.[botJid]
-    if (settingData?.anticall && json.content[0].tag == 'offer') {
-      nicola.sendMessage(callerId, { text: `Kamu telah di blok oleh bot, karena kamu menelpon bot!!\n\nJika tidak sengaja silahkan hubungi owner agar dibuka blocknya!!\nNomor owner : wa.me/${ownerNomer}` })
+      const callerId = json.content[0].attrs['call-creator']
+      const botJid = nicola.user?.id?.split(':')[0] + '@s.whatsapp.net'
+      const settingData = db.data.setting?.[botJid]
+      if (settingData?.anticall && json.content[0].tag == 'offer') {
+        nicola.sendMessage(callerId, {
+          text: `Kamu telah di blok oleh bot, karena kamu menelpon bot!!\n\nJika tidak sengaja silahkan hubungi owner agar dibuka blocknya!!\nNomor owner : wa.me/${ownerNomer}`,
+        })
 
-      // Notify owner about auto-block
-      const callerNumber = callerId.replace('@s.whatsapp.net', '')
-      nicola.sendMessage(ownerNomer + '@s.whatsapp.net', {
-        text: `🚫 *AUTO-BLOCK NOTIFICATION*\n\n` +
-          `📱 User @${callerNumber} telah di-block otomatis karena menelepon bot.\n\n` +
-          `💡 *Untuk unblock:*\n` +
-          `• Command: .unblock ${callerNumber}\n` +
-          `• Atau: .checkuser ${callerNumber}\n\n` +
-          `⚙️ *Disable anti-call:* Edit main.js line 220`,
-        mentions: [callerId]
-      })
+        // Notify owner about auto-block
+        const callerNumber = callerId.replace('@s.whatsapp.net', '')
+        nicola.sendMessage(ownerNomer + '@s.whatsapp.net', {
+          text:
+            `🚫 *AUTO-BLOCK NOTIFICATION*\n\n` +
+            `📱 User @${callerNumber} telah di-block otomatis karena menelepon bot.\n\n` +
+            `💡 *Untuk unblock:*\n` +
+            `• Command: .unblock ${callerNumber}\n` +
+            `• Atau: .checkuser ${callerNumber}\n\n` +
+            `⚙️ *Disable anti-call:* Edit main.js line 220`,
+          mentions: [callerId],
+        })
 
-      setTimeout(() => {
-        nicola.updateBlockStatus(callerId, 'block')
-        console.log(`🚫 [AUTO-BLOCK] User ${callerNumber} blocked due to phone call`)
-      }, 1000)
-    }
+        setTimeout(() => {
+          nicola.updateBlockStatus(callerId, 'block')
+          console.log(`🚫 [AUTO-BLOCK] User ${callerNumber} blocked due to phone call`)
+        }, 1000)
+      }
     } catch (err) {
       console.error('[CB:call] Error handling call event:', err.message)
     }
@@ -399,13 +429,29 @@ async function startnicola() {
     var id = nicola.decodeJid(jid)
     withoutContact = nicola.withoutContact || withoutContact
     let v
-    if (id.endsWith("@g.us")) return new Promise(async (resolve) => {
-      v = store.contacts[id] || {}
-      if (!(v.name || v.subject)) v = nicola.groupMetadata(id) || {}
-      resolve(v.name || v.subject || PhoneNumber('+' + id.replace('@s.whatsapp.net', '')).getNumber('international'))
-    })
-    else v = id === '0@s.whatsapp.net' ? { id, name: 'WhatsApp' } : id === nicola.decodeJid(nicola.user.id) ? nicola.user : (store.contacts[id] || {})
-    return (withoutContact ? '' : v.name) || v.subject || v.verifiedName || PhoneNumber('+' + jid.replace('@s.whatsapp.net', '')).getNumber('international')
+    if (id.endsWith('@g.us'))
+      return new Promise(async (resolve) => {
+        v = store.contacts[id] || {}
+        if (!(v.name || v.subject)) v = nicola.groupMetadata(id) || {}
+        resolve(
+          v.name ||
+            v.subject ||
+            PhoneNumber('+' + id.replace('@s.whatsapp.net', '')).getNumber('international')
+        )
+      })
+    else
+      v =
+        id === '0@s.whatsapp.net'
+          ? { id, name: 'WhatsApp' }
+          : id === nicola.decodeJid(nicola.user.id)
+            ? nicola.user
+            : store.contacts[id] || {}
+    return (
+      (withoutContact ? '' : v.name) ||
+      v.subject ||
+      v.verifiedName ||
+      PhoneNumber('+' + jid.replace('@s.whatsapp.net', '')).getNumber('international')
+    )
   }
 
   nicola.sendContact = async (jid, contact, quoted = '', opts = {}) => {
@@ -413,15 +459,31 @@ async function startnicola() {
     for (let i of contact) {
       list.push({
         lisplayName: owner.includes(i) ? ownerName : await nicola.getName(i + '@s.whatsapp.net'),
-        vcard: `BEGIN:VCARD\nVERSION:3.0\nN:${owner.includes(i) ? ownerName : await nicola.getName(i + '@s.whatsapp.net')}\nFN:${ownerNomer.includes(i) ? ownerName : await nicola.getName(i + '@s.whatsapp.net')}\nitem1.TEL;waid=${i}:${i}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
+        vcard: `BEGIN:VCARD\nVERSION:3.0\nN:${owner.includes(i) ? ownerName : await nicola.getName(i + '@s.whatsapp.net')}\nFN:${ownerNomer.includes(i) ? ownerName : await nicola.getName(i + '@s.whatsapp.net')}\nitem1.TEL;waid=${i}:${i}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`,
       })
     }
-    return nicola.sendMessage(jid, { contacts: { displayName: `${list.length} Kontak`, contacts: list }, ...opts }, { quoted })
+    return nicola.sendMessage(
+      jid,
+      { contacts: { displayName: `${list.length} Kontak`, contacts: list }, ...opts },
+      { quoted }
+    )
   }
 
   nicola.sendImage = async (jid, path, caption = '', quoted = '', options) => {
-    let buffer = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,`[1], 'base64') : /^https?:\/\//.test(path) ? await (await getBuffer(path)) : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
-    return await nicola.sendMessage(jid, { image: buffer, caption: caption, ...options }, { quoted })
+    let buffer = Buffer.isBuffer(path)
+      ? path
+      : /^data:.*?\/.*?;base64,/i.test(path)
+        ? Buffer.from(path.split`,`[1], 'base64')
+        : /^https?:\/\//.test(path)
+          ? await await getBuffer(path)
+          : fs.existsSync(path)
+            ? fs.readFileSync(path)
+            : Buffer.alloc(0)
+    return await nicola.sendMessage(
+      jid,
+      { image: buffer, caption: caption, ...options },
+      { quoted }
+    )
   }
 
   const jidDecode = (jid) => {
@@ -432,7 +494,7 @@ async function startnicola() {
     return {
       user: decode[1],
       device: decode[3],
-      server: decode[4]
+      server: decode[4],
     }
   }
 
@@ -440,36 +502,56 @@ async function startnicola() {
     if (!jid) return jid
     if (/:\d+@/gi.test(jid)) {
       let decode = jidDecode(jid) || {}
-      return decode.user && decode.server && decode.user + '@' + decode.server || jid
+      return (decode.user && decode.server && decode.user + '@' + decode.server) || jid
     } else return jid
   }
 
   nicola.sendImageAsSticker = async (jid, path, quoted, options = {}) => {
-    let buff = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,`[1], 'base64') : /^https?:\/\//.test(path) ? await (await getBuffer(path)) : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
+    let buff = Buffer.isBuffer(path)
+      ? path
+      : /^data:.*?\/.*?;base64,/i.test(path)
+        ? Buffer.from(path.split`,`[1], 'base64')
+        : /^https?:\/\//.test(path)
+          ? await await getBuffer(path)
+          : fs.existsSync(path)
+            ? fs.readFileSync(path)
+            : Buffer.alloc(0)
     let buffer
     if (options && (options.packname || options.author)) {
       buffer = await writeExifImg(buff, options)
     } else {
       buffer = await imageToWebp(buff)
     }
-    await nicola.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted }).then(response => {
-      fs.unlinkSync(buffer)
-      return response
-    })
+    await nicola
+      .sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted })
+      .then((response) => {
+        fs.unlinkSync(buffer)
+        return response
+      })
   }
 
   nicola.sendVideoAsSticker = async (jid, path, quoted, options = {}) => {
-    let buff = Buffer.isBuffer(path) ? path : /^data:.*?\/.*?;base64,/i.test(path) ? Buffer.from(path.split`,`[1], 'base64') : /^https?:\/\//.test(path) ? await (await getBuffer(path)) : fs.existsSync(path) ? fs.readFileSync(path) : Buffer.alloc(0)
+    let buff = Buffer.isBuffer(path)
+      ? path
+      : /^data:.*?\/.*?;base64,/i.test(path)
+        ? Buffer.from(path.split`,`[1], 'base64')
+        : /^https?:\/\//.test(path)
+          ? await await getBuffer(path)
+          : fs.existsSync(path)
+            ? fs.readFileSync(path)
+            : Buffer.alloc(0)
     let buffer
     if (options && (options.packname || options.author)) {
       buffer = await writeExifVid(buff, options)
     } else {
       buffer = await videoToWebp(buff)
     }
-    await nicola.sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted }).then(response => {
-      fs.unlinkSync(buffer)
-      return response
-    })
+    await nicola
+      .sendMessage(jid, { sticker: { url: buffer }, ...options }, { quoted })
+      .then((response) => {
+        fs.unlinkSync(buffer)
+        return response
+      })
   }
 
   return nicola

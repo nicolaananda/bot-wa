@@ -8,6 +8,35 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS otp_orders (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL CHECK (user_id ~ '^[0-9]+@s[.]whatsapp[.]net$'),
+  state TEXT NOT NULL,
+  amount NUMERIC NOT NULL CHECK (amount >= 0 AND amount < 'Infinity'::numeric),
+  data JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_otp_orders_active_user ON otp_orders(user_id)
+  WHERE state NOT IN ('cancelled','done','rejected');
+
+-- OTP hold creation must lock the canonical users row and validate all holds
+-- in a subsequent statement, on the same READ COMMITTED transaction/client.
+CREATE OR REPLACE FUNCTION protect_otp_wallet_debit()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.saldo < OLD.saldo AND NEW.saldo < COALESCE((
+    SELECT SUM(amount) FROM otp_orders
+    WHERE user_id = NEW.user_id AND state IN ('purchasing','uncertain')
+  ), 0) THEN
+    RAISE EXCEPTION 'Insufficient available wallet balance' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql VOLATILE;
+
+DROP TRIGGER IF EXISTS users_otp_wallet_debit ON users;
+CREATE TRIGGER users_otp_wallet_debit BEFORE UPDATE OF saldo ON users
+FOR EACH ROW EXECUTE PROCEDURE protect_otp_wallet_debit();
+
 CREATE TABLE IF NOT EXISTS transaksi (
   id SERIAL PRIMARY KEY,
   ref_id TEXT,
@@ -116,5 +145,4 @@ CREATE TABLE IF NOT EXISTS web_pos_pin (
 DROP TRIGGER IF EXISTS web_pos_pin_updated_at ON web_pos_pin;
 CREATE TRIGGER web_pos_pin_updated_at BEFORE UPDATE ON web_pos_pin
 FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
-
 

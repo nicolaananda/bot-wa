@@ -3,6 +3,8 @@ process.env.USE_PG = 'true'
 const mockQuery = jest.fn()
 
 jest.mock('../../config/postgres', () => ({ query: mockQuery }))
+jest.mock('dotenv', () => ({ config() {} }))
+jest.mock('../../lib/otp-wallet', () => ({ walletQuery: (...args) => mockQuery(...args) }))
 
 const Database = require('../../function/database')
 
@@ -34,6 +36,7 @@ describe('Database dirty persistence', () => {
       3,
       'silver',
       JSON.stringify(db.data.users.changed),
+      1,
     ])
 
     mockQuery.mockClear()
@@ -43,7 +46,12 @@ describe('Database dirty persistence', () => {
 
   test('mutation during save remains dirty for the next save', async () => {
     let releaseQuery
-    mockQuery.mockImplementationOnce(() => new Promise((resolve) => { releaseQuery = resolve }))
+    mockQuery.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseQuery = resolve
+        })
+    )
 
     const db = new Database()
     db.data = {
