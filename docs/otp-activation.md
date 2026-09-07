@@ -11,6 +11,17 @@ The implementation is offline-tested, not production-activated. No migration or 
 5. Deploy all wallet writers together. Never run the old absolute snapshot saver alongside the new delta saver. Confirm PostgreSQL mode (`USE_PG=true`), canonical balances, wallet reads, and successful database loading before accepting purchases.
 6. Set `OTPCEPAT_API_KEY` to a newly issued, non-leaked key through the deployment secret mechanism. It is the only OTP credential source. Restart the bot and verify polling health. No live purchase is part of activation verification here.
 
+## Setup Script
+
+`otp-setup.sh` performs first-time installation only. Stop all wallet writers and reconcile legacy bare-number wallet records first. Provide an existing, protected backup directory outside the repository:
+
+```sh
+bash otp-setup.sh --self-test
+bash otp-setup.sh --apply --writers-stopped /var/backups/bot-wa
+```
+
+The script loads the project `.env` without executing it, requires `pg_dump` and `pg_restore`, writes a private custom-format database backup, and applies only the OTP block from `options/schema.sql` in one transaction. Existing OTP objects cause a safe refusal instead of replacement. A lock prevents concurrent wallet writes during backup and migration; the flag is your confirmation that all writers were stopped, not automatic process detection. PM2 and API credentials are not modified. A failed or ambiguous commit requires inspection before retrying. Archive validation does not replace an isolated restore test. Do not roll back by starting old wallet writers or dropping OTP tables with pending orders.
+
 ## Commands
 
 - `#buy otp id gopay`: cheapest exact matching service, immediate purchase without confirmation.
