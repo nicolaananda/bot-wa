@@ -85,8 +85,7 @@ async function main() {
         AND tgname='users_otp_wallet_debit') AS trigger`)
     if (Object.values(existing.rows[0]).some(Boolean))
       throw Error('OTP objects already exist. Inspect the existing installation; nothing was changed.')
-    const legacy = await client.query("SELECT 1 FROM public.users WHERE user_id ~ '^[0-9]+$' LIMIT 1")
-    if (legacy.rowCount) throw Error('Bare-number wallet records exist. Reconcile them before setup; do not sum balances blindly.')
+    console.log('Legacy wallet records are preserved. OTP uses only the matching @s.whatsapp.net wallet; no balances are merged.')
 
     stage = 'creating backup'
     const backup = path.join(directory, `otp-before-${Date.now()}-${process.pid}.dump`)

@@ -2,10 +2,12 @@
 
 The implementation is offline-tested, not production-activated. No migration or provider purchase is performed by the tests.
 
+OTP is optional: an absent OTP schema does not block normal wallet writes, and polling does not start without an API key. Existing wallet identities and balances are not migrated or merged. Once orders exist, their reservations must remain protected even if the API key is removed; do not bypass an incomplete OTP schema or disable its wallet trigger.
+
 ## Deployment Gate
 
 1. Stop all bot, dashboard, worker, and other wallet writers. Flush successful pending saves before stopping. If a wallet save outcome is unknown, reconcile SQL against transactions first; do not replay its delta.
-2. Back up PostgreSQL and verify restoration in an isolated database. Reconcile bare-number and `@s.whatsapp.net` user records manually. OTP spends only the canonical WhatsApp row; never sum duplicate balances blindly.
+2. Back up PostgreSQL and verify restoration in an isolated database. Preserve bare-number records: they do not block installation. OTP spends only the matching `@s.whatsapp.net` row; never sum duplicate balances blindly. If a user has only a bare-number wallet, reconcile that user's identity and balance manually before enabling their OTP purchases.
 3. Test the OTP DDL from `options/schema.sql` in an isolated database, then apply only the `otp_orders`, active-user unique index, `protect_otp_wallet_debit`, and `users_otp_wallet_debit` definitions inside one explicit transaction with all writers stopped. Do not blindly run the entire schema: it contains unrelated webhook updates and deletion. Existing conflicting orders or schema definitions require inspection, not automatic repair.
 4. Verify the unique index is valid and has the expected active-state predicate, and the enabled trigger uses the expected function. Test concurrent reservation and wallet debit transactions on the isolated database. Runtime schema checks only check installation markers, not the full schema definition.
 5. Deploy all wallet writers together. Never run the old absolute snapshot saver alongside the new delta saver. Confirm PostgreSQL mode (`USE_PG=true`), canonical balances, wallet reads, and successful database loading before accepting purchases.
@@ -13,7 +15,7 @@ The implementation is offline-tested, not production-activated. No migration or 
 
 ## Setup Script
 
-`otp-setup.sh` performs first-time installation only. Stop all wallet writers and reconcile legacy bare-number wallet records first. Provide an existing, protected backup directory outside the repository:
+`otp-setup.sh` performs first-time installation only. Stop all wallet writers first. Legacy bare-number records are left untouched, not deleted, converted, or merged. Provide an existing, protected backup directory outside the repository:
 
 ```sh
 bash otp-setup.sh --self-test
