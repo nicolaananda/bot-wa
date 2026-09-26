@@ -72,7 +72,8 @@ function createWebhookHandler({ pg, serverKey, wake, ready = () => true }) {
 function eventData(row) {
   return { webhookId: row.id, eventKey: row.event_key, orderId: row.order_id,
     transactionId: row.transaction_id, transactionStatus: row.transaction_status,
-    paymentType: row.payment_type, settlementTime: row.settlement_time, gross_amount: row.gross_amount };
+    paymentType: row.payment_type, settlementTime: row.settlement_time, gross_amount: row.gross_amount,
+    notification: row.webhook_data };
 }
 
 async function processNextWebhook({ pg, dispatch }) {

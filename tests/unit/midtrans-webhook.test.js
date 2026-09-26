@@ -21,13 +21,21 @@ test('gagal persist menghasilkan 503 tanpa ACK palsu', async () => {
 });
 
 test('worker retry: gagal menjadi failed dan dapat direplay setelah restart', async () => {
-  const updates=[]; const row={id:7,event_key:'e',order_id:'QRIS-7',transaction_status:'settlement',gross_amount:10,webhook_data:{}};
+  const updates=[]; const raw={order_id:'QRIS-7',signature_key:'signed'}; const row={id:7,event_key:'e',order_id:'QRIS-7',transaction_status:'settlement',gross_amount:10,webhook_data:raw};
   const client={query:jest.fn(async sql=>{ if(sql.includes('SELECT *')) return {rows:[row]}; updates.push(sql); return {rows:[]}; }),release:jest.fn()};
   const pg={getClient:async()=>client,query:jest.fn(async sql=>{updates.push(sql); return {rows:[]};})};
   await expect(processNextWebhook({pg,dispatch:async()=>{throw Error('temporary')}})).rejects.toThrow('temporary');
   expect(updates.join('\n')).toMatch(/lifecycle_status='failed'/); expect(updates.join('\n')).not.toMatch(/lifecycle_status='completed'/);
-  const dispatched=[]; await processNextWebhook({pg,dispatch:async data=>dispatched.push(data.orderId)});
-  expect(dispatched).toEqual(['QRIS-7']); expect(updates.join('\n')).toMatch(/lifecycle_status='completed'/);
+  const dispatched=[]; await processNextWebhook({pg,dispatch:async data=>dispatched.push([data.orderId,data.notification])});
+  expect(dispatched).toEqual([['QRIS-7',raw]]); expect(updates.join('\n')).toMatch(/lifecycle_status='completed'/);
+});
+
+test('dispatcher source forwards Nala-owned orders including MEMBER', () => {
+  const fs=require('fs'); const source=fs.readFileSync(require.resolve('../../index'),'utf8');
+  expect(source).toMatch(/'LOMBA-'/);
+  expect(source).toMatch(/'MEMBER-'/);
+  expect(source).toMatch(/api\.artstudionala\.com\/api\/midtrans\/notification/);
+  expect(source).toMatch(/webhookData\.notification/);
 });
 
 test('correlation exact mendukung QRIS-* dan fallback amount+time tunggal', () => {

@@ -748,6 +748,31 @@ if (!global.midtransWebhookListenerSetup) {
   const processMidtransPayment = async (webhookData) => {
     try {
       const { orderId: webhookOrderId, transactionStatus, gross_amount } = webhookData
+      const nalaPrefixes = [
+        'BOOK-',
+        'BELAJAR-',
+        'SKET-',
+        'BAJU-',
+        'G60-',
+        'GG-',
+        'GRASP-',
+        'CLASS-',
+        'LOMBA-',
+        'MEMBER-',
+      ]
+      if (nalaPrefixes.some((prefix) => String(webhookOrderId || '').startsWith(prefix))) {
+        if (!webhookData.notification) throw new Error('Raw Midtrans notification missing')
+        await axios.post(
+          'https://api.artstudionala.com/api/midtrans/notification',
+          webhookData.notification,
+          {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 10000,
+          }
+        )
+        console.log(`✅ [MID-GLOBAL] Forwarded to Nala: ${webhookOrderId}`)
+        return
+      }
       const webhookAmount = Number(gross_amount || webhookData.gross_amount || 0)
       const isStatusPaid = /(settlement|capture)/i.test(String(transactionStatus))
 
