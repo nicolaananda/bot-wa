@@ -46,3 +46,20 @@ test('does not count the same account twice when registered in two pools', () =>
 
   expect(zoomPool.loadHostsForTier(500)).toHaveLength(1)
 })
+
+test('keeps 100p orders inside the 100p pool', () => {
+  const files = {
+    'zoom-pool-100.json': host('account-100'),
+    'zoom-pool-300.json': host('account-300'),
+  }
+  fs.statSync.mockImplementation((file) => {
+    if (!files[file.split('/').pop()]) throw Object.assign(new Error('missing'), { code: 'ENOENT' })
+    return { mtimeMs: 3 }
+  })
+  fs.readFileSync.mockImplementation((file) => JSON.stringify(files[file.split('/').pop()]))
+  const zoomPool = require('../../lib/zoom-pool')
+  zoomPool.clearCache()
+  expect(zoomPool.loadHostsForTier(100).map(({ host: item, capacityTier }) => [item.accountId, capacityTier])).toEqual([
+    ['account-100', 100],
+  ])
+})
