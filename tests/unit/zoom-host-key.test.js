@@ -58,16 +58,17 @@ test('requests the API host key and preserves leading zeros', async () => {
   await expect(client.getUser({ creds: host, requireHostKey: true })).resolves.toEqual({
     host_key: '001234',
   })
-  expect(pool.loadPool(1000)[0]).not.toHaveProperty('hostKey')
+  expect(pool.loadPool(1000)[0].hostKey).toBe('999999')
 })
 
 test.each([undefined, null, '', '12345', '1234567', 'abcdef', ' 123456', 123456])(
-  'rejects invalid API key %p without using the manual key',
+  'uses the configured key when API key %p is invalid',
   async (host_key) => {
     profile = { host_key }
-    await expect(client.getUser({ creds: host, requireHostKey: true })).rejects.toThrow(
-      'host_key missing or invalid'
-    )
+    await expect(client.getUser({ creds: host, requireHostKey: true })).resolves.toMatchObject({
+      host_key: '999999',
+      host_key_source: 'config',
+    })
   }
 )
 
@@ -86,16 +87,13 @@ test.each(['createMeetingOnFirstAvailable', 'createMeetingOnHost'])(
 )
 
 test.each([{}, { host_key: 'invalid' }, new Error('Zoom permission denied')])(
-  'key lookup failure %p prevents creation and booking across rental paths',
+  'key lookup failure %p falls back to config across rental paths',
   async (response) => {
     profile = response
-    expect((await pool.findFirstAvailableHost(opts)).ok).toBe(false)
-    expect((await pool.createMeetingOnFirstAvailable(opts)).ok).toBe(false)
-    await expect(pool.createMeetingOnHost({ ...opts, allowFallback: true })).rejects.toThrow()
-    expect(axios.mock.calls.some(([request]) => request.method === 'POST')).toBe(false)
-    expect(bookings.recordBooking).not.toHaveBeenCalled()
-    // A failed lookup must release the host lock so payment retries can succeed.
-    profile = { host_key: '001234' }
+    expect((await pool.findFirstAvailableHost(opts)).ok).toBe(true)
+    expect((await pool.createMeetingOnFirstAvailable(opts)).ok).toBe(true)
     expect((await pool.createMeetingOnHost(opts)).ok).toBe(true)
+    expect(axios.mock.calls.some(([request]) => request.method === 'POST')).toBe(true)
+    expect(bookings.recordBooking).toHaveBeenCalledTimes(2)
   }
 )
