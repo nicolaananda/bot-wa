@@ -2158,9 +2158,17 @@ module.exports = async (nicola, m, mek) => {
 
                   await reply('⏳ Membuat QR Code pembayaran ...')
 
-                  let qrImagePath
+                  const expirationTime = Date.now() + toMs('30m')
+                  let qrImage
                   try {
-                    qrImagePath = await qrisDinamis(`${totalAmount}`, './options/sticker/qris.jpg')
+                    const rawQr = await qrisDinamis(`${totalAmount}`)
+                    qrImage = await createQrisCard({
+                      qr: rawQr,
+                      amount: totalAmount,
+                      orderId,
+                      expiresAt: expirationTime,
+                      type: 'payment',
+                    })
                   } catch (qrErr) {
                     delete db.data.zoomFlow[sender]
                     return reply(
@@ -2168,7 +2176,6 @@ module.exports = async (nicola, m, mek) => {
                     )
                   }
 
-                  const expirationTime = Date.now() + toMs('30m')
                   const expireDate = new Date(expirationTime)
                   const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000))
                   const currentTime = new Date().toLocaleString('en-US', {
@@ -2196,7 +2203,6 @@ module.exports = async (nicola, m, mek) => {
                     `⏰ Batas waktu: sebelum ${formattedTime}\n` +
                     `Jika ingin membatalkan, ketik *${prefix}batal*`
 
-                  const qrImage = await fs.promises.readFile(qrImagePath)
                   const message = await nicola.sendMessage(
                     from,
                     { image: qrImage, caption },
@@ -2895,8 +2901,14 @@ module.exports = async (nicola, m, mek) => {
 
                 let amount = Number(db.data.topup[sender].data.price) + Number(digit())
 
-                let pay = await qrisDinamis(`${amount}`, './options/sticker/qris.jpg')
                 let time = Date.now() + toMs('5m')
+                const rawQr = await qrisDinamis(`${amount}`)
+                const pay = await createQrisCard({
+                  qr: rawQr,
+                  amount,
+                  expiresAt: time,
+                  type: 'payment',
+                })
                 let expirationTime = new Date(time)
                 let timeLeft = Math.max(0, Math.floor((expirationTime - new Date()) / 60000))
                 let currentTime = new Date(
@@ -2921,7 +2933,7 @@ module.exports = async (nicola, m, mek) => {
                 }
                 let mess = await nicola.sendMessage(
                   from,
-                  { image: fs.readFileSync(pay), caption: Styles(cap) },
+                  { image: pay, caption: Styles(cap) },
                   { quoted: m }
                 )
 
@@ -3377,11 +3389,15 @@ module.exports = async (nicola, m, mek) => {
         } else if (db.data.deposit[sender].session === 'konfirmasi_deposit') {
           if (chats.toLowerCase() === 'lanjut') {
             if (db.data.deposit[sender].payment === 'QRIS') {
-              let pay = await qrisDinamis(
-                `${db.data.deposit[sender].data.total_deposit}`,
-                './options/sticker/qris.jpg'
-              )
               let time = Date.now() + toMs('30m')
+              const depositAmount = Number(db.data.deposit[sender].data.total_deposit)
+              const rawQr = await qrisDinamis(`${depositAmount}`)
+              const pay = await createQrisCard({
+                qr: rawQr,
+                amount: depositAmount,
+                expiresAt: time,
+                type: 'deposit',
+              })
               let expirationTime = new Date(time)
               let timeLeft = Math.max(0, Math.floor((expirationTime - new Date()) / 60000))
               let currentTime = new Date(
@@ -3400,7 +3416,7 @@ module.exports = async (nicola, m, mek) => {
 _Silahkan scan dan transfer dengan nominal yang benar, jika sudah bot akan otomatis konfirmasi deposit._`
               let mess = await nicola.sendMessage(
                 from,
-                { image: fs.readFileSync(pay), caption: pyqrs },
+                { image: pay, caption: pyqrs },
                 { quoted: m }
               )
 
@@ -5380,7 +5396,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               tgl >= rekapStart &&
               tgl <= rekapEnd &&
               t.metodeBayar !== 'Deposit' &&
-              t.type !== 'deposit'
+              t.type !== 'deposit' &&
+              t.type !== 'wallet_reconciliation'
             )
           })
           const qrisRekap = summarizeQris(db.data.transaksi || [], rekapStart, rekapEnd)
