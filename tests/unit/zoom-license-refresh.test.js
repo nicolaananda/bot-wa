@@ -1,47 +1,64 @@
 'use strict'
 
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
 const { refreshAllLicenses, formatLicenseSummary } = require('../../lib/zoom-license-refresh')
 
-test('refreshes each account once and reports ready hosts per tier', async () => {
-  const shared = { label: 'Akun shared', accountId: 'account-1' }
-  const weak = { label: 'Akun weak', accountId: 'account-2' }
-  const disabled = {
-    label: 'Akun disabled',
-    accountId: 'account-3',
-    disabledAt: '2026-08-16T00:00:00.000Z',
-    disabledReason: 'manual',
+test('archives persistent failures, preserves API errors, restores valid archived hosts', async () => {
+  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zoom-pool-'))
+  const active = [
+    { label: 'bad', accountId: 'bad', clientSecret: 'keep-secret' },
+    { label: 'api', accountId: 'api', custom: 'keep-field' },
+  ]
+  const archived = [{ label: 'restored', accountId: 'restored', clientSecret: 'archive-secret' }]
+  fs.writeFileSync(path.join(configDir, 'zoom-pool-100.json'), JSON.stringify(active))
+  fs.writeFileSync(path.join(configDir, 'zoom-pool-100.archive.json'), JSON.stringify(archived))
+
+  const license = {
+    getHostLicense: jest.fn(async ({ accountId }) => accountId === 'api'
+      ? { ok: false, reason: 'API_ERROR', error: 'timeout' }
+      : { ok: true, info: { accountId, effectiveCapacity: 100 } }),
+    evaluate: jest.fn((info) => info.accountId === 'bad'
+      ? { ok: false, reason: 'BASIC_PLAN', capacity: 100 }
+      : { ok: true, capacity: 100, plan: 'Licensed' }),
+    reasonText: jest.fn((verdict) => verdict.reason),
   }
   const pool = {
     VALID_TIERS: [100, 300, 500, 1000],
-    loadPool: jest.fn((tier) =>
-      tier === 100 ? [shared, disabled] : tier === 300 ? [shared, weak] : []
-    ),
+    getHostExpiryStatus: () => ({ ok: true }),
+    clearCache: jest.fn(),
+  }
+
+  const snapshot = await refreshAllLicenses({ license, pool, configDir })
+  const nextActive = JSON.parse(fs.readFileSync(path.join(configDir, 'zoom-pool-100.json')))
+  const nextArchive = JSON.parse(fs.readFileSync(path.join(configDir, 'zoom-pool-100.archive.json')))
+
+  expect(nextActive.map(({ accountId }) => accountId)).toEqual(['api', 'restored'])
+  expect(nextArchive.map(({ accountId }) => accountId)).toEqual(['bad'])
+  expect(nextActive.find(({ accountId }) => accountId === 'api').custom).toBe('keep-field')
+  expect(nextArchive[0].clientSecret).toBe('keep-secret')
+  expect(license.getHostLicense).toHaveBeenCalledTimes(3)
+  expect(formatLicenseSummary(snapshot)).toContain('01:00 WIB')
+})
+
+test('archives an expired host without losing fields', async () => {
+  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zoom-pool-exp-'))
+  const host = { label: 'expired', accountId: 'expired', clientSecret: 'secret', exp: '01/01/2020' }
+  fs.writeFileSync(path.join(configDir, 'zoom-pool-100.json'), JSON.stringify([host]))
+  const pool = {
+    VALID_TIERS: [100],
+    getHostExpiryStatus: () => ({ ok: false, reason: 'ACCOUNT_EXPIRED', detail: 'expired' }),
+    clearCache: jest.fn(),
   }
   const license = {
-    getHostLicense: jest.fn(async (host) => ({
-      ok: true,
-      info: { effectiveCapacity: host.accountId === 'account-2' ? 100 : 500 },
-    })),
-    evaluate: jest.fn((info, tier) => ({
-      ok: info.effectiveCapacity >= tier,
-      capacity: info.effectiveCapacity,
-      plan: 'Licensed',
-      reason: info.effectiveCapacity >= tier ? undefined : 'CAPACITY_TOO_LOW',
-    })),
-    reasonText: jest.fn((verdict, tier) => `kapasitas ${verdict.capacity}p, butuh ${tier}p`),
+    getHostLicense: jest.fn(async () => ({ ok: true, info: { effectiveCapacity: 100 } })),
+    evaluate: jest.fn(),
+    reasonText: jest.fn(({ reason }) => reason),
   }
 
-  const snapshot = await refreshAllLicenses({ license, pool })
+  await refreshAllLicenses({ license, pool, configDir })
 
-  expect(license.getHostLicense).toHaveBeenCalledTimes(3)
-  expect(license.getHostLicense).toHaveBeenCalledWith(shared, { forceRefresh: true })
-  expect(snapshot.tiers.map(({ tier, ready, total }) => ({ tier, ready, total }))).toEqual([
-    { tier: 100, ready: 1, total: 2 },
-    { tier: 300, ready: 1, total: 2 },
-    { tier: 500, ready: 0, total: 0 },
-    { tier: 1000, ready: 0, total: 0 },
-  ])
-  expect(formatLicenseSummary(snapshot)).toContain('*300p:* 1/2 akun siap pakai')
-  expect(formatLicenseSummary(snapshot)).toContain('❌ Akun weak: kapasitas 100p, butuh 300p')
-  expect(formatLicenseSummary(snapshot)).toContain('❌ Akun disabled: disabled: manual')
+  expect(JSON.parse(fs.readFileSync(path.join(configDir, 'zoom-pool-100.json')))).toEqual([])
+  expect(JSON.parse(fs.readFileSync(path.join(configDir, 'zoom-pool-100.archive.json')))).toEqual([host])
 })

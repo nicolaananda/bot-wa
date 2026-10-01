@@ -667,7 +667,7 @@ if (!global.zoomLicenseSchedulerSetup) {
   global.zoomLicenseSchedulerSetup = true
   let running = false
   cron.schedule(
-    '0 3 * * *',
+    '0 1 * * *',
     async () => {
       if (running) return
       running = true
@@ -691,7 +691,7 @@ if (!global.zoomLicenseSchedulerSetup) {
     },
     { timezone: 'Asia/Jakarta' }
   )
-  console.log('[ZOOM-LICENSE] Daily refresh scheduled at 03:00 Asia/Jakarta')
+  console.log('[ZOOM-LICENSE] Daily refresh scheduled at 01:00 Asia/Jakarta')
 }
 
 // Setup once: notify owner whenever a Zoom host transitions disabled<->enabled.
