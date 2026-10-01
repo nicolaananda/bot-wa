@@ -57,6 +57,8 @@ config/zoom-pool-100.json
 config/zoom-pool-300.json
 config/zoom-pool-500.json
 config/zoom-pool-1000.json
+config/zoom-pool-*.archive.json
+config/backups/
 config/induk.json
 .openclaude/
 
