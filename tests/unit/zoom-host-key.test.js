@@ -97,3 +97,29 @@ test.each([{}, { host_key: 'invalid' }, new Error('Zoom permission denied')])(
     expect(bookings.recordBooking).toHaveBeenCalledTimes(2)
   }
 )
+
+test('fallback can retry the earmarked host without treating its own lock as busy', async () => {
+  let meetingScans = 0
+  axios.mockImplementation(async (request) => {
+    if (request.method === 'POST') return { status: 201, data: { id: '123456789' } }
+    if (request.url.endsWith('/meetings')) {
+      meetingScans++
+      return {
+        status: 200,
+        data: {
+          meetings:
+            meetingScans === 1
+              ? [{ id: 'busy', start_time: '2026-10-01T10:00:00Z', duration: 60 }]
+              : [],
+        },
+      }
+    }
+    return { status: 200, data: profile }
+  })
+
+  const result = await pool.createMeetingOnHost({ ...opts, allowFallback: true })
+
+  expect(result.ok).toBe(true)
+  expect(result.host.accountId).toBe(host.accountId)
+  expect(meetingScans).toBe(2)
+})
