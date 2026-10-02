@@ -3644,6 +3644,12 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
     }
 
     switch (command) {
+      case 'health':
+      case 'statusbot': {
+        if (!canUseAdminCommand({ isOwner, isGroup, isGroupAdmin: isGroupAdmins })) return reply(mess.admin)
+        const health = await collectHealth({ pg, redis: require('./config/redis').getRedis(), gowaUrl: global.gowaConfig?.apiUrl })
+        return reply(formatHealth(health))
+      }
       case 'helppromo': {
         return reply(
           `📢 *HELP PROMO*\n\n` +

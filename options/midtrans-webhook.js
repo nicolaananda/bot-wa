@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const { sendOperationalAlert } = require('../lib/telegram-notifier');
+const { logError } = require('../lib/observability');
 
 const MAX_ATTEMPTS = 10;
 const LEASE_MINUTES = 5;
@@ -63,7 +64,7 @@ function createWebhookHandler({ pg, serverKey, wake, ready = () => true }) {
       if (saved.inserted && wake) Promise.resolve(wake()).catch(() => {});
       return res.status(200).json({ status: 'ok', duplicate: !saved.inserted });
     } catch (error) {
-      console.error('[Webhook] persistence failed:', error.message);
+      logError(error, { event: 'midtrans.webhook_persist', provider: 'midtrans', orderId: notification.order_id });
       return res.status(503).json({ status: 'error', message: 'Webhook persistence failed' });
     }
   };
@@ -108,6 +109,7 @@ async function processNextWebhook({ pg, dispatch }) {
       processed_at=now(), locked_at=NULL, last_error=NULL WHERE id=$1 AND lifecycle_status='processing'`, [row.id]);
     return true;
   } catch (error) {
+    logError(error, { event: 'midtrans.fulfillment', provider: 'midtrans', orderId: row.order_id, attempts: Number(row.attempts || 0) + 1 });
     await pg.query(`UPDATE midtrans_webhooks SET lifecycle_status='failed', processed=false, locked_at=NULL,
       last_error=$2, next_attempt_at=now() + LEAST(interval '1 hour', interval '5 seconds' * power(2, attempts))
       WHERE id=$1 AND lifecycle_status='processing'`, [row.id, String(error.message || error).slice(0, 4000)]);
