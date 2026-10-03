@@ -75,7 +75,7 @@ const corsOptions = {
 
     try {
       const hostname = new URL(originValue).hostname;
-      if (allowedOrigins.includes(originValue) || hostname.endsWith('.nicola.id')) {
+      if (allowedOrigins.includes(originValue) || String(process.env.OWNER_API_ORIGINS || '').split(',').map(v => v.trim()).includes(originValue) || hostname.endsWith('.nicola.id')) {
         return callback(null, true);
       }
     } catch (err) {
@@ -88,7 +88,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-CSRF-Token', 'Idempotency-Key', 'X-Request-ID'],
   maxAge: 86400
 };
 
@@ -98,6 +98,9 @@ app.use(express.json({
   limit: '2mb',
   verify: (req, res, buffer) => { req.rawBody = Buffer.from(buffer); }
 }));
+
+// Owner dashboard API: authenticated, bounded, and redacted.
+const mountOwnerApi = require('./owner-api');
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true';
 let pg; if (usePg) { pg = require('../config/postgres'); }
 let midtransSchemaReady = false;
@@ -712,6 +715,8 @@ function _generateUserId() {
 }
 
 // API Endpoints
+
+mountOwnerApi(app, { pg, getDbInstance, usePg, redis: getRedis() });
 
 // 1. Dashboard Overview
 app.get('/api/dashboard/overview', async (req, res) => {
