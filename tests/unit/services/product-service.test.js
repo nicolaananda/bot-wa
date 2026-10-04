@@ -12,9 +12,9 @@ describe('ProductService', () => {
                     'net2u': {
                         id: 'net2u',
                         name: 'Netflix 2 User',
-                        price: 50000,
-                        price_silver: 47500,
-                        price_gold: 45000,
+                        priceB: 50000,
+                        priceS: 47500,
+                        priceG: 45000,
                         desc: 'Netflix Premium 2 User',
                         stok: ['account1', 'account2', 'account3'],
                     },

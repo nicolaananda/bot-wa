@@ -116,11 +116,11 @@ class ProductService {
      */
     getPrice(product, role) {
         const prices = {
-            bronze: product.price,
-            silver: product.price_silver || product.price,
-            gold: product.price_gold || product.price,
+            bronze: product.priceB,
+            silver: product.priceS ?? product.priceB,
+            gold: product.priceG ?? product.priceB,
         };
-        return prices[role] || product.price;
+        return prices[role] ?? product.priceB;
     }
 
     /**
