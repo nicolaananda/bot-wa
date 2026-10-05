@@ -70,6 +70,26 @@ CREATE TABLE IF NOT EXISTS settings (
   value JSONB NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS owner_idempotency (
+  key TEXT PRIMARY KEY,
+  request_hash TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','completed')),
+  result JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS owner_audit (
+  id TEXT PRIMARY KEY,
+  action TEXT NOT NULL,
+  target TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  request_id TEXT,
+  detail JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Generic key-value catch-all for other top-level maps
 CREATE TABLE IF NOT EXISTS kv_store (
   key TEXT PRIMARY KEY,

@@ -182,7 +182,7 @@ async function getCache(key) {
       console.log(`✅ [CACHE] Cache HIT for key: ${key}`);
       return JSON.parse(data);
     } else {
-      console.log(`❌ [CACHE] Cache MISS for key: ${key}`);
+      console.log(`[CACHE] Cache MISS for key: ${key}`);
       return null;
     }
   } catch (error) {

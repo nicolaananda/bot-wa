@@ -11,6 +11,16 @@ const Database = require('../../function/database')
 describe('Database dirty persistence', () => {
   beforeEach(() => mockQuery.mockReset().mockResolvedValue({ rows: [] }))
 
+  test('rejects a stale product snapshot instead of overwriting PostgreSQL', async () => {
+    const db = new Database()
+    db.data = { users: {}, produk: { p: { name: 'P', priceB: 10, stok: ['a'] } }, order: {}, zoomFlow: {}, zoomBookings: [], promo: {} }
+    db._resetPersistedState()
+    db.data.produk.p.stok.push('b')
+
+    await expect(db.save()).rejects.toMatchObject({ code: '40001' })
+    expect(mockQuery.mock.calls[0][0]).toMatch(/p\.data=input\.baseline/)
+  })
+
   test('one changed user writes one row and unchanged save writes nothing', async () => {
     const db = new Database()
     db.data = {

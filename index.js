@@ -920,9 +920,21 @@ if (!global.midtransWebhookListenerSetup) {
       // ============================================================
       if (order.metode === 'MIDTRANS-ZOOM') {
         if (order.processed) {
-          console.log(
-            `⚠️ [MID-GLOBAL-ZOOM] Order ${orderId} already processed, skipping duplicate event.`
-          )
+          if (order.deliveryStatus === 'pending' && order.fulfillment) {
+            const deliveryClient = globalRonzz || global.gowaAdapter
+            if (!deliveryClient) throw new Error('GOWA delivery client unavailable')
+            if (!order.infoDeliveredAt) {
+              await deliveryClient.sendMessage(sender, { text: order.fulfillment.infoText })
+              order.infoDeliveredAt = Date.now(); db.data.order[sender] = order; await db.save()
+            }
+            if (!order.inviteDeliveredAt) {
+              await deliveryClient.sendMessage(sender, { text: order.fulfillment.inviteText })
+              order.inviteDeliveredAt = Date.now(); order.deliveryStatus = 'sent'; order.status = 'success'
+              db.data.order[sender] = order; await db.save()
+            }
+            delete db.data.order[sender]; await db.save(); return
+          }
+          console.log(`⚠️ [MID-GLOBAL-ZOOM] Order ${orderId} already processed, skipping duplicate event.`)
           return
         }
         try {
@@ -1055,9 +1067,7 @@ if (!global.midtransWebhookListenerSetup) {
           }
 
           const meetingIdFmt = String(meeting.id).replace(/(\d{3})(\d{4})(\d+)/, '$1 $2 $3')
-          const hostName =
-            (hostInfo && (hostInfo.first_name || hostInfo.display_name || hostInfo.email)) ||
-            usedHost.label
+          const hostName = usedHost.label
           const hostKey = hostInfo.host_key
 
           const inviteLines = [
@@ -1081,11 +1091,17 @@ if (!global.midtransWebhookListenerSetup) {
             `*RefId:* ${reffId}\n\n` +
             `_Link meeting di bawah, tap & tahan untuk copy & forward ke peserta._`
 
-          if (globalRonzz) {
-            try {
-              await globalRonzz.sendMessage(sender, { text: infoText })
+          order.fulfillment = { infoText, inviteText: inviteLines.join('\n'), meetingId: String(meeting.id) }
+          order.deliveryStatus = 'pending'; db.data.order[sender] = order; await db.save()
+          const deliveryClient = globalRonzz || global.gowaAdapter
+          if (!deliveryClient) throw new Error('GOWA delivery client unavailable')
+          try {
+              await deliveryClient.sendMessage(sender, { text: infoText })
+              order.infoDeliveredAt = Date.now(); db.data.order[sender] = order; await db.save()
               await sleep(500)
-              await globalRonzz.sendMessage(sender, { text: inviteLines.join('\n') })
+              await deliveryClient.sendMessage(sender, { text: inviteLines.join('\n') })
+              order.inviteDeliveredAt = Date.now(); order.deliveryStatus = 'sent'
+              db.data.order[sender] = order; await db.save()
 
               // Kalau order datang dari grup, kirim notifikasi sukses publik
               // tanpa bocorin link/password — link cuma dikirim ke PM customer.
@@ -1108,8 +1124,8 @@ if (!global.midtransWebhookListenerSetup) {
               }
             } catch (sendErr) {
               console.error(`❌ [MID-GLOBAL-ZOOM] Error sending invite:`, sendErr.message)
+              throw sendErr
             }
-          }
 
           // Save receipt
           try {
@@ -1183,8 +1199,8 @@ if (!global.midtransWebhookListenerSetup) {
           }
         } catch (err) {
           console.error(`❌ [MID-GLOBAL-ZOOM] Unhandled error:`, err.message, err.stack)
+          throw err
         }
-        return
       }
 
       // ============================================================
@@ -1599,11 +1615,11 @@ module.exports = async (nicola, m, mek) => {
         )
       } else {
         const status = whitelist.status.toLowerCase()
-        console.warn(
+        console.log(
           `[GROUP-WHITELIST] ${whitelist.status} jid=${from} reason=${whitelist.reason} action=blocked`
         )
-        console.warn(
-          `[COMMAND] message_id=${messageId} jid=${from} command=${command || 'none'} whitelist=${status} result=blocked error=${JSON.stringify(whitelist.reason)}`
+        console.log(
+          `[COMMAND] message_id=${messageId} jid=${from} command=${command || 'none'} whitelist=${status} result=blocked reason=${JSON.stringify(whitelist.reason)}`
         )
         return
       }
@@ -2499,9 +2515,7 @@ module.exports = async (nicola, m, mek) => {
                   timeLine = `${startMom.format('MMM D, YYYY H:mm')} ${timeZoneShort}`
                 }
 
-                const hostName =
-                  (hostInfo && (hostInfo.first_name || hostInfo.display_name || hostInfo.email)) ||
-                  host.label
+                const hostName = host.label
                 const hostKey = hostInfo.host_key
 
                 // ==== Bubble 1: info / pembelian / host pool ====
@@ -6814,7 +6828,14 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               )
             } finally {
               delete db.data.order[sender]
-              await db.save()
+              try {
+                await db.save()
+              } catch (cleanupError) {
+                const message = cleanupError.code === '40001'
+                  ? 'stale product snapshot'
+                  : cleanupError.message
+                console.error(`[BUY] Cleanup save failed (${message}); transaction result is unchanged`)
+              }
             }
           } catch (outerError) {
             console.error('❌ [BUY] Outer error:', outerError)

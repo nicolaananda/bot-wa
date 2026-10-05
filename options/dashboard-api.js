@@ -319,9 +319,10 @@ app.post('/webhook/gowa', async (req, res) => {
     }
 
     const webhookData = req.body;
+    const payload = webhookData?.payload || webhookData?.data || webhookData;
     console.log('[GOWA-WEBHOOK] Received', {
       event: webhookData?.event || webhookData?.type || 'unknown',
-      messageId: webhookData?.id || webhookData?.data?.id || webhookData?.data?.message?.id || 'unknown',
+      messageId: payload?.id || payload?.message_id || payload?.messageId || payload?.message?.id || payload?.message?.message_id || payload?.message?.messageId || 'unknown',
       bytes: req.rawBody?.length || 0
     });
 

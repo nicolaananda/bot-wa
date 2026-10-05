@@ -202,7 +202,16 @@ class DatabasePG {
     // produk
     const produk = await produkPromise
     snapshot.produk = {}
-    for (const row of produk.rows) snapshot.produk[row.id] = row.data
+    for (const row of produk.rows) {
+      const value = row.data || {}
+      const bronze = Number(value.priceB ?? value.price ?? value.harga ?? 0)
+      snapshot.produk[row.id] = {
+        ...value,
+        priceB: bronze,
+        priceS: Number(value.priceS ?? value.price_silver ?? bronze),
+        priceG: Number(value.priceG ?? value.price_gold ?? bronze),
+      }
+    }
 
     // settings
     const settings = await settingsPromise
@@ -316,16 +325,19 @@ class DatabasePG {
       {
         name: 'produk',
         entries: Object.entries(this._data.produk || {}),
-        sql: (values) =>
-          `INSERT INTO produk(id, name, price, stock, data) VALUES ${values.join(',')} ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, price=EXCLUDED.price, stock=EXCLUDED.stock, data=EXCLUDED.data`,
+        // PostgreSQL wins if an owner mutation raced this legacy snapshot save.
+        sql: (values) => `WITH input(id,name,price,stock,data,baseline) AS (VALUES ${values.join(',')})
+          UPDATE produk p SET name=input.name,price=input.price,stock=input.stock,data=input.data
+          FROM input WHERE p.id=input.id AND p.data=input.baseline`,
         row: ([id, value], index) => ({
-          values: `($${index},$${index + 1},$${index + 2},$${index + 3},$${index + 4})`,
+          values: `($${index}::text,$${index + 1}::text,$${index + 2}::numeric,$${index + 3}::integer,$${index + 4}::jsonb,$${index + 5}::jsonb)`,
           params: [
             id,
             (value && (value.name || value.nama)) || null,
-            Number((value && (value.price || value.harga)) || 0),
+            Number((value && (value.priceB ?? value.price ?? value.harga)) || 0),
             Number((value && (value.stock || (value.stok ? value.stok.length : 0))) || 0),
             JSON.stringify(value || {}),
+            this._persisted.produk.get(id) || '{}',
           ],
         }),
       },
@@ -351,9 +363,12 @@ class DatabasePG {
         }
         try {
           // Never replay a balance delta after an ambiguous connection failure.
-          await (domain.name === 'users' ? walletQuery : query)(domain.sql(values), params)
+          const result = await (domain.name === 'users' ? walletQuery : query)(domain.sql(values), params)
+          if (domain.name === 'produk' && result.rowCount !== chunk.length)
+            throw Object.assign(new Error('Stale product snapshot; reload before retrying'), { code: '40001' })
           for (const { id, serialized } of chunk) this._persisted[domain.name].set(id, serialized)
         } catch (e) {
+          if (domain.name === 'produk' && e.code === '40001') throw e
           if (
             domain.name === 'users' &&
             (!/^[0-9A-Z]{5}$/.test(e.code || '') || /^(08|57|58)/.test(e.code))
