@@ -14,6 +14,10 @@ backup/
 .env.local
 .env.production
 .env.staging
+.env.*.bak*
+.env.bak*
+options/receipts/*.txt
+!options/receipts/.gitkeep
 
 # Cache files
 midtrans-payment-cache.json
