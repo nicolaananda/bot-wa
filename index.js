@@ -925,16 +925,25 @@ if (!global.midtransWebhookListenerSetup) {
             if (!deliveryClient) throw new Error('GOWA delivery client unavailable')
             if (!order.infoDeliveredAt) {
               await deliveryClient.sendMessage(sender, { text: order.fulfillment.infoText })
-              order.infoDeliveredAt = Date.now(); db.data.order[sender] = order; await db.save()
+              order.infoDeliveredAt = Date.now()
+              db.data.order[sender] = order
+              await db.save()
             }
             if (!order.inviteDeliveredAt) {
               await deliveryClient.sendMessage(sender, { text: order.fulfillment.inviteText })
-              order.inviteDeliveredAt = Date.now(); order.deliveryStatus = 'sent'; order.status = 'success'
-              db.data.order[sender] = order; await db.save()
+              order.inviteDeliveredAt = Date.now()
+              order.deliveryStatus = 'sent'
+              order.status = 'success'
+              db.data.order[sender] = order
+              await db.save()
             }
-            delete db.data.order[sender]; await db.save(); return
+            delete db.data.order[sender]
+            await db.save()
+            return
           }
-          console.log(`⚠️ [MID-GLOBAL-ZOOM] Order ${orderId} already processed, skipping duplicate event.`)
+          console.log(
+            `⚠️ [MID-GLOBAL-ZOOM] Order ${orderId} already processed, skipping duplicate event.`
+          )
           return
         }
         try {
@@ -1091,41 +1100,51 @@ if (!global.midtransWebhookListenerSetup) {
             `*RefId:* ${reffId}\n\n` +
             `_Link meeting di bawah, tap & tahan untuk copy & forward ke peserta._`
 
-          order.fulfillment = { infoText, inviteText: inviteLines.join('\n'), meetingId: String(meeting.id) }
-          order.deliveryStatus = 'pending'; db.data.order[sender] = order; await db.save()
+          order.fulfillment = {
+            infoText,
+            inviteText: inviteLines.join('\n'),
+            meetingId: String(meeting.id),
+          }
+          order.deliveryStatus = 'pending'
+          db.data.order[sender] = order
+          await db.save()
           const deliveryClient = globalRonzz || global.gowaAdapter
           if (!deliveryClient) throw new Error('GOWA delivery client unavailable')
           try {
-              await deliveryClient.sendMessage(sender, { text: infoText })
-              order.infoDeliveredAt = Date.now(); db.data.order[sender] = order; await db.save()
-              await sleep(500)
-              await deliveryClient.sendMessage(sender, { text: inviteLines.join('\n') })
-              order.inviteDeliveredAt = Date.now(); order.deliveryStatus = 'sent'
-              db.data.order[sender] = order; await db.save()
+            await deliveryClient.sendMessage(sender, { text: infoText })
+            order.infoDeliveredAt = Date.now()
+            db.data.order[sender] = order
+            await db.save()
+            await sleep(500)
+            await deliveryClient.sendMessage(sender, { text: inviteLines.join('\n') })
+            order.inviteDeliveredAt = Date.now()
+            order.deliveryStatus = 'sent'
+            db.data.order[sender] = order
+            await db.save()
 
-              // Kalau order datang dari grup, kirim notifikasi sukses publik
-              // tanpa bocorin link/password — link cuma dikirim ke PM customer.
-              if (from && from.endsWith('@g.us') && from !== sender) {
-                try {
-                  const groupNote =
-                    `🎉 Pembayaran QRIS berhasil! @${sender.split('@')[0]} telah menerima ` +
-                    `link Zoom ${tier}p di chat pribadi. Terima kasih!`
-                  await globalRonzz.sendMessage(
-                    from,
-                    { text: groupNote, mentions: [sender] },
-                    { quoted: messageKey ? { key: messageKey } : undefined }
-                  )
-                } catch (groupNotifErr) {
-                  console.error(
-                    `❌ [MID-GLOBAL-ZOOM] Error sending group confirmation:`,
-                    groupNotifErr.message
-                  )
-                }
+            // Kalau order datang dari grup, kirim notifikasi sukses publik
+            // tanpa bocorin link/password — link cuma dikirim ke PM customer.
+            if (from && from.endsWith('@g.us') && from !== sender) {
+              try {
+                const groupNote =
+                  `🎉 Pembayaran QRIS berhasil! @${sender.split('@')[0]} telah menerima ` +
+                  `link Zoom ${tier}p di chat pribadi. Terima kasih!`
+                await globalRonzz.sendMessage(
+                  from,
+                  { text: groupNote, mentions: [sender] },
+                  { quoted: messageKey ? { key: messageKey } : undefined }
+                )
+              } catch (groupNotifErr) {
+                console.error(
+                  `❌ [MID-GLOBAL-ZOOM] Error sending group confirmation:`,
+                  groupNotifErr.message
+                )
               }
-            } catch (sendErr) {
-              console.error(`❌ [MID-GLOBAL-ZOOM] Error sending invite:`, sendErr.message)
-              throw sendErr
             }
+          } catch (sendErr) {
+            console.error(`❌ [MID-GLOBAL-ZOOM] Error sending invite:`, sendErr.message)
+            throw sendErr
+          }
 
           // Save receipt
           try {
@@ -3660,8 +3679,13 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
     switch (command) {
       case 'health':
       case 'statusbot': {
-        if (!canUseAdminCommand({ isOwner, isGroup, isGroupAdmin: isGroupAdmins })) return reply(mess.admin)
-        const health = await collectHealth({ pg, redis: require('./config/redis').getRedis(), gowaUrl: global.gowaConfig?.apiUrl })
+        if (!canUseAdminCommand({ isOwner, isGroup, isGroupAdmin: isGroupAdmins }))
+          return reply(mess.admin)
+        const health = await collectHealth({
+          pg,
+          redis: require('./config/redis').getRedis(),
+          gowaUrl: global.gowaConfig?.apiUrl,
+        })
         return reply(formatHealth(health))
       }
       case 'helppromo': {
@@ -6831,10 +6855,11 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               try {
                 await db.save()
               } catch (cleanupError) {
-                const message = cleanupError.code === '40001'
-                  ? 'stale product snapshot'
-                  : cleanupError.message
-                console.error(`[BUY] Cleanup save failed (${message}); transaction result is unchanged`)
+                const message =
+                  cleanupError.code === '40001' ? 'stale product snapshot' : cleanupError.message
+                console.error(
+                  `[BUY] Cleanup save failed (${message}); transaction result is unchanged`
+                )
               }
             }
           } catch (outerError) {
