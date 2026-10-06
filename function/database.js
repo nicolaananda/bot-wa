@@ -164,6 +164,52 @@ class DatabasePG {
     return nextItem
   }
 
+  async reserveProductStock(sender, productId, quantity) {
+    const order = this._data.order && this._data.order[sender]
+    if (!order) throw new Error('Pending order not found')
+    if (Array.isArray(order.fulfillmentReservation)) return order.fulfillmentReservation
+
+    const { getClient } = require('../config/postgres')
+    const client = await getClient()
+    try {
+      await client.query('BEGIN')
+      const result = await client.query('SELECT data FROM produk WHERE id=$1 FOR UPDATE', [productId])
+      if (!result.rowCount) throw new Error('Product not found')
+      const product = result.rows[0].data || {}
+      const stock = Array.isArray(product.stok) ? product.stok : []
+      if (stock.length < quantity) {
+        await client.query('ROLLBACK')
+        return null
+      }
+      const reservation = stock.splice(0, quantity)
+      product.stok = stock
+      product.terjual = Number(product.terjual || 0) + quantity
+      delete product.stock
+      order.fulfillmentReservation = reservation
+      await client.query('UPDATE produk SET data=$2::jsonb,stock=$3 WHERE id=$1', [
+        productId,
+        JSON.stringify(product),
+        stock.length,
+      ])
+      await client.query(
+        'INSERT INTO kv_store(key,value) VALUES ($1,$2::jsonb) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()',
+        ['order', JSON.stringify(this._data.order)]
+      )
+      await client.query('COMMIT')
+      this._data.produk[productId] = cloneJson(product)
+      this._persisted.produk.set(productId, JSON.stringify(product))
+      this._persisted.kv.set('order', JSON.stringify(this._data.order))
+      return reservation
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK')
+      } catch {}
+      throw error
+    } finally {
+      client.release()
+    }
+  }
+
   async load() {
     const snapshot = {}
     const startedAt = Date.now()

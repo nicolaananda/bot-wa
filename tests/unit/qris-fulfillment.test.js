@@ -38,3 +38,13 @@ test('does not mutate stock when reservation cannot be filled', async () => {
   await expect(reserveOrderStock(db, 'user', 'product', 1)).resolves.toBeNull()
   expect(db.save).not.toHaveBeenCalled()
 })
+
+test('uses atomic database reservation when available', async () => {
+  const db = {
+    data: { order: { user: {} } },
+    reserveProductStock: jest.fn().mockResolvedValue(['reserved']),
+  }
+
+  await expect(reserveOrderStock(db, 'user', 'product', 1)).resolves.toEqual(['reserved'])
+  expect(db.reserveProductStock).toHaveBeenCalledWith('user', 'product', 1)
+})
