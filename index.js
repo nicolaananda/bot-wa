@@ -6574,15 +6574,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
               await sleep(1000)
 
-              // Proses pembelian langsung
-              db.data.produk[data[0]].terjual += jumlah
-              let dataStok = []
-              for (let i = 0; i < jumlah; i++) {
-                dataStok.push(db.data.produk[data[0]].stok.shift())
-              }
-
-              // Important: Delete old stock property to force recalculation from stok.length
-              delete db.data.produk[data[0]].stock
+              // Reserve stock durably before delivery. Reuses the pending order on retry.
+              const dataStok = await db.reserveProductStock(sender, data[0], jumlah)
+              if (!dataStok) throw new Error('Stok berubah atau tidak mencukupi; saldo perlu direkonsiliasi')
 
               // Low stock alert to owner
               const sisaStokBuy = db.data.produk[data[0]].stok.length
