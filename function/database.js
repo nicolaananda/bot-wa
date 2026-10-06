@@ -5,7 +5,7 @@ if (!usePg) {
   throw new Error('Filesystem database mode has been removed. Please set USE_PG=true.')
 }
 
-const { query } = require('../config/postgres')
+const { query, getClient } = require('../config/postgres')
 const { walletQuery } = require('../lib/otp-wallet')
 
 function toPositiveInt(value, fallback) {
@@ -164,12 +164,29 @@ class DatabasePG {
     return nextItem
   }
 
+  async addProductStock(productId, items) {
+    const stockItems = Array.isArray(items) ? items.filter((item) => typeof item === 'string' && item.trim()) : []
+    if (!stockItems.length) throw new Error('Stock items are required')
+    const result = await query(
+      `UPDATE produk SET
+         data=jsonb_set(COALESCE(data,'{}'::jsonb),'{stok}',COALESCE(data->'stok','[]'::jsonb) || to_jsonb($2::text[]),true),
+         stock=jsonb_array_length(COALESCE(data->'stok','[]'::jsonb) || to_jsonb($2::text[])),
+         updated_at=now()
+       WHERE id=$1 RETURNING data,stock`,
+      [productId, stockItems]
+    )
+    if (!result.rowCount) throw new Error('Product not found')
+    const product = result.rows[0].data || {}
+    this._data.produk[productId] = cloneJson(product)
+    this._persisted.produk.set(productId, JSON.stringify(product))
+    return Number(result.rows[0].stock || 0)
+  }
+
   async reserveProductStock(sender, productId, quantity) {
     const order = this._data.order && this._data.order[sender]
     if (!order) throw new Error('Pending order not found')
     if (Array.isArray(order.fulfillmentReservation)) return order.fulfillmentReservation
 
-    const { getClient } = require('../config/postgres')
     const client = await getClient()
     try {
       await client.query('BEGIN')

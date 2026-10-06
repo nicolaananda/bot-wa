@@ -5147,16 +5147,23 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       case 'addstok':
         {
           if (!isOwner) return reply(mess.owner)
-          let data = q.split(',')
-          if (!data[1])
+          const separator = q.indexOf(',')
+          if (separator < 1)
             return reply(
               `Contoh: ${prefix + command} idproduk,email1@gmail.com|password1|profil1|pin1|2fa1\nemail2@gmail.com|password2|profil2|pin2|2fa2\n\n*NOTE*\nJika tidak ada Profil, Pin, 2FA, kosongkan saja atau dikasih tanda strip (-)`
             )
-          if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
+          const productId = q.slice(0, separator).trim().toLowerCase()
+          if (!db.data.produk[productId]) return reply(`Produk dengan ID *${productId}* tidak ada`)
 
-          let dataStok = data[1].split('\n').map((i) => i.trim())
-          db.data.produk[data[0]].stok.push(...dataStok)
+          const dataStok = q
+            .slice(separator + 1)
+            .split('\n')
+            .map((item) => item.trim())
+            .filter(Boolean)
+          if (!dataStok.length || dataStok.some((item) => item.length > 2000))
+            return reply('Data stok kosong atau terlalu panjang')
 
+          await db.addProductStock(productId, dataStok)
           reply(`Berhasil menambahkan stok sebanyak ${dataStok.length}`)
         }
         break
