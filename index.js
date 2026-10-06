@@ -5187,10 +5187,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             )
           }
 
-          db.data.produk[idDelStok].stok = []
-
-          if (typeof global.scheduleSave === 'function') global.scheduleSave()
-
+          await db.clearProductStock(idDelStok)
           reply(`✅ Berhasil hapus *${jumlahStokDel} akun* dari stok produk *${idDelStok}*`)
         }
         break
@@ -5293,22 +5290,11 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             )
           }
 
-          // Hapus duplikat dan urutkan dari terbesar ke terkecil agar index tidak bergeser
-          const uniqueNomor = [...new Set(nomorList)].sort((a, b) => b - a)
-          const akunDipick = []
-
-          for (const nomor of uniqueNomor) {
-            const idx = nomor - 1
-            akunDipick.unshift({ nomor, data: stokPick[idx] })
-            db.data.produk[idProdukPick].stok.splice(idx, 1)
-          }
-
-          const sisaStok = db.data.produk[idProdukPick].stok.length
-
-          // Simpan perubahan
-          if (typeof global.scheduleSave === 'function') {
-            global.scheduleSave()
-          }
+          const { picked: akunDipickRaw, remaining: sisaStok } = await db.pickProductStock(
+            idProdukPick,
+            nomorList
+          )
+          const akunDipick = akunDipickRaw.map(({ number, data }) => ({ nomor: number, data }))
 
           let teks = `*╭────〔 AKUN PICK 〕─*\n`
           teks += `*┊・ 📦 Produk:* ${produkPick.name || idProdukPick}\n`
@@ -6049,8 +6035,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
 
             const jumlah = Number(data[1])
-            if (!Number.isFinite(jumlah) || jumlah <= 0)
-              return reply('Jumlah harus berupa angka lebih dari 0')
+            if (!Number.isInteger(jumlah) || jumlah <= 0)
+              return reply('Jumlah harus berupa bilangan bulat lebih dari 0')
 
             let stok = db.data.produk[data[0]].stok
             if (stok.length <= 0) return reply('Stok habis, silahkan hubungi Owner untuk restok')
@@ -6515,8 +6501,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             if (!db.data.produk[data[0]]) return reply(`Produk dengan ID *${data[0]}* tidak ada`)
 
             const jumlah = Number(data[1])
-            if (!Number.isFinite(jumlah) || jumlah <= 0)
-              return reply('Jumlah harus berupa angka lebih dari 0')
+            if (!Number.isInteger(jumlah) || jumlah <= 0)
+              return reply('Jumlah harus berupa bilangan bulat lebih dari 0')
 
             let stok = db.data.produk[data[0]].stok
             if (stok.length <= 0) return reply('Stok habis, silahkan hubungi Owner untuk restok')
@@ -7131,6 +7117,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           if (!q.split(',')[1]) return reply(`Contoh: ${prefix + command} 628xx,20000`)
           let nomorNya = q.split(',')[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net'
           let nominal = Number(q.split(',')[1])
+          if (!Number.isInteger(nominal) || nominal <= 0)
+            return reply('Nominal harus berupa bilangan bulat lebih dari 0')
 
           // Check if user exists, if not create them
           if (!db.data.users[nomorNya]) {

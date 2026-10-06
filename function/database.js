@@ -192,6 +192,52 @@ class DatabasePG {
     return Number(result.rows[0].stock || 0)
   }
 
+  async clearProductStock(productId) {
+    const result = await query(
+      `UPDATE produk SET data=jsonb_set(COALESCE(data,'{}'::jsonb),'{stok}','[]'::jsonb,true),stock=0,updated_at=now()
+       WHERE id=$1 RETURNING data`,
+      [productId]
+    )
+    if (!result.rowCount) throw new Error('Product not found')
+    const previous = Array.isArray(this._data.produk[productId]?.stok)
+      ? this._data.produk[productId].stok.length
+      : 0
+    this._data.produk[productId] = cloneJson(result.rows[0].data || {})
+    this._persisted.produk.set(productId, JSON.stringify(this._data.produk[productId]))
+    return previous
+  }
+
+  async pickProductStock(productId, numbers) {
+    const client = await getClient()
+    try {
+      await client.query('BEGIN')
+      const result = await client.query('SELECT data FROM produk WHERE id=$1 FOR UPDATE', [productId])
+      if (!result.rowCount) throw new Error('Product not found')
+      const product = result.rows[0].data || {}
+      const stock = Array.isArray(product.stok) ? product.stok : []
+      const unique = [...new Set(numbers)].sort((a, b) => b - a)
+      if (!unique.length || unique.some((number) => !Number.isInteger(number) || number < 1 || number > stock.length))
+        throw new Error('Invalid stock number')
+      const picked = []
+      for (const number of unique) picked.unshift({ number, data: stock.splice(number - 1, 1)[0] })
+      product.stok = stock
+      await client.query('UPDATE produk SET data=$2::jsonb,stock=$3,updated_at=now() WHERE id=$1', [
+        productId,
+        JSON.stringify(product),
+        stock.length,
+      ])
+      await client.query('COMMIT')
+      this._data.produk[productId] = cloneJson(product)
+      this._persisted.produk.set(productId, JSON.stringify(product))
+      return { picked, remaining: stock.length }
+    } catch (error) {
+      try { await client.query('ROLLBACK') } catch {}
+      throw error
+    } finally {
+      client.release()
+    }
+  }
+
   async reserveProductStock(sender, productId, quantity) {
     const order = this._data.order && this._data.order[sender]
     if (!order) throw new Error('Pending order not found')
