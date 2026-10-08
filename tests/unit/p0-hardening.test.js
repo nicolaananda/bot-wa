@@ -120,7 +120,7 @@ test('processed Zoom retry uses outbox contract rather than fulfillment creation
 
 test('PG delivery paths return after queueing and do not direct-send', () => {
   const source = fs.readFileSync(require.resolve('../../index.js'), 'utf8');
-  expect(source).toMatch(/queueFulfillmentDeliveries\(orderId,[\s\S]*?zoom-invite[\s\S]*?return\n\s*}\n\s*const deliveryClient/);
+  expect(source).toMatch(/queueFulfillmentDeliveries\(\s*orderId,[\s\S]*?zoom-invite[\s\S]*?return\n\s*}\n\s*const deliveryClient/);
   expect(source).toMatch(/dedupeKey: `\$\{orderId}:account`[\s\S]*?return\n\s*}\n\s*const deliveryClient/);
 });
 

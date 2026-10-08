@@ -5378,7 +5378,13 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           const idProdukCek = cekArgs[0].toLowerCase()
           const fullMode = cekArgs[1]?.toLowerCase() === 'full'
 
-          const produkCek = db.data.produk[idProdukCek]
+          const produkCekResult = await pg.query(
+            `SELECT name, COALESCE(data->'stok', '[]'::jsonb) AS stok
+             FROM produk
+             WHERE id = $1`,
+            [idProdukCek]
+          )
+          const produkCek = produkCekResult.rows[0]
 
           if (!produkCek) {
             return reply(
@@ -5600,18 +5606,27 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             )
           }
 
-          const transaksiRekap = (db.data.transaksi || []).filter((t) => {
-            if (!t.date) return false
-            const tgl = t.date.split(' ')[0]
-            return (
-              tgl >= rekapStart &&
-              tgl <= rekapEnd &&
+          const transaksiRekapResult = await pg.query(
+            `SELECT meta
+             FROM transaksi
+             WHERE COALESCE(
+               CASE
+                 WHEN meta->>'date' ~ '^\\d{4}-\\d{2}-\\d{2}'
+                 THEN LEFT(meta->>'date', 10)::date
+               END,
+               (created_at AT TIME ZONE 'Asia/Jakarta')::date
+             ) BETWEEN $1::date AND $2::date
+             ORDER BY id`,
+            [rekapStart, rekapEnd]
+          )
+          const transaksiPeriode = transaksiRekapResult.rows.map((row) => row.meta || {})
+          const transaksiRekap = transaksiPeriode.filter(
+            (t) =>
               t.metodeBayar !== 'Deposit' &&
               t.type !== 'deposit' &&
               t.type !== 'wallet_reconciliation'
-            )
-          })
-          const qrisRekap = summarizeQris(db.data.transaksi || [], rekapStart, rekapEnd)
+          )
+          const qrisRekap = summarizeQris(transaksiPeriode, rekapStart, rekapEnd)
 
           if (transaksiRekap.length === 0 && qrisRekap.depositCount === 0) {
             return reply(`📭 Tidak ada transaksi pada periode *${rekapLabel}*`)
