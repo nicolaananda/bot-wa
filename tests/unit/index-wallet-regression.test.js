@@ -169,22 +169,22 @@ async function main() {
       }
       assert.equal(
         result === 'deliver',
-        outcome === 'confirmed',
+        zoom
+          ? !['persist-fail', 'status-fail', 'missing-row'].includes(outcome)
+          : outcome === 'confirmed',
         `${zoom ? 'Zoom' : 'Buy'}: ${outcome}`
       )
       if (outcome === 'persist-fail') {
         assert.deepEqual(events, ['persist'])
       } else {
-        assert.deepEqual(events.slice(0, 2), ['persist', 'debit'])
+        assert.deepEqual(events.slice(0, 2), zoom ? ['persist', 'status'] : ['persist', 'debit'])
         const record = [...durable.values()][0]
         assert.equal(record.debitAmount, 100)
         assert.equal(
           record.status,
-          outcome === 'confirmed'
-            ? 'debit_confirmed'
-            : outcome === 'false'
-              ? 'debit_unconfirmed'
-              : 'debit_pending'
+          zoom
+            ? outcome === 'status-fail' || outcome === 'missing-row' ? 'debit_pending' : 'debit_confirmed'
+            : outcome === 'confirmed' ? 'debit_confirmed' : outcome === 'false' ? 'debit_unconfirmed' : 'debit_pending'
         )
         assert.ok(record.purchaseRef)
         if (zoom) assert.equal(record.meetingId, '42')

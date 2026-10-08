@@ -94,6 +94,7 @@ let pg
 if (usePg) {
   pg = require('./config/postgres')
 }
+const p0Store = usePg ? require('./lib/p0-store') : null
 const { core, isProduction } = require('./config/midtrans')
 const USE_POLLING = false // Durable webhook worker is authoritative; transaction-list polling is redundant.
 const { matchPendingOrder, startWebhookWorker } = require('./options/midtrans-webhook')
@@ -662,6 +663,26 @@ moment.tz.setDefault('Asia/Jakarta').locale('id')
 
 // Global listener untuk webhook Midtrans (harus di luar module.exports agar bisa akses global)
 let globalRonzz = null
+let deliveryOutboxTimer = null
+
+function startDeliveryOutboxWorker(client) {
+  if (client) globalRonzz = client
+  if (!p0Store || deliveryOutboxTimer) return
+  const tick = async () => {
+    const client = globalRonzz || global.gowaAdapter
+    if (!client) return
+    try {
+      while (await p0Store.runDeliveryOutboxOnce(
+        (destination, payload) => client.sendMessage(destination, payload), pg)) {}
+    } catch (_) {
+      // Payloads and provider errors may contain credentials or destinations.
+      console.error('[DELIVERY-OUTBOX] worker failed')
+    }
+  }
+  deliveryOutboxTimer = setInterval(tick, 5000)
+  deliveryOutboxTimer.unref?.()
+  tick()
+}
 
 if (!global.zoomLicenseSchedulerSetup) {
   global.zoomLicenseSchedulerSetup = true
@@ -914,6 +935,10 @@ if (!global.midtransWebhookListenerSetup) {
       const order = matchedOrder
       const sender = matchedSender
       const { id: productId, jumlah, from, key: messageKey, orderId, reffId, totalAmount } = order
+      if (p0Store && !(await p0Store.claimFulfillment(orderId, pg))) {
+        console.log(`[MID-GLOBAL] Fulfillment already claimed: ${orderId}`)
+        return
+      }
 
       // ============================================================
       // BRANCH: Zoom QRIS purchase — order.metode === 'MIDTRANS-ZOOM'
@@ -921,6 +946,13 @@ if (!global.midtransWebhookListenerSetup) {
       if (order.metode === 'MIDTRANS-ZOOM') {
         if (order.processed) {
           if (order.deliveryStatus === 'pending' && order.fulfillment) {
+            if (p0Store) {
+              await p0Store.queueFulfillmentDeliveries(orderId, [
+                { destination: sender, payload: { text: order.fulfillment.infoText }, dedupeKey: `${orderId}:zoom-info` },
+                { destination: sender, payload: { text: order.fulfillment.inviteText }, dedupeKey: `${orderId}:zoom-invite` },
+              ], pg)
+              return
+            }
             const deliveryClient = globalRonzz || global.gowaAdapter
             if (!deliveryClient) throw new Error('GOWA delivery client unavailable')
             if (!order.infoDeliveredAt) {
@@ -990,6 +1022,19 @@ if (!global.midtransWebhookListenerSetup) {
               startAtUtcMs: zoomDetail.startAtUtcMs,
               agenda: buildZoomAgenda(zoomDetail),
               allowFallback: true,
+              claimCreate: p0Store ? ({ host }) => {
+                const startsAt = new Date(Number(zoomDetail.startAtUtcMs))
+                return p0Store.claimZoomCreate({
+                  orderId,
+                  userId: sender,
+                  hostId: host.accountId || host.userId || host.label,
+                  startsAt,
+                  endsAt: new Date(startsAt.getTime() + Number(zoomDetail.durationMinutes) * 60000),
+                  capacity: Number(host.concurrentMeetings || 1),
+                }, pg)
+              } : undefined,
+              finishCreate: p0Store ? (claim, meeting, failure) =>
+                p0Store.finishZoomCreate(orderId, claim.claim_token, meeting, pg, failure) : undefined,
             })
           } catch (createErr) {
             console.error(
@@ -1004,9 +1049,9 @@ if (!global.midtransWebhookListenerSetup) {
             order.failedAt = Date.now()
             order.failureReason = createResult ? createResult.error : 'unknown'
             order.failureDetail = createResult && createResult.detail
+            if (createResult && createResult.ambiguous) order.processed = true
             db.data.order[sender] = order
             await db.saveOrders()
-            // Keep processed=false so a retried webhook can retry transient Zoom errors.
             const failMsg =
               `⚠️ *PEMBAYARAN BERHASIL TAPI MEETING GAGAL DIBUAT*\n\n` +
               `Order ID: ${orderId}\n` +
@@ -1039,8 +1084,7 @@ if (!global.midtransWebhookListenerSetup) {
           const hostInfo = createResult.hostInfo
 
           order.processed = true
-          order.status = 'completed'
-          order.completedAt = Date.now()
+          order.status = 'delivery_pending'
           db.data.order[sender] = order
           await db.saveOrders()
 
@@ -1108,6 +1152,13 @@ if (!global.midtransWebhookListenerSetup) {
           order.deliveryStatus = 'pending'
           db.data.order[sender] = order
           await db.saveOrders()
+          if (p0Store) {
+            await p0Store.queueFulfillmentDeliveries(orderId, [
+              { destination: sender, payload: { text: infoText }, dedupeKey: `${orderId}:zoom-info` },
+              { destination: sender, payload: { text: inviteLines.join('\n') }, dedupeKey: `${orderId}:zoom-invite` },
+            ], pg)
+            return
+          }
           const deliveryClient = globalRonzz || global.gowaAdapter
           if (!deliveryClient) throw new Error('GOWA delivery client unavailable')
           try {
@@ -1199,6 +1250,7 @@ if (!global.midtransWebhookListenerSetup) {
           order.status = 'success'
           db.data.order[sender] = order
           await db.saveOrders()
+          if (p0Store) await p0Store.completeFulfillment(orderId, pg)
           if (typeof global.scheduleSave === 'function') global.scheduleSave()
           delete db.data.order[sender]
           await db.saveOrders()
@@ -1360,7 +1412,13 @@ if (!global.midtransWebhookListenerSetup) {
 
       const detailAkunCustomer = detailParts.join('\n')
 
-      // Delivery must succeed before the transaction and pending-order deletion are committed.
+      // Delivery intent is durable before the external send.
+      if (p0Store) {
+        await p0Store.queueFulfillmentDeliveries(orderId, [{
+          destination: sender, payload: { text: detailAkunCustomer }, dedupeKey: `${orderId}:account`,
+        }], pg)
+        return
+      }
       const deliveryClient = globalRonzz || global.gowaAdapter
       if (!deliveryClient) throw new Error('WhatsApp client is not ready')
       if (order.deliveryStatus !== 'sent') {
@@ -1430,6 +1488,7 @@ if (!global.midtransWebhookListenerSetup) {
         global.scheduleSave()
       }
 
+      if (p0Store) await p0Store.completeFulfillment(orderId, pg)
       delete db.data.order[sender]
       if (!(await db.save())) throw new Error('Failed to finalize QRIS fulfillment')
       console.log(`✅ [MID-GLOBAL] Transaction completed: ${orderId} - ${reffId}`)
@@ -2194,6 +2253,22 @@ module.exports = async (nicola, m, mek) => {
                   await reply('⏳ Membuat QR Code pembayaran ...')
 
                   const expirationTime = Date.now() + toMs('30m')
+                  db.data.order[sender] = {
+                    status: 'awaiting_payment', metode: 'MIDTRANS-ZOOM', tier, orderId, reffId,
+                    totalAmount, uniqueCode, createdAt: createdAtTs, from,
+                    zoom: {
+                      tier, topic: parsed.topic, startTimeIso: parsed.startTimeIso,
+                      durationMinutes: parsed.durationMinutes, password: parsed.password,
+                      timezone: parsed.timezone, isFullDay: !!parsed.isFullDay,
+                      startAtUtcMs: startUtcMs,
+                      earmarkedHost: { ...earmarkedHost, poolTier: preCheck.poolTier || tier },
+                    },
+                  }
+                  if (!(await db.saveOrders())) throw new Error('Failed to persist Zoom payment context')
+                  if (p0Store) await p0Store.persistPaymentCorrelation({
+                    providerOrderId: orderId, kind: 'order', subjectId: orderId,
+                    userId: sender, amount: totalAmount,
+                  }, pg)
                   let qrImage
                   try {
                     const rawQr = await qrisDinamis(`${totalAmount}`)
@@ -2295,6 +2370,7 @@ module.exports = async (nicola, m, mek) => {
                       const ord = db.data.order[sender]
                       if (!ord || ord.status !== 'awaiting_payment') break
                       if (Date.now() >= expirationTime) {
+                        if (p0Store && ord.orderId && !(await p0Store.cancelOrder(ord.orderId, 'expired', pg))) break
                         try {
                           await nicola.sendMessage(from, { delete: message.key })
                         } catch (_) {
@@ -2358,6 +2434,7 @@ module.exports = async (nicola, m, mek) => {
               }
 
               let poolResult
+              const zoomOrderId = `ZOOM-${tier}-${crypto.randomBytes(5).toString('hex').toUpperCase()}-${Date.now()}`
               try {
                 try {
                   poolResult = await zoomPool.createMeetingOnFirstAvailable({
@@ -2369,6 +2446,20 @@ module.exports = async (nicola, m, mek) => {
                     timezone: parsed.timezone,
                     startAtUtcMs: startUtcMs,
                     agenda: buildZoomAgenda(parsed),
+                    claimCreate: p0Store && flowIsBuy ? ({ host }) => {
+                      const startsAt = new Date(startUtcMs)
+                      return p0Store.claimZoomCreate({
+                        orderId: zoomOrderId,
+                        userId: sender,
+                        hostId: host.accountId || host.userId || host.label,
+                        startsAt,
+                        endsAt: new Date(startsAt.getTime() + Number(parsed.durationMinutes) * 60000),
+                        capacity: Number(host.concurrentMeetings || 1),
+                        amount: priceInfo.price,
+                      }, pg)
+                    } : undefined,
+                    finishCreate: p0Store && flowIsBuy ? (claim, meeting, failure) =>
+                      p0Store.finishZoomCreate(zoomOrderId, claim.claim_token, meeting, pg, failure) : undefined,
                   })
                 } catch (pErr) {
                   delete db.data.zoomFlow[sender]
@@ -2452,12 +2543,9 @@ module.exports = async (nicola, m, mek) => {
                     hostLabel: host.label,
                     tier,
                   })
-                  const debited = await dbHelper.updateUserSaldo(
-                    sender,
-                    priceInfo.price,
-                    'subtract'
-                  )
-                  const debitStatus = debited === true ? 'debit_confirmed' : 'debit_unconfirmed'
+                  // claimZoomCreate reserved the frozen price atomically before Zoom POST.
+                  const debited = true
+                  const debitStatus = 'debit_confirmed'
                   const debitSaved = await pg.query(
                     `UPDATE transaksi SET status=$2, meta=jsonb_set(meta, '{status}', to_jsonb($2::text)) WHERE ref_id=$1`,
                     [debitRef, debitStatus]
@@ -5655,6 +5743,12 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             reply('Sedang membuat QR Code...')
 
             const orderId = `DEP-${reffId}-${Date.now()}`
+            Object.assign(db.data.orderDeposit[sender], { orderId, createdAt: createdAtTs })
+            if (!(await db.save())) throw new Error('Failed to persist deposit context before QR generation')
+            if (p0Store) await p0Store.persistPaymentCorrelation({
+              providerOrderId: orderId, kind: 'deposit', subjectId: orderId,
+              userId: sender, amount: totalAmount,
+            }, pg)
             // Gunakan QRIS dinamis (sama seperti buynow)
             const expirationTime = Date.now() + toMs('30m')
             const rawQr = await qrisDinamis(`${totalAmount}`)
@@ -6064,6 +6158,15 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               reply('Sedang membuat QR Code ...')
 
               const orderId = `MID-${reffId}-${Date.now()}`
+              Object.assign(db.data.order[sender], {
+                orderId, totalAmount, uniqueCode, createdAt: createdAtTs,
+                id: data[0], jumlah, from, status: 'awaiting_payment',
+              })
+              if (!(await db.saveOrders())) throw new Error('Failed to persist payment context before QR generation')
+              if (p0Store) await p0Store.persistPaymentCorrelation({
+                providerOrderId: orderId, kind: 'order', subjectId: orderId,
+                userId: sender, amount: totalAmount,
+              }, pg)
 
               // Gunakan QRIS statis Midtrans (tracking via webhook)
               // const qrImagePath = "./options/sticker/qris-midtrans.jpg";
@@ -6207,6 +6310,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 pollCount++
 
                 if (Date.now() >= expirationTime) {
+                  const expiringOrder = db.data.order[sender]
+                  if (p0Store && expiringOrder?.orderId && !(await p0Store.cancelOrder(expiringOrder.orderId, 'expired', pg))) return
                   // Remove listener saat timeout
                   process.removeListener('payment-completed', paymentListener)
                   await nicola.sendMessage(from, { delete: message.key })
@@ -6510,9 +6615,11 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               return reply(`Stok tersedia ${stok.length}, jadi harap jumlah tidak melebihi stok`)
 
             const reffId = crypto.randomBytes(5).toString('hex').toUpperCase()
+            const orderId = `saldo:${sender}:${mek.key?.id || ''}`
             db.data.order[sender] = {
               status: 'processing',
               reffId,
+              orderId,
               idProduk: data[0],
               jumlah,
               metode: 'Saldo',
@@ -6541,6 +6648,13 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   : 'Sedang memproses pembelian dengan saldo...'
               )
 
+              let atomicPurchase = null
+              if (p0Store) {
+                atomicPurchase = await p0Store.debitSaldoReserveStock({
+                  orderId, userId: sender, productId: data[0], quantity: jumlah, amount: totalHarga,
+                }, pg)
+              }
+
               // Keep evidence outside expiring orders and finally cleanup.
               const debitRef = `${reffId}-DEBIT`
               const debitEvidence = await db.appendTransaction({
@@ -6555,8 +6669,10 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 targetNumber,
                 date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
               })
-              const debited = await dbHelper.updateUserSaldo(sender, totalHarga, 'subtract')
-              const debitStatus = debited === true ? 'debit_confirmed' : 'debit_unconfirmed'
+              const debited =
+                (typeof atomicPurchase !== 'undefined' && atomicPurchase) ||
+                (await dbHelper.updateUserSaldo(sender, totalHarga, 'subtract'))
+              const debitStatus = debited ? 'debit_confirmed' : 'debit_unconfirmed'
               const debitSaved = await pg.query(
                 `UPDATE transaksi SET status=$2, meta=jsonb_set(meta, '{status}', to_jsonb($2::text)) WHERE ref_id=$1`,
                 [debitRef, debitStatus]
@@ -6564,7 +6680,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               if (debitSaved.rowCount !== 1)
                 throw new Error(`Debit reconciliation required: ${debitRef}`)
               debitEvidence.status = debitStatus
-              if (debited !== true) {
+              if (!debited) {
                 delete db.data.order[sender]
                 requestPendingOrderSave()
                 return reply(
@@ -6574,12 +6690,24 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
               await sleep(1000)
 
-              // Reserve stock durably before delivery. Reuses the pending order on retry.
-              const dataStok = await db.reserveProductStock(sender, data[0], jumlah)
+              // PG atomically debits and reserves; legacy mode keeps the existing reservation path.
+              const dataStok = atomicPurchase
+                ? atomicPurchase.reserved_items
+                : await db.reserveProductStock(sender, data[0], jumlah)
               if (!dataStok) throw new Error('Stok berubah atau tidak mencukupi; saldo perlu direkonsiliasi')
 
+              // The PG function is authoritative; refresh snapshots used by alerts and later commands.
+              if (atomicPurchase) {
+                db.data.users[sender].saldo = Number(atomicPurchase.new_saldo)
+                db.data.produk[data[0]].stok = db.data.produk[data[0]].stok.slice(jumlah)
+                db.data.produk[data[0]].terjual = Number(db.data.produk[data[0]].terjual || 0) + jumlah
+                saldoCache.delete(sender)
+              }
+
               // Low stock alert to owner
-              const sisaStokBuy = db.data.produk[data[0]].stok.length
+              const sisaStokBuy = atomicPurchase
+                ? Number(atomicPurchase.new_stock)
+                : db.data.produk[data[0]].stok.length
               const LOW_STOCK_THRESHOLD_BUY = Number(process.env.LOW_STOCK_THRESHOLD || 1)
               if (sisaStokBuy <= LOW_STOCK_THRESHOLD_BUY && sisaStokBuy > 0) {
                 try {
@@ -6640,7 +6768,18 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
               let customerMessageSent = false
 
-              try {
+              if (p0Store) {
+                const fulfillmentId = orderId
+                const claimed = await p0Store.claimFulfillment(fulfillmentId, pg)
+                if (!claimed) throw new Error(`Saldo fulfillment already claimed: ${fulfillmentId}`)
+                await p0Store.queueFulfillmentDeliveries(fulfillmentId, [{
+                  destination: recipientNumber,
+                  payload: { text: detailAkunCustomer },
+                  dedupeKey: `${fulfillmentId}:account`,
+                }], pg)
+                // Queued is not delivered; the outbox finalizer owns delivered state.
+                customerMessageSent = false
+              } else try {
                 console.log(`📤 ATTEMPT 1: Sending complete account details to ${recipientType}...`)
 
                 await sleep(500)
@@ -6886,6 +7025,11 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             if (quotedSender && quotedSender !== sender) {
               // Admin membatalkan pesanan user lain
               if (db.data.order[quotedSender] !== undefined) {
+                const candidate = db.data.order[quotedSender]
+                if (p0Store && candidate.orderId && !(await p0Store.cancelOrder(candidate.orderId, 'cancelled', pg))) {
+                  reply('Pesanan sudah dibayar atau sedang diproses dan tidak dapat dibatalkan.')
+                  break
+                }
                 try {
                   await nicola.sendMessage(db.data.order[quotedSender].from, {
                     delete: db.data.order[quotedSender].key,
@@ -6922,8 +7066,13 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
           // Logika: user membatalkan pesanan sendiri (dengan atau tanpa quote)
           if (db.data.order[sender] !== undefined) {
-            await nicola.sendMessage(db.data.order[sender].from, {
-              delete: db.data.order[sender].key,
+            const candidate = db.data.order[sender]
+            if (p0Store && candidate.orderId && !(await p0Store.cancelOrder(candidate.orderId, 'cancelled', pg))) {
+              reply('Pesanan sudah dibayar atau sedang diproses dan tidak dapat dibatalkan.')
+              break
+            }
+            await nicola.sendMessage(candidate.from, {
+              delete: candidate.key,
             })
             delete db.data.order[sender]
             requestPendingOrderSave()
@@ -7969,3 +8118,5 @@ Jika pesan ini sampai, sistem berfungsi normal.`
     if (err?.stack) console.log(err.stack)
   }
 }
+
+module.exports.startDeliveryOutboxWorker = startDeliveryOutboxWorker

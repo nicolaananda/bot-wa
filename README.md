@@ -41,6 +41,8 @@ Redis
 
 PostgreSQL adalah sumber data utama dan antrean pembayaran authoritative. Redis dipakai sebagai transport event WhatsApp, locking, rate limiting, dan cache.
 
+Upgrade P0: jalankan `npm run pg:migrate`, lalu `npm run pg:backfill-pending` untuk dry-run. Tinjau semua quarantine; apply hanya dengan `npm run pg:backfill-pending -- --apply`. Startup PostgreSQL berhenti jika skema kurang, baris legacy tidak dikenal, atau pending legacy belum terwakili di ledger authoritative.
+
 ## Fitur utama
 
 - Manajemen produk dan stok akun digital.

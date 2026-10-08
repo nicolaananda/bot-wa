@@ -22,6 +22,8 @@ const {
 } = require('./function/respon-group.js')
 const { nocache } = require('./function/chache.js')
 const { createReconnectController } = require('./options/reconnect-controller.js')
+const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
+const p0Store = usePg ? require('./lib/p0-store') : null
 
 //DATABASE
 global.opts = new Object(yargs(process.argv.slice(2)).exitProcess(false).parse())
@@ -157,6 +159,7 @@ const { isRedisAvailable, closeRedis } = require('./config/redis')
 })()
 
 async function startnicola() {
+  if (p0Store) await p0Store.assertSchemaReady()
   console.log(
     chalk.bold.green(
       figlet.textSync('Velzzy', {
@@ -252,6 +255,7 @@ async function startnicola() {
     process.exit(1)
   }
 
+  require('./index').startDeliveryOutboxWorker(nicola)
   console.log('[GOWA] Connected successfully!')
   console.log('[GOWA] Bot Number:', nicola.user?.id)
   console.log('[GOWA] Bot Name:', nicola.user?.name)

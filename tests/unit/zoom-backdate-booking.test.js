@@ -2,6 +2,9 @@
 
 const zoomBackdate = require('../../lib/zoom-backdate')
 
+beforeAll(() => jest.useFakeTimers().setSystemTime(new Date('2026-08-21T00:00:00.000Z')))
+afterAll(() => jest.useRealTimers())
+
 beforeEach(() => {
   global.db = { data: { zoomBookings: [] } }
   global.scheduleSave = jest.fn()
