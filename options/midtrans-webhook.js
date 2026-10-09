@@ -74,7 +74,7 @@ function eventData(row) {
   return { webhookId: row.id, eventKey: row.event_key, orderId: row.order_id,
     transactionId: row.transaction_id, transactionStatus: row.transaction_status,
     paymentType: row.payment_type, settlementTime: row.settlement_time, gross_amount: row.gross_amount,
-    notification: row.webhook_data };
+    notification: row.webhook_data, authenticated: true };
 }
 
 async function processNextWebhook({ pg, dispatch }) {

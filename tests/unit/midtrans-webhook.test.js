@@ -70,16 +70,20 @@ test('internal order id bukan external correlation', () => {
   expect(matchPendingOrder({a:order},{orderId:'QRIS-ABC',gross_amount:999},now)).toBeNull();
 });
 
-test('buynow creates provider charge and persists its stable identity before rendering QR', () => {
+test('buynow persists guarded static payment before rendering configured merchant QR', () => {
   const source = require('fs').readFileSync(require('path').join(__dirname, '../../index.js'), 'utf8');
-  const start = source.indexOf('const charge = await createQRISPayment(totalAmount, orderId)', source.indexOf("case 'buynow':"));
+  const start = source.indexOf('const staticPayment = await p0Store.allocateStaticPayment', source.indexOf("case 'buynow':"));
+  const render = source.indexOf('const rawQr = await qrisDinamis(`${totalAmount}`)', start);
   expect(start).toBeGreaterThan(-1);
-  const persist = source.indexOf('await p0Store.persistPaymentCorrelation(', start);
-  const render = source.indexOf('const rawQr = await qrisDinamis(charge.qr_string)', start);
-  expect(source.slice(start, render)).toMatch(/midtransOrderId: providerOrderId[\s\S]*midtransTransactionId: providerTransactionId/);
-  expect(source.slice(persist, render)).toMatch(/providerOrderId,/);
-  expect(start).toBeLessThan(persist);
-  expect(persist).toBeLessThan(render);
+  expect(render).toBeGreaterThan(start);
+  expect(source.slice(start, render)).toMatch(/staticPayment\.amount[\s\S]*staticPayment\.marker/);
+  expect(source.slice(start, render)).not.toMatch(/createQRISPayment/);
+});
+
+test('static settlement caller requires authenticated event and atomic binding', () => {
+  const source = require('fs').readFileSync(require('path').join(__dirname, '../../index.js'), 'utf8');
+  expect(source).toMatch(/claimStaticSettlement\(\{[\s\S]*eventKey: webhookData\.eventKey[\s\S]*authenticated: webhookData\.authenticated === true/);
+  expect(source).toMatch(/matchedBy: 'static_settlement'/);
 });
 
 test('same-amount event without exact provider identity remains non-authoritative', () => {
