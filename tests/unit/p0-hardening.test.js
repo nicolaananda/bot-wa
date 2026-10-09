@@ -115,7 +115,8 @@ test('group success is deduplicated and waits for confirmed private delivery', a
   expect(inserts[1][0]).toMatch(/ON CONFLICT \(dedupe_key\) DO NOTHING/);
   const claimSql = fs.readFileSync(require.resolve('../../lib/p0-store'), 'utf8');
   expect(claimSql).toMatch(/dedupe_key NOT LIKE '%:group-confirm'[\s\S]*account\.status='sent'/);
-  expect(claimSql).toMatch(/dedupe_key=d\.order_id\|\|':account' AND d\.status <> 'sent'/);
+  // Zoom invite/info deliveries must still gate completion; only public confirmation is optional.
+  expect(claimSql).toMatch(/dedupe_key <> d\.order_id\|\|':group-confirm' AND d\.status <> 'sent'/);
 });
 
 test('private QRIS chat queues no group notice and group payload has no account details', () => {
