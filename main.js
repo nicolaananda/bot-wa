@@ -22,6 +22,7 @@ const {
 } = require('./function/respon-group.js')
 const { nocache } = require('./function/chache.js')
 const { createReconnectController } = require('./options/reconnect-controller.js')
+const perf = require('./lib/perf-metrics').createPerfMetrics({ name: 'bot-main' })
 const usePg = String(process.env.USE_PG || '').toLowerCase() === 'true'
 const p0Store = usePg ? require('./lib/p0-store') : null
 
@@ -379,7 +380,10 @@ async function startnicola() {
         const m = smsg(nicola, mek, store)
         if (mek.key && mek.key.remoteJid === 'status@broadcast') continue // Changed from return to continue
         if (mek.key.id.startsWith('BAE5') && mek.key.id.length === 16) continue // Changed from return to continue
-        require('./index')(nicola, m, mek)
+        // ponytail: observe current fan-out first; cap concurrency only after traffic measurements.
+        void perf.measure('message', () => require('./index')(nicola, m, mek)).catch((error) => {
+          console.error('[BOT] Message handler failed:', error)
+        })
       }
     } catch (err) {
       console.log(err)

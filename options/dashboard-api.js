@@ -92,6 +92,15 @@ const corsOptions = {
   maxAge: 86400
 };
 
+const perf = require('../lib/perf-metrics').createPerfMetrics({ name: 'dashboard-api' });
+app.use((req, res, next) => {
+  // ponytail: measure all HTTP routes together; split labels when traffic identifies hot endpoints.
+  void perf.measure('http', () => new Promise((resolve) => {
+    res.once('finish', resolve);
+    res.once('close', resolve);
+  })).catch(() => {});
+  next();
+});
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use(express.json({
