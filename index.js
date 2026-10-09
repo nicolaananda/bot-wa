@@ -830,7 +830,7 @@ if (!global.midtransWebhookListenerSetup) {
           await db.appendTransaction(result.item, { persist: false })
         }
         delete db.data.orderDeposit[sender]
-        if (!(await db.save())) throw new Error('Failed to clear durable deposit context')
+        if (!(await db.saveOrderDeposits())) throw new Error('Failed to clear durable deposit context')
         // Financial commit and context removal are authoritative; UX failures never retry credit.
         const client = globalRonzz || global.gowaAdapter
         if (client) await finishDepositUx(client, { ...order, from: order.from || sender }, result)
