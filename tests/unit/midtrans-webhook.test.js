@@ -70,6 +70,24 @@ test('internal order id bukan external correlation', () => {
   expect(matchPendingOrder({a:order},{orderId:'QRIS-ABC',gross_amount:999},now)).toBeNull();
 });
 
+test('buynow creates provider charge and persists its stable identity before rendering QR', () => {
+  const source = require('fs').readFileSync(require('path').join(__dirname, '../../index.js'), 'utf8');
+  const start = source.indexOf('const charge = await createQRISPayment(totalAmount, orderId)', source.indexOf("case 'buynow':"));
+  expect(start).toBeGreaterThan(-1);
+  const persist = source.indexOf('await p0Store.persistPaymentCorrelation(', start);
+  const render = source.indexOf('const rawQr = await qrisDinamis(charge.qr_string)', start);
+  expect(source.slice(start, render)).toMatch(/midtransOrderId: providerOrderId[\s\S]*midtransTransactionId: providerTransactionId/);
+  expect(source.slice(persist, render)).toMatch(/providerOrderId,/);
+  expect(start).toBeLessThan(persist);
+  expect(persist).toBeLessThan(render);
+});
+
+test('same-amount event without exact provider identity remains non-authoritative', () => {
+  const now = Date.now();
+  const result = matchPendingOrder({ a: { metode: 'MIDTRANS', totalAmount: 100, createdAt: now - 1000 } }, { orderId: 'QRIS-OTHER', gross_amount: 100 }, now);
+  expect(result).toEqual(expect.objectContaining({ matchedBy: 'amount_time' }));
+});
+
 test('entrypoint memasang worker dan menghapus listener Redis Midtrans', () => {
   const fs=require('fs'); const index=fs.readFileSync(require.resolve('../../index'),'utf8'); const main=fs.readFileSync(require.resolve('../../main'),'utf8');
   expect(index).toMatch(/global\.stopMidtransDurableWorker = startWebhookWorker/);

@@ -6282,19 +6282,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               })
               if (!(await db.saveOrders()))
                 throw new Error('Failed to persist payment context before QR generation')
-              if (p0Store)
-                await p0Store.persistPaymentCorrelation(
-                  {
-                    providerOrderId: orderId,
-                    kind: 'order',
-                    subjectId: orderId,
-                    userId: sender,
-                    amount: totalAmount,
-                  },
-                  pg
-                )
-
-              // Gunakan QRIS statis Midtrans (tracking via webhook)
+              // Gunakan charge QRIS Midtrans agar ID provider tersimpan dan webhook dapat dicocokkan tepat.
               // const qrImagePath = "./options/sticker/qris-midtrans.jpg";
               // try {
               //   await qrisStatisMidtrans(qrImagePath);
@@ -6305,7 +6293,29 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               //   return reply(`❌ Gagal memuat QR Code Midtrans. Silakan hubungi admin.`)
               // }
               const expirationTime = Date.now() + toMs('30m')
-              const rawQr = await qrisDinamis(`${totalAmount}`)
+              const charge = await createQRISPayment(totalAmount, orderId)
+              const providerOrderId = String(charge.order_id || '')
+              const providerTransactionId = String(charge.transaction_id || '')
+              if (!providerOrderId || !providerTransactionId || !charge.qr_string)
+                throw new Error('Midtrans charge response missing stable payment identity')
+              Object.assign(db.data.order[sender], {
+                midtransOrderId: providerOrderId,
+                midtransTransactionId: providerTransactionId,
+              })
+              if (!(await db.saveOrders()))
+                throw new Error('Failed to persist provider payment identity')
+              if (p0Store)
+                await p0Store.persistPaymentCorrelation(
+                  {
+                    providerOrderId,
+                    kind: 'order',
+                    subjectId: orderId,
+                    userId: sender,
+                    amount: totalAmount,
+                  },
+                  pg
+                )
+              const rawQr = await qrisDinamis(charge.qr_string)
               const qrImage = await createQrisCard({
                 qr: rawQr,
                 amount: totalAmount,
@@ -6361,6 +6371,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 uniqueCode,
                 metode: 'MIDTRANS', // Pastikan metode di-set untuk global listener
                 createdAt: createdAtTs,
+                midtransOrderId: providerOrderId,
+                midtransTransactionId: providerTransactionId,
               }
               requestPendingOrderSave()
 
