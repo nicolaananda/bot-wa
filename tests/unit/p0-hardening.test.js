@@ -71,7 +71,10 @@ test('ambiguous delivery failure requires reconciliation without logging payload
 test('cancellation is one transactional status transition', async () => {
   const db = fakeDb([{rows:[]}, { rowCount: 1, rows: [{order_id:'o1'}] }, {rows:[]}]);
   await expect(cancelOrder('o1', 'cancelled', db)).resolves.toBe(true);
-  expect(db.calls.find(([sql]) => sql.includes('UPDATE business_orders'))[0]).toMatch(/status IN \('awaiting_payment','pending'\)/);
+  expect(db.calls.find(([sql]) => sql.includes('UPDATE business_orders'))[0]).toMatch(/status IN \('awaiting_payment','pending','cancelled','expired'\)/);
+  const sql = db.calls.find(([sql]) => sql.includes('UPDATE business_orders'))[0];
+  expect(sql).toContain("THEN status ELSE $2 END");
+  expect(sql).not.toMatch(/'processing'|'completed'|'delivery_pending'/);
 });
 
 test('fulfillment claim shares business-order lock and permits processing recovery', async () => {
