@@ -6296,8 +6296,12 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               const charge = await createQRISPayment(totalAmount, orderId)
               const providerOrderId = String(charge.order_id || '')
               const providerTransactionId = String(charge.transaction_id || '')
-              if (!providerOrderId || !providerTransactionId || !charge.qr_string)
-                throw new Error('Midtrans charge response missing stable payment identity')
+              if (!providerOrderId || !providerTransactionId || !charge.qr_string) {
+                const error = new Error('Midtrans charge failed (invalid_response)')
+                error.code = 'MIDTRANS_CHARGE_INVALID_RESPONSE'
+                error.diagnostic = { classification: 'invalid_response', provider_status_code: String(charge.status_code || '').match(/^\d{3}$/)?.[0] }
+                throw error
+              }
               Object.assign(db.data.order[sender], {
                 midtransOrderId: providerOrderId,
                 midtransTransactionId: providerTransactionId,
@@ -6609,7 +6613,10 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 }
               }
             } catch (error) {
-              console.error(`❌ [MID] Error processing Midtrans for ${data[0]}:`, error)
+              const diagnostic = error && error.diagnostic
+                ? error.diagnostic
+                : { classification: 'internal_error' }
+              console.error(`❌ [MID] Charge failed for ${data[0]}:`, diagnostic)
               reply('Gagal membuat QR Code Midtrans. Silakan coba lagi.')
               if (db.data.order[sender]) {
                 delete db.data.order[sender]

@@ -7,6 +7,29 @@ const baseUrl = MIDTRANS_PRODUCTION ? 'https://api.midtrans.com' : 'https://api.
 let transactionListFailures = 0
 let transactionListRetryAt = 0
 
+function safeChargeDiagnostic({ httpStatus, data, error } = {}) {
+  const providerStatus = String(data && data.status_code || '').match(/^\d{3}$/)?.[0]
+  const source = String(data && (data.status_message || data.error_messages) || error && error.code || '')
+  const message = source
+    .replace(/https?:\/\/\S+|[\w.+-]+@[\w.-]+|\b\d{6,}\b|(?:authorization|token|key|secret|qr)[=: ]+\S+/gi, '[redacted]')
+    .replace(/[^\w .,;:()\[\]/-]/g, '?')
+    .slice(0, 160)
+  const classification = httpStatus === 401 || httpStatus === 403 || providerStatus === '401'
+    ? 'authentication'
+    : httpStatus === 429 ? 'rate_limit'
+      : (httpStatus >= 500 || Number(providerStatus) >= 500) ? 'provider_unavailable'
+        : (httpStatus >= 400 || Number(providerStatus) >= 400) ? 'request_rejected' : 'invalid_response'
+  return { ...(Number.isInteger(httpStatus) ? { http_status: httpStatus } : {}), ...(providerStatus ? { provider_status_code: providerStatus } : {}), classification, ...(message ? { status_message: message } : {}) }
+}
+
+function chargeError(context) {
+  const diagnostic = safeChargeDiagnostic(context)
+  const error = new Error(`Midtrans charge failed (${diagnostic.classification})`)
+  error.code = 'MIDTRANS_CHARGE_FAILED'
+  error.diagnostic = diagnostic
+  return error
+}
+
 function getAuthHeader() {
   const token = Buffer.from(MIDTRANS_SERVER_KEY + ':').toString('base64')
   return { Authorization: `Basic ${token}` }
@@ -50,9 +73,11 @@ async function createQRISPayment(amount, orderId) {
     ({ data } = await axios.post(url, payload, { headers: { ...getAuthHeader(), 'Content-Type': 'application/json', Accept: 'application/json' } }))
   } catch (err) {
     const resp = err.response
-    const detail = resp ? (typeof resp.data === 'object' ? JSON.stringify(resp.data) : String(resp.data)) : err.message
-    throw new Error(`Midtrans charge failed: ${detail}`)
+    throw chargeError({ httpStatus: resp && resp.status, data: resp && resp.data, error: err })
   }
+  const statusCode = Number(data && data.status_code)
+  if (!data || (Number.isFinite(statusCode) && (statusCode < 200 || statusCode >= 300)))
+    throw chargeError({ data })
   // Normalize possible shapes
   let qrString = data.qr_string
   if (!qrString && Array.isArray(data.actions)) {
@@ -210,6 +235,7 @@ module.exports = {
   getTransactionStatusByTransactionId,
   findStaticQRISTransaction,
   checkStaticQRISPayment,
+  safeChargeDiagnostic,
   core,
   isProduction
 }
