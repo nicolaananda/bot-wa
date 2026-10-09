@@ -939,6 +939,9 @@ if (!global.midtransWebhookListenerSetup) {
       const order = matchedOrder
       const sender = matchedSender
       const { id: productId, jumlah, from, key: messageKey, orderId, reffId, totalAmount } = order
+      if (p0Store && (correlation.matchedBy !== 'correlation' || !(await p0Store.confirmPaidOrder({
+        providerOrderId: webhookOrderId, orderId, userId: sender, amount: webhookAmount,
+      }, pg)))) throw new Error('Paid order correlation requires manual review')
       if (p0Store && !(await p0Store.claimFulfillment(orderId, pg))) {
         console.log(`[MID-GLOBAL] Fulfillment already claimed: ${orderId}`)
         return

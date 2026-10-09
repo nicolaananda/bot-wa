@@ -100,6 +100,13 @@ async function main() {
   const zoomSaldo = extract('// ====== SALDO PATH (existing)', '// ====== MODE ENV SINGLE-ACCOUNT')
   assert.match(zoomSaldo, /const saldoUser = await dbHelper\.getUserSaldoAsync\(sender\)/)
   assert.doesNotMatch(zoomSaldo, /\.saldo\s*=|setCachedSaldo/)
+  const saldoBuy = extract('              let atomicPurchase = null', '              // Keep evidence outside expiring orders')
+  let actualCallerInput
+  await run(saldoBuy, {
+    p0Store: { debitSaldoReserveStock: async (input, database) => { actualCallerInput = input; assert.equal(database, 'isolated-pg'); return { reserved_items: ['item'] } } },
+    orderId: 'ORDER-1', sender: 'user-1', data: ['product-1'], jumlah: 2, totalHarga: 5000, pg: 'isolated-pg',
+  })
+  assert.equal(JSON.stringify(actualCallerInput), JSON.stringify({ orderId: 'ORDER-1', userId: 'user-1', productId: 'product-1', quantity: 2, amount: 5000 }))
   for (const zoom of [false, true]) {
     const body = extract(
       zoom ? 'const debitRef = `ZOOM-' : 'const debitRef = `${reffId}-DEBIT`',

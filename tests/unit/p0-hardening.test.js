@@ -4,7 +4,7 @@ const { migrate, LOCK_KEY } = require('../../options/migrate');
 const {
   transaction, createQrisAfterPersist, debitSaldoReserveStock, runDeliveryOutboxOnce,
   cancelOrder, queueFulfillmentDeliveries, assertSchemaReady, claimFulfillment,
-  claimZoomCreate, finishZoomCreate,
+  claimZoomCreate, finishZoomCreate, confirmPaidOrder,
 } = require('../../lib/p0-store');
 
 function fakeDb(responses = []) {
@@ -29,6 +29,14 @@ test('payment correlation commits before QR creation', async () => {
   await expect(createQrisAfterPersist({ providerOrderId:'p1', kind:'order', subjectId:'o1', userId:'u1', amount:1 }, createQris, db)).resolves.toBe('qr');
   expect(db.calls.map(([sql]) => sql.trim().split(/\s+/)[0])).toEqual(['BEGIN', 'INSERT', 'INSERT', 'COMMIT']);
   expect(createQris).toHaveBeenCalledTimes(1);
+});
+
+test('verified exact payment transitions awaiting order and rejects mismatch', async () => {
+  const ok = fakeDb([{rows:[]}, {rows:[{order_id:'o1'}]}, {rows:[]}]);
+  await expect(confirmPaidOrder({providerOrderId:'p1',orderId:'o1',userId:'u1',amount:100}, ok)).resolves.toEqual({order_id:'o1'});
+  expect(ok.calls[1][0]).toMatch(/payment_correlations[\s\S]*status='awaiting_payment'/);
+  const bad = fakeDb([{rows:[]}, {rows:[]}, {rows:[]}, {rows:[]}]);
+  await expect(confirmPaidOrder({providerOrderId:'p2',orderId:'o1',userId:'u1',amount:100}, bad)).resolves.toBeNull();
 });
 
 test('saldo debit and stock reservation use one transaction', async () => {
@@ -68,6 +76,13 @@ test('cancellation is one transactional status transition', async () => {
 
 test('fulfillment claim shares business-order lock and permits processing recovery', async () => {
   const db = fakeDb([{rows:[]}, {rows:[{status:'processing'}]}, {rows:[{order_id:'o1'}]}, {rows:[]}]);
+  await expect(claimFulfillment('o1', db)).resolves.toMatchObject({order_id:'o1'});
+  expect(db.calls[1][0]).toMatch(/business_orders.*FOR UPDATE/s);
+  expect(db.calls.filter(([sql]) => sql.includes('UPDATE business_orders'))).toHaveLength(0);
+});
+
+test('fulfillment claim accepts saldo delivery_pending from atomic reservation', async () => {
+  const db = fakeDb([{rows:[]}, {rows:[{status:'delivery_pending'}]}, {rows:[{order_id:'o1'}]}, {rows:[]}]);
   await expect(claimFulfillment('o1', db)).resolves.toMatchObject({order_id:'o1'});
   expect(db.calls[1][0]).toMatch(/business_orders.*FOR UPDATE/s);
   expect(db.calls.filter(([sql]) => sql.includes('UPDATE business_orders'))).toHaveLength(0);
