@@ -6906,7 +6906,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               console.log('📏 Message length:', detailAkunCustomer.length)
               console.log('🎯 Owner buy mode:', isOwnerBuy ? 'YES' : 'NO')
 
-              let customerMessageSent = false
+              let customerDeliveryState = 'failed'
 
               if (p0Store) {
                 const fulfillmentId = orderId
@@ -6924,7 +6924,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   pg
                 )
                 // Queued is not delivered; the outbox finalizer owns delivered state.
-                customerMessageSent = false
+                customerDeliveryState = 'queued'
               } else
                 try {
                   console.log(
@@ -6939,7 +6939,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   )
                   console.log('📨 Message result:', JSON.stringify(messageResult?.key || 'no key'))
                   console.log(`✅ SUCCESS: Complete account details sent to ${recipientType}!`)
-                  customerMessageSent = true
+                  customerDeliveryState = 'sent'
                 } catch (error) {
                   console.error('❌ ATTEMPT 1 FAILED:', error.message)
                   console.error('❌ Full error:', JSON.stringify(error, null, 2))
@@ -6957,7 +6957,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                     console.log(
                       `✅ SUCCESS: Account details sent without quoted message to ${recipientType}!`
                     )
-                    customerMessageSent = true
+                    customerDeliveryState = 'sent'
                   } catch (fallbackError1) {
                     console.error('❌ ATTEMPT 2 FAILED:', fallbackError1.message)
                     console.error('❌ Full error:', JSON.stringify(fallbackError1, null, 2))
@@ -6989,7 +6989,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                       })
                       console.log('📨 Message result:', JSON.stringify(msg3?.key || 'no key'))
                       console.log(`✅ SUCCESS: Simple account details sent to ${recipientType}!`)
-                      customerMessageSent = true
+                      customerDeliveryState = 'sent'
                     } catch (fallbackError2) {
                       console.error('❌ ALL ATTEMPTS FAILED:', fallbackError2.message)
                       console.error('❌ CUSTOMER WILL NOT RECEIVE ACCOUNT DETAILS!')
@@ -6999,7 +6999,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
               console.log(
                 '🏁 CUSTOMER MESSAGE SEND RESULT (BUY CASE):',
-                customerMessageSent ? 'SUCCESS' : 'FAILED'
+                customerDeliveryState.toUpperCase()
               )
               if (isOwnerBuy) {
                 console.log(`🎯 OWNER BUY SUMMARY:`)
@@ -7009,7 +7009,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 )
                 console.log(`   - Target WhatsApp: ${targetNumber}`)
                 console.log(`   - Product: ${data[0]} (${jumlah} items)`)
-                console.log(`   - Delivery: ${customerMessageSent ? 'SUCCESS' : 'FAILED'}`)
+                console.log(`   - Delivery: ${customerDeliveryState.toUpperCase()}`)
                 console.log(
                   `   - Database User: ${isOwnerBuy ? cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || sender.split('@')[0] : sender.split('@')[0]}`
                 )
@@ -7017,7 +7017,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 console.log(`👤 REGULAR BUY SUMMARY:`)
                 console.log(`   - Customer: ${sender}`)
                 console.log(`   - Product: ${data[0]} (${jumlah} items)`)
-                console.log(`   - Delivery: ${customerMessageSent ? 'SUCCESS' : 'FAILED'}`)
+                console.log(`   - Delivery: ${customerDeliveryState.toUpperCase()}`)
               }
 
               // Improvement: Async file write untuk receipt (R2 atau local)
@@ -7096,8 +7096,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 // Skip admin stock-empty notifications
               }
 
-              // Send single comprehensive success message
-              if (customerMessageSent) {
+              // Report enqueue separately from confirmed delivery.
+              if (customerDeliveryState === 'sent') {
                 if (isOwnerBuy) {
                   reply(
                     `🎉 Pembelian berhasil! Detail akun telah dikirim ke nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}. Terima kasih!`
@@ -7109,6 +7109,16 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 } else {
                   reply(
                     '🎉 Pembelian dengan saldo berhasil! Detail akun telah dikirim di atas. Apabila tidak terlihat rechat agar dikirim ulang Terima kasih!'
+                  )
+                }
+              } else if (customerDeliveryState === 'queued') {
+                if (isOwnerBuy) {
+                  reply(
+                    `⏳ Pembelian berhasil. Detail akun sedang diproses untuk dikirim ke chat pribadi nomor ${cleanedNumber || targetNumber?.replace('@s.whatsapp.net', '') || 'N/A'}.`
+                  )
+                } else {
+                  reply(
+                    '⏳ Pembelian dengan saldo berhasil. Detail akun sedang diproses untuk dikirim ke chat pribadi Anda.'
                   )
                 }
               } else {
