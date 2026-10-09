@@ -3,7 +3,7 @@ const fs = require('fs');
 const { migrate, LOCK_KEY } = require('../../options/migrate');
 const {
   transaction, createQrisAfterPersist, debitSaldoReserveStock, runDeliveryOutboxOnce,
-  cancelOrder, queueFulfillmentDeliveries, assertSchemaReady, claimFulfillment,
+  cancelOrder, clearDeliveredLegacyOrder, queueFulfillmentDeliveries, assertSchemaReady, claimFulfillment,
   claimZoomCreate, finishZoomCreate, confirmPaidOrder,
 } = require('../../lib/p0-store');
 
@@ -75,6 +75,23 @@ test('cancellation is one transactional status transition', async () => {
   const sql = db.calls.find(([sql]) => sql.includes('UPDATE business_orders'))[0];
   expect(sql).toContain("THEN status ELSE $2 END");
   expect(sql).not.toMatch(/'processing'|'completed'|'delivery_pending'/);
+});
+
+test('legacy cleanup requires identity, completed status, and only sent deliveries', async () => {
+  const db = fakeDb([{rows:[]},
+    {rows:[{order_id:'o1',user_id:'u1',status:'completed'}]},
+    {rows:[{sent:1,unsent:0}]}, {rows:[{value:{u1:{orderId:'o1'}}}]},
+    {rows:[],rowCount:1}, {rows:[]}]);
+  await expect(clearDeliveredLegacyOrder('u1', 'o1', db)).resolves.toBe(true);
+  expect(db.calls.some(([sql]) => sql.includes('value=value-$1'))).toBe(true);
+});
+
+test('legacy cleanup preserves unresolved delivery', async () => {
+  const db = fakeDb([{rows:[]},
+    {rows:[{order_id:'o1',user_id:'u1',status:'completed'}]},
+    {rows:[{sent:1,unsent:1}]}, {rows:[]}]);
+  await expect(clearDeliveredLegacyOrder('u1', 'o1', db)).resolves.toBeNull();
+  expect(db.calls.some(([sql]) => sql.includes('UPDATE kv_store'))).toBe(false);
 });
 
 test('fulfillment claim shares business-order lock and permits processing recovery', async () => {

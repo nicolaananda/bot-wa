@@ -95,6 +95,14 @@ if (usePg) {
   pg = require('./config/postgres')
 }
 const p0Store = usePg ? require('./lib/p0-store') : null
+
+async function clearDeliveredPending(sender) {
+  const pending = db.data.order && db.data.order[sender]
+  if (!p0Store || !pending?.orderId) return false
+  if (!(await p0Store.clearDeliveredLegacyOrder(sender, pending.orderId, pg))) return false
+  if (db.data.order[sender]?.orderId === pending.orderId) delete db.data.order[sender]
+  return true
+}
 const { core, isProduction } = require('./config/midtrans')
 const USE_POLLING = false // Durable webhook worker is authoritative; transaction-list polling is redundant.
 const { matchPendingOrder, startWebhookWorker } = require('./options/midtrans-webhook')
@@ -2304,7 +2312,7 @@ module.exports = async (nicola, m, mek) => {
                 try {
                   // Init order shell early so global webhook listener can find it
                   if (!db.data.order) db.data.order = {}
-                  if (db.data.order[sender]) {
+                  if (db.data.order[sender] && !(await clearDeliveredPending(sender))) {
                     return reply(
                       `Kamu sedang melakukan order, tunggu sampai selesai atau ketik \`${prefix}batal\`.`
                     )
@@ -4945,7 +4953,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
             `Kamu masih ada sesi pembelian Zoom aktif. Ketik \`${prefix}batal\` untuk membatalkan.`
           )
         }
-        if (db.data.order && db.data.order[sender]) {
+        if (db.data.order && db.data.order[sender] && !(await clearDeliveredPending(sender))) {
           return reply(
             `Kamu masih ada order pembayaran aktif. Tunggu selesai atau ketik \`${prefix}batal\`.`
           )
@@ -6248,7 +6256,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           }
 
           try {
-            if (db.data.order[sender] !== undefined) {
+            if (db.data.order[sender] !== undefined && !(await clearDeliveredPending(sender))) {
               await releaseLock(sender, 'mid')
               return reply(
                 `Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`
@@ -6657,7 +6665,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           }
 
           try {
-            if (db.data.order[sender] !== undefined) {
+            if (db.data.order[sender] !== undefined && !(await clearDeliveredPending(sender))) {
               await releaseLock(sender, 'buy')
               return reply(
                 `Kamu sedang melakukan order, harap tunggu sampai proses selesai. Atau ketik *${prefix}batal* untuk membatalkan pembayaran.`
@@ -7237,7 +7245,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           }
 
           // Logika: user membatalkan pesanan sendiri (dengan atau tanpa quote)
-          if (db.data.order[sender] !== undefined) {
+          if (db.data.order[sender] !== undefined && !(await clearDeliveredPending(sender))) {
             const candidate = db.data.order[sender]
             if (
               p0Store &&
@@ -7247,9 +7255,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               reply('Pesanan sudah dibayar atau sedang diproses dan tidak dapat dibatalkan.')
               break
             }
-            await nicola.sendMessage(candidate.from, {
-              delete: candidate.key,
-            })
+            try {
+              await nicola.sendMessage(candidate.from, { delete: candidate.key })
+            } catch {}
             delete db.data.order[sender]
             requestPendingOrderSave()
             cancelled = true
