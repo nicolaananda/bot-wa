@@ -5848,7 +5848,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
             const orderId = `DEP-${reffId}-${Date.now()}`
             Object.assign(db.data.orderDeposit[sender], { orderId, createdAt: createdAtTs })
-            if (!(await db.save()))
+            if (!(await db.saveOrderDeposits()))
               throw new Error('Failed to persist deposit context before QR generation')
             if (p0Store)
               await p0Store.persistPaymentCorrelation(
@@ -5920,7 +5920,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               metode: 'QRIS', // Pastikan metode di-set untuk global listener
               createdAt: createdAtTs,
             }
-            if (!(await db.save())) throw new Error('Failed to persist deposit context')
+            if (!(await db.saveOrderDeposits())) throw new Error('Failed to persist deposit context')
 
             console.log(
               `📝 [DEPOSIT] Order created: ${orderId}, Amount: Rp${totalAmount}, Sender: ${sender}`

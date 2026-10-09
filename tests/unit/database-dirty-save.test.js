@@ -21,6 +21,26 @@ describe('Database dirty persistence', () => {
     expect(mockQuery.mock.calls[0][0]).toMatch(/p\.data=input\.baseline/)
   })
 
+  test('persists a deposit without flushing a stale product snapshot', async () => {
+    const db = new Database()
+    db.data = {
+      users: {},
+      produk: { p: { name: 'P', priceB: 10, stok: ['a'] } },
+      orderDeposit: {},
+    }
+    db._resetPersistedState()
+    db.data.produk.p.stok.push('stale-local-stock')
+    db.data.orderDeposit.user = { orderId: 'DEP-1', totalAmount: 10001 }
+
+    await expect(db.saveOrderDeposits()).resolves.toBe(true)
+    expect(mockQuery).toHaveBeenCalledTimes(1)
+    expect(mockQuery.mock.calls[0][1]).toEqual([
+      'orderDeposit',
+      JSON.stringify(db.data.orderDeposit),
+    ])
+    await expect(db.save()).rejects.toMatchObject({ code: '40001' })
+  })
+
   test('one changed user writes one row and unchanged save writes nothing', async () => {
     const db = new Database()
     db.data = {

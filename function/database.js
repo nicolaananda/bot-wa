@@ -174,6 +174,16 @@ class DatabasePG {
     return true
   }
 
+  async saveOrderDeposits() {
+    const deposits = cloneJson(this._data.orderDeposit || {})
+    await query(
+      'INSERT INTO kv_store(key,value) VALUES ($1,$2::jsonb) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()',
+      ['orderDeposit', JSON.stringify(deposits)]
+    )
+    this._persisted.kv.set('orderDeposit', JSON.stringify(deposits))
+    return true
+  }
+
   async addProductStock(productId, items) {
     const stockItems = Array.isArray(items) ? items.filter((item) => typeof item === 'string' && item.trim()) : []
     if (!stockItems.length) throw new Error('Stock items are required')
