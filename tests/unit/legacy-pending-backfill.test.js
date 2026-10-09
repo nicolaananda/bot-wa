@@ -109,3 +109,10 @@ test('represented new legacy order permits restart without obsolete fingerprint'
     .mockResolvedValueOnce({ rows:[{ ok:true }] }) }
   await expect(assertBackfillReady({ db, legacy:{ order:{ u:{ orderId:'A', totalAmount:1 } } } })).resolves.toBe(true)
 })
+
+
+test('static QR rows with no provider identity do not enter legacy provider backfill', () => {
+  const { rows, quarantined } = planLegacyRows({ order:{ u:{ orderId:'MID-static', totalAmount:10001, staticPaymentMarker:'00000000-0000-4000-8000-000000000001' } } })
+  expect(rows).toEqual([])
+  expect(quarantined).toEqual([])
+})

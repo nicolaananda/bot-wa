@@ -159,3 +159,26 @@ test('migration defines durable constraints without stock payload logging', () =
   expect(sql).toMatch(/debit_saldo_reserve_stock/);
   expect(sql).not.toMatch(/RAISE NOTICE/);
 });
+
+
+test('static settlement rejects unsigned and non-integer events before DB access', async () => {
+  const { claimStaticSettlement } = require('../../lib/p0-store');
+  const db={connect:jest.fn()};
+  expect(await claimStaticSettlement({eventKey:'e',amount:100,authenticated:false},db)).toBeNull();
+  expect(await claimStaticSettlement({eventKey:'e',amount:100.5,authenticated:true},db)).toBeNull();
+  expect(db.connect).not.toHaveBeenCalled();
+});
+
+test('static payment SQL guards collisions, marker, bounds, and unique event binding', () => {
+  const fs=require('fs'), path=require('path');
+  const store=fs.readFileSync(path.join(__dirname,'../../lib/p0-store.js'),'utf8');
+  const migration=fs.readFileSync(path.join(__dirname,'../../migrations/006_static_qris_matching.sql'),'utf8');
+  expect(store).toMatch(/UNION ALL SELECT 1 FROM static_payment_orders/);
+  expect(store).toMatch(/candidates\.rows\.length !== 1/);
+  expect(store).toMatch(/expires_at>=now\(\)/);
+  expect(store).toMatch(/created_at AS received_at/);
+  expect(store).toMatch(/event\.received_at/);
+  expect(migration).toMatch(/marker UUID NOT NULL UNIQUE/);
+  expect(migration).toMatch(/settlement_event_key TEXT UNIQUE/);
+  expect(migration).toMatch(/static_payment_active_amount_unique/);
+});

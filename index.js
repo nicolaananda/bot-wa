@@ -830,16 +830,33 @@ if (!global.midtransWebhookListenerSetup) {
           await db.appendTransaction(result.item, { persist: false })
         }
         delete db.data.orderDeposit[sender]
-        if (!(await db.save())) throw new Error('Failed to clear durable deposit context')
+        if (!(await db.saveOrderDeposits())) throw new Error('Failed to clear durable deposit context')
         // Financial commit and context removal are authoritative; UX failures never retry credit.
         const client = globalRonzz || global.gowaAdapter
         if (client) await finishDepositUx(client, { ...order, from: order.from || sender }, result)
         return
       }
 
-      // Cari order yang match dengan amount
+      // Static merchant settlements have no usable provider order ID. Bind the signed durable
+      // event atomically to the sole marked, unexpired, globally unique amount candidate.
       const orders = db.data.order || {}
-      const correlation = matchPendingOrder(orders, webhookData)
+      const staticBinding = p0Store
+        ? await p0Store.claimStaticSettlement({
+            eventKey: webhookData.eventKey,
+            amount: webhookAmount,
+            authenticated: webhookData.authenticated === true,
+          }, pg)
+        : null
+      const staticEntries = staticBinding
+        ? Object.entries(orders).filter(([, order]) =>
+            order?.orderId === staticBinding.order_id &&
+            order?.staticPaymentMarker === staticBinding.marker)
+        : []
+      const correlation = staticBinding
+        ? (staticEntries.length === 1
+            ? { sender: staticEntries[0][0], order: staticEntries[0][1], matchedBy: 'static_settlement' }
+            : { ambiguous: true })
+        : matchPendingOrder(orders, webhookData)
       let matchedOrder = correlation && !correlation.ambiguous ? correlation.order : null
       let matchedSender = correlation && !correlation.ambiguous ? correlation.sender : null
 
@@ -939,9 +956,10 @@ if (!global.midtransWebhookListenerSetup) {
       const order = matchedOrder
       const sender = matchedSender
       const { id: productId, jumlah, from, key: messageKey, orderId, reffId, totalAmount } = order
-      if (p0Store && (correlation.matchedBy !== 'correlation' || !(await p0Store.confirmPaidOrder({
-        providerOrderId: webhookOrderId, orderId, userId: sender, amount: webhookAmount,
-      }, pg)))) throw new Error('Paid order correlation requires manual review')
+      if (p0Store && correlation.matchedBy !== 'static_settlement' &&
+        (correlation.matchedBy !== 'correlation' || !(await p0Store.confirmPaidOrder({
+          providerOrderId: webhookOrderId, orderId, userId: sender, amount: webhookAmount,
+        }, pg)))) throw new Error('Paid order correlation requires manual review')
       if (p0Store && !(await p0Store.claimFulfillment(orderId, pg))) {
         console.log(`[MID-GLOBAL] Fulfillment already claimed: ${orderId}`)
         return
@@ -6264,12 +6282,17 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             try {
               // Hitung harga
               let totalHarga = Number(hargaProduk(data[0], db.data.users[sender].role)) * jumlah
-              const uniqueCode = Math.floor(1 + Math.random() * 99)
-              const totalAmount = totalHarga + uniqueCode
+              const orderId = `MID-${reffId}-${Date.now()}`
+              if (!p0Store) throw new Error('Static QRIS requires PostgreSQL durability')
+              const staticPayment = await p0Store.allocateStaticPayment({
+                orderId, userId: sender, baseAmount: totalHarga, validMinutes: 30,
+              }, pg)
+              const totalAmount = Number(staticPayment.amount)
+              const uniqueCode = totalAmount - totalHarga
+              const expirationTime = new Date(staticPayment.expires_at).getTime()
+              db.data.order[sender].staticPaymentMarker = staticPayment.marker
 
               reply('Sedang membuat QR Code ...')
-
-              const orderId = `MID-${reffId}-${Date.now()}`
               Object.assign(db.data.order[sender], {
                 orderId,
                 totalAmount,
@@ -6282,44 +6305,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               })
               if (!(await db.saveOrders()))
                 throw new Error('Failed to persist payment context before QR generation')
-              // Gunakan charge QRIS Midtrans agar ID provider tersimpan dan webhook dapat dicocokkan tepat.
-              // const qrImagePath = "./options/sticker/qris-midtrans.jpg";
-              // try {
-              //   await qrisStatisMidtrans(qrImagePath);
-              //   console.log(`✅ [MID] QRIS statis Midtrans loaded: ${orderId}`);
-              // } catch (qrisError) {
-              //   console.error(`❌ [MID] Error loading QRIS statis:`, qrisError.message);
-              //   await releaseLock(sender, 'mid')
-              //   return reply(`❌ Gagal memuat QR Code Midtrans. Silakan hubungi admin.`)
-              // }
-              const expirationTime = Date.now() + toMs('30m')
-              const charge = await createQRISPayment(totalAmount, orderId)
-              const providerOrderId = String(charge.order_id || '')
-              const providerTransactionId = String(charge.transaction_id || '')
-              if (!providerOrderId || !providerTransactionId || !charge.qr_string) {
-                const error = new Error('Midtrans charge failed (invalid_response)')
-                error.code = 'MIDTRANS_CHARGE_INVALID_RESPONSE'
-                error.diagnostic = { classification: 'invalid_response', provider_status_code: String(charge.status_code || '').match(/^\d{3}$/)?.[0] }
-                throw error
-              }
-              Object.assign(db.data.order[sender], {
-                midtransOrderId: providerOrderId,
-                midtransTransactionId: providerTransactionId,
-              })
-              if (!(await db.saveOrders()))
-                throw new Error('Failed to persist provider payment identity')
-              if (p0Store)
-                await p0Store.persistPaymentCorrelation(
-                  {
-                    providerOrderId,
-                    kind: 'order',
-                    subjectId: orderId,
-                    userId: sender,
-                    amount: totalAmount,
-                  },
-                  pg
-                )
-              const rawQr = await qrisDinamis(charge.qr_string)
+              // Static merchant QR: persisted marker + collision-free amount are authoritative.
+              const rawQr = await qrisDinamis(`${totalAmount}`)
               const qrImage = await createQrisCard({
                 qr: rawQr,
                 amount: totalAmount,
@@ -6375,8 +6362,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 uniqueCode,
                 metode: 'MIDTRANS', // Pastikan metode di-set untuk global listener
                 createdAt: createdAtTs,
-                midtransOrderId: providerOrderId,
-                midtransTransactionId: providerTransactionId,
+                staticPaymentMarker: staticPayment.marker,
               }
               requestPendingOrderSave()
 

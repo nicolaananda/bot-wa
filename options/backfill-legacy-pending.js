@@ -13,6 +13,7 @@ function planLegacyRows(legacy) {
       const providerOrderId=typeof item.orderId==='string'?item.orderId.trim():''
       const userId=typeof legacyKey==='string'?legacyKey.trim():''
       const amount=positiveAmount(item.totalAmount), status=String(item.status||'').toLowerCase()
+      if (legacyKind === 'order' && typeof item.staticPaymentMarker === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.staticPaymentMarker)) continue
       if (!providerOrderId||!userId||!amount||(status&&!ACTIVE.has(status))) { quarantined.push({legacyKind,legacyKey,reason:!providerOrderId?'missing_order_id':!amount?'invalid_amount':'unknown_status'}); continue }
       rows.push({legacyKind,legacyKey,providerOrderId,subjectId:providerOrderId,userId,amount,kind:legacyKind==='orderDeposit'?'deposit':'order',orderKind:legacyKind==='orderDeposit'?'deposit':'qris',status:mapStatus(status)})
     }
