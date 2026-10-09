@@ -1472,17 +1472,17 @@ if (!global.midtransWebhookListenerSetup) {
 
       // Delivery intent is durable before the external send.
       if (p0Store) {
-        await p0Store.queueFulfillmentDeliveries(
-          orderId,
-          [
-            {
-              destination: sender,
-              payload: { text: detailAkunCustomer },
-              dedupeKey: `${orderId}:account`,
-            },
-          ],
-          pg
-        )
+        const deliveries = [{
+          destination: sender,
+          payload: { text: detailAkunCustomer },
+          dedupeKey: `${orderId}:account`,
+        }]
+        if (from.endsWith('@g.us')) deliveries.push({
+          destination: from,
+          payload: { text: '🎉 Pembayaran QRIS berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!' },
+          dedupeKey: `${orderId}:group-confirm`,
+        })
+        await p0Store.queueFulfillmentDeliveries(orderId, deliveries, pg)
         return
       }
       const deliveryClient = globalRonzz || global.gowaAdapter

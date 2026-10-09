@@ -104,6 +104,30 @@ test('saldo delivery queues one deduplicated outbox item', async () => {
   expect(insert[1][3]).toBe('SALDO-r1:account');
 });
 
+test('group success is deduplicated and waits for confirmed private delivery', async () => {
+  const db = fakeDb([{ rows: [] }, { rows: [{ id: 1 }] }, { rows: [{ id: 2 }] }, { rows: [] }, { rows: [] }]);
+  await queueFulfillmentDeliveries('o1', [
+    { destination: 'u1', payload: { text: 'credential' }, dedupeKey: 'o1:account' },
+    { destination: 'g1@g.us', payload: { text: 'success' }, dedupeKey: 'o1:group-confirm' },
+  ], db);
+  const inserts = db.calls.filter(([sql]) => sql.includes('INSERT INTO delivery_outbox'));
+  expect(inserts.map(([, params]) => params[3])).toEqual(['o1:account', 'o1:group-confirm']);
+  expect(inserts[1][0]).toMatch(/ON CONFLICT \(dedupe_key\) DO NOTHING/);
+  const claimSql = fs.readFileSync(require.resolve('../../lib/p0-store'), 'utf8');
+  expect(claimSql).toMatch(/dedupe_key NOT LIKE '%:group-confirm'[\s\S]*account\.status='sent'/);
+  expect(claimSql).toMatch(/dedupe_key=d\.order_id\|\|':account' AND d\.status <> 'sent'/);
+});
+
+test('private QRIS chat queues no group notice and group payload has no account details', () => {
+  const source = fs.readFileSync(require.resolve('../../index'), 'utf8');
+  const start = source.indexOf('const deliveries = [{', source.indexOf('const detailAkunCustomer'));
+  const block = source.slice(start, source.indexOf('const deliveryClient', start));
+  expect(block).toMatch(/if \(from\.endsWith\('@g\.us'\)\) deliveries\.push/);
+  expect(block.match(/group-confirm/g)).toHaveLength(1);
+  expect(block).toMatch(/payload: \{ text: '🎉 Pembayaran QRIS berhasil!/);
+  expect(block).not.toMatch(/payload: \{ text: detailAkunCustomer \}[\s\S]*group-confirm[\s\S]*detailAkunCustomer/);
+});
+
 test('Zoom create claim durably owns order and actual host before POST', async () => {
   const row = { order_id: 'z1', claim_token: 'token', status: 'creating', host_id: 'host-b' };
   const db = { query: jest.fn(async () => ({ rows: [row] })) };
