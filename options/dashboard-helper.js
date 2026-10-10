@@ -263,10 +263,12 @@ function exportDashboardData(db, format = 'json') {
   }
 }
 
-module.exports = {
-  getDashboardData,
-  getDailyChartData,
-  getMonthlyChartData,
-  getUserActivityData,
-  exportDashboardData
-}; 
+// A request snapshot stays synchronous; a PG-backed caller must await the result.
+// Internal chart calls share that snapshot instead of querying the ledger repeatedly.
+const { readTransactions } = require('../lib/transaction-reader');
+module.exports = Object.fromEntries(Object.entries({
+  getDashboardData, getDailyChartData, getMonthlyChartData,
+  getUserActivityData, exportDashboardData
+}).map(([name, fn]) => [name, (db, ...args) => db.pg
+  ? readTransactions(db.pg).then(transaksi => fn({ data: { ...db.data, transaksi } }, ...args))
+  : fn(db, ...args)]));

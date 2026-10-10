@@ -132,17 +132,27 @@ async function loadDatabaseAsync() {
 }
 
 // Function untuk mendapatkan data dengan format yang sesuai
-async function getFormattedDataAsync() {
-  const db = await loadDatabaseAsync();
+async function getFormattedDataAsync(transactionFilter) {
+  // Read durable transactions and users per request; do not reload unrelated state.
+  // Profit settings have no PG snapshot mapping here; preserve their existing values.
+  const db = usePg ? (await getDbInstance()).data : await loadDatabaseAsync();
   if (!db) {
     return null;
+  }
+  let users = db.users || {};
+  if (usePg) {
+    const result = await pg.query('SELECT user_id, saldo, role, data FROM users');
+    users = Object.fromEntries(result.rows.map(row => {
+      const data = row.data && typeof row.data === 'object' ? row.data : {};
+      return [row.user_id, { ...data, saldo: Number(row.saldo || 0), role: row.role || data.role || 'bronze' }];
+    }));
   }
 
   // Format data sesuai dengan yang diharapkan dashboard-helper
   return {
     data: {
-      transaksi: db.transaksi || [],
-      users: db.users || {},
+      transaksi: usePg ? await require('../lib/transaction-reader').readTransactions(pg, transactionFilter) : db.transaksi || [],
+      users,
       profit: db.profit || {},
       persentase: db.persentase || {}
     }
@@ -728,6 +738,12 @@ function _generateUserId() {
 
 mountOwnerApi(app, { pg, getDbInstance, usePg, redis: getRedis() });
 
+// Durable transactions must not become available through unauthenticated legacy routes.
+app.use('/api/dashboard', (req, res, next) => {
+  if (!POS_TOKEN) return res.status(503).json({ success: false, error: 'Dashboard authentication unavailable' });
+  if (posAuth(req, res)) next();
+});
+
 // 1. Dashboard Overview
 app.get('/api/dashboard/overview', async (req, res) => {
   try {
@@ -739,7 +755,7 @@ app.get('/api/dashboard/overview', async (req, res) => {
       });
     }
 
-    const dashboardData = getDashboardData(db);
+    const dashboardData = await getDashboardData(db);
     if (dashboardData) {
       res.json({
         success: true,
@@ -1043,7 +1059,7 @@ app.get('/api/dashboard/users/all', async (req, res) => {
 app.get('/api/dashboard/users/:userId/transactions', async (req, res) => {
   try {
     const { userId } = req.params;
-    const db = await getFormattedDataAsync();
+    const db = await getFormattedDataAsync({ user: userId.replace(/@s\.whatsapp\.net$/, '') });
 
     if (!db) {
       return res.status(500).json({
@@ -1181,7 +1197,7 @@ app.get('/api/dashboard/saldo/history', async (req, res) => {
 app.get('/api/dashboard/transactions/search/:reffId', async (req, res) => {
   try {
     const { reffId } = req.params;
-    const db = await getFormattedDataAsync();
+    const db = await getFormattedDataAsync({ reffId, limit: 1 });
 
     if (!db) {
       return res.status(500).json({

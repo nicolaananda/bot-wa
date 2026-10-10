@@ -5563,12 +5563,22 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             )
           }
 
-          // Filter transaksi sesuai range, hanya tipe 'buy' (bukan deposit)
-          const transaksiHariIni = (db.data.transaksi || []).filter((t) => {
-            if (!t.date) return false
-            const tglTransaksi = t.date.split(' ')[0]
-            if (tglTransaksi < startDate || tglTransaksi > endDate) return false
-            if (t.metodeBayar === 'Deposit' || t.type === 'deposit') return false
+          // Baca ledger langsung; tanggal mengikuti rekap, bukan cache RAM.
+          const riwayatResult = await pg.query(
+            `SELECT meta
+             FROM transaksi
+             WHERE COALESCE(
+               CASE
+                 WHEN meta->>'date' ~ '^\\d{4}-\\d{2}-\\d{2}'
+                 THEN LEFT(meta->>'date', 10)::date
+               END,
+               (created_at AT TIME ZONE 'Asia/Jakarta')::date
+             ) BETWEEN $1::date AND $2::date
+             ORDER BY id`,
+            [startDate, endDate]
+          )
+          const transaksiHariIni = riwayatResult.rows.map((row) => row.meta || {}).filter((t) => {
+            if (t.metodeBayar === 'Deposit' || t.type === 'deposit' || t.type === 'wallet_reconciliation') return false
             if (idTarget === 'all') return true
             return t.id === idTarget
           })
@@ -7719,18 +7729,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           // Get user phone number
           const userPhone = sender.split('@')[0]
 
-          // Check if transaksi exists
-          if (!db.data.transaksi || !Array.isArray(db.data.transaksi)) {
-            return reply('❌ Database transaksi tidak ditemukan.')
-          }
-
-          // Find user's last transaction
-          const userTransaksi = db.data.transaksi.filter(
-            (t) =>
-              t.user === userPhone ||
-              t.buyer === userPhone ||
-              (t.targetNumber && t.targetNumber === userPhone)
-          )
+          const { readTransactions } = require('./lib/transaction-reader')
+          const userTransaksi = await readTransactions(pg, { user: userPhone, limit: 1 })
 
           if (userTransaksi.length === 0) {
             return reply(
@@ -7831,9 +7831,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       case 'qristoday':
         {
           try {
-            if (!db?.data?.transaksi) return reply('❌ Belum ada data transaksi')
             const today = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
-            const qris = summarizeQris(db.data.transaksi, today)
+            const { readTransactions } = require('./lib/transaction-reader')
+            const qris = summarizeQris(await readTransactions(pg, { date: today }), today)
             if (qris.totalCount === 0) {
               return reply(
                 `📊 Tidak ada transaksi QRIS pada ${moment.tz('Asia/Jakarta').format('DD MMMM YYYY')}`
@@ -7862,12 +7862,10 @@ Jika pesan ini sampai, sistem berfungsi normal.`
       case 'saldotoday':
         {
           try {
-            if (!db?.data?.transaksi) return reply('❌ Belum ada data transaksi')
             const today = moment.tz('Asia/Jakarta').format('YYYY-MM-DD')
-            const transaksiSaldo = db.data.transaksi.filter(
-              (t) =>
-                String(t.metodeBayar).toUpperCase() === 'SALDO' &&
-                String(t.date || '').startsWith(today)
+            const { readTransactions } = require('./lib/transaction-reader')
+            const transaksiSaldo = (await readTransactions(pg, { date: today })).filter(
+              (t) => String(t.metodeBayar).toUpperCase() === 'SALDO'
             )
             if (transaksiSaldo.length === 0) {
               return reply(
