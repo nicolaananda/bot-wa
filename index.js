@@ -1490,7 +1490,9 @@ if (!global.midtransWebhookListenerSetup) {
           payload: { text: '🎉 Pembayaran QRIS berhasil! Detail akun telah dikirim ke chat pribadi Anda. Terima kasih!' },
           dedupeKey: `${orderId}:group-confirm`,
         })
-        await p0Store.queueFulfillmentDeliveries(orderId, deliveries, pg)
+        const ledger = require('./lib/qris-ledger').qrisLedgerItem(order, sender, new Date())
+        await p0Store.queueFulfillmentDeliveries(orderId, deliveries, pg, ledger)
+        await db.appendTransaction(ledger, { persist: false })
         return
       }
       const deliveryClient = globalRonzz || global.gowaAdapter
@@ -6297,6 +6299,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               }, pg)
               const totalAmount = Number(staticPayment.amount)
               const uniqueCode = totalAmount - totalHarga
+              const ledgerSnapshot = { name: db.data.produk[data[0]].name,
+                price: totalHarga / jumlah, profit: db.data.produk[data[0]].profit || 0,
+                userRole: db.data.users[sender].role }
               const expirationTime = new Date(staticPayment.expires_at).getTime()
               db.data.order[sender].staticPaymentMarker = staticPayment.marker
 
@@ -6305,6 +6310,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 orderId,
                 totalAmount,
                 uniqueCode,
+                ledgerSnapshot,
                 createdAt: createdAtTs,
                 id: data[0],
                 jumlah,
@@ -6368,6 +6374,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 reffId,
                 totalAmount,
                 uniqueCode,
+                ledgerSnapshot,
                 metode: 'MIDTRANS', // Pastikan metode di-set untuk global listener
                 createdAt: createdAtTs,
                 staticPaymentMarker: staticPayment.marker,
