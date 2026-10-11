@@ -41,6 +41,43 @@ describe('Database dirty persistence', () => {
     await expect(db.save()).rejects.toMatchObject({ code: '40001' })
   })
 
+  test('load publishes a sewa map and preserves existing rentals on reload', async () => {
+    const db = new Database()
+    await db.load()
+    expect(db.data.sewa).toEqual({})
+    db.data.sewa.group = { id: 'group', expired: 42 }
+    await db.load()
+    expect(db.data.sewa.group).toEqual({ id: 'group', expired: 42 })
+  })
+
+  test('partial product success advances only confirmed rows before reporting conflict', async () => {
+    const db = new Database()
+    db.data = { produk: { a: { name: 'A' }, b: { name: 'B' } } }
+    db._resetPersistedState()
+    db.data.produk.a.name = 'new A'
+    db.data.produk.b.name = 'new B'
+    mockQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'a' }] })
+    await expect(db.save()).rejects.toMatchObject({ code: '40001' })
+    expect(JSON.parse(db._persisted.produk.get('a')).name).toBe('new A')
+    expect(JSON.parse(db._persisted.produk.get('b')).name).toBe('B')
+    mockQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] })
+    await expect(db.save()).rejects.toMatchObject({ code: '40001' })
+    expect(mockQuery.mock.calls[1][1][0]).toBe('b')
+    expect(mockQuery.mock.calls[1][1]).toHaveLength(6)
+  })
+
+  test('load compares product writes to raw SQL JSON, not normalized prices', async () => {
+    const raw = { name: 'Legacy', price: 10, stok: ['a'], profit: 7 }
+    mockQuery.mockImplementation(async (sql) => ({ rows: sql === 'SELECT id, data FROM produk'
+      ? [{ id: 'p', data: raw }] : [], rowCount: 1 }))
+    const db = new Database()
+    await db.load()
+    db.data.produk.p.name = 'Edited'
+    await db.save()
+    const write = mockQuery.mock.calls.find(([sql]) => sql.startsWith('WITH input(id,'))
+    expect(JSON.parse(write[1][5])).toEqual(raw)
+  })
+
   test('one changed user writes one row and unchanged save writes nothing', async () => {
     const db = new Database()
     db.data = {

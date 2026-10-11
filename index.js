@@ -6896,10 +6896,14 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
               // The PG function is authoritative; refresh snapshots used by alerts and later commands.
               if (atomicPurchase) {
-                db.data.users[sender].saldo = Number(atomicPurchase.new_saldo)
-                db.data.produk[data[0]].stok = db.data.produk[data[0]].stok.slice(jumlah)
-                db.data.produk[data[0]].terjual =
-                  Number(db.data.produk[data[0]].terjual || 0) + jumlah
+                // SQL already committed the debit. Assigning its balance here would
+                // turn it into a second legacy delta on the next snapshot save.
+                try {
+                  await db.refreshProductSnapshot(data[0])
+                } catch {
+                  // Cache reads cannot invalidate a committed debit/reservation.
+                  console.error('[DBPG] Product cache refresh failed after committed purchase')
+                }
                 saldoCache.delete(sender)
               }
 

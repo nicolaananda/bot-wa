@@ -2,7 +2,7 @@ const expiredCheck = (nicola) => {
   setInterval(() => {
     const { groupLeave } = nicola
     let position = null
-    Object.keys(db.data.sewa).forEach((i) => {
+    Object.keys(global.db?.data?.sewa || {}).forEach((i) => {
       if (Date.now() >= db.data.sewa[i].expired) {
         position = i
       }
@@ -16,7 +16,7 @@ const expiredCheck = (nicola) => {
 
 const getAllSewa = () => {
   const array = []
-  Object.keys(db.data.sewa).forEach((i) => {
+  Object.keys(global.db?.data?.sewa || {}).forEach((i) => {
     array.push(db.data.sewa[i].id)
   })
   return array

@@ -94,6 +94,7 @@ class DatabasePG {
       produk: new Map(),
       kv: new Map(),
     }
+    this._productSqlBaseline = new Map()
     this._savePromise = null
     this._uncertainWalletSave = false
   }
@@ -184,6 +185,22 @@ class DatabasePG {
     return true
   }
 
+  async refreshProductSnapshot(productId) {
+    const baseline = this._persisted.produk.get(productId)
+    const current = this._data.produk?.[productId]
+    // Do not discard a pending owner edit or publish a read over a newer local write.
+    if (JSON.stringify(current) !== baseline) return false
+    const result = await query('SELECT data FROM produk WHERE id=$1', [productId])
+    if (this._persisted.produk.get(productId) !== baseline ||
+        JSON.stringify(this._data.produk?.[productId]) !== baseline) return false
+    if (!result.rows.length) return false
+    const product = cloneJson(result.rows[0].data || {})
+    this._data.produk[productId] = product
+    this._productSqlBaseline.delete(productId)
+    this._persisted.produk.set(productId, JSON.stringify(product))
+    return true
+  }
+
   async addProductStock(productId, items) {
     const stockItems = Array.isArray(items) ? items.filter((item) => typeof item === 'string' && item.trim()) : []
     if (!stockItems.length) throw new Error('Stock items are required')
@@ -198,6 +215,7 @@ class DatabasePG {
     if (!result.rowCount) throw new Error('Product not found')
     const product = result.rows[0].data || {}
     this._data.produk[productId] = cloneJson(product)
+    this._productSqlBaseline.delete(productId)
     this._persisted.produk.set(productId, JSON.stringify(product))
     return Number(result.rows[0].stock || 0)
   }
@@ -213,6 +231,7 @@ class DatabasePG {
       ? this._data.produk[productId].stok.length
       : 0
     this._data.produk[productId] = cloneJson(result.rows[0].data || {})
+    this._productSqlBaseline.delete(productId)
     this._persisted.produk.set(productId, JSON.stringify(this._data.produk[productId]))
     return previous
   }
@@ -238,6 +257,7 @@ class DatabasePG {
       ])
       await client.query('COMMIT')
       this._data.produk[productId] = cloneJson(product)
+      this._productSqlBaseline.delete(productId)
       this._persisted.produk.set(productId, JSON.stringify(product))
       return { picked, remaining: stock.length }
     } catch (error) {
@@ -280,6 +300,7 @@ class DatabasePG {
       )
       await client.query('COMMIT')
       this._data.produk[productId] = cloneJson(product)
+      this._productSqlBaseline.delete(productId)
       this._persisted.produk.set(productId, JSON.stringify(product))
       this._persisted.kv.set('order', JSON.stringify(this._data.order))
       return reservation
@@ -370,8 +391,12 @@ class DatabasePG {
       }
     }
 
+    // sewa is runtime-only here; reload must not discard its initialized map.
+    snapshot.sewa = this._data?.sewa || {}
     this._data = snapshot
     this._resetPersistedState()
+    // Compare-and-swap must use the exact stored JSON, not display normalization.
+    this._productSqlBaseline = new Map(produk.rows.map((row) => [row.id, JSON.stringify(row.data || {})]))
     await this.cleanupExpiredOrders()
 
     // dynamic tables made by migration (arrays as item, objects as k/v)
@@ -392,6 +417,7 @@ class DatabasePG {
   }
 
   _resetPersistedState() {
+    this._productSqlBaseline.clear()
     this._persisted.users = new Map(
       Object.entries(this._data.users || {}).map(([id, value]) => [id, JSON.stringify(value || {})])
     )
@@ -457,7 +483,7 @@ class DatabasePG {
         // PostgreSQL wins if an owner mutation raced this legacy snapshot save.
         sql: (values) => `WITH input(id,name,price,stock,data,baseline) AS (VALUES ${values.join(',')})
           UPDATE produk p SET name=input.name,price=input.price,stock=input.stock,data=input.data
-          FROM input WHERE p.id=input.id AND p.data=input.baseline`,
+          FROM input WHERE p.id=input.id AND p.data=input.baseline RETURNING p.id`,
         row: ([id, value], index) => ({
           values: `($${index}::text,$${index + 1}::text,$${index + 2}::numeric,$${index + 3}::integer,$${index + 4}::jsonb,$${index + 5}::jsonb)`,
           params: [
@@ -466,7 +492,7 @@ class DatabasePG {
             Number((value && (value.priceB ?? value.price ?? value.harga)) || 0),
             Number((value && (value.stock || (value.stok ? value.stok.length : 0))) || 0),
             JSON.stringify(value || {}),
-            this._persisted.produk.get(id) || '{}',
+            this._productSqlBaseline.get(id) || this._persisted.produk.get(id) || '{}',
           ],
         }),
       },
@@ -493,9 +519,15 @@ class DatabasePG {
         try {
           // Never replay a balance delta after an ambiguous connection failure.
           const result = await (domain.name === 'users' ? walletQuery : query)(domain.sql(values), params)
-          if (domain.name === 'produk' && result.rowCount !== chunk.length)
+          const conflict = domain.name === 'produk' && result.rowCount !== chunk.length
+          const confirmed = new Set((result.rows || []).map((row) => row.id))
+          for (const { id, serialized } of chunk) {
+            if (conflict && !confirmed.has(id)) continue
+            this._persisted[domain.name].set(id, serialized)
+            if (domain.name === 'produk') this._productSqlBaseline.delete(id)
+          }
+          if (conflict)
             throw Object.assign(new Error('Stale product snapshot; reload before retrying'), { code: '40001' })
-          for (const { id, serialized } of chunk) this._persisted[domain.name].set(id, serialized)
         } catch (e) {
           if (domain.name === 'produk' && e.code === '40001') throw e
           if (
