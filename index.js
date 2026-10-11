@@ -1070,10 +1070,11 @@ if (!global.midtransWebhookListenerSetup) {
               claimCreate: p0Store
                 ? ({ host }) => {
                     const startsAt = new Date(Number(zoomDetail.startAtUtcMs))
-                    return p0Store.claimZoomCreate(
+                    return p0Store.claimPaidZoomCreate(
                       {
                         orderId,
                         userId: sender,
+                        amount: Number(totalAmount),
                         hostId: host.accountId || host.userId || host.label,
                         startsAt,
                         endsAt: new Date(

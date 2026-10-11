@@ -26,6 +26,7 @@ async function main() {
     },
     finishZoomCreate: async (...args) => finishes.push(args),
   }
+  p0Store.claimPaidZoomCreate = p0Store.claimZoomCreate
   const zoomPool = {
     createMeetingOnHost: async (options) => {
       const claim = await options.claimCreate({ host: selected, capacityTier: 300 })
@@ -46,10 +47,11 @@ async function main() {
   await run(qris, {
     zoomPool, p0Store, pg: {}, tier: 300, earmarkedHost: { accountId: 'earmarked', poolTier: 300 },
     zoomDetail: { topic: 'q', startTimeIso: '2026-01-01T10:00:00', durationMinutes: 90, timezone: 'Asia/Jakarta', startAtUtcMs: 1767236400000 },
-    buildZoomAgenda: () => '', orderId: 'stable-qris-order', sender: 'user@s.whatsapp.net',
+    buildZoomAgenda: () => '', orderId: 'stable-qris-order', totalAmount: '2001', sender: 'user@s.whatsapp.net',
   })
   assert.equal(claims[0].orderId, 'stable-qris-order')
   assert.equal(claims[0].hostId, 'actual-host')
+  assert.equal(claims[0].amount, 2001)
   assert.equal(claims[0].endsAt - claims[0].startsAt, 90 * 60000)
   assert.deepEqual(finishes[0].slice(0, 3), ['stable-qris-order', 'token-1', { id: 'qris-meeting' }])
 
