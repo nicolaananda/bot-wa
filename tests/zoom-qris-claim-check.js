@@ -53,11 +53,40 @@ const store = require('../lib/p0-store');
     assert.equal(await store.claimPaidZoomCreate({...input,orderId:'unpaid'},db),null);
     await client.query("INSERT INTO business_orders(order_id,kind,user_id,amount,status) VALUES('full-host','qris',$1,2001,'processing')",[userId]);
     await assert.rejects(store.claimPaidZoomCreate({...input,orderId:'full-host'},db), /capacity exceeded/);
-    await store.queueFulfillmentDeliveries(orderId,[{orderId,destination:userId,payload:{text:'synthetic invite'},dedupeKey:orderId+':invite'}],db);
+    // Execute both actual Zoom queue callers, without booting the bot or calling Zoom.
+    const zoomStart = src.indexOf('// BRANCH: Zoom QRIS');
+    const queueStart = src.indexOf('await p0Store.queueFulfillmentDeliveries(', zoomStart);
+    const initialStart = src.indexOf('await p0Store.queueFulfillmentDeliveries(', queueStart + 1);
+    for (const start of [queueStart, initialStart]) {
+      const end = src.indexOf('\n', src.indexOf('pg\n', start) + 3);
+      const queue = src.slice(start, end);
+      for (const from of ['synthetic-group@g.us', userId, '', 'other@s.whatsapp.net']) {
+        let deliveries;
+        await vm.runInNewContext(`(async () => { ${queue} })()`, {
+          p0Store: {queueFulfillmentDeliveries: async (_id, items) => { deliveries = items; }},
+          pg: db, orderId, sender: userId, from, tier: 100, infoText: 'private receipt',
+          inviteLines: ['https://zoom.invalid/secret Passcode: secret Hostkey: secret'],
+          order: {tier:100, fulfillment:{infoText:'private receipt',inviteText:'https://zoom.invalid/secret Passcode: secret Hostkey: secret'}},
+        });
+        const grouped = from.endsWith('@g.us');
+        assert.equal(deliveries.length, grouped ? 3 : 2, 'group checkout must queue acknowledgement');
+        assert(deliveries.slice(0,2).every(d => d.destination === userId));
+        if (grouped) {
+          const note = deliveries[2];
+          assert.equal(note.destination, from);
+          assert.equal(note.dedupeKey, `${orderId}:zoom-group-note`);
+          assert.deepEqual(Array.from(note.payload.mentions), [userId]);
+          assert(!/https?:|secret|Passcode|Hostkey|telah menerima|sudah dikirim/i.test(note.payload.text));
+          assert.match(note.payload.text, /Pembayaran QRIS berhasil/);
+          await store.queueFulfillmentDeliveries(orderId, deliveries, db);
+        }
+      }
+    }
+    assert.equal((await client.query('SELECT * FROM delivery_outbox')).rowCount,3, 'initial/replay dedupe');
     let sends=0;
-    await store.runDeliveryOutboxOnce(async () => { sends++; return {id:'synthetic-delivery'}; },db);
-    await store.runDeliveryOutboxOnce(async () => { sends++; },db);
-    assert.equal(sends,1);
+    for (let i=0;i<4;i++) await store.runDeliveryOutboxOnce(async () => { sends++; return {id:'synthetic-delivery'}; },db);
+    assert.equal(sends,3);
+    console.log('PASS initial/replay Zoom queue: private invites, group-only acknowledgement, privacy, durable dedupe and worker delivery');
     assert.equal((await client.query('SELECT status FROM business_orders WHERE order_id=$1',[orderId])).rows[0].status,'completed');
     console.log('PASS actual QRIS caller -> allocation -> settlement -> fulfillment -> SQL booking -> completion/replay; no wallet debit; ownership/amount/unpaid/duplicate guards');
   } finally { await client.query('ROLLBACK'); client.release(); await pool.end(); }

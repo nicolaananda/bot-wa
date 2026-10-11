@@ -993,6 +993,14 @@ if (!global.midtransWebhookListenerSetup) {
                     payload: { text: order.fulfillment.inviteText },
                     dedupeKey: `${orderId}:zoom-invite`,
                   },
+                  ...(from && from.endsWith('@g.us') && from !== sender ? [{
+                    destination: from,
+                    payload: {
+                      text: `🎉 Pembayaran QRIS berhasil! @${sender.split('@')[0]}, undangan Zoom akan dikirim melalui chat pribadi. Terima kasih!`,
+                      mentions: [sender],
+                    },
+                    dedupeKey: `${orderId}:zoom-group-note`,
+                  }] : []),
                 ],
                 pg
               )
@@ -1221,6 +1229,14 @@ if (!global.midtransWebhookListenerSetup) {
                   payload: { text: inviteLines.join('\n') },
                   dedupeKey: `${orderId}:zoom-invite`,
                 },
+                ...(from && from.endsWith('@g.us') && from !== sender ? [{
+                  destination: from,
+                  payload: {
+                    text: `🎉 Pembayaran QRIS berhasil! @${sender.split('@')[0]}, undangan Zoom akan dikirim melalui chat pribadi. Terima kasih!`,
+                    mentions: [sender],
+                  },
+                  dedupeKey: `${orderId}:zoom-group-note`,
+                }] : []),
               ],
               pg
             )
