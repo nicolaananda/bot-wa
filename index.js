@@ -2311,6 +2311,8 @@ module.exports = async (nicola, m, mek) => {
                   )
                 }
 
+                let allocatedOrderId
+                let qrSendAttempted = false
                 try {
                   // Init order shell early so global webhook listener can find it
                   if (!db.data.order) db.data.order = {}
@@ -2321,17 +2323,24 @@ module.exports = async (nicola, m, mek) => {
                   }
 
                   const reffId = crypto.randomBytes(5).toString('hex').toUpperCase()
-                  const uniqueCode = Math.floor(1 + Math.random() * 99)
-                  const totalAmount = Number(priceInfo.price) + uniqueCode
                   const createdAtTs = Date.now()
                   const orderId = `ZOOM-${tier}-${reffId}-${createdAtTs}`
 
+                  if (!p0Store) throw new Error('Static QRIS requires PostgreSQL durability')
+                  const staticPayment = await p0Store.allocateStaticPayment({
+                    orderId, userId: sender, baseAmount: Number(priceInfo.price), validMinutes: 30,
+                  }, pg)
+                  allocatedOrderId = orderId
+                  const totalAmount = Number(staticPayment.amount)
+                  const uniqueCode = totalAmount - Number(priceInfo.price)
+
                   await reply('⏳ Membuat QR Code pembayaran ...')
 
-                  const expirationTime = Date.now() + toMs('30m')
+                  const expirationTime = new Date(staticPayment.expires_at).getTime()
                   db.data.order[sender] = {
                     status: 'awaiting_payment',
                     metode: 'MIDTRANS-ZOOM',
+                    staticPaymentMarker: staticPayment.marker,
                     tier,
                     orderId,
                     reffId,
@@ -2353,33 +2362,15 @@ module.exports = async (nicola, m, mek) => {
                   }
                   if (!(await db.saveOrders()))
                     throw new Error('Failed to persist Zoom payment context')
-                  if (p0Store)
-                    await p0Store.persistPaymentCorrelation(
-                      {
-                        providerOrderId: orderId,
-                        kind: 'order',
-                        subjectId: orderId,
-                        userId: sender,
-                        amount: totalAmount,
-                      },
-                      pg
-                    )
-                  let qrImage
-                  try {
-                    const rawQr = await qrisDinamis(`${totalAmount}`)
-                    qrImage = await createQrisCard({
-                      qr: rawQr,
-                      amount: totalAmount,
-                      orderId,
-                      expiresAt: expirationTime,
-                      type: 'payment',
-                    })
-                  } catch (qrErr) {
-                    delete db.data.zoomFlow[sender]
-                    return reply(
-                      `❌ Gagal generate QRIS: ${qrErr && qrErr.message ? qrErr.message : qrErr}`
-                    )
-                  }
+
+                  const rawQr = await qrisDinamis(`${totalAmount}`)
+                  const qrImage = await createQrisCard({
+                    qr: rawQr,
+                    amount: totalAmount,
+                    orderId,
+                    expiresAt: expirationTime,
+                    type: 'payment',
+                  })
 
                   const expireDate = new Date(expirationTime)
                   const timeLeft = Math.max(0, Math.floor((expireDate - Date.now()) / 60000))
@@ -2408,46 +2399,16 @@ module.exports = async (nicola, m, mek) => {
                     `⏰ Batas waktu: sebelum ${formattedTime}\n` +
                     `Jika ingin membatalkan, ketik *${prefix}batal*`
 
+                  qrSendAttempted = true
                   const message = await nicola.sendMessage(
                     from,
                     { image: qrImage, caption },
                     { quoted: m }
                   )
 
-                  // Register order. metode = 'MIDTRANS-ZOOM' supaya webhook listener
-                  // mengarahkannya ke Zoom branch, bukan product branch.
-                  db.data.order[sender] = {
-                    status: 'awaiting_payment',
-                    metode: 'MIDTRANS-ZOOM',
-                    tier,
-                    orderId,
-                    reffId,
-                    totalAmount,
-                    uniqueCode,
-                    createdAt: createdAtTs,
-                    from,
-                    key: message.key,
-                    zoom: {
-                      tier,
-                      topic: parsed.topic,
-                      startTimeIso: parsed.startTimeIso,
-                      durationMinutes: parsed.durationMinutes,
-                      password: parsed.password,
-                      timezone: parsed.timezone,
-                      isFullDay: !!parsed.isFullDay,
-                      startAtUtcMs: startUtcMs,
-                      // Earmarked host snapshot (credentials & label/timezone)
-                      earmarkedHost: {
-                        label: earmarkedHost.label,
-                        accountId: earmarkedHost.accountId,
-                        clientId: earmarkedHost.clientId,
-                        clientSecret: earmarkedHost.clientSecret,
-                        userId: earmarkedHost.userId,
-                        timezone: earmarkedHost.timezone,
-                        concurrentMeetings: earmarkedHost.concurrentMeetings,
-                        poolTier: preCheck.poolTier || tier,
-                      },
-                    },
+                  // A settlement may finish while sending the QR; never recreate/reset its order.
+                  if (db.data.order[sender]?.orderId === orderId) {
+                    db.data.order[sender].key = message.key
                   }
                   requestPendingOrderSave()
 
@@ -2463,7 +2424,7 @@ module.exports = async (nicola, m, mek) => {
                     while (db.data.order[sender]) {
                       await sleep(5000)
                       const ord = db.data.order[sender]
-                      if (!ord || ord.status !== 'awaiting_payment') break
+                      if (!ord || ord.orderId !== orderId || ord.status !== 'awaiting_payment') break
                       if (Date.now() >= expirationTime) {
                         if (
                           p0Store &&
@@ -2483,14 +2444,28 @@ module.exports = async (nicola, m, mek) => {
                         } catch (_) {
                           /* ignore */
                         }
-                        delete db.data.order[sender]
-                        requestPendingOrderSave()
+                        if (db.data.order[sender]?.orderId === orderId) {
+                          delete db.data.order[sender]
+                          requestPendingOrderSave()
+                        }
                         break
                       }
                     }
                   })().catch((e) => console.error('[ZOOM-QRIS] timeout poller error:', e.message))
 
                   return
+                } catch (error) {
+                  // Before send, cancel unusable QR allocations. A send error is ambiguous:
+                  // keep its durable context payable rather than discard a possibly shown QR.
+                  if (allocatedOrderId && !qrSendAttempted &&
+                    await p0Store.cancelOrder(allocatedOrderId, 'cancelled', pg)) {
+                    if (db.data.order[sender]?.orderId === allocatedOrderId) {
+                      delete db.data.order[sender]
+                      requestPendingOrderSave()
+                    }
+                  }
+                  delete db.data.zoomFlow[sender]
+                  throw error
                 } finally {
                   await releaseLock(sender, 'mid')
                 }
