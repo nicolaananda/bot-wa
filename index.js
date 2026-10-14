@@ -2438,22 +2438,28 @@ module.exports = async (nicola, m, mek) => {
 
                   // Polling timeout — kalau tidak ada webhook dalam 30 menit, batalkan
                   ;(async () => {
-                    while (db.data.order[sender]) {
+                    const isCurrentPayment = () => {
+                      const current = db.data.order[sender]
+                      return current?.orderId === orderId && !current.processed &&
+                        (!current.status || current.status === 'awaiting_payment')
+                    }
+                    while (isCurrentPayment()) {
                       await sleep(5000)
-                      const ord = db.data.order[sender]
-                      if (!ord || ord.orderId !== orderId || ord.status !== 'awaiting_payment') break
+                      if (!isCurrentPayment()) break
                       if (Date.now() >= expirationTime) {
                         if (
                           p0Store &&
-                          ord.orderId &&
-                          !(await p0Store.cancelOrder(ord.orderId, 'expired', pg))
+                          orderId &&
+                          !(await p0Store.cancelOrder(orderId, 'expired', pg))
                         )
                           break
+                        if (!isCurrentPayment()) break
                         try {
                           await nicola.sendMessage(from, { delete: message.key })
                         } catch (_) {
                           /* ignore */
                         }
+                        if (!isCurrentPayment()) break
                         try {
                           await nicola.sendMessage(from, {
                             text: '⏰ QRIS expired. Pembayaran dibatalkan karena melewati batas waktu 30 menit.',
@@ -2461,7 +2467,7 @@ module.exports = async (nicola, m, mek) => {
                         } catch (_) {
                           /* ignore */
                         }
-                        if (db.data.order[sender]?.orderId === orderId) {
+                        if (isCurrentPayment()) {
                           delete db.data.order[sender]
                           requestPendingOrderSave()
                         }
@@ -5963,7 +5969,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
                 // Match berdasarkan totalAmount
                 const order = db.data.orderDeposit[sender]
-                if (!order) return // Order sudah tidak ada
+                if (order?.orderId !== orderId || order.processed ||
+                  (order.status && order.status !== 'awaiting_payment')) return
 
                 const webhookAmount = Number(gross_amount || webhookData.gross_amount || 0)
                 const orderAmount = Number(totalAmount)
@@ -5985,6 +5992,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   process.removeListener('payment-completed', paymentListener)
 
                   await nicola.sendMessage(from, { delete: message.key })
+                  if (db.data.orderDeposit[sender] !== order || order.processed ||
+                    (order.status && order.status !== 'awaiting_payment')) return
 
                   const credit = baseAmount + bonus + uniqueCode
                   const previousSaldo = Number(db.data.users[sender].saldo || 0)
@@ -6071,7 +6080,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                     )
                   }
 
-                  delete db.data.orderDeposit[sender]
+                  if (db.data.orderDeposit[sender]?.orderId === orderId) {
+                    delete db.data.orderDeposit[sender]
+                  }
                   await db.save()
                   console.log(
                     `✅ [DEPOSIT] Transaction completed via webhook: ${orderId} - ${reffId}`
@@ -6089,8 +6100,14 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             const maxInterval = 10000 // Maksimal 10 detik (lebih cepat)
             let pollCount = 0
 
-            while (db.data.orderDeposit[sender]) {
+            const isCurrentPayment = () => {
+              const current = db.data.orderDeposit[sender]
+              return current?.orderId === orderId && !current.processed &&
+                (!current.status || current.status === 'awaiting_payment')
+            }
+            while (isCurrentPayment()) {
               await sleep(pollInterval)
+              if (!isCurrentPayment()) break
 
               if (pollCount < 10) {
                 pollInterval = Math.min(Math.floor(pollInterval * 1.2), maxInterval)
@@ -6101,8 +6118,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 // Remove listener saat timeout
                 process.removeListener('payment-completed', paymentListener)
                 await nicola.sendMessage(from, { delete: message.key })
+                if (!isCurrentPayment()) break
                 reply('Deposit dibatalkan karena melewati batas waktu 30 menit.')
-                delete db.data.orderDeposit[sender]
+                if (isCurrentPayment()) delete db.data.orderDeposit[sender]
                 break
               }
 
@@ -6128,6 +6146,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                LIMIT 10`,
                       [orderAmount, tolerance, orderCreatedAt]
                     )
+                    if (!isCurrentPayment()) break
 
                     if (result.rows.length > 0) {
                       console.log(
@@ -6159,6 +6178,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                    WHERE id = $1`,
                           [row.id]
                         )
+                        if (!isCurrentPayment()) break
 
                         // Trigger same processing as webhook listener
                         paymentListener({
@@ -6208,6 +6228,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                         webhook.processed = true
                         if (typeof db.save === 'function') {
                           await db.save()
+                          if (!isCurrentPayment()) break
                         }
 
                         // Trigger same processing as webhook listener
@@ -6234,7 +6255,9 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           } catch (error) {
             console.error(`Error creating QRIS DEPOSIT for ${sender}:`, error)
             reply('Gagal membuat QR Code deposit. Silakan coba lagi.')
-            delete db.data.orderDeposit[sender]
+            if (db.data.orderDeposit[sender]?.reffId === reffId) {
+              delete db.data.orderDeposit[sender]
+            }
           }
         }
         break
@@ -6395,7 +6418,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   // Match berdasarkan totalAmount (karena QRIS statis, Midtrans akan kirim gross_amount)
                   // Atau bisa juga match berdasarkan orderId jika kita set di metadata
                   const order = db.data.order[sender]
-                  if (!order) return // Order sudah tidak ada
+                  if (order?.orderId !== orderId || order.processed ||
+                    (order.status && order.status !== 'awaiting_payment')) return
 
                   const webhookAmount = Number(gross_amount || webhookData.gross_amount || 0)
                   const orderAmount = Number(totalAmount)
@@ -6446,8 +6470,14 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               const maxInterval = 10000 // Maksimal 10 detik (lebih cepat)
               let pollCount = 0
 
-              while (db.data.order[sender]) {
+              const isCurrentPayment = () => {
+                const current = db.data.order[sender]
+                return current?.orderId === orderId && !current.processed &&
+                  (!current.status || current.status === 'awaiting_payment')
+              }
+              while (isCurrentPayment()) {
                 await sleep(pollInterval)
+                if (!isCurrentPayment()) break
 
                 if (pollCount < 10) {
                   pollInterval = Math.min(Math.floor(pollInterval * 1.2), maxInterval)
@@ -6459,14 +6489,16 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   if (
                     p0Store &&
                     expiringOrder?.orderId &&
-                    !(await p0Store.cancelOrder(expiringOrder.orderId, 'expired', pg))
+                    !(await p0Store.cancelOrder(orderId, 'expired', pg))
                   )
                     return
+                  if (!isCurrentPayment()) break
                   // Remove listener saat timeout
                   process.removeListener('payment-completed', paymentListener)
                   await nicola.sendMessage(from, { delete: message.key })
+                  if (!isCurrentPayment()) break
                   reply('Pembayaran dibatalkan karena melewati batas waktu 30 menit.')
-                  delete db.data.order[sender]
+                  if (isCurrentPayment()) delete db.data.order[sender]
                   requestPendingOrderSave()
                   break
                 }
@@ -6493,6 +6525,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                    LIMIT 10`,
                         [orderAmount, tolerance, orderCreatedAt]
                       )
+                      if (!isCurrentPayment()) break
 
                       if (result.rows.length > 0) {
                         console.log(
@@ -6524,6 +6557,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                        WHERE id = $1`,
                             [row.id]
                           )
+                          if (!isCurrentPayment()) break
 
                           // Trigger same processing as webhook listener
                           paymentListener({
@@ -6573,6 +6607,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                           webhook.processed = true
                           if (typeof db.save === 'function') {
                             await db.save()
+                            if (!isCurrentPayment()) break
                           }
 
                           // Trigger same processing as webhook listener
@@ -6592,12 +6627,14 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 }
 
                 // Fallback: Cek via API juga (optional, untuk backup)
+                if (!isCurrentPayment()) break
                 if (USE_POLLING && pollCount % 5 === 0) {
                   // Cek setiap 5 polling cycle
                   try {
                     // Cek via checkStaticQRISPayment untuk backup
                     const { checkStaticQRISPayment } = require('./config/midtrans')
                     const backupCheck = await checkStaticQRISPayment(totalAmount, createdAtTs)
+                    if (!isCurrentPayment()) break
 
                     if (backupCheck.found && backupCheck.paid) {
                       console.log(`✅ [MID] Payment detected via API backup check: ${orderId}`)
@@ -6621,7 +6658,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 : { classification: 'internal_error' }
               console.error(`❌ [MID] Charge failed for ${data[0]}:`, diagnostic)
               reply('Gagal membuat QR Code Midtrans. Silakan coba lagi.')
-              if (db.data.order[sender]) {
+              if (db.data.order[sender]?.reffId === reffId) {
                 delete db.data.order[sender]
                 requestPendingOrderSave()
               }
