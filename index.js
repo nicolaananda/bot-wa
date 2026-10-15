@@ -6321,6 +6321,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               if (!p0Store) throw new Error('Static QRIS requires PostgreSQL durability')
               const staticPayment = await p0Store.allocateStaticPayment({
                 orderId, userId: sender, baseAmount: totalHarga, validMinutes: 30,
+                minCode: 77, maxCode: 150, randomize: true,
               }, pg)
               const totalAmount = Number(staticPayment.amount)
               const uniqueCode = totalAmount - totalHarga
