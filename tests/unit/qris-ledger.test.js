@@ -17,6 +17,7 @@ test('ledger metadata uses captured quote and historical completion, never curre
   const order = { orderId: 'o1', reffId: 'REF1', id: 'p1', jumlah: 2, totalAmount: 201, uniqueCode: 1,
     ledgerSnapshot: { name: 'Historical product', price: 100, profit: 9, userRole: 'gold' } };
   expect(qrisLedgerItem(order, item.user_id, new Date('2026-10-09T16:59:00Z'))).toMatchObject(item);
+  expect(qrisLedgerItem({ ...order, fulfillmentReservation: ['fixture|secret'] }, item.user_id, new Date()).akun).toEqual(['fixture|secret']);
   expect(() => qrisLedgerItem({ ...order, uniqueCode: undefined, ledgerSnapshot: undefined }, item.user_id, new Date())).toThrow();
 });
 test('QRIS ledger and durable delivery are committed atomically', async () => {

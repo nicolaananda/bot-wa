@@ -102,10 +102,9 @@ module.exports = function mountOwnerApi(app, deps = {}) {
   app.get(`${PREFIX}/transactions/:refId`, asyncRoute(async (req, res) => {
     const db=await snapshot();const row=(db.transaksi||[]).find(r=>transaction(r).refId===req.params.refId);if(!row)return fail(res,404,'NOT_FOUND','Transaksi tidak ditemukan');
     const m=row.meta||row,id=customerId(row),u=id&&db.users?.[id];
-    // Only the persisted fulfillment field, never stock or unrelated metadata.
-    const content=m.akun==null?null:typeof m.akun==='string'?m.akun:JSON.stringify(m.akun,null,2);
+    const delivery=await require('../lib/owner-delivery').resolveDelivery(row,db,pg,deps.getReceipt||require('../config/r2-storage').getReceipt);
     const ledger=id?(await pg.query('SELECT action,amount,before_balance,after_balance,notes,created_at FROM saldo_history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 5',[id])).rows.map(x=>({action:x.action,amount:Number(x.amount),before:Number(x.before_balance),after:Number(x.after_balance),notes:x.notes,createdAt:x.created_at})):[];
-    res.json({success:true,data:{...transaction(row),ledger,customerId:id||null,account:u?{username:text(u.username),displayId:redactId(id),role:text(u.role),saldo:Number(u.saldo||0),active:u.isActive!==false}:null,delivery:{source:content?'transaction.akun':'unavailable',content},quantity:m.jumlah??null}})
+    res.json({success:true,data:{...transaction(row),ledger,customerId:id||null,account:u?{username:text(u.username),displayId:redactId(id),role:text(u.role),saldo:Number(u.saldo||0),active:u.isActive!==false}:null,delivery,quantity:m.jumlah??null}})
   }))
   app.get(`${PREFIX}/transactions/:refId/receipt`, asyncRoute(async(req,res)=>{
     const ref=req.params.refId;if(!/^[A-Za-z0-9_-]{1,120}$/.test(ref))return fail(res,400,'VALIDATION_ERROR','Referensi invoice tidak valid');
