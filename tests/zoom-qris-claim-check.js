@@ -14,7 +14,7 @@ const store = require('../lib/p0-store');
   }) };
   try {
     await client.query('BEGIN');
-    for (const table of ['business_orders','static_payment_orders','midtrans_webhooks','order_fulfillments','delivery_outbox','zoom_bookings','wallet_ledger','users']) {
+    for (const table of ['business_orders','static_payment_orders','midtrans_webhooks','order_fulfillments','delivery_outbox','zoom_bookings','wallet_ledger','users','transaksi']) {
       await client.query(`CREATE TEMP TABLE ${table} (LIKE public.${table} INCLUDING ALL) ON COMMIT DROP`);
       const cols = (await client.query(`SELECT column_name,column_default FROM information_schema.columns WHERE table_schema='public' AND table_name=$1`, [table])).rows;
       for (const col of cols.filter(c => c.column_default?.includes('nextval'))) {
@@ -57,16 +57,39 @@ const store = require('../lib/p0-store');
     const zoomStart = src.indexOf('// BRANCH: Zoom QRIS');
     const queueStart = src.indexOf('await p0Store.queueFulfillmentDeliveries(', zoomStart);
     const initialStart = src.indexOf('await p0Store.queueFulfillmentDeliveries(', queueStart + 1);
-    for (const start of [queueStart, initialStart]) {
-      const end = src.indexOf('\n', src.indexOf('pg\n', start) + 3);
-      const queue = src.slice(start, end);
+    const snapshotStart = src.lastIndexOf('          const zoomLedger =', initialStart);
+    const initialBody = src.slice(snapshotStart < 0 ? src.lastIndexOf('          order.fulfillment =', initialStart) : snapshotStart,
+      src.indexOf('\n          const deliveryClient', initialStart));
+    const savedOrder = {tier:100};
+    for (const start of [initialStart, queueStart]) {
+      const queue = start === initialStart ? initialBody : src.slice(start, src.indexOf('\n              return', start));
       for (const from of ['synthetic-group@g.us', userId, '', 'other@s.whatsapp.net']) {
         let deliveries;
         await vm.runInNewContext(`(async () => { ${queue} })()`, {
-          p0Store: {queueFulfillmentDeliveries: async (_id, items) => { deliveries = items; }},
+          p0Store: {queueFulfillmentDeliveries: async (_id, items, database, ledger) => {
+            assert(ledger, 'Zoom QRIS must forward ledger before early return');
+            assert.equal(ledger.orderId, orderId);
+            assert.equal(ledger.user_id, userId);
+            assert.equal(ledger.totalBayar, Number(allocation.amount));
+            assert.equal(ledger.price, Number(allocation.amount));
+            assert.equal(ledger.profit, Number(allocation.amount));
+            assert.equal(ledger.reffId, 'synthetic-ref');
+            assert.equal(ledger.id, 'zoom100');
+            assert.equal(ledger.akun.meetingId, 'synthetic-meeting');
+            assert.equal(ledger.akun.start_time, '2030-01-01T00:00:00Z');
+            assert.equal(ledger.akun.duration, 60);
+            deliveries = items;
+            await store.queueFulfillmentDeliveries(_id, items, database, ledger);
+          }},
+          db: {data:{users:{},order:{}},saveOrders:async () => {}},
+          totalAmount:allocation.amount, reffId:'synthetic-ref',
+          moment:require('moment-timezone'),
+          meeting:{id:'synthetic-meeting',topic:'Test',join_url:'https://zoom.invalid/test',duration:90},
+          zoomDetail:{startTimeIso:'2030-01-01T00:00:00Z',durationMinutes:60,timezone:'Asia/Jakarta'},
+          usedHost:{label:'Synthetic host'},
           pg: db, orderId, sender: userId, from, tier: 100, infoText: 'private receipt',
           inviteLines: ['https://zoom.invalid/secret Passcode: secret Hostkey: secret'],
-          order: {tier:100, fulfillment:{infoText:'private receipt',inviteText:'https://zoom.invalid/secret Passcode: secret Hostkey: secret'}},
+          order: savedOrder,
         });
         const grouped = from.endsWith('@g.us');
         assert.equal(deliveries.length, grouped ? 3 : 2, 'group checkout must queue acknowledgement');
@@ -82,6 +105,8 @@ const store = require('../lib/p0-store');
         }
       }
     }
+    assert.equal((await client.query('SELECT * FROM transaksi')).rowCount,1, 'initial/replay ledger dedupe');
+    console.log('PASS actual Zoom initial/replay caller forwards compatible ledger; one durable transaction');
     assert.equal((await client.query('SELECT * FROM delivery_outbox')).rowCount,3, 'initial/replay dedupe');
     let sends=0;
     for (let i=0;i<4;i++) await store.runDeliveryOutboxOnce(async () => { sends++; return {id:'synthetic-delivery'}; },db);

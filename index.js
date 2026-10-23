@@ -1002,7 +1002,8 @@ if (!global.midtransWebhookListenerSetup) {
                     dedupeKey: `${orderId}:zoom-group-note`,
                   }] : []),
                 ],
-                pg
+                pg,
+                order.fulfillment.ledger
               )
               return
             }
@@ -1207,7 +1208,38 @@ if (!global.midtransWebhookListenerSetup) {
             `*RefId:* ${reffId}\n\n` +
             `_Link meeting di bawah, tap & tahan untuk copy & forward ke peserta._`
 
+          const zoomLedger = {
+            id: `zoom${tier}`,
+            name: `Zoom ${tier}p — ${meeting.topic}`,
+            price: Number(totalAmount),
+            date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
+            profit: Number(totalAmount),
+            jumlah: 1,
+            user: sender.split('@')[0],
+            userRole: db.data.users[sender]?.role || 'bronze',
+            reffId,
+            metodeBayar: 'QRIS',
+            totalBayar: Number(totalAmount),
+            akun: {
+              tier,
+              meetingId: String(meeting.id),
+              topic: meeting.topic,
+              join_url: meeting.join_url,
+              password: meeting.password || '',
+              // Simpan JAM ASLI customer (bukan window backdated yang dikirim ke
+              // Zoom). startAtUtcMs/durationMinutes berasal dari order.zoom.
+              start_time: zoomDetail.startTimeIso || meeting.start_time,
+              duration: Number(zoomDetail.durationMinutes || meeting.duration || 0),
+              timezone: zoomDetail.timezone || null,
+              hostLabel: usedHost.label,
+            },
+            orderId,
+            user_id: sender,
+            status: 'completed',
+          }
+
           order.fulfillment = {
+            ledger: zoomLedger,
             infoText,
             inviteText: inviteLines.join('\n'),
             meetingId: String(meeting.id),
@@ -1238,7 +1270,8 @@ if (!global.midtransWebhookListenerSetup) {
                   dedupeKey: `${orderId}:zoom-group-note`,
                 }] : []),
               ],
-              pg
+              pg,
+              zoomLedger
             )
             return
           }
@@ -1303,32 +1336,7 @@ if (!global.midtransWebhookListenerSetup) {
 
           // Log transaksi
           if (!db.data.transaksi) db.data.transaksi = []
-          await db.appendTransaction({
-            id: `zoom${tier}`,
-            name: `Zoom ${tier}p — ${meeting.topic}`,
-            price: Number(totalAmount),
-            date: moment.tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss'),
-            profit: Number(totalAmount),
-            jumlah: 1,
-            user: sender.split('@')[0],
-            userRole: db.data.users[sender]?.role || 'bronze',
-            reffId,
-            metodeBayar: 'QRIS',
-            totalBayar: Number(totalAmount),
-            akun: {
-              tier,
-              meetingId: String(meeting.id),
-              topic: meeting.topic,
-              join_url: meeting.join_url,
-              password: meeting.password || '',
-              // Simpan JAM ASLI customer (bukan window backdated yang dikirim ke
-              // Zoom). startAtUtcMs/durationMinutes berasal dari order.zoom.
-              start_time: zoomDetail.startTimeIso || meeting.start_time,
-              duration: Number(zoomDetail.durationMinutes || meeting.duration || 0),
-              timezone: zoomDetail.timezone || null,
-              hostLabel: usedHost.label,
-            },
-          })
+          await db.appendTransaction(zoomLedger)
 
           order.status = 'success'
           db.data.order[sender] = order
