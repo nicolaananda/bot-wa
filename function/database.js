@@ -185,6 +185,68 @@ class DatabasePG {
     return true
   }
 
+  _validateProductCode(id) {
+    if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(id) ||
+        ['__proto__', 'constructor', 'prototype'].includes(id))
+      throw new Error('Invalid product code')
+  }
+
+  async createProduct(id, value) {
+    this._validateProductCode(id)
+    if (Object.hasOwn(this._data.produk || {}, id)) throw new Error('Product code already exists')
+    const product = { ...cloneJson(value), id, stok: [], terjual: 0 }
+    if (typeof product.name !== 'string' || !product.name.trim()) throw new Error('Product name is required')
+    for (const key of ['priceB', 'priceS', 'priceG']) {
+      product[key] = Number(product[key] ?? product.priceB)
+      if (!Number.isFinite(product[key]) || product[key] < 0) throw new Error('Invalid product price')
+    }
+    const result = await query(
+      `INSERT INTO produk(id,name,price,stock,data) VALUES ($1,$2,$3,0,$4::jsonb)
+       ON CONFLICT (id) DO NOTHING RETURNING data`,
+      [id, product.name, product.priceB, JSON.stringify(product)]
+    )
+    if (!result.rowCount) throw new Error('Product code already exists')
+    this._data.produk[id] = cloneJson(product)
+    this._persisted.produk.set(id, JSON.stringify(product))
+    this._productSqlBaseline.delete(id)
+    return product
+  }
+
+  async renameProduct(oldId, newId) {
+    this._validateProductCode(oldId)
+    this._validateProductCode(newId)
+    if (oldId === newId || Object.hasOwn(this._data.produk || {}, newId))
+      throw new Error('Product code already exists')
+    if (this._savePromise) await this._savePromise
+    const current = this._data.produk?.[oldId]
+    const baseline = this._productSqlBaseline.get(oldId) || this._persisted.produk.get(oldId)
+    if (!current || !baseline) throw new Error('Product not found; reload catalogue')
+    // ponytail: reject active checkouts rather than migrate order/history identities.
+    if (Object.values(this._data.order || {}).some(order =>
+      order && [order.id, order.productId, order.product_id, order.idproduk].includes(oldId)))
+      throw new Error('Product has a pending order')
+    const product = { ...cloneJson(current), id: newId }
+    const result = await query(
+      `UPDATE produk SET id=$2,data=$3::jsonb,name=$4,price=$5,updated_at=now()
+       WHERE id=$1 AND data=$6::jsonb
+         AND NOT EXISTS (SELECT 1 FROM business_orders WHERE product_id=$1
+           AND status NOT IN ('completed','cancelled','expired'))
+       RETURNING data`,
+      [oldId, newId, JSON.stringify(product), product.name, Number(product.priceB), baseline]
+    )
+    if (!result.rowCount)
+      throw Object.assign(new Error('Stale product snapshot or active order; reload before retrying'), { code: '40001' })
+    // Keep edits made while SQL was pending dirty; never rewrite transaction identities.
+    const latest = this._data.produk[oldId]
+    this._data.produk[newId] = { ...latest, id: newId }
+    delete this._data.produk[oldId]
+    this._persisted.produk.delete(oldId)
+    this._productSqlBaseline.delete(oldId)
+    this._persisted.produk.set(newId, JSON.stringify(product))
+    this._productSqlBaseline.delete(newId)
+    return product
+  }
+
   async refreshProductSnapshot(productId) {
     const baseline = this._persisted.produk.get(productId)
     const current = this._data.produk?.[productId]

@@ -5197,7 +5197,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           if (db.data.produk[data[0]])
             return reply(`Produk dengan ID ${data[0]} sudah ada di database`)
 
-          db.data.produk[data[0]] = {
+          await db.createProduct(data[0], {
             id: data[0],
             name: data[1],
             desc: data[2],
@@ -5208,12 +5208,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
             profit: data[7],
             terjual: 0,
             stok: [],
-          }
-
-          // Schedule save after product added
-          if (typeof global.scheduleSave === 'function') {
-            global.scheduleSave()
-          }
+          })
 
           reply(`Berhasil menambahkan produk *${data[1]}*`)
         }
@@ -5348,10 +5343,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           if (!db.data.produk[data[0]])
             return reply(`Produk dengan ID *${data[0]}* tidak ada di database`)
 
-          db.data.produk[data[0]].id = data[1]
-          db.data.produk[data[1]] = db.data.produk[data[0]]
+          await db.renameProduct(data[0], data[1])
           reply(`Berhasil set kode produk dengan ID *${data[0]}* menjadi *${data[1]}*`)
-          delete db.data.produk[data[0]]
         }
         break
 
