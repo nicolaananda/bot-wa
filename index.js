@@ -19,6 +19,7 @@ const { createCanvas, loadImage } = require('canvas')
 
 const { OrderKuota } = require('./function/orderkuota')
 const { getGroupAdmins, runtime, sleep } = require('./function/myfunc')
+const { summarizeProducts } = require('./lib/sales-recap')
 const { color } = require('./function/console')
 const { checkGroupWhitelist } = require('./lib/group-whitelist')
 const { summarizeQris } = require('./lib/qris-summary')
@@ -5674,22 +5675,13 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
           let totalOmzet = 0
           let totalProfit = 0
-          const perProduk = {}
           const perMetode = {}
 
           for (const t of transaksiRekap) {
             const bayar = Number(t.totalBayar || t.price || 0)
             const profit = Number(t.profit || 0)
-            const qty = Number(t.qty || t.jumlah || 1)
             totalOmzet += bayar
             totalProfit += profit
-
-            const pid = t.id || 'unknown'
-            if (!perProduk[pid])
-              perProduk[pid] = { name: t.name || pid, omzet: 0, profit: 0, terjual: 0 }
-            perProduk[pid].omzet += bayar
-            perProduk[pid].profit += profit
-            perProduk[pid].terjual += qty
 
             const metode = t.metodeBayar || 'Unknown'
             if (!perMetode[metode]) perMetode[metode] = { count: 0, total: 0 }
@@ -5698,7 +5690,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           }
 
           // Sort produk by omzet
-          const topProduk = Object.entries(perProduk).sort((a, b) => b[1].omzet - a[1].omzet)
+          const topProduk = summarizeProducts(transaksiRekap).sort((a, b) => b.omzet - a.omzet)
 
           let teks = `*╭────〔 REKAP PENJUALAN 〕─*\n`
           teks += `*┊・ 📅 Periode:* ${rekapLabel}\n`
@@ -5711,7 +5703,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           teks += `*╰┈┈┈┈┈┈┈┈*\n`
 
           teks += `\n*📦 Per Produk:*\n`
-          for (const [, p] of topProduk) {
+          for (const p of topProduk) {
             teks += `• *${p.name}*: ${p.terjual}x | Rp${toRupiah(p.omzet)} | profit Rp${toRupiah(p.profit)}\n`
           }
 
