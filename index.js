@@ -20,6 +20,7 @@ const { createCanvas, loadImage } = require('canvas')
 const { OrderKuota } = require('./function/orderkuota')
 const { getGroupAdmins, runtime, sleep } = require('./function/myfunc')
 const { summarizeProducts } = require('./lib/sales-recap')
+const { saleFinancials } = require('./lib/profit-basis')
 const { color } = require('./function/console')
 const { checkGroupWhitelist } = require('./lib/group-whitelist')
 const { summarizeQris } = require('./lib/qris-summary')
@@ -805,12 +806,12 @@ if (!global.midtransWebhookListenerSetup) {
           }
         )
         console.log(`✅ [MID-GLOBAL] Forwarded to Nala: ${webhookOrderId}`)
-        return
+        return { external: true }
       }
       const webhookAmount = Number(gross_amount || webhookData.gross_amount || 0)
       const isStatusPaid = /(settlement|capture)/i.test(String(transactionStatus))
 
-      if (!isStatusPaid) return
+      if (!isStatusPaid) return { ignored: true }
       if (!webhookAmount) throw new Error('Invalid Midtrans amount')
 
       // Akses global.db langsung
@@ -1048,6 +1049,8 @@ if (!global.midtransWebhookListenerSetup) {
             order.failedAt = Date.now()
             db.data.order[sender] = order
             await db.saveOrders()
+            if (p0Store) await pg.query(`UPDATE business_orders SET status='manual_review',updated_at=now()
+              WHERE order_id=$1 AND status IN ('pending','processing','delivery_pending')`, [orderId])
             try {
               await globalRonzz.sendMessage(sender, {
                 text:
@@ -1117,6 +1120,8 @@ if (!global.midtransWebhookListenerSetup) {
             if (createResult && createResult.ambiguous) order.processed = true
             db.data.order[sender] = order
             await db.saveOrders()
+            if (p0Store) await pg.query(`UPDATE business_orders SET status='manual_review',updated_at=now()
+              WHERE order_id=$1 AND status IN ('pending','processing','delivery_pending')`, [orderId])
             const failMsg =
               `⚠️ *PEMBAYARAN BERHASIL TAPI MEETING GAGAL DIBUAT*\n\n` +
               `Order ID: ${orderId}\n` +
@@ -1429,6 +1434,8 @@ if (!global.midtransWebhookListenerSetup) {
         order.failedAt = Date.now()
         db.data.order[sender] = order
         await db.save()
+        if (p0Store) await pg.query(`UPDATE business_orders SET status='manual_review',updated_at=now()
+          WHERE order_id=$1 AND status IN ('pending','processing','delivery_pending')`, [orderId])
 
         return
       }
@@ -5675,13 +5682,15 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
           let totalOmzet = 0
           let totalProfit = 0
+          let unknownProfit = 0
           const perMetode = {}
 
           for (const t of transaksiRekap) {
             const bayar = Number(t.totalBayar || t.price || 0)
-            const profit = Number(t.profit || 0)
             totalOmzet += bayar
-            totalProfit += profit
+            const financials = saleFinancials(t)
+            if (financials.known) totalProfit += financials.profit
+            else unknownProfit++
 
             const metode = t.metodeBayar || 'Unknown'
             if (!perMetode[metode]) perMetode[metode] = { count: 0, total: 0 }
@@ -5697,6 +5706,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           teks += `*┊・ 🧾 Transaksi:* ${transaksiRekap.length}x\n`
           teks += `*┊・ 💰 Omzet:* Rp${toRupiah(totalOmzet)}\n`
           teks += `*┊・ 📈 Profit:* Rp${toRupiah(totalProfit)}\n`
+          if (unknownProfit) teks += `*┊・ ⚠️ Profit unknown:* ${unknownProfit} transaksi legacy (tidak dihitung)\n`
           teks += `*┊・ 💳 Penjualan QRIS:* ${qrisRekap.salesCount}x | Rp${toRupiah(qrisRekap.salesAmount)}\n`
           teks += `*┊・ 💰 Deposit QRIS:* ${qrisRekap.depositCount}x | Rp${toRupiah(qrisRekap.depositAmount)}\n`
           teks += `*┊・ 📊 Total QRIS:* ${qrisRekap.totalCount}x | Rp${toRupiah(qrisRekap.totalAmount)}\n`
@@ -5704,7 +5714,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
           teks += `\n*📦 Per Produk:*\n`
           for (const p of topProduk) {
-            teks += `• *${p.name}*: ${p.terjual}x | Rp${toRupiah(p.omzet)} | profit Rp${toRupiah(p.profit)}\n`
+            teks += `• *${p.name}*: ${p.terjual}x | Rp${toRupiah(p.omzet)} | profit Rp${toRupiah(p.profit)}${p.unknownProfitTransactions ? ` | ${p.unknownProfitTransactions} legacy unknown` : ''}\n`
           }
 
           teks += `\n*💳 Per Metode Bayar:*\n`

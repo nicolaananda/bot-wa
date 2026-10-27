@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const { saleFinancials } = require('../lib/profit-basis');
 const cors = require('cors');
 const fs = require('fs');
 const fsPromises = require('fs').promises;
@@ -1216,10 +1217,8 @@ app.get('/api/dashboard/transactions/search/:reffId', async (req, res) => {
       });
     }
 
-    // Hitung profit berdasarkan persentase
-    const userRole = db.data.users[transaction.user]?.role || "bronze";
-    const profitPercentage = db.data.persentase[userRole] || 2;
-    const profit = Math.floor((parseInt(transaction.price) * transaction.jumlah) * (profitPercentage / 100));
+    const financials = saleFinancials(transaction);
+    const profit = financials.profit;
 
     // Parse delivered account if exists
     const deliveredAccount = await parseDeliveredAccountFromFile(reffId);
@@ -2261,9 +2260,8 @@ app.get('/api/dashboard/analytics/advanced', async (req, res) => {
         monthlyData[month].revenue += parseInt(t.totalBayar) || 0;
         monthlyData[month].users.add(t.user);
 
-        const userRole = t.userRole || 'bronze';
-        const profitPercent = persentase[userRole] || 2;
-        monthlyData[month].profit += Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
+        const financials = saleFinancials(t);
+        if (financials.known) monthlyData[month].profit += financials.profit;
       }
     });
 
@@ -2757,9 +2755,8 @@ app.get('/api/dashboard/finance/analytics', async (req, res) => {
       const role = t.userRole || 'bronze';
       revenueByRole[role] = (revenueByRole[role] || 0) + (parseInt(t.totalBayar) || 0);
 
-      const profitPercent = persentase[role] || 2;
-      const profit = Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
-      profitByRole[role] = (profitByRole[role] || 0) + profit;
+      const financials = saleFinancials(t);
+      if (financials.known) profitByRole[role] = (profitByRole[role] || 0) + financials.profit;
     });
 
     // Daily revenue analysis (last 30 days)
@@ -2783,10 +2780,8 @@ app.get('/api/dashboard/finance/analytics', async (req, res) => {
           dailyRevenue[date].revenue += parseInt(t.totalBayar) || 0;
           dailyRevenue[date].transactions++;
 
-          const userRole = t.userRole || 'bronze';
-          const profitPercent = persentase[userRole] || 2;
-          const profit = Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
-          dailyRevenue[date].profit += profit;
+          const financials = saleFinancials(t);
+          if (financials.known) dailyRevenue[date].profit += financials.profit;
         }
       }
     });
@@ -2837,10 +2832,8 @@ app.get('/api/dashboard/finance/analytics', async (req, res) => {
       productRevenue[t.id].revenue += parseInt(t.totalBayar) || 0;
       productRevenue[t.id].transactions++;
 
-      const userRole = t.userRole || 'bronze';
-      const profitPercent = persentase[userRole] || 2;
-      const profit = Math.floor((parseInt(t.price) * (t.jumlah || 1)) * (profitPercent / 100));
-      productRevenue[t.id].profit += profit;
+      const financials = saleFinancials(t);
+      if (financials.known) productRevenue[t.id].profit += financials.profit;
     });
 
     const topRevenueProducts = Object.values(productRevenue)

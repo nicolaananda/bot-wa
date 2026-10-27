@@ -7,6 +7,7 @@ if (!usePg) {
 
 const { query, getClient } = require('../config/postgres')
 const { walletQuery } = require('../lib/otp-wallet')
+const { withSaleTimeCost } = require('../lib/profit-basis')
 
 function toPositiveInt(value, fallback) {
   const parsed = Number(value)
@@ -142,6 +143,9 @@ class DatabasePG {
   }
 
   async appendTransaction(item, { persist = true } = {}) {
+    if (item?.id && item.id !== 'deposit' && item.id !== 'Deposit Saldo' && item.unitCost === undefined) {
+      item = withSaleTimeCost(item, this._data.produk?.[item.id])
+    }
     const normalized = normalizeTransactionRecord(item)
     if (!normalized.refId) {
       throw new Error('Transaction refId is required for persistence')

@@ -23,7 +23,7 @@ test('gagal persist menghasilkan 503 tanpa ACK palsu', async () => {
 test('worker retry: gagal menjadi failed dan dapat direplay setelah restart', async () => {
   const updates=[]; const raw={order_id:'QRIS-7',signature_key:'signed'}; const row={id:7,event_key:'e',order_id:'QRIS-7',transaction_status:'settlement',gross_amount:10,webhook_data:raw};
   const client={query:jest.fn(async sql=>{ if(sql.includes('SELECT *')) return {rows:[row]}; updates.push(sql); return {rows:[]}; }),release:jest.fn()};
-  const pg={getClient:async()=>client,query:jest.fn(async sql=>{updates.push(sql); return {rows:[]};})};
+  const pg={getClient:async()=>client,query:jest.fn(async sql=>{updates.push(sql); return {rows:sql.includes('SELECT 1 FROM business_orders')?[{proof:1}]:[]};})};
   await expect(processNextWebhook({pg,dispatch:async()=>{throw Error('temporary')}})).rejects.toThrow('temporary');
   expect(updates.join('\n')).toMatch(/lifecycle_status='failed'/); expect(updates.join('\n')).not.toMatch(/lifecycle_status='completed'/);
   const dispatched=[]; await processNextWebhook({pg,dispatch:async data=>dispatched.push([data.orderId,data.notification])});

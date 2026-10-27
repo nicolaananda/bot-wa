@@ -104,7 +104,21 @@ async function processNextWebhook({ pg, dispatch }) {
   try {
     const data = eventData(row);
     if (typeof dispatch !== 'function') throw new Error('Webhook business dispatcher is required');
-    await dispatch(data, row);
+    const outcome = await dispatch(data, row);
+    if (!outcome?.external && !outcome?.ignored && ['settlement', 'capture'].includes(row.transaction_status)) {
+      const proof = await pg.query(`SELECT 1 FROM business_orders o
+        LEFT JOIN order_fulfillments f ON f.order_id=o.order_id
+        WHERE (o.order_id=$1 OR o.provider_order_id=$1 OR EXISTS (
+          SELECT 1 FROM static_payment_orders s WHERE s.order_id=o.order_id AND s.settlement_event_key=$2))
+          AND (o.status IN ('completed','manual_review') OR
+            (f.status IN ('delivery_pending','completed') AND EXISTS (
+              SELECT 1 FROM delivery_outbox d WHERE d.order_id=o.order_id)) OR EXISTS (
+              SELECT 1 FROM transaksi t WHERE t.meta->>'orderId'=o.order_id AND t.status='completed'))
+        UNION ALL SELECT 1 FROM transaksi t WHERE t.status='completed'
+          AND (t.meta->>'orderId'=$1 OR t.meta->>'midtransOrderId'=$1 OR t.ref_id='DEP-MIDTRANS-'||$1) LIMIT 1`,
+      [row.order_id, row.event_key]);
+      if (!proof.rows[0]) throw new Error('Paid event lacks durable fulfillment or manual-review evidence');
+    }
     await pg.query(`UPDATE midtrans_webhooks SET lifecycle_status='completed', processed=true,
       processed_at=now(), locked_at=NULL, last_error=NULL WHERE id=$1 AND lifecycle_status='processing'`, [row.id]);
     return true;
