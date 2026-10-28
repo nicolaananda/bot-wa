@@ -109,6 +109,7 @@ const { core, isProduction } = require('./config/midtrans')
 const USE_POLLING = false // Durable webhook worker is authoritative; transaction-list polling is redundant.
 const { matchPendingOrder, startWebhookWorker } = require('./options/midtrans-webhook')
 const { completeDeposit, finishDepositUx, matchPendingDeposit } = require('./lib/deposit-payment')
+const ZOOM_MANUAL_SUPPORT = 'Kalau tetap kosong atau bermasalah, chat admin: wa.me/6287887842985 agar pesanan diproses manual.'
 
 // Centralized, minimal send throttling + retry to avoid bursty spam patterns
 const SEND_MIN_INTERVAL_MS = Number(process.env.WA_SEND_MIN_INTERVAL_MS || 800)
@@ -1055,7 +1056,7 @@ if (!global.midtransWebhookListenerSetup) {
               await globalRonzz.sendMessage(sender, {
                 text:
                   `⚠️ Pembayaran kamu sudah masuk untuk order ${orderId}, tapi data host hilang. ` +
-                  `Hubungi admin untuk refund.`,
+                  `Pesanan tetap disimpan untuk proses manual.\n\n${ZOOM_MANUAL_SUPPORT}`,
               })
             } catch (_) {
               /* ignore */
@@ -1128,7 +1129,7 @@ if (!global.midtransWebhookListenerSetup) {
               `RefId: ${reffId}\n` +
               `Tier: Zoom ${tier}p\n` +
               `Reason: ${createResult ? createResult.error : 'unknown'}\n\n` +
-              `Silakan hubungi admin untuk refund. Saldo / nominal QRIS akan dikembalikan.`
+              `Pesanan tetap disimpan untuk proses manual.\n\n${ZOOM_MANUAL_SUPPORT}`
             try {
               await globalRonzz.sendMessage(sender, { text: failMsg })
             } catch (_) {
@@ -2319,7 +2320,7 @@ module.exports = async (nicola, m, mek) => {
                 if (!preCheck.ok) {
                   delete db.data.zoomFlow[sender]
                   if (preCheck.error === 'POOL_EMPTY') {
-                    return reply(`❌ Zoom ${tier}p kosong.`)
+                    return reply(`❌ Zoom ${tier}p kosong.\n\n${ZOOM_MANUAL_SUPPORT}`)
                   }
                   const tzShort = (parsed.timezone.split('/').pop() || parsed.timezone).replace(
                     /_/g,
@@ -2329,8 +2330,8 @@ module.exports = async (nicola, m, mek) => {
                   // (topik/jam) maupun label/akun internal milik customer lain.
                   return reply(
                     `❌ *Zoom ${tier}p kosong* di jam yang kamu minta (${tzShort}).\n\n` +
-                      `QRIS *tidak* digenerate karena meeting tidak bisa dibuat.\n\n` +
-                      `Silakan pilih jam lain. Ketik \`${prefix}zoom${tier}qris\` untuk mulai ulang.`
+                    `QRIS *tidak* digenerate karena meeting tidak bisa dibuat.\n\n` +
+                    `Silakan pilih jam lain. Ketik \`${prefix}zoom${tier}qris\` untuk mulai ulang.\n\n${ZOOM_MANUAL_SUPPORT}`
                   )
                 }
 
@@ -2604,7 +2605,7 @@ module.exports = async (nicola, m, mek) => {
                   if (poolResult.error === 'POOL_EMPTY') {
                     return reply(
                       flowIsBuy
-                        ? `❌ Zoom ${tier}p kosong.`
+                        ? `❌ Zoom ${tier}p kosong.\n\n${ZOOM_MANUAL_SUPPORT}`
                         : `❌ Host pool tier ${tier} kosong. Isi \`config/zoom-pool-${tier}.json\` di server.`
                     )
                   }
@@ -2622,7 +2623,7 @@ module.exports = async (nicola, m, mek) => {
                     return reply(
                       `❌ *Zoom ${tier}p kosong* di jam yang kamu minta (${tzShort}).\n\n` +
                         `Saldo kamu *tidak dipotong*.\n\n` +
-                        `Silakan pilih jam lain. Ketik \`${retryCmd}\` untuk mulai ulang.`
+                        `Silakan pilih jam lain. Ketik \`${retryCmd}\` untuk mulai ulang.\n\n${ZOOM_MANUAL_SUPPORT}`
                     )
                   }
                   const summary = poolResult.reasons
