@@ -14,3 +14,11 @@ test('reconciliation is one read-only aggregate query', async () => {
   expect(sql).toMatch(/paid_without_ledger/)
   expect(sql).toMatch(/completed_with_unsent_delivery/)
 })
+
+test('monitor includes PostgreSQL WAL archiver status', () => {
+  const source = require('fs').readFileSync(require.resolve('../../lib/operations-monitor'), 'utf8')
+  expect(source).toMatch(/FROM pg_stat_archiver/)
+  expect(source).toMatch(/wal_archive_failed/)
+  expect(source).toMatch(/wal_archive_stale/)
+  expect(source).toMatch(/pitr-base-success/)
+})
