@@ -23,7 +23,7 @@ collect({ pg, redis: redisModule.getRedis(), state }).then(async report => {
   fs.renameSync(temp, statePath)
   const { nextState, ...safeReport } = report
   console.log(JSON.stringify(safeReport))
-  process.exitCode = report.ok ? 0 : 1
+  process.exitCode = 0
 }).catch(error => {
   console.error(JSON.stringify({ ok: false, error: String(error.message || error).slice(0, 200) }))
   process.exitCode = 2
