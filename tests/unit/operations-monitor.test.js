@@ -22,3 +22,14 @@ test('monitor includes PostgreSQL WAL archiver status', () => {
   expect(source).toMatch(/wal_archive_stale/)
   expect(source).toMatch(/pitr-base-success/)
 })
+
+test('monitor excludes append-only owner resolutions without changing source rows', () => {
+  const fs = require('fs')
+  const source = fs.readFileSync(require.resolve('../../lib/operations-monitor'), 'utf8')
+  const migration = fs.readFileSync(require.resolve('../../migrations/007_operational_anomaly_resolutions.sql'), 'utf8')
+  expect(source).toMatch(/operational_anomaly_resolutions/)
+  expect(source).toMatch(/anomaly_type='delivery_outbox'/)
+  expect(source).toMatch(/anomaly_type='midtrans_webhook'/)
+  expect(migration).toMatch(/append-only/)
+  expect(migration).toMatch(/BEFORE UPDATE OR DELETE/)
+})
