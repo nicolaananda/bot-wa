@@ -5706,8 +5706,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
           teks += `*┊・ 📅 Periode:* ${rekapLabel}\n`
           teks += `*┊・ 🧾 Transaksi:* ${transaksiRekap.length}x\n`
           teks += `*┊・ 💰 Omzet:* Rp${toRupiah(totalOmzet)}\n`
-          teks += `*┊・ 📈 Profit:* Rp${toRupiah(totalProfit)}\n`
-          if (unknownProfit) teks += `*┊・ ⚠️ Profit unknown:* ${unknownProfit} transaksi legacy (tidak dihitung)\n`
+          teks += `*┊・ 📈 Profit${unknownProfit ? ' tercatat' : ''}:* Rp${toRupiah(totalProfit)}\n`
           teks += `*┊・ 💳 Penjualan QRIS:* ${qrisRekap.salesCount}x | Rp${toRupiah(qrisRekap.salesAmount)}\n`
           teks += `*┊・ 💰 Deposit QRIS:* ${qrisRekap.depositCount}x | Rp${toRupiah(qrisRekap.depositAmount)}\n`
           teks += `*┊・ 📊 Total QRIS:* ${qrisRekap.totalCount}x | Rp${toRupiah(qrisRekap.totalAmount)}\n`
@@ -5715,7 +5714,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
 
           teks += `\n*📦 Per Produk:*\n`
           for (const p of topProduk) {
-            teks += `• *${p.name}*: ${p.terjual}x | Rp${toRupiah(p.omzet)} | profit Rp${toRupiah(p.profit)}${p.unknownProfitTransactions ? ` | ${p.unknownProfitTransactions} legacy unknown` : ''}\n`
+            teks += `• *${p.name}*: ${p.terjual}x | Rp${toRupiah(p.omzet)} | ${p.unknownProfitTransactions ? 'profit -' : `profit Rp${toRupiah(p.profit)}`}\n`
           }
 
           teks += `\n*💳 Per Metode Bayar:*\n`
