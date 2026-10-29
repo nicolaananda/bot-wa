@@ -7263,6 +7263,12 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   candidate.orderId &&
                   !(await p0Store.cancelOrder(candidate.orderId, 'cancelled', pg))
                 ) {
+                  if (await p0Store.releaseManualReviewPending(quotedSender, candidate.orderId, pg)) {
+                    delete db.data.order[quotedSender]
+                    cancelled = true
+                    reply(`✅ Flow user @${quotedSender.split('@')[0]} sudah dilepas. Order berbayar tetap tersimpan untuk proses manual.`, { mentions: [quotedSender] })
+                    break
+                  }
                   reply('Pesanan sudah dibayar atau sedang diproses dan tidak dapat dibatalkan.')
                   break
                 }
@@ -7308,6 +7314,12 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               candidate.orderId &&
               !(await p0Store.cancelOrder(candidate.orderId, 'cancelled', pg))
             ) {
+              if (await p0Store.releaseManualReviewPending(sender, candidate.orderId, pg)) {
+                delete db.data.order[sender]
+                cancelled = true
+                reply('✅ Flow sudah dilepas. Order berbayar tetap tersimpan untuk diproses manual. Kamu sudah bisa membuat order baru.')
+                break
+              }
               reply('Pesanan sudah dibayar atau sedang diproses dan tidak dapat dibatalkan.')
               break
             }

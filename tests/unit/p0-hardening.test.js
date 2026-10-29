@@ -3,7 +3,7 @@ const fs = require('fs');
 const { migrate, LOCK_KEY } = require('../../options/migrate');
 const {
   transaction, createQrisAfterPersist, debitSaldoReserveStock, runDeliveryOutboxOnce,
-  cancelOrder, clearDeliveredLegacyOrder, queueFulfillmentDeliveries, assertSchemaReady, claimFulfillment,
+  cancelOrder, releaseManualReviewPending, clearDeliveredLegacyOrder, queueFulfillmentDeliveries, assertSchemaReady, claimFulfillment,
   claimZoomCreate, finishZoomCreate, confirmPaidOrder,
 } = require('../../lib/p0-store');
 
@@ -75,6 +75,14 @@ test('cancellation is one transactional status transition', async () => {
   const sql = db.calls.find(([sql]) => sql.includes('UPDATE business_orders'))[0];
   expect(sql).toContain("THEN status ELSE $2 END");
   expect(sql).not.toMatch(/'processing'|'completed'|'delivery_pending'/);
+});
+
+test('manual-review release removes only pending context and preserves paid order', async () => {
+  const db = fakeDb([{ rows: [] }, { rows: [{ order_id: 'paid' }] }, { rows: [] }, { rows: [] }]);
+  await expect(releaseManualReviewPending('u1', 'paid', db)).resolves.toBe(true);
+  expect(db.calls.some(([sql]) => sql.includes("status='manual_review' FOR UPDATE"))).toBe(true);
+  expect(db.calls.some(([sql]) => sql.includes("UPDATE kv_store SET value=value-$1"))).toBe(true);
+  expect(db.calls.some(([sql]) => /UPDATE business_orders SET/.test(sql))).toBe(false);
 });
 
 test('legacy cleanup requires identity, completed status, and only sent deliveries', async () => {
