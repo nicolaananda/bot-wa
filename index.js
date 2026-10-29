@@ -4601,16 +4601,16 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           `accountId=AAA-bbb-CCC\n` +
           `clientId=xxxxxxxxxxxx\n` +
           `clientSecret=yyyyyyyyyyyy\n` +
+          `hostKey=123456\n` +
           `label=Akun Utama\n` +
           `userId=me\n` +
           `timezone=Asia/Jakarta\n` +
           `concurrentMeetings=1\n` +
           `exp=12/07/2026\n` +
-          `exp=12/07/2026\n` +
           `notes=catatan opsional\n` +
           '```\n\n' +
           `*Wajib:* accountId, clientId, clientSecret\n` +
-          `*Opsional:* label (auto), userId (default: me), timezone, concurrentMeetings ` +
+          `*Opsional:* hostKey (6 digit fallback), label (auto), userId (default: me), timezone, concurrentMeetings ` +
           `(default tier ${tier} = ${zoomPool.TIER_DEFAULT_CONCURRENT[tier] || 1}), exp (format DD/MM/YYYY), notes\n\n` +
           `Host key wajib tersedia dari Zoom API (scope user:read:user:admin).\n` +
           `Setelah submit, bot otomatis cek lisensi via Zoom API.\n` +
@@ -4682,6 +4682,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           label: pick('label') || `Host ${String(accountIdVal).slice(0, 6)}`,
           userId: pick('userId', 'userid', 'user_id') || 'me',
           timezone: pick('timezone') || null,
+          hostKey: pick('hostKey', 'hostkey', 'host_key') || null,
           exp: pick('exp', 'expired', 'expiry', 'expireDate', 'expire_date') || null,
           notes: pick('notes', 'note') || '',
         }
@@ -4694,6 +4695,9 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         if (concurrentRaw) {
           const n = Number(concurrentRaw)
           if (Number.isFinite(n) && n >= 1) entry.concurrentMeetings = Math.floor(n)
+        }
+        if (entry.hostKey && !/^\d{6}$/.test(entry.hostKey)) {
+          return reply('❌ hostKey harus tepat 6 digit.')
         }
 
         const addRes = zoomPool.addHostToPool(tier, entry)
