@@ -4451,8 +4451,10 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           return reply(`❌ Host pool tier ${tier} kosong. Isi \`config/zoom-pool-${tier}.json\`.`)
 
         try {
-          await reply(`⏳ Mengambil jadwal dari ${pool.length} host (tier ${tier}p)...`)
-          const { meetings, errors, source } = await zoomPool.listBookings(tier)
+          await reply(`⏳ Memeriksa host aktif dan mengambil jadwal tier ${tier}p...`)
+          const { meetings, errors, source, activeHostCount, configuredHostCount } = await zoomPool.listBookings(tier)
+          const listedHosts = activeHostCount == null ? pool.length : activeHostCount
+          const registeredHosts = configuredHostCount == null ? pool.length : configuredHostCount
           const tz = process.env.ZOOM_DEFAULT_TIMEZONE || 'Asia/Jakarta'
 
           const sorted = meetings
@@ -4484,7 +4486,7 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
           }))
           db.data.zoomPoolList[sender] = { items, tier, createdAt: Date.now() }
 
-          const header = `📋 *DAFTAR ZOOM POOL ${tier}p* (${items.length} meeting di ${pool.length} host)\n`
+          const header = `📋 *DAFTAR ZOOM POOL ${tier}p* (${items.length} meeting di ${listedHosts} host aktif dari ${registeredHosts} terdaftar)\n`
           const lines = items.map((mt, i) => {
             const idFmt = mt.id.replace(/(\d{3})(\d{4})(\d+)/, '$1 $2 $3')
             const t = moment(mt.start_time).tz(tz).format('DD MMM YYYY HH:mm')
@@ -4558,13 +4560,13 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
         const results = []
         for (const mt of targets) {
           try {
-            await zoomPool.deleteMeetingOn({
+            const deleted = await zoomPool.deleteMeetingOn({
               tier: mt.tier || stateTier,
               hostAccountId: mt.hostAccountId,
               hostLabel: mt.hostLabel,
               meetingId: mt.id,
             })
-            results.push(`✅ [${mt.hostLabel}] ${mt.topic} (${mt.id})`)
+            results.push(`✅ [${mt.hostLabel}] ${mt.topic} (${mt.id})${deleted && deleted.alreadyMissing ? ' — sudah tidak ada di Zoom' : ''}`)
           } catch (delErr) {
             const msg = delErr && delErr.message ? delErr.message : String(delErr)
             results.push(`❌ [${mt.hostLabel}] ${mt.topic} (${mt.id}) — ${msg}`)
