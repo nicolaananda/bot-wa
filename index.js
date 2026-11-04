@@ -362,10 +362,12 @@ function cancelAutoDelete(messageKey) {
   const timeout = activeTimeouts.get(key)
   if (timeout) {
     clearTimeout(timeout.timeoutId)
-    activeTimeouts.delete(key)
+    removeAutoDeleteEntry(key)
     return true
   }
-  return false
+  const queued = ensureAutoDeleteQueue()?.some((entry) => entry.id === key)
+  if (queued) removeAutoDeleteEntry(key)
+  return Boolean(queued)
 }
 
 /**
@@ -677,7 +679,10 @@ let globalRonzz = null
 let deliveryOutboxTimer = null
 
 function startDeliveryOutboxWorker(client) {
-  if (client) globalRonzz = client
+  if (client) {
+    globalRonzz = client
+    initializeAutoDeleteManager(client)
+  }
   if (!p0Store || deliveryOutboxTimer) return
   const tick = async () => {
     const client = globalRonzz || global.gowaAdapter
@@ -971,6 +976,26 @@ if (!global.midtransWebhookListenerSetup) {
         (correlation.matchedBy !== 'correlation' || !(await p0Store.confirmPaidOrder({
           providerOrderId: webhookOrderId, orderId, userId: sender, amount: webhookAmount,
         }, pg)))) throw new Error('Paid order correlation requires manual review')
+      if (p0Store && await p0Store.suppressFulfillmentForManualSale({
+        orderId, userId: sender, productId, quantity: Number(jumlah),
+        createdAt: Number(order.createdAt || order.startedAt),
+      }, pg)) {
+        order.processed = true
+        order.status = 'manual_fulfilled'
+        db.data.order[sender] = order
+        await db.saveOrders()
+        if (globalRonzz && messageKey) {
+          try {
+            const keyId = messageKey.id || messageKey
+            await globalRonzz.deleteMessage(from, keyId)
+            cancelAutoDelete(keyId)
+          } catch (error) {
+            console.error('[MID-GLOBAL] Failed deleting manually fulfilled QR:', error.message)
+          }
+        }
+        console.log(`[MID-GLOBAL] Manual sale already fulfilled order: ${orderId}`)
+        return
+      }
       if (p0Store && !(await p0Store.claimFulfillment(orderId, pg))) {
         console.log(`[MID-GLOBAL] Fulfillment already claimed: ${orderId}`)
         return
@@ -1164,6 +1189,7 @@ if (!global.midtransWebhookListenerSetup) {
             try {
               const keyId = messageKey.id || messageKey
               await globalRonzz.deleteMessage(from, keyId)
+              cancelAutoDelete(keyId)
             } catch (e) {
               console.error(`⚠️ [MID-GLOBAL-ZOOM] Error deleting QR bubble:`, e.message)
             }
@@ -1464,6 +1490,7 @@ if (!global.midtransWebhookListenerSetup) {
         try {
           const keyId = messageKey.id || messageKey
           await globalRonzz.deleteMessage(from, keyId)
+          cancelAutoDelete(keyId)
           console.log(`✅ [MID-GLOBAL] QRIS bubble deleted: ${keyId}`)
         } catch (e) {
           console.error(`⚠️ [MID-GLOBAL] Error deleting message:`, e.message)
@@ -2444,6 +2471,7 @@ module.exports = async (nicola, m, mek) => {
                   if (db.data.order[sender]?.orderId === orderId) {
                     db.data.order[sender].key = message.key
                   }
+                  scheduleAutoDelete(message.key, from, Math.max(0, expirationTime - Date.now()), 'expired Zoom QRIS')
                   requestPendingOrderSave()
 
                   // Clear flow state — order tracking kini di db.data.order[sender]
@@ -2471,12 +2499,7 @@ module.exports = async (nicola, m, mek) => {
                         )
                           break
                         if (!isCurrentPayment()) break
-                        try {
-                          await nicola.sendMessage(from, { delete: message.key })
-                        } catch (_) {
-                          /* ignore */
-                        }
-                        if (!isCurrentPayment()) break
+                        // Persistent auto-delete owns the QR bubble across restarts.
                         try {
                           await nicola.sendMessage(from, {
                             text: '⏰ QRIS expired. Pembayaran dibatalkan karena melewati batas waktu 30 menit.',
@@ -6415,6 +6438,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 createdAt: createdAtTs,
                 staticPaymentMarker: staticPayment.marker,
               }
+              scheduleAutoDelete(message.key, from, Math.max(0, expirationTime - Date.now()), 'expired QRIS')
               requestPendingOrderSave()
 
               console.log(
@@ -6504,9 +6528,8 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                   )
                     return
                   if (!isCurrentPayment()) break
-                  // Remove listener saat timeout
+                  // Remove listener saat timeout. Persistent auto-delete owns the QR bubble.
                   process.removeListener('payment-completed', paymentListener)
-                  await nicola.sendMessage(from, { delete: message.key })
                   if (!isCurrentPayment()) break
                   reply('Pembayaran dibatalkan karena melewati batas waktu 30 menit.')
                   if (isCurrentPayment()) delete db.data.order[sender]

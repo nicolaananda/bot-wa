@@ -16,7 +16,7 @@ function toPositiveInt(value, fallback) {
 
 const UPSERT_CHUNK = toPositiveInt(process.env.PG_UPSERT_CHUNK || 100, 100)
 const ORDER_TTL_MS = 24 * 60 * 60 * 1000
-const KV_SYNC_KEYS = ['order', 'orderDeposit', 'zoomFlow', 'zoomBookings', 'promo']
+const KV_SYNC_KEYS = ['order', 'orderDeposit', 'zoomFlow', 'zoomBookings', 'promo', 'autoDeleteQueue']
 const KV_DEFAULTS = {
   order: {},
   orderDeposit: {},
@@ -33,6 +33,7 @@ const KV_DEFAULTS = {
     lastSentDate: '',
     lastSentAt: 0,
   },
+  autoDeleteQueue: [],
 }
 
 function removeExpiredOrders(orders, now = Date.now()) {
