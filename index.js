@@ -269,10 +269,23 @@ async function performAutoDelete(entry) {
   try {
     await nicola.sendMessage(entry.remoteJid, { delete: deleteKey })
     console.log(`🗑️ Auto-deleted ${entry.description} after delay`)
+    removeAutoDeleteEntry(entry.id)
   } catch (error) {
     console.error(`[Timeout] Failed to auto-delete ${entry.description}:`, error.message)
-  } finally {
-    removeAutoDeleteEntry(entry.id)
+    const queue = ensureAutoDeleteQueue()
+    const queued = queue?.find((item) => item.id === entry.id)
+    if (!queued) return
+    queued.attempts = Number(queued.attempts || 0) + 1
+    activeTimeouts.delete(entry.id)
+    if (queued.attempts < 5) {
+      queued.deleteAt = Date.now() + Math.min(queued.attempts * 60_000, 5 * 60_000)
+      persistAutoDeleteQueue()
+      scheduleAutoDeleteEntry(queued)
+    } else {
+      queued.status = 'failed'
+      queued.lastError = String(error.message || error).slice(0, 300)
+      persistAutoDeleteQueue()
+    }
   }
 }
 
@@ -344,6 +357,7 @@ function initializeAutoDeleteManager(nicola) {
   if (!queue) return
 
   for (const entry of queue.slice()) {
+    if (entry.status === 'failed') continue
     if (entry.deleteAt <= Date.now()) {
       performAutoDelete(entry)
     } else {

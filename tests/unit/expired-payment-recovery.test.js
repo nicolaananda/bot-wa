@@ -45,3 +45,10 @@ test('QR expiry deletion survives restart through the PostgreSQL KV queue', () =
   expect(index).toMatch(/scheduleAutoDelete\(message\.key, from, Math\.max\(0, expirationTime - Date\.now\(\)\), 'expired Zoom QRIS'\)/)
   expect(index).toMatch(/function startDeliveryOutboxWorker\(client\)[\s\S]*initializeAutoDeleteManager\(client\)/)
 })
+
+test('failed QR deletion is retried and retained after the retry ceiling', () => {
+  const index = fs.readFileSync(require.resolve('../../index'), 'utf8')
+  expect(index).toMatch(/queued\.attempts < 5/)
+  expect(index).toMatch(/queued\.status = 'failed'/)
+  expect(index).not.toMatch(/finally \{\s*removeAutoDeleteEntry\(entry\.id\)/)
+})
