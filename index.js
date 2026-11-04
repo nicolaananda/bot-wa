@@ -972,10 +972,6 @@ if (!global.midtransWebhookListenerSetup) {
       const order = matchedOrder
       const sender = matchedSender
       const { id: productId, jumlah, from, key: messageKey, orderId, reffId, totalAmount } = order
-      if (p0Store && correlation.matchedBy !== 'static_settlement' &&
-        (correlation.matchedBy !== 'correlation' || !(await p0Store.confirmPaidOrder({
-          providerOrderId: webhookOrderId, orderId, userId: sender, amount: webhookAmount,
-        }, pg)))) throw new Error('Paid order correlation requires manual review')
       if (p0Store && await p0Store.suppressFulfillmentForManualSale({
         orderId, userId: sender, productId, quantity: Number(jumlah),
         createdAt: Number(order.createdAt || order.startedAt),
@@ -996,6 +992,10 @@ if (!global.midtransWebhookListenerSetup) {
         console.log(`[MID-GLOBAL] Manual sale already fulfilled order: ${orderId}`)
         return
       }
+      if (p0Store && correlation.matchedBy !== 'static_settlement' &&
+        (correlation.matchedBy !== 'correlation' || !(await p0Store.confirmPaidOrder({
+          providerOrderId: webhookOrderId, orderId, userId: sender, amount: webhookAmount,
+        }, pg)))) throw new Error('Paid order correlation requires manual review')
       if (p0Store && !(await p0Store.claimFulfillment(orderId, pg))) {
         console.log(`[MID-GLOBAL] Fulfillment already claimed: ${orderId}`)
         return

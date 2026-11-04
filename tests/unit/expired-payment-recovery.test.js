@@ -31,6 +31,11 @@ test('ordinary late payment remains eligible for automatic fulfillment', async (
   }, db)).resolves.toBe(false)
 })
 
+test('manual-sale guard runs before strict late-payment correlation', () => {
+  const index = fs.readFileSync(require.resolve('../../index'), 'utf8')
+  expect(index.indexOf('suppressFulfillmentForManualSale')).toBeLessThan(index.indexOf('Paid order correlation requires manual review'))
+})
+
 test('QR expiry deletion survives restart through the PostgreSQL KV queue', () => {
   const database = fs.readFileSync(require.resolve('../../function/database'), 'utf8')
   const index = fs.readFileSync(require.resolve('../../index'), 'utf8')
