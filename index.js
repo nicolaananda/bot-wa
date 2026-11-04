@@ -2705,6 +2705,7 @@ module.exports = async (nicola, m, mek) => {
                     userRole: db.data.users[sender]?.role || 'bronze',
                     reffId: `ZOOM-${meeting.id}`,
                     metodeBayar: 'Saldo',
+                    status: 'completed',
                     totalBayar: priceInfo.price,
                     akun: {
                       tier,
@@ -7125,6 +7126,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
                 userRole: db.data.users[sender].role,
                 reffId: reffId,
                 metodeBayar: 'Saldo',
+                status: 'completed',
                 totalBayar: totalHarga,
                 isOwnerBuy: isOwnerBuy,
                 targetNumber: isOwnerBuy

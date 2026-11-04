@@ -16,3 +16,10 @@ test('persists completed buynow transactions directly to PostgreSQL', () => {
   expect(buynowPersistence).not.toBeNull()
   expect(buynowPersistence[0]).not.toMatch(/persist:\s*false/)
 })
+
+test('persists successful wallet purchases as completed', () => {
+  const source = fs.readFileSync(require.resolve('../../index'), 'utf8')
+  const walletTransactions = [...source.matchAll(/await db\.appendTransaction\(\{[\s\S]*?metodeBayar: 'Saldo'[\s\S]*?\}\)/g)]
+  expect(walletTransactions.length).toBeGreaterThanOrEqual(2)
+  walletTransactions.forEach(([transaction]) => expect(transaction).toMatch(/status: 'completed'/))
+})
