@@ -2404,6 +2404,7 @@ module.exports = async (nicola, m, mek) => {
                   if (!p0Store) throw new Error('Static QRIS requires PostgreSQL durability')
                   const staticPayment = await p0Store.allocateStaticPayment({
                     orderId, userId: sender, baseAmount: Number(priceInfo.price), validMinutes: 30,
+                    minCode: 77, maxCode: 150, randomize: true,
                   }, pg)
                   allocatedOrderId = orderId
                   const totalAmount = Number(staticPayment.amount)

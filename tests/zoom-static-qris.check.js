@@ -26,6 +26,10 @@ async function run(options = {}) {
     p0Store: options.noStore ? null : {
       allocateStaticPayment: async (input) => {
         calls.push('allocate'); assert.equal(input.baseAmount, 6000)
+        assert.deepEqual(
+          { minCode: input.minCode, maxCode: input.maxCode, randomize: input.randomize },
+          { minCode: 77, maxCode: 150, randomize: true }
+        )
         if (options.allocateFails) throw Error('allocation failed')
         return { amount: 6042, marker: 'fixture-marker', expires_at: new Date(Date.now() + 1800000).toISOString() }
       },
@@ -48,6 +52,7 @@ async function run(options = {}) {
       return { key: 'message-key' }
     } },
     requestPendingOrderSave: () => calls.push('request-save'),
+    scheduleAutoDelete: () => calls.push('schedule-delete'),
     sleep: () => new Promise(resolve => polls.push(resolve)),
     console: { log() {}, error() {} },
   }
