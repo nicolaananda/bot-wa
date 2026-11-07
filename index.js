@@ -1755,8 +1755,15 @@ module.exports = async (nicola, m, mek) => {
     const pushname = m.pushName
     const budy = typeof m.text == 'string' ? m.text : ''
     const args = chats.split(/ +/).slice(1)
-    const q = args.join(' ')
-    const command = (chats.replace(prefix, '').trim().match(/^\S+/) || [''])[0].toLowerCase()
+    let q = args.join(' ')
+    let command = (chats.replace(prefix, '').trim().match(/^\S+/) || [''])[0].toLowerCase()
+    if (command === 'buynow' && args[0]?.toLowerCase() === 'zoom100') {
+      command = 'zoom100qris'
+      q = args.slice(1).join(' ')
+    } else if (command === 'buy' && args[0]?.toLowerCase() === 'zoom100') {
+      command = 'zoom100'
+      q = args.slice(1).join(' ')
+    }
     const botNumber = nicola.user.id.split(':')[0] + '@s.whatsapp.net'
     let groupMetadata = ''
     try {
