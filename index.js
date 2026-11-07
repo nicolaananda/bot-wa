@@ -5148,6 +5148,7 @@ Jika pesan ini sampai, sistem berfungsi normal.`
         }
         break
 
+      case 'spotify':
       case 'stok':
       case 'stock':
         {
@@ -5157,12 +5158,28 @@ Jika pesan ini sampai, sistem berfungsi normal.`
               return reply('❌ Database tidak tersedia atau rusak')
             }
 
-            const products = db.data.produk
+            const allProducts = db.data.produk
+            const products =
+              command === 'spotify'
+                ? Object.fromEntries(
+                    Object.entries(allProducts).filter(
+                      ([id, product]) =>
+                        id.toLowerCase().includes('spo') ||
+                        String(product?.name || '')
+                          .toLowerCase()
+                          .includes('spotify')
+                    )
+                  )
+                : allProducts
             if (Object.keys(products).length === 0) {
-              return reply('📦 Belum ada produk di database')
+              return reply(
+                command === 'spotify'
+                  ? '📦 Produk Spotify belum tersedia'
+                  : '📦 Belum ada produk di database'
+              )
             }
 
-            let teks = `*╭────〔 PRODUCT LIST📦 〕─*\n`
+            let teks = `*╭────〔 ${command === 'spotify' ? 'SPOTIFY' : 'PRODUCT'} LIST📦 〕─*\n`
             teks += `*┊・* Cara membeli:\n`
             teks += `*┊・* 1. Buynow (QRIS Otomatis): ${prefix}buynow kodeproduk jumlah\n`
             teks += `*┊・*    Contoh: ${prefix}buynow netflix 2\n`
