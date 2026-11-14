@@ -3943,6 +3943,47 @@ _Silahkan transfer dengan nomor yang sudah tertera, jika sudah harap kirim bukti
     }
 
     switch (command) {
+      case 'menu':
+      case 'help': {
+        if (isGroup) return reply('Menu pelanggan hanya tersedia melalui chat pribadi.')
+        const textMenu =
+          `*MENU ${botName}*\n\n` +
+          `• stok — daftar produk\n` +
+          `• deposit — isi saldo\n` +
+          `• riwayat — transaksi terakhir\n` +
+          `• zoom100 — pesan Zoom\n\n` +
+          `Ketik nama command untuk melanjutkan.`
+        try {
+          return await nicola.sendMessage(from, {
+            interactive: {
+              body: `Halo ${pushname}, pilih layanan yang dibutuhkan:`,
+              footer: `${botName} © ${ownerName}`,
+              buttons: [
+                {
+                  name: 'single_select',
+                  params: {
+                    title: 'Buka menu',
+                    sections: [
+                      {
+                        title: 'Layanan pelanggan',
+                        rows: [
+                          { id: 'stok', title: 'Daftar Produk', description: 'Lihat harga dan stok' },
+                          { id: 'deposit', title: 'Deposit Saldo', description: 'Isi saldo akun' },
+                          { id: 'riwayat', title: 'Riwayat Transaksi', description: 'Lihat transaksi terakhir' },
+                          { id: 'zoom100', title: 'Zoom Meeting', description: 'Pesan meeting Zoom' },
+                        ],
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          })
+        } catch (error) {
+          console.warn('[MENU] Interactive send failed, using text fallback:', error.message)
+          return reply(textMenu)
+        }
+      }
       case 'health':
       case 'statusbot': {
         if (!canUseAdminCommand({ isOwner, isGroup, isGroupAdmin: isGroupAdmins }))
